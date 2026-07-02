@@ -1,0 +1,1541 @@
+07-02 03:30:41.192 19766 19798 I TestRunner: started: nativeGraphCanvasShowsSeededNodesSelectionAndGlobalMode(com.reversetutor.preview.Phase5GraphDeviceTest)
+07-02 03:30:41.256 19766 19798 W FileTestStorage: Output properties is not supported.
+07-02 03:30:41.256 19766 19798 I Tracing : Tracer added: class androidx.test.platform.tracing.AndroidXTracer
+07-02 03:30:41.264 19766 19766 D EventInjectionStrategy: Creating injection strategy with input manager.
+07-02 03:30:41.265 19766 19766 W setutor.previe: Accessing hidden method Landroid/hardware/input/InputManager;->getInstance()Landroid/hardware/input/InputManager; (greylist, reflection, allowed)
+07-02 03:30:41.265 19766 19766 W setutor.previe: Accessing hidden method Landroid/hardware/input/InputManager;->injectInputEvent(Landroid/view/InputEvent;I)Z (greylist, reflection, allowed)
+07-02 03:30:41.265 19766 19766 W setutor.previe: Accessing hidden field Landroid/hardware/input/InputManager;->INJECT_INPUT_EVENT_MODE_WAIT_FOR_FINISH:I (greylist, reflection, allowed)
+07-02 03:30:41.278 19766 19766 W setutor.previe: Accessing hidden method Landroid/os/MessageQueue;->next()Landroid/os/Message; (greylist, reflection, allowed)
+07-02 03:30:41.278 19766 19766 W setutor.previe: Accessing hidden field Landroid/os/MessageQueue;->mMessages:Landroid/os/Message; (greylist, reflection, allowed)
+07-02 03:30:41.278 19766 19766 W setutor.previe: Accessing hidden method Landroid/os/Message;->recycleUnchecked()V (greylist, reflection, allowed)
+07-02 03:30:41.279 19766 19798 D IdlingRegistry: Registering idling resources: [androidx.compose.ui.test.junit4.EspressoLink@da0218f]
+07-02 03:30:41.292 28638 16637 D MtpServer: doGetObjectHandles from parent:4560  return 1 handles
+07-02 03:30:41.306 28638 16637 D MtpServer: doGetObjectHandles from parent:4583  return 1 handles
+07-02 03:30:41.308 19766 19798 W Settings: Setting always_finish_activities has moved from android.provider.Settings.System to android.provider.Settings.Global, returning read-only value.
+07-02 03:30:41.310  2672  2800 W ScenarioService: number format exception! str:
+07-02 03:30:41.319  1650  1864 I HWRME LIBHWRME_CLIENT: ResMngMmEvent interface arg 0, 11065
+07-02 03:30:41.320  1650  1864 I [SECURITY]: [HPS][DEFAULT][PopupBackgroundWindowPermission]: newly added package: com.reversetutor.preview to shouldMonitorPackages
+07-02 03:30:41.320 28638 16637 D MtpServer: doGetObjectHandles from parent:4584  return 4 handles
+07-02 03:30:41.329  1650  1864 D SEAPP_C_SecurityProfileManager: getRules: response=Response{code=200, message='OK', result=Bundle[{rules=[Bundle[{properties=Bundle[{appGalleryStrategy=0}], name=com.reversetutor.preview}]]}]}
+07-02 03:30:41.330  2672  2800 I ZAppActionService: mOptCardInfos:[]pkgList:[com.huawei.localBackup, com.huawei.appmarket, com.huawei.hwid]
+07-02 03:30:41.330  2672  2800 I ScenarioService: app start speedup : com.reversetutor.preview
+07-02 03:30:41.331  1650  1864 I [SECURITY]: [HPS][DEFAULT][PopupRuleParser]: parseFromRule: rule = Rule{name='com.reversetutor.preview', properties={appGalleryStrategy=0}}
+07-02 03:30:41.332 28638 16637 D MtpServer: doGetObjectHandles from parent:4586  return 1 handles
+07-02 03:30:41.333  1650 16387 I [SECURITY]: [HPS][DEFAULT][PopupActivityEventMonitor]: processActivityEvent: uid=11065, packageName=com.reversetutor.preview, activityOriginalStartResult=2047, hwInterceptionMask=0, validMaskLength=12
+07-02 03:30:41.333  2672  2871 I KStateManager: send binder call message, called pid:16931, calling pid:[1650]
+07-02 03:30:41.333  2971 19410 I HwEasyGoService: totalNum24
+07-02 03:30:41.334  1650 19635 I HwAppOpsServiceMgr: begin set hw operation mode, code:100000 uid:11065 package:com.reversetutor.preview mode:2 calling uid:1000 pid process:system_server
+07-02 03:30:41.334  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:41.350  1650  2161 I HwBackgroundDexOptServiceEx: configPidProcess pid: -1
+07-02 03:30:41.398  2971 19659 I HwEasyGoService: totalNum6
+07-02 03:30:41.482   867   867 I aptouch_daemon: print_log, touch:1, down:1 (+0)
+07-02 03:30:41.482  1650  2060 D fingersense_manager: Calling fingersense_classify_touch()
+07-02 03:30:41.483  1650  2060 D fingersense_manager: fingersense_classify_touch() finished
+07-02 03:30:41.484  1650  2059 I InputDispatcher: stylus touch down, set lcd event 1
+07-02 03:30:41.484  1650  2059 I InputDispatcher: stylus touch down, set lcd event 1
+07-02 03:30:41.484   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5378
+07-02 03:30:41.484   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5378, ret=2
+07-02 03:30:41.697  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:41.709  2971 24649 E DollieActivityManagerAdapter: HwActivityNotifierEx null uid
+07-02 03:30:41.709  2971  6730 D Hicom_Monitor: ActivityNotifier not support:com.reversetutor.preview
+07-02 03:30:41.709  5129 19726 W ContentSensor_13.10.10.204_FrameworkRegistry: Unknown state is : showStartingWindow
+07-02 03:30:41.713  1650  1902 I NavigationBarPolicy: pointY:344.6667realSize.y:1496HIT_REGION_TO_MAX:21
+07-02 03:30:41.716  5914  8906 I CAWARENESS_34447_AlarmTimer: onReceive ,alarm time is 1782934241649,2026-07-02 03:30:41.649
+07-02 03:30:41.716  5914  8906 I CAWARENESS_34447_AlarmTimer: onReceive finish
+07-02 03:30:41.718  1650  1905 E system_server: Invalid ID 0x00000000.
+07-02 03:30:41.723  5914 19803 I CAWARENESS_34447_AbilityScheduler: query {dataId=100000036, mode=0} from time_ability
+07-02 03:30:41.723  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:41.723  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-54,rsrq(noise):-92,rtt(chload):496,buffhigh(uldelay):0,buffcomm(rtt):4
+07-02 03:30:41.723  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:41.723  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-54,rsrq(noise):-92,rtt(chload):496,buffhigh(uldelay):0,buffcomm(rtt):9
+07-02 03:30:41.723  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+07-02 03:30:41.724  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+07-02 03:30:41.725 19766 19766 W ActivityThread: handleWindowVisibility: no activity for token android.os.BinderProxy@631ce08
+07-02 03:30:41.725  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10105,4,0,312,1,2,4,0,312,65000,39000,10,10,0,35,82,0 CID 2 mMasterWifiRssi -54 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+07-02 03:30:41.726  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+07-02 03:30:41.726  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+07-02 03:30:41.726  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+07-02 03:30:41.726  2672  2824 I AppFastHibernation: rev exception for visible pkg: com.reversetutor.preview
+07-02 03:30:41.727  1650  3451 D ZrHung.AppEyeFocusWindow: FocusWindowErrorScene CheckFreezeScreen
+07-02 03:30:41.728  2276  2958 I CapsuleManager: onAppSwitch package=com.reversetutor.preview, current=tech.zeroxcore.app
+07-02 03:30:41.728  2971  4587 D Hicom_Monitor: AppSwitchNotifier not support app from:tech.zeroxcore.app, to:com.reversetutor.preview
+07-02 03:30:41.728  2971 24649 I AssistantService-11.2.1.200: registerHwActivityNotifier call fromPackage:tech.zeroxcore.app, toPackage:com.reversetutor.preview
+07-02 03:30:41.729  2971  3453 D AssistantService-11.2.1.200: handleMessage app switch fromPackage:tech.zeroxcore.app, toPackage:com.reversetutor.preview
+07-02 03:30:41.730  2276  2276 I NotificationViewHierarchyManager: updateNotificationViews activeNotificationSize=9
+07-02 03:30:41.730  3398 13983 I HiAdKit.DC.PersistentMessageCenter:  notifyMessage com.huawei.hwid_app_switch_from_to_intent
+07-02 03:30:41.730  1650  1905 I DecorView[preview]: pkgName:com.reversetutor.preview old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:41.730  2672  2800 I ScenarioService: refresh visibleApp:[com.reversetutor.preview]
+07-02 03:30:41.730  2672  2800 I ScenarioService: add focus on app:tech.zeroxcore.app to visiblePkgs
+07-02 03:30:41.731  2672  2800 I PGServer: report state:14 event type:1 pid:-1 uid:-1 pkg:tech.zeroxcore.app#com.reversetutor.preview to pid: 2672
+07-02 03:30:41.731  2672  2800 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:41.732  1650  1905 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:41.732  1650  1905 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:41.732  1650  1905 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview
+07-02 03:30:41.733  2971 24649 D Hicom_Monitor: ActivityNotifier not support:tech.zeroxcore.app
+07-02 03:30:41.733  2971  3146 D DollieActivityManagerAdapter: [Paused] pid:19069 uid:10105 ComponentInfo{tech.zeroxcore.app/tech.zeroxcore.app.MainActivity} uidState:2
+07-02 03:30:41.733  3398 13979 I HiAdKit.DC.CommonSystemUtil:  isDeviceProvisioned: true
+07-02 03:30:41.733  3398 13979 I HiAdKit.DC.ACREntry:  oobe: false
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: updateSectionBoundaries reason test
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: logShadeChild at 9
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: logShadeChild at 8
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: logShadeChild at 7
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: logShadeChild at 6
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: Silent
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: logShadeChild at 5
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: SilentHeader
+07-02 03:30:41.733  1650  2195 I WiFi_PRO_WifiProStateMachine: current app com.reversetutor.preview, has changed
+07-02 03:30:41.733  2276  2276 I NotifSectionsManager: logShadeChild at 4
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 3
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  1650  2195 I WiFi_PRO_WifiProStateMachine: not in RecommendWifi2CellState.
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 2
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 1
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 0
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: AlertingHeader
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: New header target positions:
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: MediaControls:-1
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: IncomingHeader:-1
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: AlertingHeader:0
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: SilentHeader:5
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Final order:
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 0
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: AlertingHeader
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 1
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 2
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 3
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 4
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 5
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: SilentHeader
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 6
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Silent
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 7
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 8
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: logShadeChild at 9
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:41.734  2276  2276 I NotifSectionsManager: Section boundary update complete
+07-02 03:30:41.735  2276  2276 I HwScreenRecorderTimer: updateCapsuleState isTransientShown=false isStatusBarWindowShown=true hasScreenRecorderTimer=false isPanelExpand=false
+07-02 03:30:41.735  2276  2276 D HwCapsuleCacheList: produceData []
+07-02 03:30:41.735  2276  2276 I HwCapsuleDataConsumer: onDataProduce isAnimatorRunning=false
+07-02 03:30:41.735  3398 13980 I HiAdKit.DC.AppDataCollectionProvider:  execute cmd: 5
+07-02 03:30:41.735  3398 13980 I HiAdKit.DC.AppDataCollectionManager:  report third
+07-02 03:30:41.736  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+07-02 03:30:41.737  2990 16785 I iconnect:BluetoothApi: adapter status 12
+07-02 03:30:41.737  2990 16785 I iconnect:NearbyDeviceDetect: isPropEnable=true, isBluetoothEnabled=true, isScreenOn=true, isNotSpecialAppOnTop=true, scanCondition=0
+07-02 03:30:41.737  3398 13980 W fwkit_kims: [fwkit KIMSServiceController.java:61] Can't find the specific package.
+07-02 03:30:41.737  1650  1905 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:41.737  5129 19726 W ContentSensor_13.10.10.204_ContentSensorService: mEventListener is null
+07-02 03:30:41.738  3398 13980 I HiAdKit.DC.AppDataCollectionManager:  aop is true
+07-02 03:30:41.738  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:h
+07-02 03:30:41.738  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.738  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:X
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:i
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:3
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:3
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:i
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:h
+07-02 03:30:41.739  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:41.740  2276  2276 I NotifSectionsManager: updateFirstAndLastViewsForAllSections, changed:false
+07-02 03:30:41.742  2276  2276 D StackScrollAlgorithm: liveRowList is empty
+07-02 03:30:41.742  3775 15112 I HiAdKit.PpsCoreService.Cmd:  isCmdAllowAccess rom: true permitRegion: 1
+07-02 03:30:41.742  3775 15112 I HiAdKit.PpsCoreService.Cmd:  call method: reportConsent
+07-02 03:30:41.742  3775 15112 I HiAdKit.PpsCoreService.Cmd:  callerPkg: com.huawei.hwid
+07-02 03:30:41.743  2276  2276 D HwCapsuleCacheList: consumeData []
+07-02 03:30:41.743  2276  2276 I HwStatusBarCapsuleHelper: onCapsuleDataUpdate isOverlay=true, mIsCapsuleLauncherAnimationStart=false
+07-02 03:30:41.743  2276  2276 I HwStatusBarCapsuleView: hide capsule
+07-02 03:30:41.743  2276  2276 I HwStatusBarCapsuleHelper: onCapsuleDataUpdate isOverlay=false, mIsCapsuleLauncherAnimationStart=false
+07-02 03:30:41.743  2276  2276 I HwStatusBarCapsuleView: hide capsule
+07-02 03:30:41.743  2276  2276 D HwCapsuleCacheList: consumeData null
+07-02 03:30:41.744  1650  1864 W         : Failed to UpdateQosForCgroupInner, tid=0, policy=10
+07-02 03:30:41.744  5914 19803 I CAWARENESS_34447_AlarmTimer: current state of screen is screen_on
+07-02 03:30:41.745  5914 19803 I CAWARENESS_34447_RtcTimeManager: the type of callback is 4 and triggeredTimeThreshold is 1782934241745, 2026-07-02 03:30:41.745
+07-02 03:30:41.745  1650  2051 E AwareLog: CpuKeyProcessSetVipFeature: getUidsByUid pkgName is null, uid=10105
+07-02 03:30:41.745  5914 19803 I CAWARENESS_34447_AbilityContext: [1782934256189] deliver {dataId=100000061, mode=0} to response_location_ability
+07-02 03:30:41.746  5914 19803 I CAWARENESS_34447_RtcTimeManager: freshTimer nextTime = 1782984155896, 2026-07-02 17:22:35.896, alarmType = 1
+07-02 03:30:41.746  5914 19807 I CAWARENESS_34447_LocationResponseAbility: doLocationUpdates
+07-02 03:30:41.748 19766 19766 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:41.748   675 24802 I OemNetd : setChrAppUid(10, 11065)
+07-02 03:30:41.742  3758  3758 W kworker/u17:0: type=1400 audit(0.0:60096): avc: granted { setsched } for pid=3758 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:41.750  1650  2051 W AwareLog: SchedLevelBoost: onFgActivitiesChanged config not set!
+07-02 03:30:41.750  5914 19807 I CAWARENESS_34447_AbilityScheduler: unsubscribe {dataId=100000061, mode=0} from response_location_ability
+07-02 03:30:41.750 28638 16637 D MtpServer: doGetObjectHandles from parent:4587  return 29 handles
+07-02 03:30:41.746  3758  3758 W kworker/u17:0: type=1400 audit(0.0:60097): avc: granted { setsched } for pid=3758 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:41.753 19766 19808 I OpenGLRenderer: RenderThread: progress name = [com.reversetutor.preview], viewCornerType = 0
+07-02 03:30:41.753  1650 19806 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=3, mIsHiTouchRestricted=false
+07-02 03:30:41.754  2433  2576 I hwPS_RestrictionAdapter: getMaliciousAppInfo: packageName:com.reversetutor.preview flags:1
+07-02 03:30:41.756  2672  2841 I PGServer: checkPkgType. calling pkg: com.huawei.iaware
+07-02 03:30:41.758  1650  2668 D SEAPP_C_SecurityProfileManager: getRules: response=Response{code=200, message='OK', result=Bundle[{rules=[Bundle[{properties=Bundle[{restrictions=SMS_BLANK|CALL_LOG_BLANK|CONTACTS_BLANK|CALENDAR_BLANK|LOCATION|STORAGE|SYSTEM_ALERT_WINDOW|POPUP_BACKGROUND_WINDOW|CAMERA|MICROPHONE|SENSORS|ACTIVITY_RECOGNITION|GET_INSTALLED_APPS|NOTIFICATION_DISABLED_BEHAVIOR, restrictionLevel=1, name=com.reversetutor.preview, isRestricted=false}], name=com.reversetutor.preview}]]}]}
+07-02 03:30:41.760 19766 19811 I iGraphics: [0020080c] pn: com.reversetutor.preview, p: 19766
+07-02 03:30:41.760 19766 19811 I iGraphics: [0030080c] no spt app: com.reversetutor.preview
+07-02 03:30:41.774 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: PRE_ON_CREATE
+07-02 03:30:41.775 19766 19766 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was PRE_ON_CREATE
+07-02 03:30:41.778  5914 19810 I CAWARENESS_34447_RtcTimeManager: freshTimer nextTime = 1782984155896, 2026-07-02 17:22:35.896, alarmType = 1
+07-02 03:30:41.778  5914 19810 W CAWARENESS_34447_AlarmTimer: the next triggered time is not changed,so no need to reset
+07-02 03:30:41.779 19069 19069 D DecorView: showOrHideHighlightView: hasFocus=false; winMode=1; isMrgNull=true
+07-02 03:30:41.779  5914 19807 I CAWARENESS_34447_AbilityScheduler: subscribe {dataId=100000061, mode=0} from response_location_ability
+07-02 03:30:41.779  3429  6046 D TaskStackListener: destory snapshot binder pid 0 myPid 3429 snapshot TaskSnapshot{ mTopActivityComponent=tech.zeroxcore.app/.MainActivity mSnapshot=android.graphics.GraphicBuffer@ffa7fee (504x1047) mColorSpace=sRGB IEC61966-2.1 (id=0, model=RGB) mOrientation=1 mContentInsets=[0,67][0,0] mReducedResolution=true mScale=0.7 mIsRealSnapshot=true mWindowingMode=1 mSystemUiVisibility=8192 mIsTranslucent=false
+07-02 03:30:41.782   761  7021 D AudioPolicyService: getUidState(11065) cacheIter->second.first, return cacheIter->second.second(5)
+07-02 03:30:41.783  2971  3265 I Hicom_Monitor: notifyAppStarted: uid = 11065
+07-02 03:30:41.783  5914 19812 I CAWARENESS_34447_RtcTimeManager: freshTimer nextTime = 1782935441779, 2026-07-02 03:50:41.779, alarmType = 1
+07-02 03:30:41.784  2971  3265 I UctpAppMonitor: handleAppStarted: pkgName is com.reversetutor.preview mIsNeedToOpen is false
+07-02 03:30:41.784  2276  2276 I StatusBarLayout: refreshTint: tint: b2000000, area:Rect(0, 0 - 0, 0)
+07-02 03:30:41.784  2971  3265 I AppStatisticProc: handleAppStarted: pkgName = com.reversetutor.preview is not apk supported in Smartcare
+07-02 03:30:41.784  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:41.784  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:41.785  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:41.785  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:41.785  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:41.788  1650  2668 W ActivityManager: Sending non-protected broadcast huawei.intent.action.APP_TYPE_UPDATE from system 2672:com.huawei.iaware/1000 pkg com.huawei.powergenie
+07-02 03:30:41.788  1650  2668 W ActivityManager: Sending non-protected broadcast huawei.intent.action.APP_TYPE_UPDATE from system 2672:com.huawei.iaware/1000 pkg com.huawei.powergenie
+07-02 03:30:41.789  2672  2800 I PF_API_JNI: ACCKIT_APS_NotifyInfo 3: tech.zeroxcore.app#com.reversetutor.preview
+07-02 03:30:41.789  2672  2800 I ScenarioService: app run front pkg: com.reversetutor.preview
+07-02 03:30:41.789  2672  2841 I PGServer: checkPkgType. calling pkg: com.huawei.iaware
+07-02 03:30:41.789  2672  2672 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:41.789   762   762 D ACCKIT_ : pack:"tech.zeroxcore.app"
+07-02 03:30:41.789   762   762 D ACCKIT_ : pack:"com.reversetutor.preview"
+07-02 03:30:41.790  2672  2824 I PG_ash  : com.reversetutor.preview become visible
+07-02 03:30:41.790  2672  2824 I PG_ash  : Visible app changed pkg : com.reversetutor.preview, visible: true
+07-02 03:30:41.790  2672  2824 I PG_ash  : request H pkgs: [com.huawei.android.totemweather, com.android.calendar] reason: widget_invisible
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch stylusCurrentPkgName = com.reversetutor.preview lastOneFramePkgName =
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch currentPackageName = com.reversetutor.preview
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch appType=-1 appState=1 gameMode=2
+07-02 03:30:41.790  1011  1011 D ITouchService: itouchReaderMonitor empty
+07-02 03:30:41.790  1011  1011 D ITouchService: g_itouch_reader_monitor Monitor::IsReaderMonitorEnable()=0
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch getCurrentParmID tempPkg=com.reversetutor.xxx
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch:app com.reversetutor.preview is  not game app
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch:app com.reversetutor.preview is  not in StylusPenList
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch:styluspen_switch is disable
+07-02 03:30:41.790  1011  1011 D ITouchService: itouch:currentAppTypeName =|UNKNOWN|
+07-02 03:30:41.792  2672  2800 D ScenarioService: front pkg : com.reversetutor.preview launcher: false
+07-02 03:30:41.792  2672  2824 I PG_ash  : front pkg : com.reversetutor.preview
+07-02 03:30:41.792  2672  2824 I PG_ash  : Visible app changed pkg : com.reversetutor.preview, visible: true
+07-02 03:30:41.792  2672  2800 D ScenarioService: new above launcher front pkgs: [tech.zeroxcore.app, com.reversetutor.preview]
+07-02 03:30:41.792  2672  2834 I PGServer: report state:10000 event type:2 pid:0 uid:0 pkg:tech.zeroxcore.app to pid: 1650
+07-02 03:30:41.792  2672  2834 I PGServer: report state:10000 event type:2 pid:0 uid:0 pkg:tech.zeroxcore.app to pid: 2672
+07-02 03:30:41.792  2672  2834 I SceneReceiver: state type: 10000 eventType:2 pid:0 uid:0 pkg:tech.zeroxcore.app
+07-02 03:30:41.792  2672  2834 I PGServer: report state:10000 event type:2 pid:0 uid:0 pkg:tech.zeroxcore.app to pid: 2971
+07-02 03:30:41.792  2672  2834 I PGServer: report state:10000 event type:1 pid:0 uid:0 pkg:com.reversetutor.preview to pid: 1650
+07-02 03:30:41.793  2672  2834 I PGServer: report state:10000 event type:1 pid:0 uid:0 pkg:com.reversetutor.preview to pid: 2672
+07-02 03:30:41.793  2672  2834 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:41.793  2672  2834 I SceneReceiver: state type: 10000 eventType:1 pid:0 uid:0 pkg:com.reversetutor.preview
+07-02 03:30:41.793  2672  2834 I PGServer: report state:10000 event type:1 pid:0 uid:0 pkg:com.reversetutor.preview to pid: 2971
+07-02 03:30:41.793   725   725 W hwcomposer: setGpuFreqBoost:154: boostGpuFreq succ !
+07-02 03:30:41.794  2672  2871 I PGServer: checkPkgType. calling pkg: android
+07-02 03:30:41.794  5914 19807 I CAWARENESS_34447_LocationResponseAbility: last cache location is fresh enough
+07-02 03:30:41.794  5914 19807 I CAWARENESS_34447_AbilityScheduler: unsubscribe {dataId=100000061, mode=0} from response_location_ability
+07-02 03:30:41.795  5914 19814 I CAWARENESS_34447_RtcTimeManager: freshTimer nextTime = 1782984155896, 2026-07-02 17:22:35.896, alarmType = 1
+07-02 03:30:41.796   761  7021 D AudioFlinger: setParameters(): io 0, keyvalue debug log is close, calling pid 2672 calling uid 1000
+07-02 03:30:41.797  2672  2800 I AppsUsage: scnOff: false FgAPP: com.reversetutor.preview BgAPP: tech.zeroxcore.app
+07-02 03:30:41.798  2672  2800 I ScenarioService: app focus change from: tech.zeroxcore.app to:com.reversetutor.preview
+07-02 03:30:41.799   735 29785 I AudioModuleManager: [AudioModuleSetParameters:51]: list size: 13
+07-02 03:30:41.802  5914 19807 I CAWARENESS_34447_AbilityScheduler: subscribe {dataId=100000061, mode=0} from response_location_ability
+07-02 03:30:41.802  5914 19807 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:time_ability is running, add to queue 2/1/3
+07-02 03:30:41.803  5914 19815 I CAWARENESS_34447_RtcTimeManager: freshTimer nextTime = 1782935381872, 2026-07-02 03:49:41.872, alarmType = 1
+07-02 03:30:41.807 19766 19766 I DecorView[]: pkgName:com.reversetutor.preview old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:41.807 19766 19766 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:41.807 19766 19766 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:41.811   761  7021 D AudioFlinger: setParameters(): io 0, keyvalue debug log is close, calling pid 2672 calling uid 1000
+07-02 03:30:41.811   735 29785 I AudioModuleManager: [AudioModuleSetParameters:51]: list size: 13
+07-02 03:30:41.812  2672  2841 I PGServer: getTopFrontApp. calling pkg: android
+07-02 03:30:41.819 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: CREATED
+07-02 03:30:41.819 19766 19766 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.reversetutor.preview.MainActivity@c08a99e
+07-02 03:30:41.821 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: STARTED
+07-02 03:30:41.821 19766 19766 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.reversetutor.preview.MainActivity@c08a99e
+07-02 03:30:41.826 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: RESUMED
+07-02 03:30:41.826 19766 19766 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.reversetutor.preview.MainActivity@c08a99e
+07-02 03:30:41.826 19766 19766 I HwPartMagicWindowFactory: add android.common.HwPartMagicWindowFactoryImpl to memory.
+07-02 03:30:41.830 13781 13858 I HwLauncher: LocalTaskList loadTasksInBackground:3 numTasks:3 currentUserId:0
+07-02 03:30:41.830 28638 28657 I d.process.medi: TaskController ExpandGCThreshold currentGCThreshold(KB) = 6422 targetGCThreshold = 71958 delta = 65536
+07-02 03:30:41.830 28638 28657 I d.process.medi: TaskController add CheckCriticalStatusTask
+07-02 03:30:41.831 19766 19766 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:41.832 19766 19766 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:41.832 19766 19766 I HwPartPowerOfficeFactory: add HwPartPowerOfficeFactoryImpl to memory.
+07-02 03:30:41.833  1650  2641 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview
+07-02 03:30:41.834  2971 19410 I HwEasyGoService: totalNum25
+07-02 03:30:41.834  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:41.837 19766 19766 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:41.839 19766 19766 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:41.839 19766 19808 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:41.839  5914  9753 I CAWARENESS_34447_AppUsageManager: onEvent, packageName=com.reversetutor.preview, activityName=com.reversetutor.preview.MainActivity, moduleName=, uid=11065, cancelCompleteMiniProgram= false
+07-02 03:30:41.834  3758  3758 W kworker/u17:0: type=1400 audit(0.0:60098): avc: granted { setsched } for pid=3758 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:41.839  2926 31157 I OPCollectLog: AppChangeImpl:call onAppChange.
+07-02 03:30:41.839  2926  7027 I OPCollectLog: HwForegroundAppAction:handleMessage
+07-02 03:30:41.839  2926  7027 D OPCollectLog: HwForegroundAppAction:FG executeWithArgs
+07-02 03:30:41.839  2926  7027 I OPCollectLog: OPCollectUtils:ODMF Api Version:2.16.3
+07-02 03:30:41.840  2926  7027 I OPCollectLog: Action:HwForegroundAppAction executed successfully
+07-02 03:30:41.840  2926  7027 D OPCollectLog: OdmfCollectScheduler:handleMessage msg: 4
+07-02 03:30:41.840  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache 1
+07-02 03:30:41.840  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache curTime: 123127898, interval: 2936
+07-02 03:30:41.840  5914  9753 I CAWARENESS_34447_AbilityContext: [1782934242182] deliver {dataId=100000006, mode=0} to 4 receivers
+07-02 03:30:41.840  2926  7027 I OPCollectLog: OdmfHelper:isCharging: true
+07-02 03:30:41.841  5914  9753 I CAWARENESS_34447_AbilityContext: [1782934242183] deliver {dataId=100000007, mode=0} to 8 receivers
+07-02 03:30:41.841  5914  9753 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:ability_appusage_filter is running, add to queue 4/1/5
+07-02 03:30:41.841  5914  9753 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:capture_ability is running, add to queue 4/2/6
+07-02 03:30:41.842  1037  1082 D AwareLog: iawared: fg_hl_ctl update fgUid=11065 g_isGame=0
+07-02 03:30:41.842  5914 19817 I CAWARENESS_34447_AbilityContext: [1782934242182] deliver {dataId=100000258, mode=0} to null
+07-02 03:30:41.843  2926  7027 I OPCollectLog: OdmfHelper:insert database success
+07-02 03:30:41.843  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache size: 1
+07-02 03:30:41.843  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache lastTime: 123127901
+07-02 03:30:41.844 19766 19816 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=1, mIsHiTouchRestricted=false
+07-02 03:30:41.845  5914  9753 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:ride_code_ability is running, add to queue 8/2/10
+07-02 03:30:41.845  5914 19823 I CAWARENESS_34447_RideCodeConfig: isEnterRideCodePage: start
+07-02 03:30:41.845  5914 19821 W CAWARENESS_34447_TemplateUtil: getAppTemplateByVersionCode: param is null
+07-02 03:30:41.845  5914 19823 W CAWARENESS_34447_TrafficCodeProcessor: rideCodeComponentName is empty.
+07-02 03:30:41.845  5914 19824 I CAWARENESS_34447_RecentAppChangeFence: lastReport tech.zeroxcore.app, packageName is com.reversetutor.preview
+07-02 03:30:41.845  5914 19821 I CAWARENESS_34447_PageCaptureAbility: handleActivityChangedEvent: no need to capture
+07-02 03:30:41.846  5914 19825 I CAWARENESS_34447_AbilityContext: [1782934242183] no such subscribe
+07-02 03:30:41.846  5914 19820 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:capture_ability is running, add to map 9/1/11
+07-02 03:30:41.846  5914 19820 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:ride_code_ability is running, add to map 9/1/11
+07-02 03:30:41.847  5914 19828 W CAWARENESS_34447_StationNameHelper: package name not alipay
+07-02 03:30:41.847  2971  4587 D Hicom_Monitor: ActivityNotifier not support:com.reversetutor.preview
+07-02 03:30:41.847  2971  3146 D DollieActivityManagerAdapter: [Resumed] bg:true pid:19766 uid:11065 ComponentInfo{com.reversetutor.preview/com.reversetutor.preview.MainActivity}
+07-02 03:30:41.847  2971  3146 E DollieAdapterService: notifyActivityState pkg:com.reversetutor.preview/com.reversetutor.preview.MainActivity state:2 fg:true mUid:11065
+07-02 03:30:41.848  2971  3146 I ConnCureStateMonitor: handleMessage: msg[2]
+07-02 03:30:41.848  2971  3146 I HwPacketFilterBypass: handleActivityUidStateChanged uid:11065 -1 foreground:1
+07-02 03:30:41.848  2971  3146 I OllieMsgCenter: publishEvt=2135097351
+07-02 03:30:41.848  2971  3146 I OllieMsgCenter: publishEvt=2130771969
+07-02 03:30:41.848  2971  3146 I OllieMsgCenter: publishEvt=2130771985
+07-02 03:30:41.848  2971  3146 I SpeedTestNotifier: Speed test app is back Activity
+07-02 03:30:41.849  2971  3146 D ForegroundDataOpt: is APK changed:true uid:11065 mBgLimitLevel:0
+07-02 03:30:41.849  2971  3146 I OllieMsgCenter: publishEvt=2134966274
+07-02 03:30:41.849  2971  3146 I OllieMsgCenter: publishEvt=2135097350
+07-02 03:30:41.849  2971  3146 I ForegroundDataOpt: mCurUid changed to 11065
+07-02 03:30:41.850  5914 19818 I CAWARENESS_34447_AbilityScheduler: query {dataId=100000250, mode=0} from ability_multi_dimension_capture
+07-02 03:30:41.851  2971  3146 D DsduChr : uid=11065, isTrafficFree=false, isUsingFreeTraffic=false
+07-02 03:30:41.852 19069 19069 W HiTouch_PressGestureDetector: Touch pointer move a lot. The moving distance of X is:280.44128, limit is:34The moving distance of Y is:41.041565, limit is:34
+07-02 03:30:41.894  1650  2108 I WificondControl: Noise: -94, Snr: 127, Chload: 364, rssi: -56, txBitrate: 65, rxBitrate: 52, frequency: 2437, UlDelay: -1, currentTxBytes: 58850847, currentTxPackets: 517207, currentTxFailed: 0, currentRxBytes: 1108153603, currentRxPackets: 803374
+07-02 03:30:41.895  1650  2197 D HuaweiWifiWatchdogStateMachine: nothing to do
+07-02 03:30:41.895  1650  2197 I HuaweiWifiWatchdogStateMachine: POta txb txg rxg:0, 85, 0. Lr =0% Totpkt=85
+07-02 03:30:41.895  1650  2107 I WiFi_PRO: MSG_RETURN_AP_CURRY_RSSI rssi = -56
+07-02 03:30:41.895  1650  2107 I QosMonitor: queryRtt: rttType = 3
+07-02 03:30:41.895  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+07-02 03:30:41.896  1650  2107 I QosMonitor: postEventFromNative: msg=100,arg1=4,arg2=10
+07-02 03:30:41.896  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+07-02 03:30:41.896  1650  2107 I QosMonitor: postEventFromNative: msg=100,arg1=0,arg2=10
+07-02 03:30:41.896  1650  2107 D HuaweiWifiWatchdogStateMachine: nothing to do
+07-02 03:30:41.896  1650  2107 I MQoS    : rtt=260,tcpTxPkts=509261,tcpRxPkts=744865
+07-02 03:30:41.896  1650  2107 I QosMonitor: resetRtt: rttType = 3
+07-02 03:30:41.896  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+07-02 03:30:41.897  1650 16994 I MQoS    : QOS_level:0(0),wifi-link;SIM error;use level-0
+07-02 03:30:41.897  1650 16994 I MQoS    : skip-low-Level:0(0),wifi-link;SIM error;use level-0
+07-02 03:30:41.897  1650  2197 I HuaweiWifiWatchdogStateMachine: PTcp RTT:260, rtt pkt=90, tcp_rx=61, tcp_tx=76, tcp_reTran=0, rtRate=0
+07-02 03:30:41.898  1650  2197 I HuaweiWifiWatchdogStateMachine: rssi bad, mrssi=-56 < TargetRssi=-52
+07-02 03:30:41.898  1650  2197 I HuaweiWifiWatchdogStateMachine: start computeQosLevel tcpRtt = 260 ,rssi = -56 ,mBestSpeedInPeriod = 31088
+07-02 03:30:41.898  1650  2197 I HuaweiWifiWatchdogStateMachine: smoothConsecutiveQosResults, currentQosLevel = 3
+07-02 03:30:41.898  2971 19659 I HwEasyGoService: totalNum7
+07-02 03:30:41.898  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:41.899  2672  2800 I ScenarioService: refresh visibleApp:[com.reversetutor.preview]
+07-02 03:30:41.899  2672  2800 I PGServer: report state:14 event type:1 pid:-1 uid:-1 pkg:com.reversetutor.preview to pid: 2672
+07-02 03:30:41.899  2672  2800 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:41.899  2672  2800 I PF_API_JNI: ACCKIT_APS_NotifyInfo 3: com.reversetutor.preview
+07-02 03:30:41.899   762   762 D ACCKIT_ : pack:"com.reversetutor.preview"
+07-02 03:30:41.899  2672  2800 E CommonAdapter: not find method for get Running Package Information
+07-02 03:30:41.899  2672  2800 E ScenarioService: multiScreenVisibleApps is empty
+07-02 03:30:41.899  2672  2824 I PG_ash  : tech.zeroxcore.app become invisible
+07-02 03:30:41.899  2672  2824 I PG_ash  : Visible app changed pkg : tech.zeroxcore.app, visible: false
+07-02 03:30:41.899  2672  2824 I PG_ash  : request H pkgs: [com.huawei.android.totemweather, com.android.calendar] reason: widget_invisible
+07-02 03:30:41.945  1650  2051 W Process : Unable to open /proc/-1/status
+07-02 03:30:41.945 19069 19069 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:41.960 28638 16637 D MtpServer: doGetObjectHandles from parent:304  return 1 handles
+07-02 03:30:41.981 28638 16637 D MtpServer: doGetObjectHandles from parent:367  return 9 handles
+07-02 03:30:41.982   675 24802 I netd    : trafficSwapActiveStatsMap() <15.87ms>
+07-02 03:30:41.990 28638 16637 D MtpServer: doGetObjectHandles from parent:4622  return 0 handles
+07-02 03:30:42.000 28638 16637 D MtpServer: doGetObjectHandles from parent:4621  return 1 handles
+07-02 03:30:41.994  3758  3758 W kworker/u17:0: type=1400 audit(0.0:60099): avc: granted { setsched } for pid=3758 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.android.calendar, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry_phone
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.android.contacts, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.android.deskclock, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry_phone
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.android.mediacenter, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.eg.android.AlipayWidget, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.example.android.notepad, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.android.remotecontroller, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.android.thememanager, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.android.tips, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry_phone
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.android.totemweather, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry_phone
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.audioaccessorymanager, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.camera, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.famanager, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.health, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.photos, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.search, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:search_pa
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.security.privacycenter, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.smarthome, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.suggestion, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.ohos.videoeditor, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:com.huawei.wallet.facard, isEntryInstallationFree:true
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames bundleName:ohos.global.systemres, isEntryInstallationFree:false
+07-02 03:30:42.001 20991 19686 D BundleMgrProxy: getServiceBundleNames entryModuleName:entry
+07-02 03:30:42.002   675 24802 I netd    : trafficSwapActiveStatsMap() <16.62ms>
+07-02 03:30:42.002 20991 21176 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1010900606
+07-02 03:30:42.007 28638 16637 D MtpServer: doGetObjectHandles from parent:4629  return 0 handles
+07-02 03:30:42.015 28638 16637 D MtpServer: doGetObjectHandles from parent:4624  return 0 handles
+07-02 03:30:42.023 28638 16637 D MtpServer: doGetObjectHandles from parent:4627  return 0 handles
+07-02 03:30:42.026 20991 21176 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:42.026 20991 21176 I HslPackageManager: is Support Hsl false
+07-02 03:30:42.027 20991 21003 I uawei.appmarke: TaskController ExpandGCThreshold currentGCThreshold(KB) = 39345 targetGCThreshold = 104881 delta = 65536
+07-02 03:30:42.028 20991 21003 I uawei.appmarke: TaskController add CheckCriticalStatusTask
+07-02 03:30:42.029 20991 21176 I NK_RealHttpClient: ApkObtainTask-0|embedded.a1|23|request: ConnectTimeout:, ConcurrentConnectDelay:，request firstIpv6ClientConcurrentConnectDelay：httpclient: ConnectTimeout:6000, ConcurrentConnectDelay:500，httpclient firstIpv6ClientConcurrentConnectDelay：250
+07-02 03:30:42.030 20991 21176 I NK_CountryCodeBean: ApkObtainTask-0|network.grs.local.model.CountryCodeBean|15|get issue_country code from VENDOR_COUNTRY
+07-02 03:30:42.031 20991 21176 I NK_OkReqTsk: ApkObtainTask-0|embedded.j3|285|the request has used the okhttp!
+07-02 03:30:42.033   766  1040 W BufferQueueProducer: [tech.zeroxcore.app/tech.zeroxcore.app.MainActivity#0]:1397: disconnect: not connected (req=1)
+07-02 03:30:42.033 19069 19121 W libEGL  : EGLNativeWindowType 0x75c5428450 disconnect failed
+07-02 03:30:42.035   725   725 W hwcomposer: setGpuFreqBoost:159: boostGpuFreq release !
+07-02 03:30:42.034  3758  3758 W kworker/u17:0: type=1400 audit(0.0:60100): avc: granted { setsched } for pid=3758 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:42.048 19766 19766 W setutor.previe: Accessing hidden method Landroid/view/View;->getViewRootImpl()Landroid/view/ViewRootImpl; (greylist, reflection, allowed)
+07-02 03:30:42.048 19766 19766 W setutor.previe: Accessing hidden field Landroid/view/View$AttachInfo;->mVisibleInsets:Landroid/graphics/Rect; (greylist, reflection, allowed)
+07-02 03:30:42.048 19766 19766 W setutor.previe: Accessing hidden field Landroid/view/ViewRootImpl;->mAttachInfo:Landroid/view/View$AttachInfo; (greylist, reflection, allowed)
+07-02 03:30:42.049 28638 16637 D MtpServer: doGetObjectHandles from parent:4623  return 0 handles
+07-02 03:30:42.075 28638 16637 D MtpServer: doGetObjectHandles from parent:4625  return 2 handles
+07-02 03:30:42.084 28638 16637 D MtpServer: doGetObjectHandles from parent:4631  return 1 handles
+07-02 03:30:42.090 28638 16637 D MtpServer: doGetObjectHandles from parent:4632  return 0 handles
+07-02 03:30:42.098 28638 16637 D MtpServer: doGetObjectHandles from parent:4630  return 1 handles
+07-02 03:30:42.099 19766 19766 W setutor.previe: Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/Rect;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+07-02 03:30:42.099 19766 19766 W setutor.previe: Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/RectF;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+07-02 03:30:42.104 28638 16637 D MtpServer: doGetObjectHandles from parent:4633  return 0 handles
+07-02 03:30:42.105 20991 21176 I NK_RouteInterceptor: ApkObtainTask-0|embedded.t3|178|has alt-svc, try to use quic
+07-02 03:30:42.105 20991 23826 I NK_Netdiag: ApkObtainTask-0 ->NK_netdiag_0|netdiag.tools.NetDetectAndPolicy|1|the time count will reset!
+07-02 03:30:42.105 20991 21176 I NK_InterceptorExecutor: ApkObtainTask-0|embedded.p2|409|response code:200
+07-02 03:30:42.107  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:42.108 20991 21176 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112013
+07-02 03:30:42.108 20991 21176 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:120108
+07-02 03:30:42.109 20991 21176 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1010901501
+07-02 03:30:42.110 20991 21012 W HiApp.UpM/UpdateCheckImpl: ApkObtainTask-0{6373} get no app update
+07-02 03:30:42.110 20991 21012 W HiApp.AppInstalledUpdateChange: ApkObtainTask-0{6373} invalid info
+07-02 03:30:42.111 28638 16637 D MtpServer: doGetObjectHandles from parent:4626  return 3 handles
+07-02 03:30:42.119 28638 16637 D MtpServer: doGetObjectHandles from parent:4635  return 0 handles
+07-02 03:30:42.125 28638 16637 D MtpServer: doGetObjectHandles from parent:4636  return 0 handles
+07-02 03:30:42.131 28638 16637 D MtpServer: doGetObjectHandles from parent:4634  return 0 handles
+07-02 03:30:42.138 28638 16637 D MtpServer: doGetObjectHandles from parent:4628  return 0 handles
+07-02 03:30:42.145 28638 16637 D MtpServer: doGetObjectHandles from parent:21  return 7 handles
+07-02 03:30:42.154 28638 16637 D MtpServer: doGetObjectHandles from parent:4642  return 2 handles
+07-02 03:30:42.164 28638 16637 D MtpServer: doGetObjectHandles from parent:4644  return 2 handles
+07-02 03:30:42.171 28638 16637 D MtpServer: doGetObjectHandles from parent:4647  return 0 handles
+07-02 03:30:42.180 28638 16637 D MtpServer: doGetObjectHandles from parent:4646  return 1 handles
+07-02 03:30:42.187 19766 19766 W setutor.previe: Class androidx.compose.runtime.snapshots.SnapshotStateList failed lock verification and will run slower.
+07-02 03:30:42.187 19766 19766 W setutor.previe: Common causes for lock verification issues are non-optimized dex code
+07-02 03:30:42.187 19766 19766 W setutor.previe: and incorrect proguard optimizations.
+07-02 03:30:42.192  2971  3146 I SpeedTestNotifier: is low speed scene
+07-02 03:30:42.207 28638 16637 D MtpServer: doGetObjectHandles from parent:4645  return 11 handles
+07-02 03:30:42.232 19069 19100 D ZrHung.AppEyeUiProbe: not watching, wait.
+07-02 03:30:42.239   867   867 I aptouch_daemon: print_log, touch:0, down:0
+07-02 03:30:42.239  1650  2059 I InputDispatcher: stylus touch up, set lcd event 0
+07-02 03:30:42.239  1650  2059 I InputDispatcher: stylus touch up, set lcd event 0
+07-02 03:30:42.240   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5379
+07-02 03:30:42.240   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5379, ret=2
+07-02 03:30:42.260 28638 16637 D MtpServer: doGetObjectHandles from parent:4650  return 0 handles
+07-02 03:30:42.285 28638 16637 D MtpServer: doGetObjectHandles from parent:4652  return 7 handles
+07-02 03:30:42.316   766  1038 D         : DoWinFrameOptStatusRecog begin to recog Layer result=2
+07-02 03:30:42.316   766  1038 D         : DoWinFrameOptStatusRecog begin to recog Layer result=2
+07-02 03:30:42.317  1650  2668 D ZrHung.AppEyeFocusWindow: FocusWindowErrorScene cancelCheckFreezeScreen
+07-02 03:30:42.317  1650  2668 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+07-02 03:30:42.317  1650  1902 D HwPhoneWindowManager: Transact:setSystemUIColor to status bar service
+07-02 03:30:42.320  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:42.320  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:42.320  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:42.333 19766 19808 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:42.334  2971 19410 I HwEasyGoService: totalNum26
+07-02 03:30:42.334  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:42.359   498   498 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@3.0::IMapper/default in either framework or device manifest.
+07-02 03:30:42.359 19766 19808 W Gralloc3: mapper 3.x is not supported
+07-02 03:30:42.398  2971 19659 I HwEasyGoService: totalNum8
+07-02 03:30:42.399  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:42.400  1011  1011 I AGPService: aps-info: focus pkgName - com.reversetutor.preview, with 0 more apps
+07-02 03:30:42.400  1011  1011 E AGPService: FrameRateManager: iaware strange app type: -1
+07-02 03:30:42.400  1011  1011 I AGPService: FrameRateManager: aps-info: new pkgName - com.reversetutor.preview, type - -1
+07-02 03:30:42.401  1011  1011 I AGPService: GpuPolicyManager: m_currentPkgName - com.reversetutor.preview
+07-02 03:30:42.410 19766 19766 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+07-02 03:30:42.410 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=true; winMode=1; isMrgNull=true
+07-02 03:30:42.413  1650  1919 I ActivityTaskManager: Displayed com.reversetutor.preview/.MainActivity: +1s94ms
+07-02 03:30:42.413  1049  1390 E ScreemCommon: fail to extract lcd fps mode!
+07-02 03:30:42.414  1049  1390 W ScreemCommon: ProcessEntry, not beta version or commercial log off
+07-02 03:30:42.414 19766 19766 W InputMethodManager: startInputReason = 1
+07-02 03:30:42.418 17339 17339 I CeliaKeyboard_LatinIME: onUnbindInput
+07-02 03:30:42.419 17339 17339 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:42.421 19766 19798 D RenderService: RCS is disable
+07-02 03:30:42.422   766  1718 W ServiceManager: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=11065 pid=19766
+07-02 03:30:42.422 19766 19766 W InputMethodManager: startInputReason = 5
+07-02 03:30:42.422   766  1718 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=11065 => denied (377 us)
+07-02 03:30:42.423 17339 17339 I CeliaKeyboard_BaseInputConnector: finishComposingTextExpand
+07-02 03:30:42.424 17339 17339 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+07-02 03:30:42.426 19766 19857 I StubController: system app validUid:11065, isFriend:false
+07-02 03:30:42.427   761  7021 D AudioPolicyService: getUidState(99012) cacheIter->second.first, return cacheIter->second.second(4)
+07-02 03:30:42.427   761  7021 D AudioPolicyService: getUidState(10105) cacheIter->second.first, return cacheIter->second.second(2)
+07-02 03:30:42.427   761  7021 D AudioPolicyService: getUidState(10031) cacheIter->second.first, return cacheIter->second.second(2)
+07-02 03:30:42.428  2672  2800 W ScenarioService: number format exception! str:
+07-02 03:30:42.428  2971  3146 D DollieActivityManagerAdapter: [UidStateChanged]  uid:10105 uidState:16
+07-02 03:30:42.428  2971  3146 E DollieAdapterService: notifyActivityState pkg:tech.zeroxcore.app/tech.zeroxcore.app.MainActivity state:16 fg:false mUid:10105
+07-02 03:30:42.429  2971  3146 I HwPacketFilterBypass: handleActivityUidStateChanged uid:10105 -1 foreground:0
+07-02 03:30:42.429  2971  3146 I HwPacketFilterBypass: isAllowSendSmartCureToChr false, no exceptions occur, dropCnt:0
+07-02 03:30:42.429  2971  3146 I OllieMsgCenter: publishEvt=2130771969
+07-02 03:30:42.430  2971  3146 I OllieMsgCenter: publishEvt=2134966274
+07-02 03:30:42.431  4263 15011 I FontLog : (REDACTED) Received query %s, URI %s
+07-02 03:30:42.431  4263 15011 I FontLog : (REDACTED) Query [%s] resolved to %s
+07-02 03:30:42.432  4263 15011 I FontLog : (REDACTED) Fetch %s end status %s
+07-02 03:30:42.438  4263 15011 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+07-02 03:30:42.446  4263 15011 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch stylusCurrentPkgName = com.reversetutor.preview lastOneFramePkgName =
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch currentPackageName = tech.zeroxcore.app
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch appType=-1 appState=0 gameMode=2
+07-02 03:30:42.447  1011  1011 D ITouchService: itouchReaderMonitor empty
+07-02 03:30:42.447  1011  1011 D ITouchService: g_itouch_reader_monitor Monitor::IsReaderMonitorEnable()=0
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch getCurrentParmID tempPkg=tech.zeroxcore.xxx
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch:app tech.zeroxcore.app is  not game app
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch:app tech.zeroxcore.app is  not in StylusPenList
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch:styluspen_switch is disable
+07-02 03:30:42.447  1011  1011 D ITouchService: itouch:currentAppTypeName =|UNKNOWN|
+07-02 03:30:42.448  1650  2051 W AwareLog: SchedLevelBoost: onFgActivitiesChanged config not set!
+07-02 03:30:42.450   761  2299 D AudioPolicyService: getUidState(90002) cacheIter->second.first, return cacheIter->second.second(16)
+07-02 03:30:42.450   761  2299 D AudioPolicyService: getUidState(90001) cacheIter->second.first, return cacheIter->second.second(16)
+07-02 03:30:42.450   761  2299 D AudioPolicyService: getUidState(10111) cacheIter->second.first, return cacheIter->second.second(16)
+07-02 03:30:42.450   761  2299 D AudioPolicyService: getUidState(10031) cacheIter->second.first, return cacheIter->second.second(6)
+07-02 03:30:42.472 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: PAUSED
+07-02 03:30:42.472 19766 19766 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.reversetutor.preview.MainActivity@c08a99e
+07-02 03:30:42.473 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: STOPPED
+07-02 03:30:42.473 19766 19766 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.reversetutor.preview.MainActivity@c08a99e
+07-02 03:30:42.475 28638 16637 D MtpServer: doGetObjectHandles from parent:4657  return 1 handles
+07-02 03:30:42.487 28638 16637 D MtpServer: doGetObjectHandles from parent:4667  return 1 handles
+07-02 03:30:42.489 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@c08a99e in: DESTROYED
+07-02 03:30:42.489 19766 19766 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+07-02 03:30:42.493   766  1040 W BufferQueueProducer: [com.reversetutor.preview/com.reversetutor.preview.MainActivity#0]:1397: disconnect: not connected (req=1)
+07-02 03:30:42.494 19766 19808 W libEGL  : EGLNativeWindowType 0x75c5428590 disconnect failed
+07-02 03:30:42.497  1650  2641 D ZrHung.AppEyeFocusWindow: FocusWindowErrorScene CheckFreezeScreen
+07-02 03:30:42.497  1650  2641 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+07-02 03:30:42.501 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: PRE_ON_CREATE
+07-02 03:30:42.501 19766 19766 V ActivityScenario: Activity lifecycle changed event received but ignored because the reported transition was not ON_CREATE while the last known transition was DESTROYED
+07-02 03:30:42.503  1029  1029 E Thermal-daemon:hw_thermal: [rfboard] tempNew :30  tempOld :29
+07-02 03:30:42.504  1029  1029 E Thermal-daemon:hw_thermal: Report temperature: [rfboard] temp :30  reportThreshold:1
+07-02 03:30:42.504 19766 19766 I DecorView[]: pkgName:com.reversetutor.preview old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:42.508 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: CREATED
+07-02 03:30:42.508  2672  2841 I ThermalTraceService: code:1, appInfo:com.reversetutor.preview#10000, levelInfo:0,warm_system_h,3#22,warm_shell,1
+07-02 03:30:42.508 19766 19766 V ActivityScenario: Update currentActivityStage to CREATED, currentActivity=com.reversetutor.preview.MainActivity@e1f5f66
+07-02 03:30:42.509 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: STARTED
+07-02 03:30:42.509 19766 19766 V ActivityScenario: Update currentActivityStage to STARTED, currentActivity=com.reversetutor.preview.MainActivity@e1f5f66
+07-02 03:30:42.510 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: RESUMED
+07-02 03:30:42.510 19766 19766 V ActivityScenario: Update currentActivityStage to RESUMED, currentActivity=com.reversetutor.preview.MainActivity@e1f5f66
+07-02 03:30:42.512 19766 19766 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:42.512  1016  2074 D dubaid  : [CpuAppStats.cpp] FindUidEntry# Uid(11062) has not package, maybe it's already uninstalled
+07-02 03:30:42.512  1016  2074 E dubaid  : [CpuAppStats.cpp] UpdateUidCpuTime# Failed to find uid entry
+07-02 03:30:42.512 19766 19766 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:42.513  1650  4969 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview
+07-02 03:30:42.513  1016  2074 D dubaid  : [CpuAppStats.cpp] FindUidEntry# Uid(11063) has not package, maybe it's already uninstalled
+07-02 03:30:42.513  1016  2074 E dubaid  : [CpuAppStats.cpp] UpdateUidCpuTime# Failed to find uid entry
+07-02 03:30:42.516  1016  1179 D dubaid  : [BufferedLogServer.cpp] ReceiveMessage# Received buffered log from dubai_driver-0
+07-02 03:30:42.516 19766 19766 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:42.517  1016  1179 D dubaid  : [BufferedLogServer.cpp] ReceiveMessage# Received buffered log from dubai_driver-0
+07-02 03:30:42.518  2926 31157 I OPCollectLog: AppChangeImpl:call onAppChange.
+07-02 03:30:42.518  5914  9753 I CAWARENESS_34447_AppUsageManager: Repeat info, don't need publish
+07-02 03:30:42.520 28638 16637 D MtpServer: doGetObjectHandles from parent:4651  return 6 handles
+07-02 03:30:42.521  2926  7027 I OPCollectLog: HwForegroundAppAction:handleMessage
+07-02 03:30:42.521  2926  7027 D OPCollectLog: HwForegroundAppAction:FG executeWithArgs
+07-02 03:30:42.521  2926  7027 I OPCollectLog: OPCollectUtils:ODMF Api Version:2.16.3
+07-02 03:30:42.521 19766 19860 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=1, mIsHiTouchRestricted=false
+07-02 03:30:42.521  2926  7027 I OPCollectLog: Action:HwForegroundAppAction executed successfully
+07-02 03:30:42.521  2926  7027 D OPCollectLog: OdmfCollectScheduler:handleMessage msg: 4
+07-02 03:30:42.521  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache 1
+07-02 03:30:42.521  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache curTime: 123128579, interval: 678
+07-02 03:30:42.521  2926  7027 I OPCollectLog: OdmfHelper:isCharging: true
+07-02 03:30:42.523  2926  7027 I OPCollectLog: OdmfHelper:insert database success
+07-02 03:30:42.523  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache size: 1
+07-02 03:30:42.523  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache lastTime: 123128580
+07-02 03:30:42.528  2971  6730 D Hicom_Monitor: ActivityNotifier not support:com.reversetutor.preview
+07-02 03:30:42.528  2971  3146 D DollieActivityManagerAdapter: [Resumed] bg:false pid:19766 uid:11065 ComponentInfo{com.reversetutor.preview/com.reversetutor.preview.MainActivity}
+07-02 03:30:42.528  2971  3146 E DollieAdapterService: notifyActivityState pkg:com.reversetutor.preview/com.reversetutor.preview.MainActivity state:2 fg:true mUid:11065
+07-02 03:30:42.528  2971  3146 I OllieMsgCenter: publishEvt=2130771985
+07-02 03:30:42.528  2971  3146 D ForegroundDataOpt: is APK changed:false uid:11065 mBgLimitLevel:0
+07-02 03:30:42.529  1650  2107 I TrafficMonitor: update:rxPkts:4,txPkts:5,rxBytes:1182,txBytes:2185
+07-02 03:30:42.529  1650  2107 I TrafficMonitor: gettimer:interval=2000
+07-02 03:30:42.566  2482  3877 W bt_btm  : btm_inq_db_new bda: 88:15:**:**:**:38 state: -1
+07-02 03:30:42.620  1650  4984 D ZrHung.AppEyeFocusWindow: FocusWindowErrorScene cancelCheckFreezeScreen
+07-02 03:30:42.620  1650  4984 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+07-02 03:30:42.622 19766 19808 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:42.630 28638 16637 D MtpServer: doGetObjectHandles from parent:4653  return 1 handles
+07-02 03:30:42.650 19766 19766 I HwViewRootImpl: removeInvalidNode jank list is null
+07-02 03:30:42.651 19766 19808 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:42.655 28638 16637 D MtpServer: doGetObjectHandles from parent:4649  return 2 handles
+07-02 03:30:42.676 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=true; winMode=1; isMrgNull=true
+07-02 03:30:42.676 19766 19766 W InputMethodManager: startInputReason = 1
+07-02 03:30:42.679 17339 17339 I CeliaKeyboard_BaseInputConnector: finishComposingTextExpand
+07-02 03:30:42.680 17339 17339 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+07-02 03:30:42.694  1049  1390 E ScreemCommon: fail to extract lcd fps mode!
+07-02 03:30:42.695  1049  1390 W ScreemCommon: ProcessEntry, not beta version or commercial log off
+07-02 03:30:42.714 28638 16637 D MtpServer: doGetObjectHandles from parent:4637  return 2 handles
+07-02 03:30:42.740  5129  5962 W ContentSensor_13.10.10.204_AppUsageStatusHandler: appInfo or appInfo.metaData is null
+07-02 03:30:42.740  5129  5962 I ContentSensor_13.10.10.204_PackageUtil: pkgName : tech.zeroxcore.app
+07-02 03:30:42.750  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:42.750  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:306,rsrp(rssi):-56,rsrq(noise):-94,rtt(chload):364,buffhigh(uldelay):0,buffcomm(rtt):1
+07-02 03:30:42.750  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:42.750  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:306,rsrp(rssi):-56,rsrq(noise):-94,rtt(chload):364,buffhigh(uldelay):0,buffcomm(rtt):18
+07-02 03:30:42.750  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+07-02 03:30:42.750  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+07-02 03:30:42.750  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+07-02 03:30:42.751  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 11065,4,0,306,1,2,4,0,306,65000,52000,10,10,0,1,0,0 CID 2 mMasterWifiRssi -56 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+07-02 03:30:42.751  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+07-02 03:30:42.751  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+07-02 03:30:42.751  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+07-02 03:30:42.753 28638 16637 D MtpServer: doGetObjectHandles from parent:4638  return 3 handles
+07-02 03:30:42.813 28638 16637 D MtpServer: doGetObjectHandles from parent:4641  return 2 handles
+07-02 03:30:42.822  1049  1390 E ScreemCommon: fail to extract lcd fps mode!
+07-02 03:30:42.822 28638 16637 D MtpServer: doGetObjectHandles from parent:4683  return 2 handles
+07-02 03:30:42.823  1049  1390 W ScreemCommon: ProcessEntry, not beta version or commercial log off
+07-02 03:30:42.830 28638 28657 I d.process.medi: TaskController CheckCriticalStatusTask is running.........
+07-02 03:30:42.831  7225  7359 W HWBR-O-0602|BrowserServiceWorkerClient: tabManager is null
+07-02 03:30:42.834  1029  3910 E Thermal-daemon:ambient: UpdateAmbientInformation: is first history!!
+07-02 03:30:42.836  2971 19410 I HwEasyGoService: totalNum27
+07-02 03:30:42.836  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:42.837  1029  3910 E Thermal-daemon:ambient: UpdateAmbientInformation: devCurrent -395, last_avg_current -40, clear history input array
+07-02 03:30:42.838 28638 16637 D MtpServer: doGetObjectHandles from parent:4686  return 0 handles
+07-02 03:30:42.838 14247 14247 W kworker/u17:4: type=1400 audit(0.0:60123): avc: granted { setsched } for pid=14247 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:42.849  2971  3146 I HwPacketFilterBypass: isBypassAllowed not allowed reason: DATA_OFF
+07-02 03:30:42.849  2971  3146 I HwPacketFilterBypass: kernelAddTrackUid uid:11065 allowed:false
+07-02 03:30:42.854 28638 16637 D MtpServer: doGetObjectHandles from parent:4685  return 1 handles
+07-02 03:30:42.854 19766 19766 I DecorView[]: pkgName:com.reversetutor.preview old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:42.856  5914 19862 I CAWARENESS_34447_AbilityContext: [1782934257321] deliver {dataId=1001000011, mode=0} to 2 receivers
+07-02 03:30:42.870 19766 19766 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:42.871 19766 19766 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:42.871  1650  4969 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview
+07-02 03:30:42.866 14247 14247 W kworker/u17:4: type=1400 audit(0.0:60124): avc: granted { setsched } for pid=14247 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:42.884  1650  4969 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+07-02 03:30:42.884  1650  4969 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+07-02 03:30:42.884 28638 16637 D MtpServer: doGetObjectHandles from parent:4684  return 8 handles
+07-02 03:30:42.885 19766 19766 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:42.886 12972 12972 W kworker/u17:3: type=1400 audit(0.0:60125): avc: granted { setsched } for pid=12972 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:42.893 19766 19866 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=2, mIsHiTouchRestricted=false
+07-02 03:30:42.898  2971 19659 I HwEasyGoService: totalNum9
+07-02 03:30:42.898  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:42.928 28638 16637 D MtpServer: doGetObjectHandles from parent:4689  return 0 handles
+07-02 03:30:42.939 28638 16637 D MtpServer: doGetObjectHandles from parent:4691  return 5 handles
+07-02 03:30:43.006 19766 19808 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:43.027 28638 16637 D MtpServer: doGetObjectHandles from parent:4690  return 6 handles
+07-02 03:30:43.028 20991 21003 I uawei.appmarke: TaskController CheckCriticalStatusTask is running.........
+07-02 03:30:43.033 19766 19808 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:43.033 19766 19766 W InputMethodManager: startInputReason = 1
+07-02 03:30:43.044 17339 17339 I CeliaKeyboard_BaseInputConnector: finishComposingTextExpand
+07-02 03:30:43.045 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=false; winMode=1; isMrgNull=true
+07-02 03:30:43.046  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:43.046  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.046  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.047 17339 17339 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+07-02 03:30:43.075  1049  1390 E ScreemCommon: fail to extract lcd fps mode!
+07-02 03:30:43.075  1049  1390 W ScreemCommon: ProcessEntry, not beta version or commercial log off
+07-02 03:30:43.139 28638 16637 D MtpServer: doGetObjectHandles from parent:4692  return 1 handles
+07-02 03:30:43.153  2482  3877 W bt_btm  : btm_inq_db_new bda: 40:00:**:**:**:9a state: -1
+07-02 03:30:43.161  1650  2108 I WificondControl: Noise: -92, Snr: 127, Chload: 356, rssi: -60, txBitrate: 65, rxBitrate: 52, frequency: 2437, UlDelay: -1, currentTxBytes: 58853018, currentTxPackets: 517210, currentTxFailed: 0, currentRxBytes: 1108154695, currentRxPackets: 803376
+07-02 03:30:43.164  1650  2108 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@8f0e10d
+07-02 03:30:43.167 28638 16637 D MtpServer: doGetObjectHandles from parent:4688  return 2 handles
+07-02 03:30:43.196 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112047
+07-02 03:30:43.196 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1010900606
+07-02 03:30:43.197  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.198  7954  7954 I DEVMGR_KillPhoneServiceManager: 1600104310|R|I|Try to kill health enter
+07-02 03:30:43.199   675  1218 W /system/bin/netd: A binder object at 0x7c4d81a240 is being transacted on, however, this object is in the same process as its proxy. Transacting with this binder is expensive compared to just calling the corresponding functionality in the same process.
+07-02 03:30:43.199  7954  7954 I DEVMGR_KillPhoneServiceManager: 1600104310|R|I|Try to kill health after 10 seconds
+07-02 03:30:43.199   675  1218 I PreDnsController: CanPreDnsQuery,persist.sys.predns is false!
+07-02 03:30:43.201  1650  1650 D HwConnectivityManagerImpl: getNetworkPolicyFlag flagStr null
+07-02 03:30:43.230 28638 16637 D MtpServer: doGetObjectHandles from parent:4639  return 1 handles
+07-02 03:30:43.233  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.254 28638 16637 D MtpServer: doGetObjectHandles from parent:4640  return 0 handles
+07-02 03:30:43.262 28638 16637 D MtpServer: doGetObjectHandles from parent:4643  return 0 handles
+07-02 03:30:43.268 28638 16637 D MtpServer: doGetObjectHandles from parent:134  return 1 handles
+07-02 03:30:43.278 28638 16637 D MtpServer: doGetObjectHandles from parent:4711  return 2 handles
+07-02 03:30:43.302 14247 14247 W kworker/u17:4: type=1400 audit(0.0:60126): avc: granted { setsched } for pid=14247 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:43.314 28638 16637 D MtpServer: doGetObjectHandles from parent:80  return 1 handles
+07-02 03:30:43.324 28638 16637 D MtpServer: doGetObjectHandles from parent:4714  return 1 handles
+07-02 03:30:43.332 28638 16637 D MtpServer: doGetObjectHandles from parent:4715  return 2 handles
+07-02 03:30:43.337  2971 19410 I HwEasyGoService: totalNum28
+07-02 03:30:43.337  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:43.343   867   867 I aptouch_daemon: print_log, touch:1, down:1 (+0)		filter: 0
+07-02 03:30:43.346  1049  1390 E ScreemCommon: fail to extract lcd fps mode!
+07-02 03:30:43.346  1049  1390 W ScreemCommon: ProcessEntry, not beta version or commercial log off
+07-02 03:30:43.350  1650  2161 I HwBackgroundDexOptServiceEx: configPidProcess pid: -1
+07-02 03:30:43.359 19766 19766 I DecorView[]: pkgName:com.reversetutor.preview old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:43.368 28638 16637 D MtpServer: doGetObjectHandles from parent:4717  return 11 handles
+07-02 03:30:43.386   766  2631 W BufferQueueProducer: [com.reversetutor.preview/com.reversetutor.preview.MainActivity#1]:1397: disconnect: not connected (req=1)
+07-02 03:30:43.386 19766 19808 W libEGL  : EGLNativeWindowType 0x75c121e450 disconnect failed
+07-02 03:30:43.386 19766 19808 D OpenGLRenderer: endAllActiveAnimators on 0x7565697800 (UnprojectedRipple) with handle 0x75c5532ce0
+07-02 03:30:43.386 19766 19808 D OpenGLRenderer: endAllActiveAnimators on 0x7565695a00 (UnprojectedRipple) with handle 0x75c5532b60
+07-02 03:30:43.389  1650  4984 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+07-02 03:30:43.389  1650  4984 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+07-02 03:30:43.392  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:43.393  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.393  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.395 19766 19766 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:43.396 19766 19766 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:43.396  1650  2668 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview
+07-02 03:30:43.399  1650  2668 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+07-02 03:30:43.399  1650  2668 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+07-02 03:30:43.399  2971 19659 I HwEasyGoService: totalNum10
+07-02 03:30:43.399  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:43.399 19766 19766 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:43.399  1650  4984 D InputDispatcher: Window handle Window{978245d u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} has no registered input channel
+07-02 03:30:43.406 14247 14247 W kworker/u17:4: type=1400 audit(0.0:60127): avc: granted { setsched } for pid=14247 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:43.415 19766 19870 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=2, mIsHiTouchRestricted=false
+07-02 03:30:43.436 19766 19808 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:43.447 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=true; winMode=1; isMrgNull=true
+07-02 03:30:43.453 19766 19766 W InputMethodManager: startInputReason = 1
+07-02 03:30:43.457  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:43.457  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.457  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.460 17339 17339 I CeliaKeyboard_BaseInputConnector: finishComposingTextExpand
+07-02 03:30:43.460 17339 17339 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+07-02 03:30:43.460 19766 19808 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:43.461 19766 19766 W InputMethodManager: startInputReason = 1
+07-02 03:30:43.465 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=false; winMode=1; isMrgNull=true
+07-02 03:30:43.467 17339 17339 I CeliaKeyboard_BaseInputConnector: finishComposingTextExpand
+07-02 03:30:43.468 17339 17339 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+07-02 03:30:43.469   761  7021 D AudioPolicyService: getUidState(10031) cacheIter->second.first, return cacheIter->second.second(4)
+07-02 03:30:43.496   867   867 I aptouch_daemon: print_log, touch:1, down:0 (0)	amend:(0, 19 1555)
+07-02 03:30:43.496  1650  2060 D fingersense_manager: Calling fingersense_classify_touch()
+07-02 03:30:43.499  1650  2060 D fingersense_manager: fingersense_classify_touch() finished
+07-02 03:30:43.500  1650  2059 I InputDispatcher: stylus touch down, set lcd event 1
+07-02 03:30:43.500  1650  2059 I InputDispatcher: stylus touch down, set lcd event 1
+07-02 03:30:43.501   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5378
+07-02 03:30:43.501   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5378, ret=2
+07-02 03:30:43.502  1650  1902 I HWRME LIBHWRME_CLIENT: ResMngMmEvent interface arg 1, 11065
+07-02 03:30:43.502  1650  1902 I NavigationBarPolicy: pointY:1036.6667realSize.y:1496HIT_REGION_TO_MAX:21
+07-02 03:30:43.505  1650  1902 I InputTransport: Fun_filterMotionEvent reportMoveEvent!
+07-02 03:30:43.505  1650  2054 I InputTransport: Fun_filterMotionEvent reportMoveEvent!
+07-02 03:30:43.519  5129  5962 W ContentSensor_13.10.10.204_ContentSensorService: mEventListener is null
+07-02 03:30:43.520  5129  5962 W ContentSensor_13.10.10.204_AppUsageStatusHandler: appInfo or appInfo.metaData is null
+07-02 03:30:43.520  5129  5962 I ContentSensor_13.10.10.204_PackageUtil: pkgName : com.reversetutor.preview
+07-02 03:30:43.528  1650  2054 I GestureNav_Strategy: try to animate scatter process: process = 0.27262485, fist pending moving process = 0.1
+07-02 03:30:43.537  1650  2210 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:43.539  1650  2232 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:43.540  2672  2800 I ScenarioService: not landscape, do nothing
+07-02 03:30:43.549   766  2631 W BufferQueueProducer: [SurfaceView - GestureNavAnim#0]:1397: disconnect: not connected (req=1)
+07-02 03:30:43.549  1650  2232 W libEGL  : EGLNativeWindowType 0x77a58c6010 disconnect failed
+07-02 03:30:43.549  1650  2232 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:43.554  2672  2800 I ScenarioService: not landscape, do nothing
+07-02 03:30:43.570 28638 16637 D MtpServer: doGetObjectHandles from parent:208  return 1 handles
+07-02 03:30:43.577   766  1852 W BufferQueueProducer: [com.reversetutor.preview/com.reversetutor.preview.MainActivity#2]:1397: disconnect: not connected (req=1)
+07-02 03:30:43.577 19766 19808 W libEGL  : EGLNativeWindowType 0x75c121e450 disconnect failed
+07-02 03:30:43.578 19766 19808 D OpenGLRenderer: endAllActiveAnimators on 0x75657c9500 (UnprojectedRipple) with handle 0x75c5425dc0
+07-02 03:30:43.578 28638 16637 D MtpServer: doGetObjectHandles from parent:4729  return 0 handles
+07-02 03:30:43.581  1650  1864 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+07-02 03:30:43.581  1650  1864 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+07-02 03:30:43.584 28638 16637 D MtpServer: doGetObjectHandles from parent:46  return 1 handles
+07-02 03:30:43.584  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:43.585  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.585  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:43.590 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=true; winMode=1; isMrgNull=true
+07-02 03:30:43.591 19766 19766 W InputMethodManager: startInputReason = 1
+07-02 03:30:43.595  1650  1864 D InputDispatcher: Window handle Window{9312fad u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} has no registered input channel
+07-02 03:30:43.596 28638 16637 D MtpServer: doGetObjectHandles from parent:4730  return 1 handles
+07-02 03:30:43.598 17339 17339 I CeliaKeyboard_BaseInputConnector: finishComposingTextExpand
+07-02 03:30:43.598 17339 17339 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+07-02 03:30:43.602 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.607 20991  3113 I chatty  : uid=10022(com.huawei.appmarket) RepTaskHandler identical 10 lines
+07-02 03:30:43.608 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.608  1650  1864 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.608 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.610 20991  3113 I chatty  : uid=10022(com.huawei.appmarket) RepTaskHandler identical 5 lines
+07-02 03:30:43.611 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.611  1650  1864 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.612 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.613 28638 16637 D MtpServer: doGetObjectHandles from parent:4731  return 1 handles
+07-02 03:30:43.613 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.623 20991  3113 I chatty  : uid=10022(com.huawei.appmarket) RepTaskHandler identical 13 lines
+07-02 03:30:43.624 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.624 28638 16637 D MtpServer: doGetObjectHandles from parent:4732  return 3 handles
+07-02 03:30:43.624 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.634 20991  3113 I chatty  : uid=10022(com.huawei.appmarket) RepTaskHandler identical 22 lines
+07-02 03:30:43.634 20991  3113 I HMSSDK_HMSPackageManager: Enter getHMSPackageName
+07-02 03:30:43.636 28638 16637 D MtpServer: doGetObjectHandles from parent:4733  return 2 handles
+07-02 03:30:43.653 20991 19877 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:43.653 20991 19877 I HslPackageManager: is Support Hsl false
+07-02 03:30:43.656 20991 19877 I NK_RealHttpClient: pool-2-thread-71|embedded.a1|23|request: ConnectTimeout:, ConcurrentConnectDelay:，request firstIpv6ClientConcurrentConnectDelay：httpclient: ConnectTimeout:6000, ConcurrentConnectDelay:500，httpclient firstIpv6ClientConcurrentConnectDelay：250
+07-02 03:30:43.657 20991 19877 I NK_CountryCodeBean: pool-2-thread-71|network.grs.local.model.CountryCodeBean|15|get issue_country code from VENDOR_COUNTRY
+07-02 03:30:43.657 20991 19877 I NK_OkReqTsk: pool-2-thread-71|embedded.j3|285|the request has used the okhttp!
+07-02 03:30:43.687 28638 16637 D MtpServer: doGetObjectHandles from parent:4734  return 6 handles
+07-02 03:30:43.695 20991 19877 I NK_RouteInterceptor: pool-2-thread-71|embedded.t3|178|has alt-svc, try to use quic
+07-02 03:30:43.696 20991 19877 I NK_InterceptorExecutor: pool-2-thread-71|embedded.p2|409|response code:200
+07-02 03:30:43.697 20991 23826 I NK_Netdiag: pool-2-thread-71 ->NK_netdiag_0|netdiag.tools.NetDetectAndPolicy|1|the time count will reset!
+07-02 03:30:43.699  1650  1864 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.700 20991 19877 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112013
+07-02 03:30:43.714   867   867 I aptouch_daemon: print_log, touch:0, down:0
+07-02 03:30:43.714  1650  2059 I InputDispatcher: stylus touch up, set lcd event 0
+07-02 03:30:43.715  1650  2059 I InputDispatcher: stylus touch up, set lcd event 0
+07-02 03:30:43.715   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5379
+07-02 03:30:43.715   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5379, ret=2
+07-02 03:30:43.715  1650  2054 I GestureNav_Strategy: Gesture failed as sliding rollback or canceled, duration:217ms, offsetDistance:22.0, action:1
+07-02 03:30:43.716  1650  1902 I NavigationBarPolicy: onFling::Gest_Navigation_Enable, return!
+07-02 03:30:43.716 20991 19873 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:43.716 20991 19873 I HslPackageManager: is Support Hsl false
+07-02 03:30:43.718 20991 19873 I NK_RealHttpClient: pool-2-thread-67|embedded.a1|23|request: ConnectTimeout:, ConcurrentConnectDelay:，request firstIpv6ClientConcurrentConnectDelay：httpclient: ConnectTimeout:6000, ConcurrentConnectDelay:500，httpclient firstIpv6ClientConcurrentConnectDelay：250
+07-02 03:30:43.719 20991 19873 I NK_CountryCodeBean: pool-2-thread-67|network.grs.local.model.CountryCodeBean|15|get issue_country code from VENDOR_COUNTRY
+07-02 03:30:43.720 20991 19873 I NK_OkReqTsk: pool-2-thread-67|embedded.j3|285|the request has used the okhttp!
+07-02 03:30:43.747 20991 19873 I NK_RouteInterceptor: pool-2-thread-67|embedded.t3|178|has alt-svc, try to use quic
+07-02 03:30:43.747 20991 23826 I NK_Netdiag: pool-2-thread-67 ->NK_netdiag_0|netdiag.tools.NetDetectAndPolicy|1|the time count will reset!
+07-02 03:30:43.748 20991 19873 I NK_InterceptorExecutor: pool-2-thread-67|embedded.p2|409|response code:200
+07-02 03:30:43.749  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.752 20991 19873 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112013
+07-02 03:30:43.760 20991 19878 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:43.760 20991 19878 I HslPackageManager: is Support Hsl false
+07-02 03:30:43.763 20991 19878 I NK_RealHttpClient: pool-2-thread-72|embedded.a1|23|request: ConnectTimeout:, ConcurrentConnectDelay:，request firstIpv6ClientConcurrentConnectDelay：httpclient: ConnectTimeout:6000, ConcurrentConnectDelay:500，httpclient firstIpv6ClientConcurrentConnectDelay：250
+07-02 03:30:43.764 20991 19878 I NK_CountryCodeBean: pool-2-thread-72|network.grs.local.model.CountryCodeBean|15|get issue_country code from VENDOR_COUNTRY
+07-02 03:30:43.765 20991 19878 I NK_OkReqTsk: pool-2-thread-72|embedded.j3|285|the request has used the okhttp!
+07-02 03:30:43.766  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:43.766  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-60,rsrq(noise):-92,rtt(chload):356,buffhigh(uldelay):0,buffcomm(rtt):0
+07-02 03:30:43.766  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:43.766  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-60,rsrq(noise):-92,rtt(chload):356,buffhigh(uldelay):0,buffcomm(rtt):23
+07-02 03:30:43.766  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+07-02 03:30:43.766  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+07-02 03:30:43.767  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+07-02 03:30:43.767  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 11065,4,0,312,1,2,4,0,312,65000,52000,10,10,0,16,8,0 CID 2 mMasterWifiRssi -60 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+07-02 03:30:43.768  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+07-02 03:30:43.768  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+07-02 03:30:43.768  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+07-02 03:30:43.769   766  2631 W BufferQueueProducer: [SurfaceView - GestureNavAnim#0]:1397: disconnect: not connected (req=1)
+07-02 03:30:43.769  1650  2232 W libEGL  : EGLNativeWindowType 0x77a58c6010 disconnect failed
+07-02 03:30:43.770  2672  2800 I ScenarioService: check surface view pkg: com.reversetutor.preview
+07-02 03:30:43.771   766  2631 W BufferQueueProducer: [GestureNavAnim#0]:1397: disconnect: not connected (req=1)
+07-02 03:30:43.771  1650  2210 W libEGL  : EGLNativeWindowType 0x77b1929310 disconnect failed
+07-02 03:30:43.793 20991 23826 I NK_Netdiag: pool-2-thread-72 ->NK_netdiag_0|netdiag.tools.NetDetectAndPolicy|1|the time count will reset!
+07-02 03:30:43.793 20991 19878 I NK_RouteInterceptor: pool-2-thread-72|embedded.t3|178|has alt-svc, try to use quic
+07-02 03:30:43.794  2672  2800 I AppTypeRecogManager: Update app type name:com.reversetutor.preview.test type:65535
+07-02 03:30:43.794  2672  2800 I AppTypeRecogManager: Update app type by self. name:com.reversetutor.preview.test type:65535
+07-02 03:30:43.795 20991 19878 I NK_InterceptorExecutor: pool-2-thread-72|embedded.p2|409|response code:200
+07-02 03:30:43.802  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.804 20991 19878 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112013
+07-02 03:30:43.808 28638 16637 D MtpServer: doGetObjectHandles from parent:4735  return 4 handles
+07-02 03:30:43.811 20991  3113 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:43.811 20991  3113 I HslPackageManager: is Support Hsl false
+07-02 03:30:43.811 20991  3113 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:43.811 20991  3113 I HslPackageManager: is Support Hsl false
+07-02 03:30:43.812 20991 21012 W HiApp.IdleUp/IdleUpdateListManager: RepTaskHandler{7107} buildDownloadTask task is null
+07-02 03:30:43.813  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.814  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.831 28638 28657 I d.process.medi: TaskController CheckCriticalStatusTask is running.........
+07-02 03:30:43.831 28638 28657 I d.process.medi: TaskController check not in critical status, trigger a gc task to run
+07-02 03:30:43.833 20991  3113 I PowerKitApi: Caller: com.huawei.appmarket get power usage.
+07-02 03:30:43.833  2672  2871 I PowerKit_Impl: Calling: com.huawei.appmarket Module:com.huawei.appmarket Start:1782847843833 End:1782934243833
+07-02 03:30:43.833  2672  2871 I PowerRankManager: getUsageDataFromDubai startTime: 1782847843833 endTime: 1782934243833
+07-02 03:30:43.833  1016 15349 I dubaid  : [QueryService.cpp] HandleRequestQueryData# start: 1782847843833, end: 1782934244833, tag: 1
+07-02 03:30:43.834  1016 15349 I dubaid  : [QueryService.cpp] HandleBalanceFinished# All requested components balance accounting have been finished
+07-02 03:30:43.836  2971 19410 I HwEasyGoService: totalNum29
+07-02 03:30:43.836  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:43.847  3398  6424 I HiAdKit.DC.AppDataCollectionManager:  report third
+07-02 03:30:43.848  2971  3146 I ConnCureStateMonitor: handleMessage: msg[4]
+07-02 03:30:43.848  3398  6424 W fwkit_kims: [fwkit KIMSServiceController.java:61] Can't find the specific package.
+07-02 03:30:43.849  2971  3146 I ConnCureStateMonitor: canPerformConnCure: network is not in service.
+07-02 03:30:43.849  2971  3146 D ConnCureConfigUtil: isCaredApp: input = com.reversetutor.preview
+07-02 03:30:43.849  2971  3146 I ConnCureStateMonitor: isCaredApp:false,isAllowed:true,isDataEnabled:true
+07-02 03:30:43.850  3398  6424 I NetworkSdk_CountryCodeBean: [HMSCore NetworkLog.java:1] pps-msg-queue|network.grs.local.model.CountryCodeBean|16|get issue_country code from VENDOR_COUNTRY
+07-02 03:30:43.850  3398  6424 I HiAdKit.DC.NetworkUtil:  multicard device
+07-02 03:30:43.853  3398  6424 I HiAdKit.DC.CommonSystemUtil:  hasPermissions true
+07-02 03:30:43.854  3398 13982 I HiAdKit.DC.AtcPopupChecker:  cloud cfg hms ver:null
+07-02 03:30:43.856  3398  6424 I HiAdKit.DC.CommonSystemUtil:  hasPermissions true
+07-02 03:30:43.857  3398 13982 I HiAdKit.DC.AtcPopupChecker:  cloud cfg hms ver:null
+07-02 03:30:43.858  3398  6424 I HiAdKit.DC.CommonSystemUtil:  isDeviceProvisioned: true
+07-02 03:30:43.859  3398 13979 I HiAdKit.DC.ADCP:  addAppDataCollectionToCache - cache valide time: 7200 expireTime: 1782502243859
+07-02 03:30:43.864  1016  1110 E dubaid  : [SqlOperator.cpp] PrepareSqlStatement# Prepare statement error: no such table: detailed_applications_tp
+07-02 03:30:43.864  1016  1110 E dubaid  : [SqlOperator.cpp] QueryEntries# Failed to prepare statement
+07-02 03:30:43.864  1016  1110 E dubaid  : [DubaiStorage.cpp] QueryEntriesInner# Failed to query entries
+07-02 03:30:43.865  1016 15349 E dubaid  : [DubaiStorage.cpp] QueryEntries# Failed to query entries: SELECT name, SUM(active_time), SUM(idle_time), SUM(energy) FROM detailed_applications_tp WHERE name IN ('com.huawei.appmarket') AND start_time >= 1782847843833 AND end_time <= 1782934244833  GROUP BY name
+07-02 03:30:43.865  1016 15349 E dubaid  : [QueryService.cpp] DoQueryData# Failed to query data
+07-02 03:30:43.865  1016 15349 E dubaid  : [QueryService.cpp] QueryTpAppData# Failed to query tp app data
+07-02 03:30:43.868  2672  2871 I PowerRankManager: query form PowerAttribute
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: com.huawei.appmarket" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 873.401" mBgTotalPower/mAh:193.5689
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: com.android.incallui" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: wifi_ap" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: hw_bt" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: hw_systemidle" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: hw_screen" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: hw_wlan" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: hw_phone" mFgTime/s: 0.0" mFgTotalPower/mAh:0.0" mBgTime/s: 0.0" mBgTotalPower/mAh:0.0
+07-02 03:30:43.868  2672  2871 D PowerRankManager: name: hw_modemidle" mFgTime/s: 19961.75" mFgTotalPower/mAh:11.815556" mBgTime/s: 6.375" mBgTotalPower/mAh:0.06527778
+07-02 03:30:43.869 28638 28657 I d.process.medi: TaskController RestoreGCTaskStatus
+07-02 03:30:43.875 20991  3113 I HslPackageManager: Get Hsl Package Manager.
+07-02 03:30:43.875 20991  3113 I HslPackageManager: is Support Hsl false
+07-02 03:30:43.876 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.calendar appName: 日历
+07-02 03:30:43.876 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.877 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.878 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.contacts appName: 联系人
+07-02 03:30:43.878 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.879 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.879 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.deskclock appName: 时钟
+07-02 03:30:43.880 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.880 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.calendar appName: 日历
+07-02 03:30:43.880 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.880 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.881 20991  3113 I NK_RealHttpClient: RepTaskHandler|embedded.a1|23|request: ConnectTimeout:, ConcurrentConnectDelay:，request firstIpv6ClientConcurrentConnectDelay：httpclient: ConnectTimeout:6000, ConcurrentConnectDelay:500，httpclient firstIpv6ClientConcurrentConnectDelay：250
+07-02 03:30:43.881 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.mediacenter appName: 华为音乐
+07-02 03:30:43.881 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.882 20991  3113 I NK_CountryCodeBean: RepTaskHandler|network.grs.local.model.CountryCodeBean|15|get issue_country code from VENDOR_COUNTRY
+07-02 03:30:43.882 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.883 20991  3113 I NK_OkReqTsk: RepTaskHandler|embedded.j3|285|the request has used the okhttp!
+07-02 03:30:43.883 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.eg.android.AlipayWidget
+07-02 03:30:43.884 28638 16637 D MtpServer: doGetObjectHandles from parent:305  return 2 handles
+07-02 03:30:43.884 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.example.android.notepad appName: 备忘录
+07-02 03:30:43.884 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.885 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.885 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.android.remotecontroller
+07-02 03:30:43.886 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.android.thememanager appName: 主题
+07-02 03:30:43.886 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.888 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.888 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.888 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.contacts appName: 联系人
+07-02 03:30:43.889 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.889 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.android.tips appName: 玩机技巧
+07-02 03:30:43.889 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.889 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.890 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.890 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.deskclock appName: 时钟
+07-02 03:30:43.890 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.890 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.android.totemweather appName: 天气
+07-02 03:30:43.891 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.891 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.891 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.android.mediacenter appName: 华为音乐
+07-02 03:30:43.891 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.892 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.892 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.audioaccessorymanager appName: 音频管家
+07-02 03:30:43.892 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.892 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.893 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.eg.android.AlipayWidget
+07-02 03:30:43.893 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.893 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: getEntryModuleName is null
+07-02 03:30:43.893 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.example.android.notepad appName: 备忘录
+07-02 03:30:43.894 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.894 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.ohos.famanager appName: 服务中心
+07-02 03:30:43.894 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.894 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.894 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.android.remotecontroller
+07-02 03:30:43.895 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.895 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.android.thememanager appName: 主题
+07-02 03:30:43.896 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.897 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.898 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.health
+07-02 03:30:43.898 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: getEntryModuleName is null
+07-02 03:30:43.899  1650  3362 W ActivityManager: Sending non-protected broadcast com.huawei.android.APPSTARTUP_CHANGED from system 1650:system/1000 pkg android
+07-02 03:30:43.899 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.android.tips appName: 玩机技巧
+07-02 03:30:43.899 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.ohos.search appName: 全局搜索数据服务
+07-02 03:30:43.899 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.899 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.899  2971 19659 I HwEasyGoService: totalNum11
+07-02 03:30:43.900  2672  2800 D ApplistMgr: handle apps optimize changed
+07-02 03:30:43.900  4523  4523 I PushLog110123300: [main-1]action is com.huawei.android.APPSTARTUP_CHANGED
+07-02 03:30:43.900  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:43.900  2672  2800 I ApplistMgr: mNeverOptimizeApps : [com.huawei.localBackup, com.huawei.appmarket]
+07-02 03:30:43.900  2672  2800 I ApplistMgr: mNeverOptimizeHideApps: [com.huawei.hwid]
+07-02 03:30:43.900  2672  2800 I ApplistMgr: mAlwaysOptimizeApps : []
+07-02 03:30:43.901 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.901  2672  2800 I ApplistMgr: mSmartOptimizeApps : [com.huawei.hifolder, com.quark.browser, com.huawei.android.tips, com.huawei.ohos.smarthome, tech.zeroxcore.app, com.excean.gspace, com.huawei.ar.measure, com.eg.android.AlipayWidget, com.chaoxing.mobile, com.reversetutor.core.data.test, com.huawei.android.FMRadio, com.tencent.androidqqmail, com.huawei.android.totemweather, com.huawei.gameassistant, com.huawei.android.findmyphone, com.huawei.videoeditor, com.huawei.hms5gkit.agentservice, com.reversetutor.preview.test, com.and.games505.TerrariaPaid, com.android.simappdialog, com.huawei.smarthome, com.tencent.mm, com.huawei.tips, com.athena.athena, com.lastcube.app, org.telegram.messenger.web, com.huawei.calculator, com.instagram.android, com.huawei.hwread.dz, com.huawei.lives, com.tencent.mtt, com.huawei.ohos.videoeditor, com.huawei.commonwallpaper, com.tencent.wework, com.hicloud.android.clone, com.twitter.android, com.huawei.featurelayer.sharedfeature.xrkit, com.ss.android.ugc.aweme, com.tencent.mobileqq, com.android.localtransport, com.huawei.hwireader, com.kugou.android, com.ss.android.essay.joke, com.huawei.contactscamcard, com.reversetutor.app, com.huawei.himovie, com.huawei.compass, com.valvesoftware.android.steam.community, tech.zeroxcore.nativeapp, com.vmall.client, com.autonavi.minimap, com.huawei.android.remotecontroller, com.huawei.ohos.health, com.yingyonghui.market, com.reversetutor.preview, com.baidu.netdisk, com.huawei.game.kitserver, com.pluto.athena, com.eg.android.AlipayGphone, cn.wps.moffice_eng, com.greenpoint.android.mc10086.activity]
+07-02 03:30:43.901  2672  2800 I AppFasManager: delay set fas when optimize changed , delay : 10000
+07-02 03:30:43.901  2672  2824 I ash_r   : request wkp pkgs: [com.huawei.localBackup, com.huawei.appmarket, com.huawei.hwid] reason: nerver_opt_apps
+07-02 03:30:43.901 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.android.totemweather appName: 天气
+07-02 03:30:43.902 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.906  4523  4559 W PushLog110123300: [ReceiverDispatcher-199]get forbid list failed
+07-02 03:30:43.906 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.907 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.audioaccessorymanager appName: 音频管家
+07-02 03:30:43.907 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.908 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.908 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: getEntryModuleName is null
+07-02 03:30:43.908 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.909 20311 19880 E HiBoard_14.1.27.300_FaFormInfoManager: formsInfos is empty
+07-02 03:30:43.909 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.security.privacycenter
+07-02 03:30:43.909 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.smarthome
+07-02 03:30:43.909 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.ohos.famanager appName: 服务中心
+07-02 03:30:43.909 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.910 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.ohos.suggestion appName: 小艺建议
+07-02 03:30:43.911 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.911 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.911 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.health
+07-02 03:30:43.911 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: getEntryModuleName is null
+07-02 03:30:43.912 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.ohos.search appName: 全局搜索数据服务
+07-02 03:30:43.912 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.912 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.913 14282 19881 E HiBoard_14.1.27.300_FaFormInfoManager: formsInfos is empty
+07-02 03:30:43.913 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.security.privacycenter
+07-02 03:30:43.913 20311 19880 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.913 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.smarthome
+07-02 03:30:43.913 28638 16637 D MtpServer: doGetObjectHandles from parent:4748  return 1 handles
+07-02 03:30:43.913 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.videoeditor
+07-02 03:30:43.914 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: getAppInfo, com.huawei.ohos.suggestion appName: 小艺建议
+07-02 03:30:43.914 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.wallet.facard
+07-02 03:30:43.914 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 2, code = 52
+07-02 03:30:43.914 20311 19880 E HiBoard_14.1.27.300_FaInstallManager: getAppInfo, ohos.global.systemres error : ohos.global.systemres
+07-02 03:30:43.915 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: getAppInfo is null
+07-02 03:30:43.915 20311 19880 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: set size :12 resultData size: 12
+07-02 03:30:43.915 20311 19880 I HiBoard_14.1.27.300_FaLocalAppObservable: All match
+07-02 03:30:43.916 14282 19881 I AbilityFormProxy-031: getFormsInfo transact  proxyType = 1, code = 3028
+07-02 03:30:43.916 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.ohos.videoeditor
+07-02 03:30:43.916 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: isEntryInstallationFree is true originName: com.huawei.wallet.facard
+07-02 03:30:43.917 14282 19881 E HiBoard_14.1.27.300_FaInstallManager: getAppInfo, ohos.global.systemres error : ohos.global.systemres
+07-02 03:30:43.917 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: getAppInfo is null
+07-02 03:30:43.917 14282 19881 I HiBoard_14.1.27.300_FaInstallManager: queryLocalFaApp: set size :12 resultData size: 12
+07-02 03:30:43.917  1016  1110 I dubaid  : [DubaiStorage.cpp] DoFlushEntriesBuffer# Flush all entries into database: /data/system_ce/0/dubai/dubai.db
+07-02 03:30:43.917 14282 19881 I HiBoard_14.1.27.300_FaLocalAppObservable: All match
+07-02 03:30:43.920 20991  3113 I NK_RouteInterceptor: RepTaskHandler|embedded.t3|178|has alt-svc, try to use quic
+07-02 03:30:43.920 20991 23826 I NK_Netdiag: RepTaskHandler ->NK_netdiag_0|netdiag.tools.NetDetectAndPolicy|1|the time count will reset!
+07-02 03:30:43.920 20991  3113 I NK_InterceptorExecutor: RepTaskHandler|embedded.p2|409|response code:200
+07-02 03:30:43.922  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.924 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112013
+07-02 03:30:43.927  1016  1110 I dubaid  : [DubaiStorage.cpp] DoFlushEntriesBuffer# Flush all entries into database: /data/system_ce/0/dubai/dubai.db
+07-02 03:30:43.927  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.928  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.932  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.932  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.936  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.936  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.939  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.940  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.943  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.943  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.946  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.947  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.950 28638 16637 D MtpServer: doGetObjectHandles from parent:324  return 1 handles
+07-02 03:30:43.951  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.951  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.955  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.955  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.958  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.958  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.961  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.961  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.965  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.966  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.970  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.971  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.971 28638 16637 D MtpServer: doGetObjectHandles from parent:315  return 0 handles
+07-02 03:30:43.974  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.975  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.976 28638 16637 D MtpServer: doGetObjectHandles from parent:156  return 1 handles
+07-02 03:30:43.979  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.980  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.984  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.985  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.986 28638 16637 D MtpServer: doGetObjectHandles from parent:4752  return 1 handles
+07-02 03:30:43.989  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.990  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.994  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:43.995  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:43.998 28638 16637 D MtpServer: doGetObjectHandles from parent:4753  return 1 handles
+07-02 03:30:43.999  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.000  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:44.004  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.004  2672  2871 I PGServer: getThermalInfo. calling pkg: com.huawei.appmarket
+07-02 03:30:44.008  1650  4984 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.011 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:2010100302
+07-02 03:30:44.012 20991 21012 W HiApp.FinishUpdateDataCacheManager: RepTaskHandler{7107} get key fail, key = finish_update_data_cache_key
+07-02 03:30:44.012 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1010901501
+07-02 03:30:44.020 28638 16637 D MtpServer: doGetObjectHandles from parent:342  return 3 handles
+07-02 03:30:44.028 20991 21003 I uawei.appmarke: TaskController CheckCriticalStatusTask is running.........
+07-02 03:30:44.028 20991 21003 I uawei.appmarke: TaskController check not in critical status, trigger a gc task to run
+07-02 03:30:44.029 28638 16637 D MtpServer: doGetObjectHandles from parent:4755  return 1 handles
+07-02 03:30:44.058 28638 16637 D MtpServer: doGetObjectHandles from parent:4757  return 13 handles
+07-02 03:30:44.081 20991 21003 I uawei.appmarke: TaskController RestoreGCTaskStatus
+07-02 03:30:44.162 14247 14247 W kworker/u17:4: type=1400 audit(0.0:60128): avc: granted { setsched } for pid=14247 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c41,c260,c512,c768 tclass=process
+07-02 03:30:44.312 28638 16637 D MtpServer: doGetObjectHandles from parent:255  return 1 handles
+07-02 03:30:44.337  2971 19410 I HwEasyGoService: totalNum30
+07-02 03:30:44.337  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:44.344 28638 16637 D MtpServer: doGetObjectHandles from parent:120  return 1 handles
+07-02 03:30:44.357 28638 16637 D MtpServer: doGetObjectHandles from parent:4773  return 1 handles
+07-02 03:30:44.382 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1010900606
+07-02 03:30:44.383 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1010900606
+07-02 03:30:44.384 28638 16637 D MtpServer: doGetObjectHandles from parent:114  return 1 handles
+07-02 03:30:44.386 20991 21012 W HiApp.AgGuard/AgGuardPermissionRecordProcess: RepTaskHandler{7107} do not support getPermissionUsage
+07-02 03:30:44.387 20991 21012 W HiApp.ReportAppUsageTask: RepTaskHandler{7107} usage stat list is empty!!!
+07-02 03:30:44.390 20991 21012 W HiApp.PreloadReportDataController: RepTaskHandler{7107} preloadAppReportInfos is empty
+07-02 03:30:44.394  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.396  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.399  2971 19659 I HwEasyGoService: totalNum12
+07-02 03:30:44.399  2971 19659 I HwEasyGoService: NameNotFoundException
+07-02 03:30:44.425 28638 16637 D MtpServer: doGetObjectHandles from parent:24  return 30 handles
+07-02 03:30:44.452 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112047
+07-02 03:30:44.453 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:0, eventId:1013200103
+07-02 03:30:44.455 20991  3113 I FormalHASDK: HAImpl==> onEvent. tag:_default_config_tag, type:1, eventId:907112047
+07-02 03:30:44.458  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.462  1650  2668 I chatty  : uid=1000(system) Binder:1650_B identical 3 lines
+07-02 03:30:44.465  1650  2668 E WifiService: enforceCanAccessScanResults: hiding ssid and bssidUID 10022 has no location permission
+07-02 03:30:44.521 28638 16637 D MtpServer: doGetObjectHandles from parent:4786  return 156 handles
+07-02 03:30:44.531  1650  2107 I TrafficMonitor: update:rxPkts:25,txPkts:23,rxBytes:18323,txBytes:7525
+07-02 03:30:44.531  1650  2107 I TrafficMonitor: gettimer:interval=2000
+07-02 03:30:44.577   675 24802 I netd    : trafficSwapActiveStatsMap() <12.12ms>
+07-02 03:30:44.582  1650  4984 I HWRME LIBHWRME_CLIENT: ResMngMmEvent interface arg 0, 11066
+07-02 03:30:44.585  1037  1082 D AwareLog: iawared: WorkingsetProcessCommand subCmd = 354, userId=11066, pid=0, com.reversetutor.preview.test
+07-02 03:30:44.587  2672  2800 I ScenarioService: app start speedup : com.reversetutor.preview.test
+07-02 03:30:44.587  1650 16387 I [SECURITY]: [HPS][DEFAULT][PopupActivityEventMonitor]: processActivityEvent: uid=11065, packageName=com.reversetutor.preview, activityOriginalStartResult=7, hwInterceptionMask=0, validMaskLength=4
+07-02 03:30:44.590  1037  1082 D AwareLog: iawared: WorkingsetSendPrereadMsg com.reversetutor.preview.test
+07-02 03:30:44.590  1037  1082 D AwareLog: iawared: WorkingsetStart com.reversetutor.preview.test in monitor0
+07-02 03:30:44.604  5129 19726 W ContentSensor_13.10.10.204_FrameworkRegistry: Unknown state is : showStartingWindow
+07-02 03:30:44.605  2971  6730 E DollieActivityManagerAdapter: HwActivityNotifierEx null uid
+07-02 03:30:44.605  2971  2988 D Hicom_Monitor: ActivityNotifier not support:com.reversetutor.preview.test
+07-02 03:30:44.606 19766 19766 E RtgSchedManager: endActivityTransaction: margin state not match
+07-02 03:30:44.607 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: PAUSED
+07-02 03:30:44.607 19766 19766 V ActivityScenario: Update currentActivityStage to PAUSED, currentActivity=com.reversetutor.preview.MainActivity@e1f5f66
+07-02 03:30:44.610 19766 19766 E RtgSchedManager: endActivityTransaction: margin state not match
+07-02 03:30:44.611  5129 19726 W ContentSensor_13.10.10.204_ContentSensorService: mEventListener is null
+07-02 03:30:44.612  1037  1082 D AwareLog: iawared: WorkingsetProcessCommand subCmd = 354, userId=11066, pid=0, com.reversetutor.preview.test
+07-02 03:30:44.612  1037  1082 D AwareLog: iawared: WorkingsetStart com.reversetutor.preview.test in monitor0
+07-02 03:30:44.612  2971  6730 D Hicom_Monitor: ActivityNotifier not support:com.reversetutor.preview
+07-02 03:30:44.613  2971  3146 D DollieActivityManagerAdapter: [Paused] pid:19766 uid:11065 ComponentInfo{com.reversetutor.preview/com.reversetutor.preview.MainActivity} uidState:2
+07-02 03:30:44.614  1650  1905 E system_server: Invalid ID 0x00000000.
+07-02 03:30:44.615  1650  1905 I DecorView[test]: pkgName:com.reversetutor.preview.test old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:44.616  1650  1905 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:44.616  1650  1905 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:44.617  1650  1905 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview.test
+07-02 03:30:44.618   761  7021 D AudioPolicyService: getUidState(11066) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+07-02 03:30:44.618   761  7021 D AudioPolicyService: getUidState(11066) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+07-02 03:30:44.618  1650  1905 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:44.624   676   676 D Zygote  : Forked child process 19887
+07-02 03:30:44.626  1650 19893 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview.test, windowType=3, mIsHiTouchRestricted=false
+07-02 03:30:44.626  1037  1082 D AwareLog: iawared: WorkingsetProcessCommand subCmd = 350, userId=11066, pid=19887, com.reversetutor.preview.test
+07-02 03:30:44.627  1037  1082 D AwareLog: iawared: WorkingsetStart com.reversetutor.preview.test in monitor0
+07-02 03:30:44.627  1650  1905 D ZrHung.AppEyeFocusWindow: FocusWindowErrorScene CheckFreezeScreen
+07-02 03:30:44.628  1650  1905 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+07-02 03:30:44.628 19766 19766 D DecorView: showOrHideHighlightView: hasFocus=false; winMode=1; isMrgNull=true
+07-02 03:30:44.629 19887 19887 I or.preview.tes: Late-enabling -Xcheck:jni
+07-02 03:30:44.636 28638 28657 I d.process.medi: TaskController ExpandGCThreshold currentGCThreshold(KB) = 6422 targetGCThreshold = 71958 delta = 65536
+07-02 03:30:44.636 28638 28657 I d.process.medi: TaskController add CheckCriticalStatusTask
+07-02 03:30:44.649 19887 19887 E libc    : Access denied finding property "persist.device_config.runtime_native.use_app_image_startup_cache"
+07-02 03:30:44.649 19887 19887 E or.preview.tes: LoadAppImageStartupCache enabled : 1
+07-02 03:30:44.649 19887 19887 E or.preview.tes: Unknown bits set in runtime_flags: 0x8000
+07-02 03:30:44.642 19887 19887 W or.preview.tes: type=1400 audit(0.0:60129): avc: denied { read } for pid=19887 name="u:object_r:device_config_runtime_native_prop:s0" dev="tmpfs" ino=16690 scontext=u:r:untrusted_app:s0:c42,c260,c512,c768 tcontext=u:object_r:device_config_runtime_native_prop:s0 tclass=file permissive=0
+07-02 03:30:44.650 19887 19887 I or.preview.tes: Reinit property: dalvik.vm.checkjni= false
+07-02 03:30:44.650 19887 19887 I or.preview.tes: ReInitProperties: persist.vm.debug.dumpapi= false
+07-02 03:30:44.671  1650  2195 I WiFi_PRO_WifiProStateMachine: current app com.reversetutor.preview.test, has changed
+07-02 03:30:44.671  1650  2195 I WiFi_PRO_WifiProStateMachine: not in RecommendWifi2CellState.
+07-02 03:30:44.671  2276  2958 I CapsuleManager: onAppSwitch package=com.reversetutor.preview.test, current=com.reversetutor.preview
+07-02 03:30:44.671  2672  2800 I ScenarioService: app run front pkg: com.reversetutor.preview.test
+07-02 03:30:44.672  3398 13983 I HiAdKit.DC.PersistentMessageCenter:  notifyMessage com.huawei.hwid_app_switch_from_to_intent
+07-02 03:30:44.672  2971  6730 D Hicom_Monitor: AppSwitchNotifier not support app from:com.reversetutor.preview, to:com.reversetutor.preview.test
+07-02 03:30:44.673  2971  2988 I AssistantService-11.2.1.200: registerHwActivityNotifier call fromPackage:com.reversetutor.preview, toPackage:com.reversetutor.preview.test
+07-02 03:30:44.673  2971  3453 D AssistantService-11.2.1.200: handleMessage app switch fromPackage:com.reversetutor.preview, toPackage:com.reversetutor.preview.test
+07-02 03:30:44.673  2276  2276 I NotificationViewHierarchyManager: updateNotificationViews activeNotificationSize=9
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: updateSectionBoundaries reason test
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 9
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 8
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 7
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 6
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Silent
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 5
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: SilentHeader
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 4
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 3
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 2
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 1
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 0
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: AlertingHeader
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: New header target positions:
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: MediaControls:-1
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: IncomingHeader:-1
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: AlertingHeader:0
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: SilentHeader:5
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Final order:
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 0
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: AlertingHeader
+07-02 03:30:44.674  3398 13979 I HiAdKit.DC.CommonSystemUtil:  isDeviceProvisioned: true
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 1
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 2
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 3
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 4
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 5
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: SilentHeader
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 6
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Silent
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 7
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 8
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: logShadeChild at 9
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.674  2276  2276 I NotifSectionsManager: Section boundary update complete
+07-02 03:30:44.674  3398 13979 I HiAdKit.DC.ACREntry:  oobe: false
+07-02 03:30:44.675  3398 13980 I HiAdKit.DC.AppDataCollectionProvider:  execute cmd: 5
+07-02 03:30:44.675  3398 13980 I HiAdKit.DC.AppDataCollectionManager:  report third
+07-02 03:30:44.675  2276  2276 I HwScreenRecorderTimer: updateCapsuleState isTransientShown=false isStatusBarWindowShown=true hasScreenRecorderTimer=false isPanelExpand=false
+07-02 03:30:44.675  2276  2276 D HwCapsuleCacheList: produceData []
+07-02 03:30:44.675  2276  2276 I HwCapsuleDataConsumer: onDataProduce isAnimatorRunning=false
+07-02 03:30:44.676  3398 13980 W fwkit_kims: [fwkit KIMSServiceController.java:61] Can't find the specific package.
+07-02 03:30:44.676  2672  2841 I PGServer: checkPkgType. calling pkg: com.huawei.iaware
+07-02 03:30:44.676  3398 13980 I HiAdKit.DC.AppDataCollectionManager:  aop is true
+07-02 03:30:44.677  3775 15118 I HiAdKit.PpsCoreService.Cmd:  isCmdAllowAccess rom: true permitRegion: 1
+07-02 03:30:44.677  3775 15118 I HiAdKit.PpsCoreService.Cmd:  call method: reportConsent
+07-02 03:30:44.677  3775 15118 I HiAdKit.PpsCoreService.Cmd:  callerPkg: com.huawei.hwid
+07-02 03:30:44.682 19887 19907 D HwFrameworkSecurityPartsFactory: HwFrameworkSecurityPartsFactory in.
+07-02 03:30:44.682 19887 19907 I HwFrameworkSecurityPartsFactory: add HwFrameworkSecurityPartsFactory to memory.
+07-02 03:30:44.682 19887 19907 D BehaviorCollectManager: hook process for AI virus second
+07-02 03:30:44.685 19887 19907 I BehaviorCollectManager: bindAnalyzerService: huawei.android.security.IAppBehaviorDataAnalyzer$Stub$Proxy@8d75b45 pid:19887
+07-02 03:30:44.685  2990 16785 I iconnect:BluetoothApi: adapter status 12
+07-02 03:30:44.685  2990 16785 I iconnect:NearbyDeviceDetect: isPropEnable=true, isBluetoothEnabled=true, isScreenOn=true, isNotSpecialAppOnTop=true, scanCondition=0
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:h
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:X
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:i
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:3
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:3
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:i
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:h
+07-02 03:30:44.686  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.691   766  1035 W BufferQueueProducer: [com.reversetutor.preview/com.reversetutor.preview.MainActivity#0]:1397: disconnect: not connected (req=1)
+07-02 03:30:44.692 19766 19808 W libEGL  : EGLNativeWindowType 0x75c5428590 disconnect failed
+07-02 03:30:44.692  2276  2276 I NotifSectionsManager: updateFirstAndLastViewsForAllSections, changed:false
+07-02 03:30:44.693  2276  2276 D StackScrollAlgorithm: liveRowList is empty
+07-02 03:30:44.694  2276  2276 D HwCapsuleCacheList: consumeData []
+07-02 03:30:44.695  2276  2276 I HwStatusBarCapsuleHelper: onCapsuleDataUpdate isOverlay=true, mIsCapsuleLauncherAnimationStart=false
+07-02 03:30:44.695  2276  2276 I HwStatusBarCapsuleView: hide capsule
+07-02 03:30:44.695  2276  2276 I HwStatusBarCapsuleHelper: onCapsuleDataUpdate isOverlay=false, mIsCapsuleLauncherAnimationStart=false
+07-02 03:30:44.695  2276  2276 I HwStatusBarCapsuleView: hide capsule
+07-02 03:30:44.695  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+07-02 03:30:44.696  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:44.696  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+07-02 03:30:44.699  2276  2276 D HwCapsuleCacheList: consumeData null
+07-02 03:30:44.703  2672  2800 D ScenarioService: front pkg : com.reversetutor.preview.test launcher: false
+07-02 03:30:44.703  2672  2800 D ScenarioService: new above launcher front pkgs: [tech.zeroxcore.app, com.reversetutor.preview, com.reversetutor.preview.test]
+07-02 03:30:44.703  2672  2800 I AppsUsage: scnOff: false FgAPP: com.reversetutor.preview.test BgAPP: com.reversetutor.preview
+07-02 03:30:44.704  2672  2824 I PG_ash  : front pkg : com.reversetutor.preview.test
+07-02 03:30:44.704  2672  2824 I PG_ash  : Visible app changed pkg : com.reversetutor.preview.test, visible: true
+07-02 03:30:44.704  2672  2834 I PGServer: report state:10000 event type:2 pid:0 uid:0 pkg:com.reversetutor.preview to pid: 1650
+07-02 03:30:44.704  2672  2834 I PGServer: report state:10000 event type:2 pid:0 uid:0 pkg:com.reversetutor.preview to pid: 2672
+07-02 03:30:44.704  2672  2834 I SceneReceiver: state type: 10000 eventType:2 pid:0 uid:0 pkg:com.reversetutor.preview
+07-02 03:30:44.704  2672  2834 I PGServer: report state:10000 event type:2 pid:0 uid:0 pkg:com.reversetutor.preview to pid: 2971
+07-02 03:30:44.704  2672  2834 I PGServer: report state:10000 event type:1 pid:0 uid:0 pkg:com.reversetutor.preview.test to pid: 1650
+07-02 03:30:44.704  2672  2834 I PGServer: report state:10000 event type:1 pid:0 uid:0 pkg:com.reversetutor.preview.test to pid: 2672
+07-02 03:30:44.704  2672  2834 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:44.705  2672  2871 I PGServer: checkPkgType. calling pkg: android
+07-02 03:30:44.707  1650  1904 W         : Failed to UpdateQosForCgroupInner, tid=0, policy=10
+07-02 03:30:44.707  2672  2800 I ScenarioService: app focus change from: com.reversetutor.preview to:com.reversetutor.preview.test
+07-02 03:30:44.707  2672  2800 I ScenarioService: add focus on app:com.reversetutor.preview.test to visiblePkgs
+07-02 03:30:44.709  1650  2051 E AwareLog: CpuKeyProcessSetVipFeature: getUidsByUid pkgName is null, uid=11065
+07-02 03:30:44.710  1650  2051 W AwareLog: SchedLevelBoost: onFgActivitiesChanged config not set!
+07-02 03:30:44.712  3429  6046 D TaskStackListener: destory snapshot binder pid 0 myPid 3429 snapshot TaskSnapshot{ mTopActivityComponent=com.reversetutor.preview/.MainActivity mSnapshot=android.graphics.GraphicBuffer@b72c8f (504x1047) mColorSpace=sRGB IEC61966-2.1 (id=0, model=RGB) mOrientation=1 mContentInsets=[0,67][0,0] mReducedResolution=true mScale=0.7 mIsRealSnapshot=true mWindowingMode=1 mSystemUiVisibility=0 mIsTranslucent=false
+07-02 03:30:44.713  2433  2576 I hwPS_RestrictionAdapter: getMaliciousAppInfo: packageName:com.reversetutor.preview.test flags:1
+07-02 03:30:44.713   675 24802 I OemNetd : setChrAppUid(10, 11066)
+07-02 03:30:44.706 12972 12972 W kworker/u17:3: type=1400 audit(0.0:60130): avc: granted { setsched } for pid=12972 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c42,c260,c512,c768 tclass=process
+07-02 03:30:44.714 19887 19887 D ApplicationLoaders: createClassLoader zip: /system/framework/android.test.base.jar librarySearchPath: /data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64 libraryPermittedPath: /data/user/0/com.reversetutor.preview.test parent: java.lang.BootClassLoader@2b6d746 targetSdkVersion: 34 isBundled: false classLoaderName: null sharedLibraries: null
+07-02 03:30:44.715  1650  3456 W ActivityManager: Sending non-protected broadcast huawei.intent.action.APP_TYPE_UPDATE from system 2672:com.huawei.iaware/1000 pkg com.huawei.powergenie
+07-02 03:30:44.715  1650  3456 W ActivityManager: Sending non-protected broadcast huawei.intent.action.APP_TYPE_UPDATE from system 2672:com.huawei.iaware/1000 pkg com.huawei.powergenie
+07-02 03:30:44.715  2672  2841 I PGServer: checkPkgType. calling pkg: com.huawei.iaware
+07-02 03:30:44.716  2672  2672 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:44.717   761  7097 D AudioFlinger: setParameters(): io 0, keyvalue debug log is close, calling pid 2672 calling uid 1000
+07-02 03:30:44.717 19887 19887 D ApplicationLoaders: createClassLoader zip: /system/framework/android.test.mock.jar librarySearchPath: /data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64 libraryPermittedPath: /data/user/0/com.reversetutor.preview.test parent: java.lang.BootClassLoader@2b6d746 targetSdkVersion: 34 isBundled: false classLoaderName: null sharedLibraries: [dalvik.system.PathClassLoader[DexPathList[[zip file "/system/framework/android.test.base.jar"],nativeLibraryDirectories=[/data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64, /system/lib64, /hw_product/lib64, /system/product/lib64, /prets/lib64]]]]
+07-02 03:30:44.717   735 29785 I AudioModuleManager: [AudioModuleSetParameters:51]: list size: 13
+07-02 03:30:44.718 19887 19887 I or.preview.tes: The ClassLoaderContext is a special shared library.
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch stylusCurrentPkgName = com.reversetutor.preview.test lastOneFramePkgName =
+07-02 03:30:44.719  2672  2834 I SceneReceiver: state type: 10000 eventType:1 pid:0 uid:0 pkg:com.reversetutor.preview.test
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch currentPackageName = com.reversetutor.preview.test
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch appType=-1 appState=1 gameMode=2
+07-02 03:30:44.719  1011  1011 D ITouchService: itouchReaderMonitor empty
+07-02 03:30:44.719  1011  1011 D ITouchService: g_itouch_reader_monitor Monitor::IsReaderMonitorEnable()=0
+07-02 03:30:44.719  2672  2834 I PGServer: report state:10000 event type:1 pid:0 uid:0 pkg:com.reversetutor.preview.test to pid: 2971
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch getCurrentParmID tempPkg=com.reversetutor.preview.xxx
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch:app com.reversetutor.preview.test is  not game app
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch:app com.reversetutor.preview.test is  not in StylusPenList
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch:styluspen_switch is disable
+07-02 03:30:44.719  1011  1011 D ITouchService: itouch:currentAppTypeName =|UNKNOWN|
+07-02 03:30:44.720 19887 19887 D ApplicationLoaders: createClassLoader zip: /system/framework/android.test.runner.jar librarySearchPath: /data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64 libraryPermittedPath: /data/user/0/com.reversetutor.preview.test parent: java.lang.BootClassLoader@2b6d746 targetSdkVersion: 34 isBundled: false classLoaderName: null sharedLibraries: [dalvik.system.PathClassLoader[DexPathList[[zip file "/system/framework/android.test.base.jar"],nativeLibraryDirectories=[/data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64, /system/lib64, /hw_product/lib64, /system/product/lib64, /prets/lib64]]], dalvik.system.PathClassLoader[DexPathList[[zip file "/system/framework/android.test.mock.jar"],nativeLibraryDirectories=[/data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64, /system/lib64, /hw_product/lib64, /system/product/lib64, /prets/lib64]]]]
+07-02 03:30:44.720 19887 19887 I or.preview.tes: The ClassLoaderContext is a special shared library.
+07-02 03:30:44.721 13781 13858 I HwLauncher: LocalTaskList loadTasksInBackground:3 numTasks:3 currentUserId:0
+07-02 03:30:44.722 19887 19887 D ApplicationLoaders: createClassLoader zip: /data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/base.apk librarySearchPath: /data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64 libraryPermittedPath: /data/user/0/com.reversetutor.preview.test parent: java.lang.BootClassLoader@2b6d746 targetSdkVersion: 34 isBundled: false classLoaderName: null sharedLibraries: [dalvik.system.PathClassLoader[DexPathList[[zip file "/system/framework/android.test.mock.jar"],nativeLibraryDirectories=[/data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64, /system/lib64, /hw_product/lib64, /system/product/lib64, /prets/lib64]]], dalvik.system.PathClassLoader[DexPathList[[zip file "/system/framework/android.test.runner.jar"],nativeLibraryDirectories=[/data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/lib/arm64, /system/lib64, /hw_product/lib64, /system/product/lib64, /prets/lib64]]]]
+07-02 03:30:44.723   761  7097 D AudioFlinger: setParameters(): io 0, keyvalue debug log is close, calling pid 2672 calling uid 1000
+07-02 03:30:44.724   735 29785 I AudioModuleManager: [AudioModuleSetParameters:51]: list size: 13
+07-02 03:30:44.725  1650  1864 D SEAPP_C_SecurityProfileManager: getRules: response=Response{code=200, message='OK', result=Bundle[{rules=[Bundle[{properties=Bundle[{restrictions=SMS_BLANK|CALL_LOG_BLANK|CONTACTS_BLANK|CALENDAR_BLANK|LOCATION|STORAGE|SYSTEM_ALERT_WINDOW|POPUP_BACKGROUND_WINDOW|CAMERA|MICROPHONE|SENSORS|ACTIVITY_RECOGNITION|GET_INSTALLED_APPS|NOTIFICATION_DISABLED_BEHAVIOR, restrictionLevel=1, name=com.reversetutor.preview.test, isRestricted=false}], name=com.reversetutor.preview.test}]]}]}
+07-02 03:30:44.725  2971  3265 I Hicom_Monitor: notifyAppStarted: uid = 11066
+07-02 03:30:44.725   761  7021 D AudioPolicyService: getUidState(11066) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+07-02 03:30:44.725   761  7021 D AudioPolicyService: getUidState(11066) cacheIter->second.first, return cacheIter->second.second(-1)
+07-02 03:30:44.725  2971  3265 I UctpAppMonitor: handleAppStarted: pkgName is com.reversetutor.preview.test mIsNeedToOpen is false
+07-02 03:30:44.725  2971  3265 I AppStatisticProc: handleAppStarted: pkgName = com.reversetutor.preview.test is not apk supported in Smartcare
+07-02 03:30:44.727  2672  2841 I PGServer: getTopFrontApp. calling pkg: android
+07-02 03:30:44.739   675  1218 W /system/bin/netd: A binder object at 0x7c4d81a240 is being transacted on, however, this object is in the same process as its proxy. Transacting with this binder is expensive compared to just calling the corresponding functionality in the same process.
+07-02 03:30:44.739   675  1218 I PreDnsController: CanPreDnsQuery,persist.sys.predns is false!
+07-02 03:30:44.740  1650  1650 D HwConnectivityManagerImpl: getNetworkPolicyFlag flagStr null
+07-02 03:30:44.741 19887 19887 I or.preview.tes: HwMultiThreadDexLoader location /data/app/com.reversetutor.preview.test-f9HrmgbShyh2-Ihl7jfjeA==/base.apk start threadNum=2
+07-02 03:30:44.734 12972 12972 W kworker/u17:3: type=1400 audit(0.0:60131): avc: granted { setsched } for pid=12972 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c42,c260,c512,c768 tclass=process
+07-02 03:30:44.742 12972 12972 W kworker/u17:3: type=1400 audit(0.0:60132): avc: granted { setsched } for pid=12972 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c42,c260,c512,c768 tclass=process
+07-02 03:30:44.755 19887 19907 I HwApiCacheMangerEx: apicache path=/storage/emulated/0 state=mounted key=com.reversetutor.preview.test#11066#256
+07-02 03:30:44.755 19887 19907 I HwApiCacheMangerEx: need clear apicache,because volumes changed,oldCnt=0 newCnt=1
+07-02 03:30:44.756 19887 19907 I HwApiCacheMangerEx: apicache path=/storage/emulated/0 state=mounted key=com.reversetutor.preview.test#11066#0
+07-02 03:30:44.756 19887 19907 I HwApiCacheMangerEx: need clear apicache,because volumes changed,oldCnt=1 newCnt=1
+07-02 03:30:44.759 19887 19887 I HwTypeface: updateFont: scale=1.0
+07-02 03:30:44.760 19887 19887 I FontFamily: buildHwFonts: add Font {nativePtr=505638409152, path=/data/skin/fonts/DroidSansChinese.ttf, style=FontStyle { weight=400, slant=0}, ttcIndex=0, axes=, localeList=, buffer=java.nio.DirectByteBuffer[pos=0 lim=6972836 cap=6972836], isFontWeightVariable=false} to [Font {nativePtr=505638409152, path=/data/skin/fonts/DroidSansChinese.ttf, style=FontStyle { weight=400, slant=0}, ttcIndex=0, axes=, localeList=, buffer=java.nio.DirectByteBuffer[pos=0 lim=6972836 cap=6972836], isFontWeightVariable=false}]
+07-02 03:30:44.760 19887 19887 D SystemFonts: isUsingHwThemeFonts: online invariable font existed
+07-02 03:30:44.760 19887 19887 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:44.760 19887 19907 I AwareBitmapCacher: init processName:com.reversetutor.preview.test pid=19887 uid=11066
+07-02 03:30:44.760 19887 19887 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:44.761 19887 19915 E AwareLog: AtomicFileUtils: readFileLines file not exist: android.util.AtomicFile@c9766c1
+07-02 03:30:44.772 19887 19887 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:44.775 19887 19917 I OpenGLRenderer: RenderThread: progress name = [com.reversetutor.preview.test], viewCornerType = 0
+07-02 03:30:44.775 19887 19919 I iGraphics: [0020080c] pn: com.reversetutor.preview.test, p: 19887
+07-02 03:30:44.775 19887 19919 I iGraphics: [0030080c] no spt app: com.reversetutor.preview.test
+07-02 03:30:44.784  2672  2800 W ScenarioService: number format exception! str:
+07-02 03:30:44.791  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:44.791  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-57,rsrq(noise):-92,rtt(chload):350,buffhigh(uldelay):0,buffcomm(rtt):0
+07-02 03:30:44.791  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+07-02 03:30:44.791  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-57,rsrq(noise):-92,rtt(chload):350,buffhigh(uldelay):0,buffcomm(rtt):24
+07-02 03:30:44.791  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+07-02 03:30:44.791  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+07-02 03:30:44.791  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+07-02 03:30:44.793  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 11065,4,0,312,1,2,4,0,312,65000,78000,10,10,0,34,122,0 CID 2 mMasterWifiRssi -57 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+07-02 03:30:44.793  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+07-02 03:30:44.793  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+07-02 03:30:44.793  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+07-02 03:30:44.800 19887 19887 I DecorView[]: pkgName:com.reversetutor.preview.test old windowMode:0 new windoMode:1, isFixedSize:false
+07-02 03:30:44.807  2672  2800 I ScenarioService: refresh visibleApp:[com.reversetutor.preview.test]
+07-02 03:30:44.807  2672  2800 I PGServer: report state:14 event type:1 pid:-1 uid:-1 pkg:com.reversetutor.preview.test to pid: 2672
+07-02 03:30:44.807  2672  2800 I ApsAppsTypeHandler: APS: APK: ApsAppsTypeHandler.getInstance, sInstance = com.huawei.android.hwaps.o@98a343e
+07-02 03:30:44.807  2672  2800 I PF_API_JNI: ACCKIT_APS_NotifyInfo 3: com.reversetutor.preview.test
+07-02 03:30:44.808  2672  2800 E CommonAdapter: not find method for get Running Package Information
+07-02 03:30:44.808   762   762 D ACCKIT_ : pack:"com.reversetutor.preview.test"
+07-02 03:30:44.808  2672  2800 E ScenarioService: multiScreenVisibleApps is empty
+07-02 03:30:44.808  2672  2824 I PG_ash  : com.reversetutor.preview become invisible
+07-02 03:30:44.808  2672  2824 I PG_ash  : Visible app changed pkg : com.reversetutor.preview, visible: false
+07-02 03:30:44.808  2672  2824 I PG_ash  : request H pkgs: [com.huawei.android.totemweather, com.android.calendar] reason: widget_invisible
+07-02 03:30:44.809 19887 19887 I HwPartMagicWindowFactory: add android.common.HwPartMagicWindowFactoryImpl to memory.
+07-02 03:30:44.813 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: STOPPED
+07-02 03:30:44.813 19766 19766 V ActivityScenario: Update currentActivityStage to STOPPED, currentActivity=com.reversetutor.preview.MainActivity@e1f5f66
+07-02 03:30:44.817 19887 19887 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-02 03:30:44.818 19887 19887 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-02 03:30:44.818 19887 19887 I HwPartPowerOfficeFactory: add HwPartPowerOfficeFactoryImpl to memory.
+07-02 03:30:44.819 19766 19766 D LifecycleMonitor: Lifecycle status change: com.reversetutor.preview.MainActivity@e1f5f66 in: DESTROYED
+07-02 03:30:44.819 19766 19766 V ActivityScenario: Update currentActivityStage to DESTROYED, currentActivity=null
+07-02 03:30:44.820  1650  3451 I HwPCUtils#HwRioViewManager: check if rio enable, displayId = 0， packageName = com.reversetutor.preview.test
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch stylusCurrentPkgName = com.reversetutor.preview.test lastOneFramePkgName =
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch currentPackageName = com.reversetutor.preview
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch appType=-1 appState=0 gameMode=2
+07-02 03:30:44.820  1011  1011 D ITouchService: itouchReaderMonitor empty
+07-02 03:30:44.820  1011  1011 D ITouchService: g_itouch_reader_monitor Monitor::IsReaderMonitorEnable()=0
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch getCurrentParmID tempPkg=com.reversetutor.xxx
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch:app com.reversetutor.preview is  not game app
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch:app com.reversetutor.preview is  not in StylusPenList
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch:styluspen_switch is disable
+07-02 03:30:44.820  1011  1011 D ITouchService: itouch:currentAppTypeName =|UNKNOWN|
+07-02 03:30:44.824 19766 19766 E RtgSchedManager: endActivityTransaction: margin state not match
+07-02 03:30:44.835  2971  3146 D DollieActivityManagerAdapter: [UidStateChanged]  uid:11065 uidState:5
+07-02 03:30:44.835  2971  3146 E DollieAdapterService: notifyActivityState pkg:com.reversetutor.preview/com.reversetutor.preview.MainActivity state:5 fg:false mUid:11065
+07-02 03:30:44.836  1650  2051 W AwareLog: SchedLevelBoost: onFgActivitiesChanged config not set!
+07-02 03:30:44.836   761  7097 D AudioPolicyService: getUidState(11065) cacheIter->second.first, return cacheIter->second.second(2)
+07-02 03:30:44.836  2971  3146 I HwPacketFilterBypass: handleActivityUidStateChanged uid:11065 -1 foreground:0
+07-02 03:30:44.836  2971  3146 I HwPacketFilterBypass: isAllowSendSmartCureToChr false, no exceptions occur, dropCnt:0
+07-02 03:30:44.836  2971  3146 I OllieMsgCenter: publishEvt=2130771969
+07-02 03:30:44.837  1650  3456 D wifiserviceimpl: netmask =14745599
+07-02 03:30:44.837  2971 19410 I HwEasyGoService: totalNum31
+07-02 03:30:44.838  2971 19410 I HwEasyGoService: NameNotFoundException
+07-02 03:30:44.838  2971  3146 D AppDynamicRtt: getAppRttSlowThreshold rtt sample not enought, uid:0, sample:1169
+07-02 03:30:44.838 19887 19887 D InputEventReceiver: dispatchInputInterval 1000000
+07-02 03:30:44.840 19887 19887 I RmeSchedManager: init Rme, version is: v1.0
+07-02 03:30:44.841  2971  3146 I OllieMsgCenter: publishEvt=2134966274
+07-02 03:30:44.841  1650  4969 D HwConnectivityManagerImpl: startappqoednscollection action =1timer =1000
+07-02 03:30:44.841  2926 31157 I OPCollectLog: AppChangeImpl:call onAppChange.
+07-02 03:30:44.842  2926  7027 I OPCollectLog: HwForegroundAppAction:handleMessage
+07-02 03:30:44.842  2926  7027 D OPCollectLog: HwForegroundAppAction:FG executeWithArgs
+07-02 03:30:44.842  2926  7027 I OPCollectLog: OPCollectUtils:ODMF Api Version:2.16.3
+07-02 03:30:44.842  2926  7027 I OPCollectLog: Action:HwForegroundAppAction executed successfully
+07-02 03:30:44.842  5914  9753 I CAWARENESS_34447_AppUsageManager: onEvent, packageName=com.reversetutor.preview.test, activityName=androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity, moduleName=, uid=11066, cancelCompleteMiniProgram= false
+07-02 03:30:44.842  2926  7027 D OPCollectLog: OdmfCollectScheduler:handleMessage msg: 4
+07-02 03:30:44.842  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache 1
+07-02 03:30:44.842  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache curTime: 123130900, interval: 2320
+07-02 03:30:44.842  2672  2800 I ScenarioService: app focus change from: com.reversetutor.preview.test to:tech.zeroxcore.app
+07-02 03:30:44.842  2672  2800 I ScenarioService: add focus on app:tech.zeroxcore.app to visiblePkgs
+07-02 03:30:44.843  2926  7027 I OPCollectLog: OdmfHelper:isCharging: true
+07-02 03:30:44.844  1037  1082 D AwareLog: iawared: fg_hl_ctl update fgUid=11066 g_isGame=0
+07-02 03:30:44.845  2926  7027 I OPCollectLog: OdmfHelper:insert database success
+07-02 03:30:44.845  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache size: 1
+07-02 03:30:44.845  2926  7027 I OPCollectLog: OdmfHelper:opcollectCache lastTime: 123130903
+07-02 03:30:44.846 19887 19917 D OpenGLRenderer: disableOutlineDraw is true
+07-02 03:30:44.847  5914  9753 I CAWARENESS_34447_AbilityContext: [1782934245189] deliver {dataId=100000006, mode=0} to 4 receivers
+07-02 03:30:44.848  5914  9753 I CAWARENESS_34447_AbilityContext: [1782934245190] deliver {dataId=100000007, mode=0} to 8 receivers
+07-02 03:30:44.848  5914  9753 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:ability_appusage_filter is running, add to queue 4/1/5
+07-02 03:30:44.848  5914  9753 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:capture_ability is running, add to queue 4/2/6
+07-02 03:30:44.848  5914 19924 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:ability_appusage_filter is running, add to map 4/1/6
+07-02 03:30:44.848  5914 19924 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:capture_ability is running, add to map 4/1/6
+07-02 03:30:44.848  5914 19921 I CAWARENESS_34447_AbilityContext: [1782934245189] deliver {dataId=100000258, mode=0} to null
+07-02 03:30:44.849  5914  9753 W CAWARENESS_34447_ThreadPool: thread pool abilityThreadPoll(50) label:ride_code_ability is running, add to queue 6/1/9
+07-02 03:30:44.850  5914 19925 W CAWARENESS_34447_TemplateUtil: getAppTemplateByVersionCode: param is null
+07-02 03:30:44.850  5914 19925 I CAWARENESS_34447_PageCaptureAbility: handleActivityChangedEvent: no need to capture
+07-02 03:30:44.851  5914 19927 I CAWARENESS_34447_RideCodeConfig: isEnterRideCodePage: start
+07-02 03:30:44.851  5914 19927 W CAWARENESS_34447_TrafficCodeProcessor: rideCodeComponentName is empty.
+07-02 03:30:44.853  5914 19933 W CAWARENESS_34447_StationNameHelper: package name not alipay
+07-02 03:30:44.853  2276  2958 I CapsuleManager: onAppSwitch package=tech.zeroxcore.app, current=com.reversetutor.preview.test
+07-02 03:30:44.853  2971 24649 D Hicom_Monitor: AppSwitchNotifier not support app from:com.reversetutor.preview.test, to:tech.zeroxcore.app
+07-02 03:30:44.854  1650  2195 I WiFi_PRO_WifiProStateMachine: current app tech.zeroxcore.app, has changed
+07-02 03:30:44.854  1650  2195 I WiFi_PRO_WifiProStateMachine: not in RecommendWifi2CellState.
+07-02 03:30:44.854  2971  4587 I AssistantService-11.2.1.200: registerHwActivityNotifier call fromPackage:com.reversetutor.preview.test, toPackage:tech.zeroxcore.app
+07-02 03:30:44.854  2971  3453 D AssistantService-11.2.1.200: handleMessage app switch fromPackage:com.reversetutor.preview.test, toPackage:tech.zeroxcore.app
+07-02 03:30:44.855  2276  2276 I NotificationViewHierarchyManager: updateNotificationViews activeNotificationSize=9
+07-02 03:30:44.854  2971  3146 D DollieActivityManagerAdapter: [Resumed] bg:true pid:19887 uid:11066 ComponentInfo{com.reversetutor.preview.test/androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity}
+07-02 03:30:44.855  2971  3146 E DollieAdapterService: notifyActivityState pkg:com.reversetutor.preview.test/androidx.test.core.app.InstrumentationActivityInvoker$EmptyActivity state:2 fg:true mUid:11066
+07-02 03:30:44.855   766  1038 D         : DoWinFrameOptStatusRecog begin to recog Layer result=2
+07-02 03:30:44.855  2971  6730 D Hicom_Monitor: ActivityNotifier not support:com.reversetutor.preview.test
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: updateSectionBoundaries reason test
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: logShadeChild at 9
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: logShadeChild at 8
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: logShadeChild at 7
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: logShadeChild at 6
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: Silent
+07-02 03:30:44.855   766  1038 D         : DoWinFrameOptStatusRecog begin to recog Layer result=2
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: logShadeChild at 5
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: SilentHeader
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: logShadeChild at 4
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.855  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 3
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 2
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 1
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  3398 13983 I HiAdKit.DC.PersistentMessageCenter:  notifyMessage com.huawei.hwid_app_switch_from_to_intent
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 0
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: AlertingHeader
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: New header target positions:
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: MediaControls:-1
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: IncomingHeader:-1
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: AlertingHeader:0
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: SilentHeader:5
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Final order:
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 0
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: AlertingHeader
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 1
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 2
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 3
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 4
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Alerting
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 5
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: SilentHeader
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 6
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: isHeadsUp:false
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Silent
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 7
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 8
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: logShadeChild at 9
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Other
+07-02 03:30:44.856  2276  2276 I NotifSectionsManager: Section boundary update complete
+07-02 03:30:44.857  3398 13979 I HiAdKit.DC.CommonSystemUtil:  isDeviceProvisioned: true
+07-02 03:30:44.857  2276  2276 I HwScreenRecorderTimer: updateCapsuleState isTransientShown=false isStatusBarWindowShown=true hasScreenRecorderTimer=false isPanelExpand=false
+07-02 03:30:44.857  2276  2276 D HwCapsuleCacheList: produceData []
+07-02 03:30:44.857  2276  2276 I HwCapsuleDataConsumer: onDataProduce isAnimatorRunning=false
+07-02 03:30:44.857  3398 13979 I HiAdKit.DC.ACREntry:  oobe: false
+07-02 03:30:44.858  3398 13981 I HiAdKit.DC.AppDataCollectionProvider:  execute cmd: 5
+07-02 03:30:44.858  3398 13981 I HiAdKit.DC.AppDataCollectionManager:  report third
+07-02 03:30:44.859  2971  3146 I ConnCureStateMonitor: handleMessage: msg[2]
+07-02 03:30:44.859  2971  3146 I HwPacketFilterBypass: handleActivityUidStateChanged uid:11066 -1 foreground:1
+07-02 03:30:44.859  2971  3146 I OllieMsgCenter: publishEvt=2135097351
+07-02 03:30:44.859  1650  3451 D wifiserviceimpl: netmask =14745599
+07-02 03:30:44.860 19887 19929 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview.test, windowType=1, mIsHiTouchRestricted=false
+07-02 03:30:44.860  2971  3146 I OllieMsgCenter: publishEvt=2130771969
+07-02 03:30:44.860  2971  3146 I OllieMsgCenter: publishEvt=2130771985
+07-02 03:30:44.860  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+07-02 03:30:44.861  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+07-02 03:30:44.860  3775 15119 I HiAdKit.PpsCoreService.Cmd:  isCmdAllowAccess rom: true permitRegion: 1
+07-02 03:30:44.861  3775 15119 I HiAdKit.PpsCoreService.Cmd:  call method: reportConsent
+07-02 03:30:44.861  3775 15119 I HiAdKit.PpsCoreService.Cmd:  callerPkg: com.huawei.hwid
+07-02 03:30:44.861  1650  1864 D HwConnectivityManagerImpl: startappqoednscollection action =0timer =1000
+07-02 03:30:44.861  2672  2841 I PGServer: getTopFrontApp. calling pkg: android
+07-02 03:30:44.861  3398 13981 W fwkit_kims: [fwkit KIMSServiceController.java:61] Can't find the specific package.
+07-02 03:30:44.862  2990 16785 I iconnect:BluetoothApi: adapter status 12
+07-02 03:30:44.862  2990 16785 I iconnect:NearbyDeviceDetect: isPropEnable=true, isBluetoothEnabled=true, isScreenOn=true, isNotSpecialAppOnTop=true, scanCondition=0
+07-02 03:30:44.862  5914 19932 I CAWARENESS_34447_AbilityContext: [1782934245190] no such subscribe
+07-02 03:30:44.862  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:h
+07-02 03:30:44.862  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.862  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:X
+07-02 03:30:44.862  3398 13981 I HiAdKit.DC.AppDataCollectionManager:  aop is true
+07-02 03:30:44.863  5914 19922 I CAWARENESS_34447_AbilityScheduler: query {dataId=100000250, mode=0} from ability_multi_dimension_capture
+07-02 03:30:44.862  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.863  2971  3146 I SpeedTestNotifier: Speed test app is back Activity
+07-02 03:30:44.864  2971  3146 D ForegroundDataOpt: is APK changed:true uid:11066 mBgLimitLevel:0
+07-02 03:30:44.863  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:i
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:3
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:3
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:i
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: report:NOT_SPECIAL_APP_ON_TOP device:h
+07-02 03:30:44.864  2990 16785 I iconnect:DeviceStateMachineManager: Return exist stateMachine
+07-02 03:30:44.864  5914 19931 I CAWARENESS_34447_RecentAppChangeFence: lastReport com.reversetutor.preview, packageName is com.reversetutor.preview.test
+07-02 03:30:44.864  2971  3146 I OllieMsgCenter: publishEvt=2134966274
+07-02 03:30:44.864  2971  3146 I OllieMsgCenter: publishEvt=2135097350
+07-02 03:30:44.864  2971  3146 I ForegroundDataOpt: mCurUid changed to 11066
+07-02 03:30:44.866  2276  2276 I NotifSectionsManager: updateFirstAndLastViewsForAllSections, changed:false
+07-02 03:30:44.867  2276  2276 D StackScrollAlgorithm: liveRowList is empty
+07-02 03:30:44.869  2276  2276 D HwCapsuleCacheList: consumeData []
+07-02 03:30:44.869  2276  2276 I HwStatusBarCapsuleHelper: onCapsuleDataUpdate isOverlay=true, mIsCapsuleLauncherAnimationStart=false
+07-02 03:30:44.869  2276  2276 I HwStatusBarCapsuleView: hide capsule
+07-02 03:30:44.869  2276  2276 I HwStatusBarCapsuleHelper: onCapsuleDataUpdate isOverlay=false, mIsCapsuleLauncherAnimationStart=false
+07-02 03:30:44.869  2276  2276 I HwStatusBarCapsuleView: hide capsule
+07-02 03:30:44.869  2276  2276 D HwCapsuleCacheList: consumeData null
+07-02 03:30:44.869  2971  3146 D DsduChr : uid=11066, isTrafficFree=false, isUsingFreeTraffic=false
+07-02 03:30:44.873 19887 19917 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-02 03:30:44.874 19766 19798 D IdlingRegistry: Unregistering idling resources: [androidx.compose.ui.test.junit4.EspressoLink@da0218f]
+07-02 03:30:44.875 19766 19798 I TestRunner: finished: nativeGraphCanvasShowsSeededNodesSelectionAndGlobalMode(com.reversetutor.preview.Phase5GraphDeviceTest)

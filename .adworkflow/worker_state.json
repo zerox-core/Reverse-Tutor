@@ -1,0 +1,49 @@
+{
+  "task_id": "NATIVE-P5-007",
+  "status": "verified",
+  "done": [
+    "Activated NATIVE-P5-007 task spec and regenerated ADworkflo context from the codegraph.",
+    "Added LlmContextEvidence to LLM generation requests and planner normalization.",
+    "Injected context evidence into OpenAI-compatible and Anthropic-compatible preview payload text.",
+    "Updated ChatGenerationRepository to pass context evidence and append visible source references to generated assistant messages.",
+    "Added a testable ChatContextEvidence builder that uses user-text relevance, skips queued/unsupported/no-chunk sources, truncates body text, caps evidence at six items, and degrades gracefully when repositories are missing or fail.",
+    "Wired ChatRoute to collect memory/source context before generation using MemoryRepository and SourceRepository.",
+    "Added focused tests for context payloads, citation footer, and memory/source context evidence building.",
+    "Ran focused P5-007 tests, full test/lint/debug build, and APK badging verification."
+  ],
+  "changed_files": [
+    ".adworkflow/artifacts/NATIVE-P5-007/README.md",
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/review_findings.json",
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/worker_state.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/ChatGenerationRepositoryTest.kt",
+    "mobile-native/core/llm/src/main/java/com/reversetutor/core/llm/LlmGenerationLifecycle.kt",
+    "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmGenerationLifecycleTest.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatContextEvidence.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatContextEvidenceTest.kt"
+  ],
+  "current_problem": "",
+  "next_action": "Proceed to NATIVE-UX-005 Phase 5 Context/graph/source UI polish, then NATIVE-P5-008 validation.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "No signed or release APK was built.",
+    "No Room schema version change was made.",
+    "Do not touch mobile/android/app/release.jks, mobile/android/app/build.gradle, mobile/capacitor.config.json, mobile/package.json, or static/app/index.html.",
+    "No real LLM provider/network call was made.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval."
+  ],
+  "remaining_risks": [
+    "Visible Sources footer reflects provided context evidence, not strict model-emitted cited_chunk_ids.",
+    "Exact clickable citations and source/message row highlighting remain follow-up work.",
+    "Current relevance is lightweight keyword matching, not the full legacy retrieval/routing pipeline.",
+    "Sources without readable chunks, including most complex parser/vision files, are skipped until parser extraction lands."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

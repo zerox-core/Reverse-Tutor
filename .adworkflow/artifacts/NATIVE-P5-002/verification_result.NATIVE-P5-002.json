@@ -1,0 +1,65 @@
+{
+  "task_id": "NATIVE-P5-002",
+  "commands": [
+    ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.memory.MemoryRepositoryTest :feature:memory:testDebugUnitTest --tests com.reversetutor.feature.memory.ContextHubModelsTest :feature:chat:testDebugUnitTest --tests com.reversetutor.feature.chat.ChatUiStateTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:data:testDebugUnitTest :feature:memory:testDebugUnitTest :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:compileDebugAndroidTestKotlin :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5MemoryDeviceTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\aapt.exe dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb shell getprop ro.product.model; adb shell getprop ro.build.version.release; adb shell getprop ro.build.version.sdk"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.memory.MemoryRepositoryTest :feature:memory:testDebugUnitTest --tests com.reversetutor.feature.memory.ContextHubModelsTest :feature:chat:testDebugUnitTest --tests com.reversetutor.feature.chat.ChatUiStateTest --no-daemon --stacktrace",
+      "notes": "Failed first as expected before implementation, then passed after MemoryRepository, ContextHub snapshot, and Chat action updates."
+    },
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest :feature:memory:testDebugUnitTest :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Passed. Focused JVM and app compile checks cover data repository, Context Hub models, Chat state, AppShell/MainActivity wiring, and app Kotlin compile."
+    },
+    {
+      "command": ".\\gradlew.bat :app:compileDebugAndroidTestKotlin :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Passed after adding Phase5MemoryDeviceTest and wiring memory repository through app shell."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5MemoryDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10 / API 29. XML report records tests=1, failures=0, errors=0."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed. Project-level native JVM tests, Android lint, and internal debug APK build passed after P5-002."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed via SDK build-tools 35.0.0 aapt. Package remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "adb getprop device metadata",
+      "notes": "Passed. Device metadata captured as HMA-AL00, Android 10, API 29."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "No manual edit/delete UI matrix for anchors/notes/errors was run; repository-level behavior is covered by JVM tests.",
+    "No graph node/edge renderer validation was run; graph engine remains NATIVE-P5-003."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/memory/MemoryRepositoryTest.kt",
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/ContextHubModelsTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatUiStateTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5MemoryDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-002-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-002-hma-al00/TEST-HMA-AL00-10-p5-002.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-002-hma-al00/test-result.textproto",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-002-hma-al00/test-results.log",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-002-hma-al00/logcat-Phase5MemoryDeviceTest.txt",
+    ".adworkflow/artifacts/NATIVE-P5-002/README.md",
+    ".adworkflow/artifacts/NATIVE-P5-002/TEST-HMA-AL00-10-p5-002.xml"
+  ],
+  "summary": "NATIVE-P5-002 is complete for the native preview memory persistence slice. Anchors, notes, and errors have repository create/list/update/delete/resolve foundations; Context Hub displays real memory snapshot counts; Chat Note action creates a linked note; and HMA-AL00 validates chat-note-to-context-hub behavior.",
+  "residual_risk": "This does not close graph/source context parity. Jump-to-message, manual memory management UI, explicit transaction boundaries, graph integration, and Phase 6 parity/device matrix remain open."
+}

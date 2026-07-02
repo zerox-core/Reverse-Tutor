@@ -1,0 +1,63 @@
+{
+  "task_id": "NATIVE-P4-002",
+  "status": "completed",
+  "done": [
+    "Implemented native protocol import reader for versioned full-backup, session-export, preset, LLM-profile, legacy wrapper, graph-snapshot, and import-result documents.",
+    "Implemented native import repository with validation, dry-run summary, append transaction write, import batch result recording, invalid whole-file no-write behavior, and safe invalid-record skip reporting.",
+    "Added Settings import/export screen with paste input, Android document picker, dry-run, import result summary, and import action gating.",
+    "Added external JSON receive/open path through MainActivity intent handling and AppShell auto-navigation to Import/export.",
+    "Connected DataModule.nativeImportRepository and AppShell wiring without changing the internal package id.",
+    "Integrated parallel NATIVE-P4-004 protocol-side export builder work for current-session, full-backup, graph-snapshot, and preset payloads with secret filtering.",
+    "Integrated parallel NATIVE-UX-002 shared Compose token/component foundation and minimal AppShell styling hookup."
+  ],
+  "changed_files": [
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    ".codegraph/index.json",
+    "mobile-native/app/src/main/AndroidManifest.xml",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/theme/ReverseTutorTheme.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/theme/ReverseTutorTokens.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorActions.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorDialogs.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorScaffold.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorStatus.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorSurfaces.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/theme/ReverseTutorTokenTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/export/ProtocolExportPayloads.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/export/ProtocolExportPayloadBuilderTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "tasks/native-android-next-workplan.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "current_problem": "NATIVE-P4-002 is implemented and locally verified. Phase 4 is still open because import modes, data-backed export/share-save, first-launch prompt, and Phase 4 device validation remain incomplete.",
+  "next_action": "Activate NATIVE-P4-003 for append/overwrite/new-space import modes and idempotency. Continue NATIVE-P4-004 data-backed export and Android share/save after protocol builder foundation.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "Do not build signed or release APKs.",
+    "Do not call real LLM providers during automated or device smoke validation.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "Coverage registry remains conservative; P0 blockers are not reduced without full parity evidence.",
+    "NATIVE-P4-004 is only protocol-layer complete so far; Android share/save and data-backed export are not complete."
+  ],
+  "remaining_risks": [
+    "P4-002 has local JVM/build validation but no device smoke for file picker, external receive intent, or import result UI.",
+    "Only append write path is implemented; overwrite and new-space modes remain NATIVE-P4-003.",
+    "Legacy wrapper import is validated but does not unwrap nested legacy payload stores yet.",
+    "P4-004 protocol export builders are available, but no data-backed export repository or share/save delivery exists yet.",
+    "UX-002 is component foundation only; screenshot, dynamic type, dark mode, and device visual QA remain later UX tasks."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

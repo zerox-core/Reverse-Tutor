@@ -1,0 +1,43 @@
+{
+  "task_id": "NATIVE-P5-001",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "context_data_parity",
+      "finding": "Context Hub now exposes required surfaces, but it intentionally does not read or edit anchors, notes, errors, graph nodes, or per-session settings.",
+      "recommendation": "Keep LEG-020 through LEG-024 open until P5 data/repository and graph renderer tasks add real persistence, linking, and interaction evidence."
+    },
+    {
+      "severity": "medium",
+      "area": "graph_renderer",
+      "finding": "Graph is represented by a deferred state, not a native Canvas renderer.",
+      "recommendation": "Implement graph state/layout/gesture work in NATIVE-P5-003 and NATIVE-P5-004 before claiming graph parity."
+    },
+    {
+      "severity": "low",
+      "area": "navigation_density",
+      "finding": "Bottom navigation remains horizontally scrollable and still exposes too many top-level items for small phones.",
+      "recommendation": "Move About and Import/export under Settings or a More pattern in the shell navigation UX follow-up."
+    },
+    {
+      "severity": "low",
+      "area": "ui_quality_matrix",
+      "finding": "P5-001 has HMA-AL00 screenshots/XML and an instrumentation smoke test, but not full dark mode, dynamic type, TalkBack, IME, and small-screen matrix coverage.",
+      "recommendation": "Keep complete UI quality validation in the later UX QA task."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-P5-001.json",
+    ".adworkflow/verification_result.json",
+    "tasks/arch-native-android-migration.md",
+    "tasks/native-android-ui-design-system.md",
+    "tasks/native-android-ui-acceptance-checklist.md",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubModels.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/README.md"
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "task_id": "NATIVE-P2-006",
+  "goal": "Validate Phase 2 core loop integration when preview APK is requested.",
+  "non_goals": [
+    "Do not call real LLM unless the user explicitly asks for manual device validation.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Phase 2 core loop is exercised end-to-end on the preview APK: create/open session, profile setup/no-model path, chat send, assistant mock reply, persistence after restart, and safe navigation.",
+    "Validation evidence includes UI dumps or screenshots and pid-scoped logcat with no app crash/ANR signatures.",
+    "Coverage registry is updated conservatively; no replacement readiness is claimed."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": "qa/device-validation",
+  "branch": "native/integration-phase-2-core-loop",
+  "legacy_ids": [
+    "LEG-005..LEG-018",
+    "LEG-026..LEG-028",
+    "LEG-041",
+    "LEG-042",
+    "LEG-043"
+  ],
+  "dependencies": [
+    "NATIVE-P2-002",
+    "NATIVE-P2-003",
+    "NATIVE-P2-005"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/qa/device-validation",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run .\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "Install preview APK and capture HMA-AL00 device smoke when available",
+    "Validate ADworkflo JSON and coverage registry"
+  ],
+  "notes": [
+    "Generated as part of ADworkflo full-roadmap orchestration after NATIVE-P2-005 device verification.",
+    "Worker must keep implementation scoped to this task and update worker_state/verification_result/review_findings as required.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

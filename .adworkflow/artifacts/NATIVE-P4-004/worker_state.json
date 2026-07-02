@@ -1,0 +1,50 @@
+{
+  "task_id": "NATIVE-P4-004",
+  "status": "completed",
+  "done": [
+    "Implemented data-backed NativeExportRepository foundation for current-session and full-backup exports.",
+    "Added RoomNativeExportStore over existing Room DAOs without changing schema version.",
+    "Verified current-session and full-backup export JSON generation while excluding secretRef/API key material.",
+    "Added DataModule.nativeExportRepository wiring.",
+    "Added ExportPipelineUiState for export result display, share/save gating, unavailable state, and saved state.",
+    "Extended Import/export screen with current-session export, full-backup export, share, save, and export result panels.",
+    "Wired AppShell to generate export JSON, share via Android ACTION_SEND, and save via ACTION_CREATE_DOCUMENT.",
+    "Updated coverage registry and workplan to reflect P4-004 local completion while keeping device evidence open for P4-007."
+  ],
+  "changed_files": [
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    ".codegraph/index.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "tasks/native-android-next-workplan.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "current_problem": "NATIVE-P4-004 native export flows are implemented at local code/build level. Phase 4 remains open because P4-006 first-launch prompt and P4-007 device validation are not complete.",
+  "next_action": "Implement NATIVE-P4-006 first-launch import prompt, then run NATIVE-P4-007 device validation for import/export/wipe/first-launch prompt.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "Do not build signed or release APKs.",
+    "Do not call real LLM providers during automated or device smoke validation.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "Coverage registry remains conservative; P0 blockers are not reduced without device and parity evidence."
+  ],
+  "remaining_risks": [
+    "P4-004 has local JVM/build/lint evidence but no device smoke for Android share/save flows.",
+    "Full-backup repository snapshot retains messages, but protocol full-backup JSON still follows the current builder contract and does not serialize messages.",
+    "Graph-snapshot and preset export validation exists at protocol level; Settings currently exposes current-session and full-backup export actions.",
+    "P4-007 must verify that exported JSON can be saved/shared and imported back on device."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

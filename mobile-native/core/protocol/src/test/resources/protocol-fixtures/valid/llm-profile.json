@@ -1,0 +1,15 @@
+{
+  "schema": "native_llm_profile_v1",
+  "version": 1,
+  "type": "llm_profile",
+  "id": "profile-fixture-1",
+  "name": "Synthetic OpenAI-compatible profile",
+  "provider": "openai_compatible",
+  "api_type": "openai_compatible",
+  "base_url": "https://example.invalid/v1",
+  "model": "fixture-model",
+  "secret_status": "redacted",
+  "capabilities": {
+    "vision": false
+  }
+}

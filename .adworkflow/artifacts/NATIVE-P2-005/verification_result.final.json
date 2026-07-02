@@ -1,0 +1,118 @@
+{
+  "task_id": "NATIVE-P2-005",
+  "commands": [
+    ".\\gradlew.bat :core:llm:testDebugUnitTest :core:data:testDebugUnitTest :feature:chat:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "adb kill-server; adb start-server; adb devices",
+    "adb devices -l",
+    "Get-PnpDevice -PresentOnly filtered for Android/ADB/Huawei/HMA/MTP/Phone/Composite/USB and VID_12D1",
+    "adb install -r mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb shell pm clear com.reversetutor.preview",
+    "adb shell am start -n com.reversetutor.preview/.MainActivity",
+    "adb shell uiautomator dump /sdcard/window.xml",
+    "adb exec-out cat /sdcard/window.xml > mobile-native\\qa\\device-validation\\2026-07-01-native-p2-005-hma-al00\\mock-generation.xml",
+    "adb shell screencap -p /sdcard/native-p2-005-mock-generation.png",
+    "adb pull /sdcard/native-p2-005-mock-generation.png mobile-native\\qa\\device-validation\\2026-07-01-native-p2-005-hma-al00\\mock-generation.png",
+    "adb logcat -d --pid <appPid> > mobile-native\\qa\\device-validation\\2026-07-01-native-p2-005-hma-al00\\pid-logcat.txt",
+    "& 'C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\aapt.exe' dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk | Select-String -Pattern \"package:\"",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+    "ConvertFrom-Json validation for .adworkflow JSON files, task_specs, and .codegraph/index.json",
+    "Inline PowerShell coverage registry validator"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:llm:testDebugUnitTest :core:data:testDebugUnitTest :feature:chat:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after expanded acceptance tests; covers generation planning, request metadata/capabilities/secretRef, fake streaming/failure/timeout outcomes, no-real-provider call count, provider payload context, streamed assistant persistence, provider failure/timeout mapping, stale-token rejection before and after runtime, no-model outcome, unsupported vision downgrade, blank prompt blocking, and Chat generation status labels."
+    },
+    {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed after preview app wiring through DataModule, MainActivity, AppShell, and ChatRoute."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed on final code state; project-level JVM tests, Android lint, and internal debug APK build completed. SDK XML version warning is environmental and non-fatal."
+    },
+    {
+      "command": "& 'C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\34.0.0\\aapt.exe' dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk | Select-String -Pattern \"package:\"",
+      "notes": "Passed; debug APK package is com.reversetutor.preview, versionName 0.1.0-native-preview, versionCode 1."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; rebuilt .codegraph/index.json with 130 files, 23597 source lines, 878 symbols, 315 imports, and 42 likely test files."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; refreshed context_raw.json and context_manifest.json for NATIVE-P2-005 from codegraph-index with L1-index context and warning_count=0."
+    },
+    {
+      "command": "ConvertFrom-Json validation for .adworkflow JSON files, task_specs, and .codegraph/index.json",
+      "notes": "Passed; validated 21 JSON files."
+    },
+    {
+      "command": "Inline PowerShell coverage registry validator",
+      "notes": "Passed; registry has exactly LEG-001 through LEG-044, status counts verified=3, in_progress=29, not_started=12, and P0 blockers=29."
+    },
+    {
+      "command": "adb devices -l",
+      "notes": "Passed after phone reconnection/authorization; detected HJS0218B27008886 as HMA-AL00 / Android 10 / API 29."
+    },
+    {
+      "command": "adb install -r mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk; adb shell pm clear com.reversetutor.preview; adb shell am start -n com.reversetutor.preview/.MainActivity",
+      "notes": "Passed; installed the internal debug APK, cleared preview app data, and launched `com.reversetutor.preview/.MainActivity` on HMA-AL00."
+    },
+    {
+      "command": "uiautomator/input no-model device smoke",
+      "notes": "Passed; sent `P2-005-no-mode` in Chat before a profile existed and captured `No model configured`, `You`, and the user message in `mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/no-model.xml` plus screenshot."
+    },
+    {
+      "command": "uiautomator/input Settings profile smoke",
+      "notes": "Passed; created active `MockProfile` with OpenAiCompatible / gpt-4o-mini, base URL `https://api.openai.com/v1`, and `No key saved` visible in `settings-profile-card.xml` plus screenshot."
+    },
+    {
+      "command": "uiautomator/input mock-generation device smoke",
+      "notes": "Passed; sent `P2-005-mock-generation` in Chat and captured assistant reply `Mock generation ready` in `mock-generation.xml` plus screenshot. `No model configured` was absent after the active profile existed."
+    },
+    {
+      "command": "adb logcat -d --pid <appPid>",
+      "notes": "Passed; pid-scoped logcat saved to `mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/pid-logcat.txt`; no FATAL EXCEPTION, ANR, AndroidRuntime, process-death, Exception, or Error signatures were found."
+    }
+  ],
+  "failed": [
+    {
+      "command": ".\\gradlew.bat :core:llm:testDebugUnitTest :core:data:testDebugUnitTest :feature:chat:testDebugUnitTest --no-daemon --stacktrace",
+      "expected": true,
+      "notes": "Initial TDD RED failed for unresolved P2-005 production APIs: LlmGenerationPlanner/request/token/result/runtime, ChatGenerationRepository/input/outcome, and ChatGenerationUiState."
+    },
+    {
+      "command": ".\\gradlew.bat :core:llm:testDebugUnitTest :core:data:testDebugUnitTest :feature:chat:testDebugUnitTest --no-daemon --stacktrace",
+      "expected": false,
+      "notes": "Intermediate compile failed because the new ChatGenerationRepositoryTest helper names collided with existing same-package LlmProfileRepositoryTest private helpers; fixed by renaming the new helper classes."
+    }
+  ],
+  "not_run": [
+    "No connectedDebugAndroidTest was run because P2-005 did not change Room schema/DAO behavior requiring instrumentation.",
+    "No signed or release APK was built.",
+    "No real LLM provider calls were made."
+  ],
+  "evidence": [
+    "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmGenerationLifecycleTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/ChatGenerationRepositoryTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatUiStateTest.kt",
+    "mobile-native/app/build/outputs/apk/debug/app-debug.apk",
+    "tasks/native-legacy-coverage-registry.md",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/context_manifest.json",
+    ".codegraph/index.json",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/no-model.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/no-model.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/settings-profile-card.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/profile-card.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/mock-generation.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/mock-generation.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/pid-logcat.txt"
+  ],
+  "summary": "NATIVE-P2-005 direct-provider generation lifecycle is implemented and verified with expanded offline deterministic tests, lint, debug APK build, package inspection, registry validation, and HMA-AL00 true-device no-model/profile/mock-generation smoke evidence.",
+  "residual_risk": "Replacement readiness is not achieved. P0 blockers remain open, live direct provider networking is intentionally not implemented, background generation isolation remains P3-001, and the current device evidence covers one HMA-AL00 / Android 10 physical phone only."
+}

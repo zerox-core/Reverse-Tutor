@@ -1,0 +1,62 @@
+{
+  "task_id": "NATIVE-P5-001",
+  "status": "verified",
+  "done": [
+    "Moved Context Hub from an app-shell placeholder into a native :feature:memory screen with a dedicated UI state model.",
+    "Added active Chat entry through the Chat header so Context Hub is reachable from a real active session, not only placeholder Chat.",
+    "Exposed Overview, Graph, Anchors, Notes, Errors, and Session settings surfaces in the Context Hub shell.",
+    "Added explicit empty/deferred copy that states graph/source parity is not complete and avoids overclaiming native graph readiness.",
+    "Kept graph rendering, anchors, notes, errors, and session settings persistence/editing out of scope for later Phase 5 tasks.",
+    "Aligned MemoryModule route with the app Context Hub route.",
+    "Added JVM tests for ContextHubUiState required surfaces and deferred graph/session-settings states.",
+    "Added HMA-AL00 instrumentation coverage for active Chat -> Context Hub -> Back to Chat.",
+    "Captured HMA-AL00 XML/PNG evidence for the active Chat entry, Context Hub overview, and Graph deferred state.",
+    "Updated Phase 5 workplan, coverage registry, and ADworkflo project state without closing replacement-readiness blockers."
+  ],
+  "changed_files": [
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/review_findings.json",
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/worker_state.json",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5ContextHubDeviceTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubModels.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/MemoryModule.kt",
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/ContextHubModelsTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/chat.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub-graph.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub-graph.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/sessions.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/TEST-HMA-AL00-10-p5-001.xml",
+    "tasks/native-android-next-workplan.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "current_problem": "",
+  "next_action": "Proceed to NATIVE-P5-005 Source library and simple local parsers, then NATIVE-P5-002 anchors/notes/errors persistence.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "No signed or release APK was built.",
+    "Do not touch mobile/android/app/release.jks, mobile/android/app/build.gradle, mobile/capacitor.config.json, mobile/package.json, or static/app/index.html.",
+    "No real LLM provider/network call was made.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "Context Hub shell is not graph/source/evidence parity; it is an explicit Phase 5 shell."
+  ],
+  "remaining_risks": [
+    "LEG-019 remains a P0 blocker until Phase 6 parity validates the complete per-session context experience.",
+    "LEG-020 remains a P0 blocker because native graph renderer, pan/zoom/select, and detail sheets are not implemented.",
+    "LEG-021 through LEG-023 remain blocked on real anchors, notes, errors persistence and evidence linking.",
+    "LEG-024 remains a P0 blocker because persona, strategy, deadline, avatar, change warnings, and per-session settings editing are deferred.",
+    "Bottom navigation remains crowded and horizontally scrollable; broader shell navigation cleanup remains a UX follow-up.",
+    "Full dark mode, dynamic type, TalkBack, IME, and small-screen UI matrix remain assigned to later UX validation."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

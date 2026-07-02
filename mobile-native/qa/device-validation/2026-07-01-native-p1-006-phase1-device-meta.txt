@@ -1,0 +1,7 @@
+﻿serial=HJS0218B27008886
+model=HMA-AL00
+android=10
+sdk=29
+package=com.reversetutor.preview
+pid=18977
+result=passed

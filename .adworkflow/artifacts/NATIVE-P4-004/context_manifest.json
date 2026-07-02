@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P4-004",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/export/ProtocolExportPayloads.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/NativeSessionPreset.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/export/ProtocolExportPayloadBuilderTest.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/NativeSessionPresetValidatorTest.kt",
+    "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/preferences/AppPreferencesRepositoryTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/preferences/AppPreferenceKeys.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_export_uses_native_android_share_sheet (tests/test_android_background_llm.py:195)",
+    "test_mobile_llm_api_type_is_protocol_family_and_deepseek_uses_current_models (tests/test_llm_provider_presets.py:39)",
+    "test_mobile_builtin_session_presets_are_rich_and_varied (tests/test_mobile_product_experience.py:516)",
+    "export_session (server.py:706)",
+    "test_android_manifest_declares_background_llm_service_and_permissions (tests/test_android_background_llm.py:11)",
+    "test_android_background_llm_plugin_sources_exist_and_are_registered (tests/test_android_background_llm.py:24)",
+    "test_android_main_activity_refreshes_stale_app_shell_cache_on_native_upgrade (tests/test_android_background_llm.py:127)",
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)",
+    "test_mobile_update_download_opens_native_installer_when_available (tests/test_android_background_llm.py:180)",
+    "test_kg_queries_are_session_isolated (tests/test_kg_schema.py:179)",
+    "test_mobile_llm_settings_use_custom_picker_ui_instead_of_visible_native_selects (tests/test_llm_provider_presets.py:85)",
+    "test_android_background_job_carries_api_type_and_capability (tests/test_llm_provider_presets.py:193)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not export API keys by default.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

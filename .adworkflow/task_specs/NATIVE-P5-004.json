@@ -1,0 +1,79 @@
+{
+  "task_id": "NATIVE-P5-004",
+  "goal": "Implement graph edit and review parity.",
+  "non_goals": [
+    "Do not waive graph P0 behavior without approval.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Graph edit/save and review parity checklist is implemented or explicitly marked blocking/waived.",
+    "Related source/chat jump paths are available where data exists.",
+    "P0 graph parity is not waived without explicit approval."
+  ],
+  "risk_level": "high",
+  "execution_mode": "fanout_workers",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json"
+  ],
+  "module": ":feature:memory/:core:data",
+  "branch": "native/memory-graph-sources",
+  "legacy_ids": [
+    "LEG-020",
+    "LEG-025"
+  ],
+  "dependencies": [
+    "NATIVE-P5-002",
+    "NATIVE-P5-003",
+    "NATIVE-P5-006"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/core/data/src/main/java",
+    "mobile-native/core/data/src/test/java",
+    "mobile-native/core/data/src/androidTest/java",
+    "mobile-native/feature/memory/src/main/java",
+    "mobile-native/feature/memory/src/test/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run feature:memory/feature:sources/core:data/feature:chat/core:llm JVM tests",
+    "Run .\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "Run graph/source touch-device validation when feasible",
+    "Validate ADworkflo JSON and coverage registry"
+  ],
+  "notes": [
+    "Generated as part of ADworkflo full-roadmap orchestration after NATIVE-P2-005 device verification.",
+    "Worker must keep implementation scoped to this task and update worker_state/verification_result/review_findings as required.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

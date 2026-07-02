@@ -1,0 +1,72 @@
+{
+  "task_id": "NATIVE-P5-003",
+  "commands": [
+    ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.graph.GraphRepositoryTest :feature:memory:testDebugUnitTest --tests com.reversetutor.feature.memory.KnowledgeGraphUiStateTest --tests com.reversetutor.feature.memory.ContextHubModelsTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:data:testDebugUnitTest :feature:memory:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5GraphDeviceTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5ContextHubDeviceTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\aapt.exe dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb shell getprop ro.product.model; adb shell getprop ro.build.version.release"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.graph.GraphRepositoryTest :feature:memory:testDebugUnitTest --tests com.reversetutor.feature.memory.KnowledgeGraphUiStateTest --tests com.reversetutor.feature.memory.ContextHubModelsTest --no-daemon --stacktrace",
+      "notes": "Failed first during development on compile/old assertion issues, then passed after Canvas API and graph-state test updates. Covers repository save/list, invalid input, space isolation, empty/invalid/large graph state, hit testing, and Context Hub graph state mapping."
+    },
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest :feature:memory:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+      "notes": "Passed. Confirms data/memory unit suites, app Kotlin compile, and Android instrumentation source compile."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5GraphDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10. XML report records tests=1, failures=0, errors=0; flow covers seeded graph, Context Hub Graph route, Canvas semantics, node selection detail, relation display, and Global graph mode."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5ContextHubDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10 after Graph section changed from deferred copy to native empty state."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed. Project-level native JVM tests, Android lint, and internal debug APK build passed after P5-003."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed via SDK build-tools 35.0.0 aapt. Package remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "adb getprop device metadata",
+      "notes": "Passed. Device metadata captured as HMA-AL00, Android 10."
+    }
+  ],
+  "failed": [
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5GraphDeviceTest\" --no-daemon --stacktrace",
+      "notes": "One rerun failed before test execution because adb temporarily reported device HJS0218B27008886 not found during APK install. Device returned online and the same command passed on rerun."
+    }
+  ],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "No pixel-level gesture physics test was run; device test validates routed Canvas, selection/detail, and global graph mode through stable Compose semantics and text.",
+    "No graph edit/review UI matrix was run; it remains NATIVE-P5-004.",
+    "No source/memory-to-chat context injection validation was run; it remains NATIVE-P5-007."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/graph/GraphRepositoryTest.kt",
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/KnowledgeGraphUiStateTest.kt",
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/ContextHubModelsTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5GraphDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5ContextHubDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-003-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-003-hma-al00/TEST-HMA-AL00-10-p5-003.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-003-hma-al00/test-result.textproto",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-003-hma-al00/test-results.log",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-003-hma-al00/logcat-Phase5GraphDeviceTest.txt",
+    ".adworkflow/artifacts/NATIVE-P5-003/README.md",
+    ".adworkflow/artifacts/NATIVE-P5-003/TEST-HMA-AL00-10-p5-003.xml"
+  ],
+  "summary": "NATIVE-P5-003 is complete for the native preview graph-engine slice. The app now has a Room-backed graph repository, deterministic native graph UI state, Compose Canvas rendering, pan/zoom/tap selection, accessible node selection/detail UI, invalid/empty/large states, Context Hub Graph integration, Global graph route, focused tests, HMA-AL00 device evidence, full test/lint/build verification, and package-id confirmation.",
+  "residual_risk": "This does not close full graph replacement parity. Graph data is still space-scoped rather than sessionId-scoped, edit/review parity remains NATIVE-P5-004, source/memory context injection remains NATIVE-P5-007, and Phase 6 parity/device matrix remains required before PWA exit."
+}

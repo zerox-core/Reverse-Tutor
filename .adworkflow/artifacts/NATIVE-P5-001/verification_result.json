@@ -1,0 +1,62 @@
+{
+  "task_id": "NATIVE-P5-001",
+  "commands": [
+    ".\\gradlew.bat :feature:memory:testDebugUnitTest :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5ContextHubDeviceTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb install -r mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb shell am start -n com.reversetutor.preview/.MainActivity",
+    "adb shell input tap to open a real session and Context Hub",
+    "adb shell uiautomator dump /sdcard/window.xml",
+    "adb exec-out screencap -p"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :feature:memory:testDebugUnitTest :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Passed. Covers ContextHubUiState surfaces/deferred copy, Chat header entry compilation, app shell route wiring, and app Kotlin compile."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5ContextHubDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10. XML report records tests=1, failures=0, errors=0."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed after Context Hub shell, Chat entry, app shell routing, and test additions."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed. Package remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview, and the APK is debuggable/internal preview."
+    },
+    {
+      "command": "adb install -r app-debug.apk; adb shell am start -n com.reversetutor.preview/.MainActivity",
+      "notes": "Passed for internal debug preview install and launch; no signed/release APK was built and com.reversetutor.app was not replaced."
+    },
+    {
+      "command": "adb uiautomator dump + screencap",
+      "notes": "Passed. Captured Sessions, active Chat entry, Context Hub overview, and Graph deferred-state evidence under the P5-001 HMA-AL00 evidence directory."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "No graph renderer pan/zoom/select/detail validation was run because graph rendering is out of scope for NATIVE-P5-001.",
+    "No anchors/notes/errors/session-settings persistence validation was run because those behaviors remain assigned to later Phase 5 tasks.",
+    "No all-up dark mode, large text, TalkBack, or IME screenshot matrix was run; that remains later UX QA."
+  ],
+  "evidence": [
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/ContextHubModelsTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5ContextHubDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/TEST-HMA-AL00-10-p5-001.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/chat.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub-graph.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-001-hma-al00/context-hub-graph.xml"
+  ],
+  "summary": "NATIVE-P5-001 is complete for the native preview Context Hub shell. The app now exposes Context Hub from a real active Chat session, shows the required surfaces, clearly marks graph/source parity as deferred, and has JVM, build/lint, and HMA-AL00 device evidence.",
+  "residual_risk": "This does not close Phase 5 or replacement-readiness blockers. Real graph rendering, anchors, notes, errors, source linking, and per-session settings editing remain future work."
+}

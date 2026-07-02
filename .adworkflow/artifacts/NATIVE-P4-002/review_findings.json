@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P4-002",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_validation",
+      "finding": "P4-002 import pipeline has JVM/build/lint evidence, but no device smoke for Android document picker, external receive intent, dry-run screen, or write-result UI.",
+      "recommendation": "Keep NATIVE-P4-007 as the device evidence gate for import, export, wipe, first-launch prompt, and logcat checks."
+    },
+    {
+      "severity": "medium",
+      "area": "import_modes",
+      "finding": "The implemented write path is append-only. Overwrite, new-space, and idempotency semantics are not complete.",
+      "recommendation": "Activate NATIVE-P4-003 next and add transaction tests for append, overwrite, new-space, duplicate source ids, and rollback behavior."
+    },
+    {
+      "severity": "medium",
+      "area": "legacy_payload_depth",
+      "finding": "Legacy wrapper documents are validated and reported, but nested legacy IndexedDB-style payload unwrapping is not implemented.",
+      "recommendation": "Handle legacy wrapper mapping in P4-003 or a dedicated follow-up before claiming full LEG-032 parity."
+    },
+    {
+      "severity": "medium",
+      "area": "export_scope",
+      "finding": "NATIVE-P4-004 sidecar completed protocol payload builders only. Data-backed export repositories, current-session export action, full backup export, graph snapshot export wiring, and Android share/save delivery remain open.",
+      "recommendation": "Continue P4-004 with data and Android delivery scopes after P4-003 import modes or in a disjoint worker if write scopes stay clean."
+    },
+    {
+      "severity": "low",
+      "area": "ui_quality",
+      "finding": "UX-002 added shared tokens/components and AppShell hookup, but no screenshot, dynamic type, dark mode, IME, or small-screen QA was run.",
+      "recommendation": "Use UX-003/UX-004/UX-006 for visual QA and device screenshot evidence."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/export/ProtocolExportPayloadBuilderTest.kt",
+    "mobile-native/app/src/main/AndroidManifest.xml",
+    "tasks/native-legacy-coverage-registry.md"
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "task_id": "NATIVE-P5-005",
+  "commands": [
+    ".\\gradlew.bat :app:testDebugUnitTest --tests com.reversetutor.preview.shell.SourceImportInputFactoryTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.sources.SourceRepositoryTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:model:testDebugUnitTest :core:data:testDebugUnitTest :feature:sources:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5SourcesDeviceTest\" --no-daemon --stacktrace",
+    "C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\aapt.exe dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb shell getprop ro.product.model; adb shell getprop ro.build.version.release; adb shell getprop ro.build.version.sdk"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest --tests com.reversetutor.preview.shell.SourceImportInputFactoryTest --no-daemon --stacktrace",
+      "notes": "Passed after TDD red. Covers source picker input construction, unsupported binary no-read behavior, unreadable text input preservation, and bounded text reads."
+    },
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.sources.SourceRepositoryTest --no-daemon --stacktrace",
+      "notes": "Passed. Covers TXT, Markdown, sanitized HTML, unsupported/future-assisted visibility, failed text visibility, and reprocess chunk replacement."
+    },
+    {
+      "command": ".\\gradlew.bat :core:model:testDebugUnitTest :core:data:testDebugUnitTest :feature:sources:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+      "notes": "Passed. Focused P5-005 JVM and compile verification across model, data, sources feature, app unit tests, app Kotlin compile, and Android test compile."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed. Project-level native JVM tests, Android lint, and internal debug APK build passed after Source Library implementation."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5SourcesDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10 / API 29. XML report records tests=1, failures=0, errors=0."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed via SDK build-tools 35.0.0 aapt. Package remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview, label Reverse Tutor Native."
+    },
+    {
+      "command": "adb getprop device metadata",
+      "notes": "Passed. Device metadata captured as HMA-AL00, Android 10, API 29."
+    }
+  ],
+  "expected_red": [
+    {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest --tests com.reversetutor.preview.shell.SourceImportInputFactoryTest --no-daemon --stacktrace",
+      "notes": "Failed before implementing buildSourceImportInput, as expected: unresolved reference buildSourceImportInput."
+    },
+    {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest --tests com.reversetutor.preview.shell.SourceImportInputFactoryTest --no-daemon --stacktrace",
+      "notes": "Failed before implementing readSourceTextWithinLimit, as expected: unresolved reference readSourceTextWithinLimit."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "No separate manual installDebug/screenshot capture was run for P5-005 because the Gradle instrumentation run removed the native preview package from the device and this task did not request a manual install.",
+    "No real Android system document picker screenshot matrix was captured.",
+    "No complex parser validation for PDF, DOCX, PPTX, EPUB, image OCR, or persisted URI re-read was run; those remain later Phase 5 tasks."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/sources/SourceRepositoryTest.kt",
+    "mobile-native/feature/sources/src/test/java/com/reversetutor/feature/sources/SourcesUiStateTest.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/shell/SourceImportInputFactoryTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5SourcesDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-005-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-005-hma-al00/TEST-HMA-AL00-10-p5-005.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-005-hma-al00/test-result.textproto",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-005-hma-al00/test-results.log",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-005-hma-al00/logcat-Phase5SourcesDeviceTest.txt",
+    ".adworkflow/artifacts/NATIVE-P5-005/README.md",
+    ".adworkflow/artifacts/NATIVE-P5-005/TEST-HMA-AL00-10-p5-005.xml"
+  ],
+  "summary": "NATIVE-P5-005 is complete for the native preview Source Library foundation. Android can open the Sources route, queue document-picker source imports, parse TXT/Markdown locally, sanitize HTML as partial local extraction, keep unsupported/failed files visible, show parser status/cards/snippets, and expose a reprocess entry. JVM, lint/build, APK badging, and HMA-AL00 instrumentation evidence passed.",
+  "residual_risk": "This does not close source/context replacement readiness. Persisted URI permissions, original-file re-read during reprocess, complex parser support, source-to-chat attachment, anchors, graph links, and Phase 6 device/migration matrix remain open."
+}

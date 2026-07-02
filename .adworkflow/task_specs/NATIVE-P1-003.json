@@ -1,0 +1,80 @@
+{
+  "task_id": "NATIVE-P1-003",
+  "goal": "Add core domain models, initial Room schema, DAO boundaries, and schema versioning policy for native local data.",
+  "non_goals": [
+    "Do not implement full repositories or feature UI.",
+    "Do not implement import/export transaction execution.",
+    "Do not implement encryption or Android Keystore secret storage.",
+    "Do not call real LLM providers.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not build signed APKs."
+  ],
+  "acceptance_criteria": [
+    "Space is a first-class user-visible domain model with id, name, kind, created/updated timestamps, and optional sourceImportId.",
+    "Core domain models exist for sessions, messages, LLM profiles, memory/context items, graph, sources, background jobs, import batches, and export records.",
+    "Initial Room schema includes the core tables listed in ARCH section 6.2.",
+    "User-owned Room entities include spaceId where relevant.",
+    "DAO boundaries exist for spaces, sessions, messages, sources, graph, jobs, import batches, and export records.",
+    "Database versioning policy is explicit and test-covered.",
+    "Data layer compiles independently from UI modules.",
+    "Entity mapping and DAO smoke tests are present.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch_or_changed_file_summary",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json"
+  ],
+  "module": ":core:model,:core:data",
+  "branch": "native/local-data",
+  "legacy_ids": [
+    "LEG-005",
+    "LEG-012",
+    "LEG-020",
+    "LEG-026",
+    "LEG-031",
+    "LEG-032",
+    "LEG-034"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/Space.kt",
+    "mobile-native/core/model/build.gradle.kts",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/core/data/build.gradle.kts"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Write failing tests before production model/schema implementation.",
+    "Run :core:model:testDebugUnitTest.",
+    "Run :core:data:testDebugUnitTest.",
+    "Run :core:data:connectedDebugAndroidTest if an ADB device is available.",
+    "Run native Gradle assembleDebug, test, and lint."
+  ],
+  "notes": [
+    "This is a schema foundation task. Repositories and feature UI should be deferred to later tasks.",
+    "Room compiler configuration is allowed as part of the already-approved Room stack."
+  ]
+}

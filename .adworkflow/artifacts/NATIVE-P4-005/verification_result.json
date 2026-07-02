@@ -1,0 +1,68 @@
+{
+  "task_id": "NATIVE-P4-005",
+  "commands": [
+    ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:protocol:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:protocol:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts and codegraph",
+    "PowerShell coverage registry validator for tasks/native-legacy-coverage-registry.md",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "aapt dump badging app-debug.apk"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after local data wipe repository, settings confirmation model, and AppShell wiring."
+    },
+    {
+      "command": ".\\gradlew.bat :core:protocol:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Passed after P4-001 worker fixed ProtocolFieldKind enum naming."
+    },
+    {
+      "command": ".\\gradlew.bat :core:protocol:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed; protocol fixture/schema validator tests are green."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "ConvertFrom-Json validation for ADworkflo JSON artifacts and codegraph",
+      "notes": "Passed; validated 69 JSON files before this artifact update."
+    },
+    {
+      "command": "PowerShell coverage registry validator for tasks/native-legacy-coverage-registry.md",
+      "notes": "Passed; coverage_rows=44 and p0_blockers=29 remain conservative."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; codegraph now indexes 137 files and 24761 source lines."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No real LLM provider/network call was run.",
+    "No P4-005 destructive wipe device smoke was run yet; keep Phase 4 validation task open for device evidence.",
+    "No coverage registry status was advanced for LEG-033 because device evidence and full Phase 4 validation are still pending."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/wipe/LocalDataWipeRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/wipe/LocalDataWipeRepositoryTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/VersionedProtocolSchemas.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/VersionedProtocolSchemaValidatorTest.kt",
+    "mobile-native/core/protocol/src/test/resources/protocol-fixtures/",
+    "tasks/native-android-ui-design-system.md",
+    "tasks/native-android-ui-acceptance-checklist.md",
+    "tasks/native-ui-ux-roadmap.md",
+    ".adworkflow/worker_state.json"
+  ],
+  "summary": "NATIVE-P4-005 local data wipe is implemented with repository and settings confirmation coverage. Parallel NATIVE-P4-001 protocol foundation and NATIVE-UX-001 design-system documentation are also complete and verified locally.",
+  "residual_risk": "Phase 4 is not complete: import pipeline, export flows, import modes, first-launch prompt, and Phase 4 device validation remain open."
+}

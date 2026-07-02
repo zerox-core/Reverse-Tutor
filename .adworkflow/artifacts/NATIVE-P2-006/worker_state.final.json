@@ -1,0 +1,42 @@
+{
+  "task_id": "NATIVE-P2-006",
+  "status": "completed",
+  "done": [
+    "Archived NATIVE-P2-005 final artifacts and activated NATIVE-P2-006 as the current ADworkflo task.",
+    "Generated and validated the remaining downstream ADworkflo task specs, including Phase 3, Phase 4, Phase 5, Phase 6, and the expanded UI/UX track.",
+    "Added a deterministic app-level Android instrumentation test for the Phase 2 core loop: create Exam sprint session, no-model send, fake-runtime assistant reply, and persistence after activity recreation.",
+    "Validated P2-006 on HMA-AL00 / Android 10 / API 29 with Gradle connected test, manual instrumentation, UI dumps/screenshots, and pid-scoped logcat.",
+    "Confirmed the debug APK package identity remains com.reversetutor.preview with versionName 0.1.0-native-preview."
+  ],
+  "changed_files": [
+    ".adworkflow/execution_plan.json",
+    ".adworkflow/task_specs/NATIVE-UX-007.json",
+    ".adworkflow/task_specs/NATIVE-UX-008.json",
+    ".adworkflow/task_specs/NATIVE-UX-009.json",
+    ".adworkflow/task_specs/NATIVE-UX-010.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    ".codegraph/index.json",
+    "mobile-native/app/build.gradle.kts",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/",
+    "tasks/native-ui-ux-roadmap.md"
+  ],
+  "current_problem": "P2-006 is complete. The next implementation slice should start from tasks whose dependencies are now open after batch-2-validation: NATIVE-UX-001/002, NATIVE-P4-001/P4-005, and NATIVE-P5-001/P5-005. P3 remains later unless explicitly prioritized.",
+  "next_action": "Archive P2-006 artifacts, activate the next task contract, then dispatch disjoint workers for UI foundation and protocol/import-export foundation.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "Do not build signed or release APKs.",
+    "Do not call real LLM providers during automated or device smoke validation.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "UI/UX track is now explicit but must not overclaim functional parity."
+  ],
+  "remaining_risks": [
+    "P2-006 device validation is strong for HMA-AL00 / Android 10 but does not replace the future Phase 6 device matrix.",
+    "Live provider networking, WorkManager background jobs, import/export parity, graph/source parity, and replacement readiness remain future tasks.",
+    "The UI/UX track has been planned and partially specified, but production UI polish still needs implementation and screenshot QA."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

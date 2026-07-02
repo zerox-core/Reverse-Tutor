@@ -1,0 +1,42 @@
+{
+  "task_id": "NATIVE-P5-002",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "transaction_boundary",
+      "finding": "MemoryRepository writes the specialist table and memory_items table as separate DAO calls.",
+      "recommendation": "Add an explicit Room transaction boundary before replacement readiness or bulk memory extraction."
+    },
+    {
+      "severity": "medium",
+      "area": "memory_management_ui",
+      "finding": "Repository supports update/delete/resolve behavior, but the UI path only covers Chat Note creation and Context Hub display.",
+      "recommendation": "Add manual memory management UI and jump-to-message behavior in later Context Hub/graph/source integration tasks."
+    },
+    {
+      "severity": "medium",
+      "area": "error_workflow",
+      "finding": "Error logs can be created/resolved by repository tests, but no correction review or diagnostics workflow is wired.",
+      "recommendation": "Keep LEG-023 open until Phase 3 diagnostics and error-review evidence exists."
+    },
+    {
+      "severity": "low",
+      "area": "graph_parity",
+      "finding": "Memory evidence is not yet projected into graph nodes/edges.",
+      "recommendation": "Handle node/edge materialization and review parity in NATIVE-P5-003/P5-004."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-P5-002.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/memory/MemoryRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubModels.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5MemoryDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-002-hma-al00/README.md"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "task_id": "NATIVE-P2-005",
+  "goal": "Implement the native direct-provider generation lifecycle foundation that connects chat turns to LLM profile selection, mockable provider runtimes, pending/streaming reply state, stale-token protection, and explicit no-model UX.",
+  "non_goals": [
+    "Do not call real LLM providers from automated tests or device smoke.",
+    "Do not require Python runtime for Android chat generation.",
+    "Do not implement WorkManager background jobs or notifications; those belong to NATIVE-P3-001 and NATIVE-P3-002.",
+    "Do not implement full source citation/context injection; that belongs to NATIVE-P5-007.",
+    "Do not implement Phase 4 import/export protocols.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness."
+  ],
+  "acceptance_criteria": [
+    "A native generation request model captures sessionId, message text, selected LLM profile metadata, provider kind, model, baseUrl, capability flags, quote/image-draft context where applicable, and a generation token.",
+    "A direct-provider runtime abstraction exists for OpenAI-compatible and Anthropic-compatible strategies without forcing real network calls in tests.",
+    "A deterministic fake provider runtime can return success, streaming chunks, failure, timeout-like errors, and stale-token scenarios.",
+    "Chat generation lifecycle supports no-model configured state, pending reply state, success reply persistence, failure message/diagnostic state, cancellation or stale-token rejection, and regenerate entry foundation.",
+    "Assistant replies are persisted as assistant messages only when the generation token still belongs to the active session/request.",
+    "Image draft or vision input checks respect provider capability flags and degrade gracefully when unsupported.",
+    "Automated tests cover no-profile/no-model UX, generation request construction, fake streaming parsing/aggregation, stale-token rejection, provider failure mapping, assistant message persistence, and no real provider calls.",
+    "Settings/profile foundation from NATIVE-P2-004 is consumed through repository/model boundaries rather than duplicated logic.",
+    "Chat UI exposes clear pending/no-model/failure states without hiding the existing local composer and timeline behavior.",
+    "Legacy coverage registry is updated conservatively for LEG-016, LEG-018, and LEG-042.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json"
+  ],
+  "module": ":core:llm/:feature:chat/:core:data",
+  "branch": "native/llm-runtime",
+  "legacy_ids": [
+    "LEG-016",
+    "LEG-018",
+    "LEG-042"
+  ],
+  "dependencies": [
+    "NATIVE-P2-003",
+    "NATIVE-P2-004"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/core/llm/src/main/java",
+    "mobile-native/core/llm/src/test/java",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/message/MessageRepository.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatUiState.kt",
+    "mobile-native/feature/chat/src/test/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Follow TDD: add failing tests before production implementation for generation request model, fake runtime, streaming aggregation, no-model state, stale-token rejection, provider failure mapping, and chat UI state.",
+    "Run focused core llm, core data, feature chat, and app JVM tests.",
+    "Run native project test, lint, and app assembleDebug.",
+    "Run connected instrumentation only if the implementation touches Room DAO behavior requiring device validation.",
+    "Install preview debug APK on the connected device and capture no-model/pending/mock-generation smoke evidence when feasible.",
+    "Use app pid/package-specific logcat filtering to avoid global AndroidRuntime false positives.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json and rebuild codegraph."
+  ],
+  "notes": [
+    "Existing PRD/ARCH/TODO and prior user approval are the design basis for this task.",
+    "P2-005 should connect P2-003 chat and P2-004 LLM profile foundation without adding background jobs yet.",
+    "If a production HTTP client dependency is needed, treat it as a dependency decision and avoid adding a major dependency without explicit user approval.",
+    "This task may implement provider protocol contracts and fake/direct runtime boundaries before live network validation."
+  ]
+}

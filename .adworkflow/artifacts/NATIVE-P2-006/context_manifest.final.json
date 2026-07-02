@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P2-006",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppNavigation.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/shell/AppNavigationStateTest.kt",
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/LlmProfile.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/theme/ReverseTutorTheme.kt",
+    "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/preferences/AppPreferencesRepositoryTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_chat_image_attachment_sends_direct_multimodal_turn (tests/test_mobile_persistence.py:469)",
+    "test_mock_intent_wrap_when_user_signals_end (tests/test_llm.py:214)",
+    "test_mobile_chat_turns_are_bound_and_rendered_safely (tests/test_llm_provider_presets.py:311)",
+    "test_mobile_source_memory_is_updated_lazily_when_chat_hits_a_node (tests/test_mobile_persistence.py:215)",
+    "test_mobile_regular_sends_are_processed_one_queued_turn_at_a_time (tests/test_mobile_persistence.py:1066)",
+    "_send (tests/test_adapters.py:11)",
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)",
+    "test_mobile_update_download_opens_native_installer_when_available (tests/test_android_background_llm.py:180)",
+    "test_upsert_mastery_requires_evidence_before_score_increases (tests/test_db.py:34)",
+    "test_add_episode_stores_append_only_system_message (tests/test_db.py:93)",
+    "test_delete_session_after_node_invalidation_leaves_no_orphan_edges (tests/test_kg_consistency.py:345)",
+    "test_upsert_kg_node_appends_episode_id_once (tests/test_kg_schema.py:49)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not call real LLM unless the user explicitly asks for manual device validation.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

@@ -1,0 +1,51 @@
+{
+  "task_id": "NATIVE-P2-005",
+  "status": "reviewed_device_verified",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_validation",
+      "finding": "True-device smoke for P2-005 now covers one physical phone: HMA-AL00 / Android 10 / API 29. The no-model state, profile activation path, mock generation reply, and pid-scoped logcat check passed on that device.",
+      "recommendation": "Treat this as sufficient for P2-005 task closure, but do not treat it as replacement readiness. Keep broader device matrix and Phase 2/P6 validation open."
+    },
+    {
+      "severity": "medium",
+      "area": "provider_runtime",
+      "finding": "OpenAI-compatible and Anthropic-compatible runtime classes currently build protocol payloads and return disabled-live-call failures; they do not perform network I/O.",
+      "recommendation": "Treat this as the intended P2 foundation. Add live HTTP client selection, secret retrieval, retries, and provider-specific diagnostics only in a later explicitly approved provider validation task."
+    },
+    {
+      "severity": "medium",
+      "area": "background_safety",
+      "finding": "Stale-token protection is covered inside ChatGenerationRepository, but process-death/background job ownership is not implemented.",
+      "recommendation": "Keep LEG-016 as a P0 blocker until P3-001 adds WorkManager/job isolation and deleted-session safeguards."
+    },
+    {
+      "severity": "low",
+      "area": "ux_state",
+      "finding": "The preview app uses FakeLlmGenerationRuntime so successful generation appears as a local mock reply.",
+      "recommendation": "Keep UI copy, coverage registry, and release notes clear that this is preview/mock generation, not live provider readiness."
+    },
+    {
+      "severity": "low",
+      "area": "test_evidence",
+      "finding": "P2-005 local acceptance coverage now includes fake failure/timeout outcomes, provider failure mapping, streamed persistence, after-runtime stale-token rejection, unsupported vision downgrade, blank prompt blocking, and provider payload context.",
+      "recommendation": "Keep these as regression fixtures for P2-006 and P3-001; add device evidence separately once ADB sees a phone."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-P2-005.json",
+    ".adworkflow/context_manifest.json",
+    "mobile-native/core/llm/src/main/java/com/reversetutor/core/llm/LlmGenerationLifecycle.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatUiState.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmGenerationLifecycleTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/ChatGenerationRepositoryTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatUiStateTest.kt",
+    ".adworkflow/verification_result.json",
+    "tasks/native-legacy-coverage-registry.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-005-hma-al00/"
+  ]
+}

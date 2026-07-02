@@ -1,0 +1,10 @@
+{
+  "schema": "reverse_tutor_preset_v1",
+  "version": 1,
+  "type": "preset",
+  "title": "Synthetic preset",
+  "role": "Socratic student",
+  "goal": "Practice explaining one idea",
+  "profile": "Concise and curious",
+  "sourceHandoff": "deferred"
+}

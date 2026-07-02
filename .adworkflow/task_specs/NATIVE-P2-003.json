@@ -1,0 +1,94 @@
+{
+  "task_id": "NATIVE-P2-003",
+  "goal": "Implement the native chat timeline, local text composer, quote context, and message action foundation backed by Room persistence.",
+  "non_goals": [
+    "Do not implement real LLM generation or provider calls.",
+    "Do not implement streaming, background generation jobs, notifications, or stale-result handling; those belong to NATIVE-P2-005 and Phase 3.",
+    "Do not implement real image file picker, parser, or multimodal model analysis; source/image import belongs to Phase 5.",
+    "Do not implement full notes/memory side effects beyond a visible deferred action where needed; memory mutations belong to NATIVE-P5-002.",
+    "Do not implement full citation/source evidence rendering; source evidence integration belongs to Phase 5.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness."
+  ],
+  "acceptance_criteria": [
+    "Chat screen opens for the selected session and shows the selected session title.",
+    "Messages for the selected session persist through Room-backed repository behavior and render in chronological order after reload/restart.",
+    "User can enter text in a native composer and send a local user message.",
+    "Blank composer sends are rejected without creating a message.",
+    "Composer remains represented with an IME-safe bottom area using native Compose insets.",
+    "Quote reply can be selected from an existing message and creates visible/stored quote context for the next sent message.",
+    "Message quote context is persisted in the existing message quote table or equivalent schema v1 path.",
+    "Message action foundation exposes quote, note/deferred, regenerate/deferred, archive/delete where applicable without calling real LLM or memory side effects.",
+    "Image draft preview/cancel is represented as local draft UI state only, without file picker/parser implementation.",
+    "Automated tests cover message ordering/persistence, blank send rejection, quote persistence, and chat UI state/action modeling.",
+    "Legacy coverage registry is updated conservatively for LEG-012, LEG-013, LEG-014, LEG-015, LEG-018, and LEG-041.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json"
+  ],
+  "module": ":feature:chat/:core:data",
+  "branch": "native/chat-main-flow",
+  "legacy_ids": [
+    "LEG-012",
+    "LEG-013",
+    "LEG-014",
+    "LEG-015",
+    "LEG-018",
+    "LEG-041"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/ConversationModels.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/entity/Entities.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/session/SessionRepository.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/SessionsScreen.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/SessionListModels.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Follow TDD: add failing tests before production implementation for message repository behavior and chat UI state/action modeling.",
+    "Run focused core data, feature chat, and app JVM tests.",
+    "Run connected core data instrumentation if an ADB device is available.",
+    "Run native project test, lint, and app assembleDebug.",
+    "Install preview debug APK on the connected device and capture chat composer/quote/action/IME smoke evidence when feasible.",
+    "Use app pid/package-specific logcat filtering to avoid global AndroidRuntime false positives.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json and rebuild codegraph."
+  ],
+  "notes": [
+    "Existing PRD/ARCH/TODO and prior user approval are the design basis for this task.",
+    "Use existing Room schema v1 tables for messages, attachments, and message_quotes where possible; avoid schema changes unless tests prove they are necessary.",
+    "Local user-message send is a native UI/data foundation only; assistant generation belongs to later LLM/runtime tasks."
+  ]
+}

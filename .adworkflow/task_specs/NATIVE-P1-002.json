@@ -1,0 +1,69 @@
+{
+  "task_id": "NATIVE-P1-002",
+  "goal": "Implement the native app shell, Material 3 theme foundation, top-level navigation host, and Android back behavior model.",
+  "non_goals": [
+    "Do not complete feature internals.",
+    "Do not implement Room schema or repositories.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not build signed APKs."
+  ],
+  "acceptance_criteria": [
+    "Main destinations exist as native routes: Sessions, Chat, Context hub, Global graph, Sources, Settings, Import/export, and About/diagnostics.",
+    "Material 3 theme foundation is centralized rather than embedded entirely in MainActivity.",
+    "Top-level app shell exposes title/status actions appropriate for internal preview.",
+    "Android back first closes modal/sheet state.",
+    "Android back exits Context hub to Chat.",
+    "Android back exits Chat to Sessions.",
+    "Android back on Sessions allows app-level exit.",
+    "Empty destinations are clearly marked as internal preview placeholders.",
+    "Existing mobile/ PWA package config and signing assets are unchanged.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch_or_changed_file_summary",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":app",
+  "branch": "native/android-foundation",
+  "legacy_ids": [
+    "LEG-001",
+    "LEG-002",
+    "LEG-039",
+    "LEG-040"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/build.gradle.kts"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run app module unit tests for navigation/back state.",
+    "Run native Gradle assembleDebug, test, and lint.",
+    "If ADB device is available, install and launch preview and capture evidence."
+  ],
+  "notes": [
+    "This is still a scaffold task. Placeholder screens are acceptable, but the navigation/back model must be real and testable."
+  ]
+}

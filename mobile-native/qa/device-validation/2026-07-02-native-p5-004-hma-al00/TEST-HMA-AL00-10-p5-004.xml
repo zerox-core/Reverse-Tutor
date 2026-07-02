@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuite name="com.reversetutor.preview.Phase5GraphDeviceTest" tests="1" failures="0" errors="0" skipped="0" time="5.626" timestamp="2026-07-01T20:34:38" hostname="localhost">
+  <properties>
+    <property name="device" value="HMA-AL00 - 10" />
+    <property name="flavor" value="" />
+    <property name="project" value=":app" />
+  </properties>
+  <testcase name="nativeGraphCanvasShowsSeededNodesSelectionAndGlobalMode" classname="com.reversetutor.preview.Phase5GraphDeviceTest" time="4.155" />
+</testsuite>

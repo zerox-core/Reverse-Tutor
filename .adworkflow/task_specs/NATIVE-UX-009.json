@@ -1,0 +1,84 @@
+{
+  "task_id": "NATIVE-UX-009",
+  "goal": "Specify source library and parser status UI for supported, partial, deferred, unsupported, failed, and recovery states.",
+  "non_goals": [
+    "Do not claim full local parsing for deferred complex formats.",
+    "Do not silently discard unsupported files.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Parser status UI spec distinguishes supported, partial, deferred, unsupported, failed, and recovery states.",
+    "User-facing copy and recovery actions are specified for source import and parser outcomes.",
+    "Dependencies on source library, simple parser, complex parser status, and UX foundation work are recorded.",
+    "No prohibited package/signing/PWA release changes are made."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "fanout_workers",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "parser_status_ui_spec",
+    "state_copy_matrix",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":feature:sources parser-status-ui",
+  "branch": "native/ui-ux-system",
+  "legacy_ids": [
+    "LEG-011",
+    "LEG-034",
+    "LEG-035",
+    "LEG-036"
+  ],
+  "dependencies": [
+    "NATIVE-UX-001",
+    "NATIVE-UX-002",
+    "NATIVE-UX-005",
+    "NATIVE-P5-005",
+    "NATIVE-P5-006"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-ui-ux-roadmap.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/feature/sources/src/main/java",
+    "mobile-native/feature/sources/src/test/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    "mobile-native/qa/device-validation"
+  ],
+  "verification_expectations": [
+    "Validate the parser status UI spec is internally consistent with Phase 5 source/parser ownership.",
+    "Run JSON validation for modified ADworkflo specs.",
+    "If UI files are changed by the future worker, run Compose/UI state tests where available and capture screenshots when feasible."
+  ],
+  "notes": [
+    "Added as a Phase 5 UI/UX follow-up to split source/parser status UI decisions out of the broad NATIVE-UX-005 surface task.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

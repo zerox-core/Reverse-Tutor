@@ -1,0 +1,55 @@
+{
+  "task_id": "NATIVE-P4-005",
+  "status": "completed",
+  "done": [
+    "Implemented local destructive data wipe flow with explicit confirmation in Settings.",
+    "Added LocalDataWipeRepository and Room-backed wipe store that deletes stored secret refs, clears Room tables, resets DataStore preferences, and reseeds the default preview state.",
+    "Added settings UI state and confirmation phrase validation for local data wipe.",
+    "Connected MainActivity/AppShell to DataModule.localDataWipeRepository.",
+    "Completed parallel NATIVE-P4-001 protocol foundation through a worker with versioned schemas, lightweight JSON parsing, fixture validation, warning/invalid/secret-redaction tests, and protocol unit tests.",
+    "Completed parallel NATIVE-UX-001 UI design-system documentation through a worker with design system, acceptance checklist, and roadmap updates."
+  ],
+  "changed_files": [
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/task_spec.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    ".codegraph/index.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/preferences/AppPreferencesRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/wipe/LocalDataWipeRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/ChatGenerationRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/LlmProfileRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/wipe/LocalDataWipeRepositoryTest.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/",
+    "mobile-native/core/protocol/src/test/resources/protocol-fixtures/",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "tasks/native-android-ui-design-system.md",
+    "tasks/native-android-ui-acceptance-checklist.md",
+    "tasks/native-ui-ux-roadmap.md"
+  ],
+  "current_problem": "P4-001, P4-005, and UX-001 are complete. Next dependencies are open for NATIVE-P4-002 and NATIVE-P4-004; UX-002 can also start but should avoid colliding with settings import/export UI work.",
+  "next_action": "Activate NATIVE-P4-002 or split P4-002/P4-004 into disjoint workers: import coordinator in core:data/settings models and export protocol/service in core:protocol/core:data.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "Do not build signed or release APKs.",
+    "Do not call real LLM providers during automated or device smoke validation.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "Coverage registry remains conservative; P0 blockers are not reduced without full parity evidence."
+  ],
+  "remaining_risks": [
+    "P4-005 has JVM coverage and build verification but no HMA-AL00 destructive-wipe device smoke yet.",
+    "P4-001 validates top-level protocol contracts and fixtures; deep import mapping, idempotency, and transaction semantics remain P4-002/P4-003.",
+    "UX-001 is documentation only; UX-002+ must implement and screenshot-test the actual UI system."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

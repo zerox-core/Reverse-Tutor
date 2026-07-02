@@ -1,0 +1,62 @@
+{
+  "task_id": "NATIVE-P1-001",
+  "goal": "Scaffold the new native Android project under mobile-native with the approved package id and baseline Gradle module topology.",
+  "non_goals": [
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not implement full feature behavior beyond a launchable native shell.",
+    "Do not build signed APKs unless explicitly requested."
+  ],
+  "acceptance_criteria": [
+    "mobile-native/ exists as a native Android project.",
+    "Kotlin, Jetpack Compose, and Material 3 are configured.",
+    "Baseline modules are represented: :app, :core:protocol, :core:model, :core:data, :core:llm, :feature:chat, :feature:memory, :feature:sources, :feature:settings.",
+    "Internal package id is com.reversetutor.preview.",
+    "The app launches into a native Compose screen.",
+    "Existing mobile/ PWA package config and signing assets are unchanged.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch_or_changed_file_summary",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":app",
+  "branch": "native/android-foundation",
+  "legacy_ids": [
+    "LEG-001"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run native Gradle assemble/check commands once mobile-native exists.",
+    "If Gradle cannot run because dependencies are unavailable, record the exact blocker.",
+    "Do not run connected device tests unless a device/emulator is available and the user requests validation."
+  ],
+  "notes": [
+    "This task is the first implementation task after planning. It should not start unless the user explicitly moves from planning into code implementation."
+  ]
+}

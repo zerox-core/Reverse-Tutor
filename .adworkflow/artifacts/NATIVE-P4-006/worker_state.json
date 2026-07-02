@@ -1,0 +1,43 @@
+{
+  "task_id": "NATIVE-P4-006",
+  "status": "completed",
+  "done": [
+    "Added FirstLaunchImportPromptUiState with preview-disabled default and replacement-build gating.",
+    "Added prompt copy that routes users to export-file import and states API keys are not migrated.",
+    "Wired AppShell to optionally show the prompt, route confirmation to Import/export, and dismiss without package identity changes.",
+    "Added tests for preview-disabled behavior, unseen replacement-build prompt behavior, and API-key non-migration copy.",
+    "Added tasks/native-first-launch-import-prompt-runbook.md with package/cover-install dependencies and approval gates.",
+    "Updated coverage registry and workplan to keep P4-007 as the Phase 4 device evidence gate."
+  ],
+  "changed_files": [
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    ".codegraph/index.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "tasks/native-android-next-workplan.md",
+    "tasks/native-first-launch-import-prompt-runbook.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "current_problem": "NATIVE-P4-006 is implemented and locally verified. Phase 4 now needs NATIVE-P4-007 device validation before it can be treated as validated.",
+  "next_action": "Run NATIVE-P4-007 device validation for import modes, export share/save, wipe, first-launch prompt behavior, package id, and logcat checks.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "The first-launch prompt is disabled by default in preview builds.",
+    "Do not build signed or release APKs.",
+    "Do not switch official package identity or cover-install behavior without Phase 6 approval.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval."
+  ],
+  "remaining_risks": [
+    "Prompt behavior has local tests but no device screenshot evidence yet.",
+    "Persisting already-seen prompt state is intentionally deferred until replacement-build preference policy is finalized.",
+    "P4-007 must validate that preview package identity remains unchanged and prompt gating behaves correctly when enabled for test."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

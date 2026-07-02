@@ -1,0 +1,320 @@
+{
+  "schema": "ADworkflo.context_raw.v1",
+  "task_id": "NATIVE-UX-004",
+  "source": "codegraph-index",
+  "matched_files": [
+    {
+      "score": 6,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 145,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+      "language": "kotlin",
+      "loc": 253,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+      "language": "kotlin",
+      "loc": 46,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+      "language": "kotlin",
+      "loc": 539,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 209,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/export/ProtocolExportPayloads.kt",
+      "language": "kotlin",
+      "loc": 317,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/export/ProtocolExportPayloadBuilderTest.kt",
+      "language": "kotlin",
+      "loc": 160,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 91,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+      "language": "kotlin",
+      "loc": 284,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/wipe/LocalDataWipeRepository.kt",
+      "language": "kotlin",
+      "loc": 58,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 212,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/wipe/LocalDataWipeRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 73,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/LightweightJson.kt",
+      "language": "kotlin",
+      "loc": 265,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/NativeSessionPreset.kt",
+      "language": "kotlin",
+      "loc": 108,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolModule.kt",
+      "language": "kotlin",
+      "loc": 16,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/VersionedProtocolSchemas.kt",
+      "language": "kotlin",
+      "loc": 430,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/NativeSessionPresetValidatorTest.kt",
+      "language": "kotlin",
+      "loc": 86,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolFixtureLoader.kt",
+      "language": "kotlin",
+      "loc": 12,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/VersionedProtocolSchemaValidatorTest.kt",
+      "language": "kotlin",
+      "loc": 87,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+      "language": "kotlin",
+      "loc": 747,
+      "is_test": false
+    }
+  ],
+  "matched_symbols": [
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_frontend_enqueues_and_imports_native_background_turns",
+      "line": 153,
+      "end_line": 177,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_export_uses_native_android_share_sheet",
+      "line": 195,
+      "end_line": 225,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_pwa_context_images_are_imported_through_anchors",
+      "line": 238,
+      "end_line": 247,
+      "file": "tests/test_image_memory.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_verification_status_none_does_not_increase_existing_score",
+      "line": 12,
+      "end_line": 38,
+      "file": "tests/test_mastery_evidence_weighting.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_update_download_opens_native_installer_when_available",
+      "line": 180,
+      "end_line": 192,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_has_learning_evidence_true_when_correctness_at_least_half",
+      "line": 143,
+      "end_line": 144,
+      "file": "tests/test_kg_gate.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_free_glm_can_be_explicitly_selected_after_user_api_exists",
+      "line": 248,
+      "end_line": 262,
+      "file": "tests/test_llm_provider_presets.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_prompt_adapts_when_goal_is_not_learning",
+      "line": 330,
+      "end_line": 337,
+      "file": "tests/test_llm_provider_presets.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_failed_verification_rolls_back_high_score",
+      "line": 94,
+      "end_line": 128,
+      "file": "tests/test_mastery_evidence_weighting.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_preset_import_export_is_lightweight_and_safe",
+      "line": 611,
+      "end_line": 623,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_goal_and_companion_state_tables_exist_and_are_initialized",
+      "line": 114,
+      "end_line": 124,
+      "file": "tests/test_mode_skeleton.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_import_md_creates_chunks_and_fts_rows",
+      "line": 31,
+      "end_line": 46,
+      "file": "tests/test_retrieval.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_web_search_enabled_imports_mock_result_as_citable_source",
+      "line": 83,
+      "end_line": 108,
+      "file": "tests/test_websearch.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "evidence_ids",
+      "line": 113,
+      "end_line": 118,
+      "file": "db.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "_normalize_evidence",
+      "line": 796,
+      "end_line": 827,
+      "file": "engine.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "_has_learning_evidence",
+      "line": 66,
+      "end_line": 77,
+      "file": "kg_gate.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "_evidence_episode_ids_for_action",
+      "line": 873,
+      "end_line": 881,
+      "file": "server.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "test_android_background_llm_plugin_sources_exist_and_are_registered",
+      "line": 24,
+      "end_line": 124,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "test_android_main_activity_refreshes_stale_app_shell_cache_on_native_upgrade",
+      "line": 127,
+      "end_line": 150,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "test_learning_state_record_blocks_no_entry_when_recent_steps_exist",
+      "line": 47,
+      "end_line": 94,
+      "file": "tests/test_clue_student_discipline.py"
+    }
+  ],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "warnings": []
+}

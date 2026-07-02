@@ -1,0 +1,39 @@
+{
+  "task_id": "NATIVE-P4-007",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "high",
+      "area": "replacement_readiness",
+      "finding": "P4-007 validates Phase 4 behavior on one internal preview device, but it is not a replacement-release gate.",
+      "recommendation": "Keep PWA/Capacitor available and require Phase 6 parity/device-matrix approval before any package/signing or PWA-exit decision."
+    },
+    {
+      "severity": "medium",
+      "area": "export_protocol",
+      "finding": "Full-backup repository snapshots messages, but current full-backup protocol JSON does not serialize message records.",
+      "recommendation": "Track as a follow-up before closing LEG-031 or using full-backup as a complete migration artifact."
+    },
+    {
+      "severity": "medium",
+      "area": "external_import_sources",
+      "finding": "Manual ADB ACTION_SEND/ACTION_VIEW attempts are diagnostic only because command-line text/URI delivery produced zero writable records.",
+      "recommendation": "Use real document-provider/file-picker or replacement-source fixtures in Phase 6 before closing LEG-032."
+    },
+    {
+      "severity": "medium",
+      "area": "ui_ux",
+      "finding": "P4-007 validates functional import/export/wipe flows, but UX audit still shows import/export flow needs step-wise product polish.",
+      "recommendation": "Run NATIVE-UX-004 after this archive."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-P4-007.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/README.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md"
+  ]
+}

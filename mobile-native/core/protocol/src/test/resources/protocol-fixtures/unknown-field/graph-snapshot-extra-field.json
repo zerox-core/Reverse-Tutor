@@ -1,0 +1,9 @@
+{
+  "schema": "reverse_tutor_graph_snapshot_v1",
+  "version": 1,
+  "type": "graph_snapshot",
+  "created_at": "2026-07-01T00:00:00Z",
+  "nodes": [],
+  "edges": [],
+  "legacy_canvas_hint": "ignored by native protocol v1"
+}

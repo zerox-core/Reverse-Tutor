@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P5-003",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/GraphModels.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5ContextHubDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5MemoryDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5SourcesDeviceTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/SessionListUiStateTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/SourceImportInputFactory.kt"
+  ],
+  "relevant_symbols": [
+    "test_android_webview_uses_native_ime_input_connection (tests/test_mobile_persistence.py:33)",
+    "test_mobile_export_uses_native_android_share_sheet (tests/test_android_background_llm.py:195)",
+    "test_mobile_graph_sheet_can_expand_to_detailed_node_page (tests/test_mobile_persistence.py:616)",
+    "test_mobile_graph_sheet_expanded_detail_reads_like_report_with_semantic_cards (tests/test_mobile_persistence.py:673)",
+    "test_mobile_header_without_session_does_not_reference_graph_node_state (tests/test_mobile_persistence.py:765)",
+    "test_mobile_llm_config_uses_native_preferences_for_long_term_storage (tests/test_mobile_persistence.py:10)",
+    "test_mobile_graph_sheet_displays_saved_branch_expansion (tests/test_mobile_persistence.py:238)",
+    "test_mobile_graph_sheet_opens_chat_fragment_nodes_without_changing_sheet_layout (tests/test_mobile_persistence.py:280)",
+    "test_mobile_graph_backfills_existing_mastery_into_global_kg_nodes (tests/test_mobile_persistence.py:387)",
+    "test_mobile_graph_sheet_detail_sections_and_bidirectional_node_jumps (tests/test_mobile_persistence.py:659)",
+    "test_android_main_activity_refreshes_stale_app_shell_cache_on_native_upgrade (tests/test_android_background_llm.py:127)",
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not use WebView graph carry-over.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

@@ -1,0 +1,803 @@
+﻿--------- beginning of main
+06-30 20:52:22.641 15151 18945 I Cloud[16.3.0.302]Album.LockManager: releaseLock taskType: GENERAL_SYNC_SDK
+06-30 20:52:22.641 15151 18945 I Cloud[16.3.0.302]Album.LockManager: executeReleaseLock
+06-30 20:52:22.641 15151 18945 I Cloud[16.3.0.302]Album.LockExecutor: deleteExecute: traceId, prepareTraceId:04001_01_1782823919_96738005,null
+06-30 20:52:22.643 15151 18947 I Cloud[16.3.0.302]Album.PowerControlManager: isAutoSync isNeedControl:true controlType:1
+06-30 20:52:22.651 15151 16868 I SecurityComp20000302: SSLFNew: createSocket
+06-30 20:52:22.651 15151 16868 I SecurityComp20000302: SSLFNew: set default protocols
+06-30 20:52:22.652 15151 16868 I SecurityComp20000302: SSLFNew: set default cipher
+06-30 20:52:22.656 15151 16870 I SecurityComp20000302: SSLFNew: createSocket
+06-30 20:52:22.656 15151 16870 I SecurityComp20000302: SSLFNew: set default protocols
+06-30 20:52:22.656 15151 16870 I SecurityComp20000302: SSLFNew: set default cipher
+06-30 20:52:22.659 15151 18947 I Cloud[16.3.0.302]Base.BaseUtil: readConfigStr, read local config str success
+06-30 20:52:22.675 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 152
+06-30 20:52:22.676 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 115
+06-30 20:52:22.676 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 152
+06-30 20:52:22.682 15151 16869 I SecurityComp20000302: SSLFNew: createSocket
+06-30 20:52:22.688 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 115
+06-30 20:52:22.690 18467 18467 W kworker/u17:0: type=1400 audit(0.0:9939): avc: granted { setsched } for pid=18467 scontext=u:r:kernel:s0 tcontext=u:r:untrusted_app:s0:c38,c256,c512,c768 tclass=process
+06-30 20:52:22.693 15151 16868 I SecurityComp20000302: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.694 15151 16868 I SecurityComp20000302: SX509TM: check server i=0
+06-30 20:52:22.694 15151 16868 I SecurityComp20000302: SX509TM: client root ca size=31
+06-30 20:52:22.694 15151 16871 I SecurityComp20000302: SSLFNew: createSocket
+06-30 20:52:22.698 19253 19385 D ProfileInstaller: Installing profile for com.reversetutor.preview
+06-30 20:52:22.702 15151 16868 I SecurityComp20000302: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.704 15151 16868 I SecurityComp20000302: : verify: certificate is : CN=cloud.huawei.asia,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+06-30 20:52:22.704 15151 16869 I SecurityComp20000302: SSLFNew: set default protocols
+06-30 20:52:22.704 15151 16869 I SecurityComp20000302: SSLFNew: set default cipher
+06-30 20:52:22.708 15151 16871 I SecurityComp20000302: SSLFNew: set default protocols
+06-30 20:52:22.708 15151 16871 I SecurityComp20000302: SSLFNew: set default cipher
+06-30 20:52:22.709 15151 16870 I SecurityComp20000302: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.709 15151 16870 I SecurityComp20000302: SX509TM: check server i=0
+06-30 20:52:22.709 15151 16870 I SecurityComp20000302: SX509TM: client root ca size=31
+06-30 20:52:22.723 15151 16870 I SecurityComp20000302: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.724 15151 16870 I SecurityComp20000302: : verify: certificate is : CN=cloud.huawei.asia,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+06-30 20:52:22.727 15151 18947 I Cloud[16.3.0.302]Config.HiCloudSysParamMapCache: isNpsDisplayPolicy  :1
+06-30 20:52:22.734 15151 18945 I Cloud[16.3.0.302]Config.HiCloudSysParamManager: graySwitch:1
+06-30 20:52:22.739 15151 18945 I [5.2.0]DriveSDK.HttpTransport: curl -X DELETE -- 'cloudphoto-drcn.cloud.dbankcloud.cn/cloudPhoto/v1/lock' -H '04001_01_1782823942_94223072' << $$$
+06-30 20:52:22.741 15151 16870 E Cloud[16.3.0.302]Sync.OpenGWService: nsp.user.getQuotaInfo {code=1105, message=openapi-drcn.cloud.dbankcloud.cn[:false]java.io.InterruptedIOException: interrupted}
+06-30 20:52:22.741 15151 16870 E Cloud[16.3.0.302]Sync.QuotaInfoRequestor: getQuotaSummary exception:{code=1105, message=openapi-drcn.cloud.dbankcloud.cn[:false]java.io.InterruptedIOException: interrupted}
+06-30 20:52:22.743 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_common, type:1, eventId:00000_01_1782823942_06453939
+06-30 20:52:22.743 15151 16870 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.744 15151 16870 E Cloud[16.3.0.302]Album.SDKUploadAsyncCallable: check space error
+06-30 20:52:22.744   675  1218 W /system/bin/netd: A binder object at 0x7c4d81a240 is being transacted on, however, this object is in the same process as its proxy. Transacting with this binder is expensive compared to just calling the corresponding functionality in the same process.
+06-30 20:52:22.744   675  1218 I PreDnsController: CanPreDnsQuery,persist.sys.predns is false!
+06-30 20:52:22.745 15151 16870 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.745 15151 18952 I FormalHASDK: RecordTask==> record evt size: 5, tag: clouddrive_common, type: maint
+06-30 20:52:22.745 15151 18947 I Cloud[16.3.0.302]Album.RequestCacheManager: hiCloudSysParamMap get about cache time60
+06-30 20:52:22.747 15151 18952 I FormalHASDK: RecordTask==> record evt size: 15, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.748 15151 18947 I Cloud[16.3.0.302]Album.RequestCacheManager: maxBatchGetNumber:10
+06-30 20:52:22.749 15151 18952 I FormalHASDK: RecordTask==> record evt size: 16, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.758  1650  1919 D ZrHung.AppEyeTransparentWindow: handleMessage CHECK_TRANS_WINDOW_ERROR_MSG
+06-30 20:52:22.759 15151 18947 I Cloud[16.3.0.302]Config.HiCloudSysParamManager: graySwitch:1
+06-30 20:52:22.764 15151 16869 I SecurityComp20000302: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.764 15151 16869 I SecurityComp20000302: SX509TM: check server i=0
+06-30 20:52:22.764 15151 16869 I SecurityComp20000302: SX509TM: client root ca size=31
+06-30 20:52:22.769  3987  4070 I DFS     : InodeManager-CheckIdle: no opened inodes
+06-30 20:52:22.769  3987  4070 I DFS     : NetworkManager: has 1 online neighbors, 2 btNeighbors
+06-30 20:52:22.769  3987  4070 I DFS     : FileHandler: reset idle count
+06-30 20:52:22.769 15151 16871 I SecurityComp20000302: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.769 15151 16871 I SecurityComp20000302: SX509TM: check server i=0
+06-30 20:52:22.769 15151 16871 I SecurityComp20000302: SX509TM: client root ca size=31
+06-30 20:52:22.775 15151 18947 I [5.2.0]DriveSDK.HttpTransport: curl -- 'cloudphoto-drcn.cloud.dbankcloud.cn/cloudPhoto/v1/changes/getStartCursor' -H '04001_01_1782823919_96738005' << $$$
+06-30 20:52:22.777 15151 16869 I SecurityComp20000302: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.777  1650  1650 D HwConnectivityManagerImpl: getNetworkPolicyFlag flagStr null
+06-30 20:52:22.778 15151 16869 I SecurityComp20000302: : verify: certificate is : CN=cloud.huawei.asia,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+06-30 20:52:22.779   675  1218 W /system/bin/netd: A binder object at 0x7c4d81a240 is being transacted on, however, this object is in the same process as its proxy. Transacting with this binder is expensive compared to just calling the corresponding functionality in the same process.
+06-30 20:52:22.779   675  1218 I PreDnsController: CanPreDnsQuery,persist.sys.predns is false!
+06-30 20:52:22.780 15151 16871 I SecurityComp20000302: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.781  1650  1650 D HwConnectivityManagerImpl: getNetworkPolicyFlag flagStr null
+06-30 20:52:22.783 15151 16871 I SecurityComp20000302: : verify: certificate is : CN=cloud.huawei.asia,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+06-30 20:52:22.784 15151 16869 E Cloud[16.3.0.302]Sync.OpenGWService: nsp.user.getQuotaInfo {code=1105, message=openapi-drcn.cloud.dbankcloud.cn[:false]java.io.InterruptedIOException: interrupted}
+06-30 20:52:22.784 15151 16869 E Cloud[16.3.0.302]Sync.QuotaInfoRequestor: getQuotaSummary exception:{code=1105, message=openapi-drcn.cloud.dbankcloud.cn[:false]java.io.InterruptedIOException: interrupted}
+06-30 20:52:22.785 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_common, type:1, eventId:00000_01_1782823942_83262121
+06-30 20:52:22.786 15151 16869 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.786 15151 16869 E Cloud[16.3.0.302]Album.SDKUploadAsyncCallable: check space error
+06-30 20:52:22.787 15151 16869 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.787 15151 18952 I FormalHASDK: RecordTask==> record evt size: 6, tag: clouddrive_common, type: maint
+06-30 20:52:22.789 15151 18952 I FormalHASDK: RecordTask==> record evt size: 17, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.791 15151 18952 I FormalHASDK: RecordTask==> record evt size: 18, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.791 15151 16868 I Cloud[16.3.0.302]Sync.QuotaInfoRequestor: getQuotaSummary Success
+06-30 20:52:22.795 15151 16868 I Cloud[16.3.0.302]Album.BaseUploadCallable: checkUserYunSpaceEnough spaceTotal=5368709120, spaceUsed=5575400607
+06-30 20:52:22.797 15151 16868 I Cloud[16.3.0.302]Album.SyncTypeManager: setNotifyData needSpace: 5577781406
+06-30 20:52:22.798 15151 16868 W Cloud[16.3.0.302]Album.BaseUploadCallable: space too low, total: 5368709120, used: 5575400607, upload size: 2380799
+06-30 20:52:22.799 15151 16868 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.799 15151 16868 I Cloud[16.3.0.302]Album.SyncSessionManager: setSpaceFull: true
+06-30 20:52:22.799 15151 16868 E Cloud[16.3.0.302]Album.SDKUploadAsyncCallable: user space not enough
+06-30 20:52:22.799 15151 16866 I Cloud[16.3.0.302]Album.SDKUploadPhoto: HandleCallable upload, ret: 122, fileName: ****3428.jpg
+06-30 20:52:22.800 15151 16866 I Cloud[16.3.0.302]Album.SyncSessionManager: setSpaceFull: true
+06-30 20:52:22.800 15151 16866 I Cloud[16.3.0.302]Album.SyncTypeManager: setNotifyData needSpace: 5577781406
+06-30 20:52:22.800 15151 18952 I FormalHASDK: RecordTask==> record evt size: 19, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.800 15151 16866 I Cloud[16.3.0.302]Album.SDKUploadPhoto: cancelGeneralUploadTask, errCode: 122
+06-30 20:52:22.801 15151 16866 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9148
+06-30 20:52:22.801 15151 16866 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9096
+06-30 20:52:22.801 15151 16866 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9034
+06-30 20:52:22.801 15151 15235 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9148
+06-30 20:52:22.801 15151 15235 I Cloud[16.3.0.302]Album.TaskThreadManager: processUploadTask type:1;fileName:IMG_20250516_142636.jpg, fileUploadType: 0lpath: /DCIM/Camera
+06-30 20:52:22.802 15151 16865 E Cloud[16.3.0.302]Album.FixedCallable: FixedCallable exception:com.huawei.android.hicloud.album.service.logic.callable.SDKUploadAsyncCallable@eab2910,sysFixedThreadPoolInternal isShutdown:false,isTerminated:false,sysFixedThreadPool isShutdown:false,isTerminated:false,baseCallable.getRetry():1,baseCallable.getCurrentRetry():1,fixedCallableList:0,fixedCallableExecutedList:1,error message:java.util.concurrent.CancellationException
+06-30 20:52:22.802 15151 16865 I Cloud[16.3.0.302]Album.FixedCallable: baseCallable.getCancelCode is:122
+06-30 20:52:22.802 15151 16865 I Cloud[16.3.0.302]Album.SDKUploadPhoto: HandleCallable upload, ret: 115, fileName: ****2636.jpg
+06-30 20:52:22.802 15151 16865 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9148
+06-30 20:52:22.802 15151 16865 E Cloud[16.3.0.302]Album.SDKUploadPhoto: this upload batch fail,traceId:04001_01_1782823919_96738005,errMsg:Attempt to invoke virtual method 'long java.lang.Long.longValue()' on a null object reference
+06-30 20:52:22.802 15151 16865 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9034
+06-30 20:52:22.806 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 122
+06-30 20:52:22.807 15151 15319 I SecurityComp20000302: SSLFNew: createSocket
+06-30 20:52:22.807 15151 15319 I SecurityComp20000302: SSLFNew: set default protocols
+06-30 20:52:22.807 15151 15319 I SecurityComp20000302: SSLFNew: set default cipher
+06-30 20:52:22.808 15372 16798 D CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: uploadSyncComplete ignore msg
+06-30 20:52:22.810 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 122
+06-30 20:52:22.810 15372 16798 E CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: upload err: 115
+06-30 20:52:22.811 15372 16798 D CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: uploadSyncComplete ignore msg
+06-30 20:52:22.813  1650  2107 I TrafficMonitor: update:rxPkts:34,txPkts:47,rxBytes:19384,txBytes:8199
+06-30 20:52:22.813  1650  2107 I TrafficMonitor: no expired. level:2
+06-30 20:52:22.813  1650  2107 I TrafficMonitor: gettimer:interval=2000
+06-30 20:52:22.813  1650  2107 I TrafficMonitor: during_ms:2003,period_ms:2000
+06-30 20:52:22.813  1650  2107 I TrafficMonitor: count:986,rx_sum:34,tx_sum:47,rxBytes:19384,during_ms:2003,rx_speed:9677.483774338492,tx_speed:4093.35996005991,rto:0.723404255319149
+06-30 20:52:22.813  1650  2107 I HuaweiWifiWatchdogStateMachine: Get speed information rx_speed = 9677 ,tx_speed = 4093 ,isSpeedOk = false ,mBestSpeedInPeriod = 9677
+06-30 20:52:22.817 15151 15237 I SecurityComp20000302: SSLFNew: createSocket
+06-30 20:52:22.817 15151 15237 I SecurityComp20000302: SSLFNew: set default protocols
+06-30 20:52:22.817 15151 15237 I SecurityComp20000302: SSLFNew: set default cipher
+06-30 20:52:22.818 15151 18947 I SecurityComp10200309: v: createSocket s host port autoClose
+06-30 20:52:22.819 15151 18947 I SecurityComp10200309: v: set default protocols
+06-30 20:52:22.819 15151 18947 I SecurityComp10200309: v: set default cipher suites
+06-30 20:52:22.830 15151 18945 I Cloud[16.3.0.302]Config.HiCloudSysParamManager: graySwitch:1
+06-30 20:52:22.830 15151 18945 I Cloud[16.3.0.302]Album.HiHttpCloudPhotoDriveExecutor: runTask execute m0 code:0
+06-30 20:52:22.832 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823942_94223072
+06-30 20:52:22.832 15151 18945 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.833 15151 15151 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9005
+06-30 20:52:22.834 15151 18952 I FormalHASDK: RecordTask==> record evt size: 20, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.835 15151 18952 I FormalHASDK: RecordTask==> record evt size: 21, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.859 15151 15319 I SecurityComp20000302: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.859 15151 15319 I SecurityComp20000302: SX509TM: check server i=0
+06-30 20:52:22.859 15151 15319 I SecurityComp20000302: SX509TM: client root ca size=31
+06-30 20:52:22.859 15151 15237 I SecurityComp20000302: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.860 15151 15237 I SecurityComp20000302: SX509TM: check server i=0
+06-30 20:52:22.861 15151 15237 I SecurityComp20000302: SX509TM: client root ca size=31
+06-30 20:52:22.869 15151 15237 I SecurityComp20000302: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.871 15151 15237 I SecurityComp20000302: : verify: certificate is : CN=cloud.huawei.asia,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+06-30 20:52:22.875 15151 16871 I Cloud[16.3.0.302]Sync.QuotaInfoRequestor: getQuotaSummary Success
+06-30 20:52:22.875 15151 18947 I SecurityComp10200309: SX509TM: checkServerTrusted begin,size=2,authType=GENERIC
+06-30 20:52:22.876 15151 18947 I SecurityComp10200309: SX509TM: check server i=0
+06-30 20:52:22.876 15151 18947 I SecurityComp10200309: SX509TM: client root ca size=31
+06-30 20:52:22.884 15151 15319 I SecurityComp20000302: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.885 15151 15319 I SecurityComp20000302: : verify: certificate is : CN=cloud.huawei.asia,O=Huawei Software Technologies Co.\, Ltd.,L=Nanjing,ST=Jiangsu,C=CN
+06-30 20:52:22.886 15151 16871 I Cloud[16.3.0.302]Album.BaseUploadCallable: checkUserYunSpaceEnough spaceTotal=5368709120, spaceUsed=5575400607
+06-30 20:52:22.889 15151 16871 I Cloud[16.3.0.302]Album.SyncTypeManager: setNotifyData needSpace: 5579251589
+06-30 20:52:22.889 15151 16871 W Cloud[16.3.0.302]Album.BaseUploadCallable: space too low, total: 5368709120, used: 5575400607, upload size: 3850982
+06-30 20:52:22.891 15151 16871 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:22.891 15151 16871 I Cloud[16.3.0.302]Album.SyncSessionManager: setSpaceFull: true
+06-30 20:52:22.892 15151 16871 E Cloud[16.3.0.302]Album.SDKUploadAsyncCallable: user space not enough
+06-30 20:52:22.893 15151 18952 I FormalHASDK: RecordTask==> record evt size: 22, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:22.897 15151 18947 I SecurityComp10200309: SX509TM: checkServerTrusted end, CN=GlobalSign, O=GlobalSign, OU=GlobalSign Root CA - R3
+06-30 20:52:22.898    47    47 W migration/6: type=1400 audit(0.0:9940): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:22.902    53    53 W migration/7: type=1400 audit(0.0:9941): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:22.994 19389 19389 W app_process: type=1400 audit(0.0:9942): avc: denied { read } for pid=19389 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 20:52:22.994 19389 19389 W app_process: type=1400 audit(0.0:9943): avc: denied { read } for pid=19389 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 20:52:22.994 19389 19389 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 20:52:22.994 19389 19389 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 20:52:22.994 19389 19389 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:22.995 19389 19389 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-30 20:52:22.998 19389 19389 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ hw_mc.art.mt_dex_loader=1
+06-30 20:52:22.998 19389 19389 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ g_numThreads=4
+06-30 20:52:22.998 19389 19389 W app_process: [MemLeak.JavaTrack]: failed to dlopen libmemleak_tracker.so
+06-30 20:52:22.998 19389 19389 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+06-30 20:52:22.998 19389 19389 I AndroidRuntime: Using default boot image
+06-30 20:52:22.999 19389 19389 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+06-30 20:52:22.999 19389 19389 I AndroidRuntime: Leaving lock profiling enabled
+06-30 20:52:22.999 19389 19389 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+06-30 20:52:23.001 19389 19389 I         : HwCustType is 0
+06-30 20:52:23.001 19389 19389 E         : open file error
+06-30 20:52:23.001 19389 19389 I         : no cota live update cust policy found
+06-30 20:52:23.001 19389 19389 I         : GetCfgDirRealPolicyValue: custPolicyDirs: /system/emui/base:/system/emui/china:/vendor/etc:/odm/cust/all/cn:/odm/etc:/odm/hw_odm/HMA-AL00:/odm/special_cust/HMA-AL00/all/cn:/hw_product/etc:/hw_product/region_comm/china:/preas/china:/hw_product/hw_oem/HMA-AL00:/preload/HMA-AL00/all/cn:/cust/global:/cust/hw/cn:/version/cust/all/cn:/hw_product/special_cust/HMA-AL00/all/cn:/version/special_cust/HMA-AL00/all/cn:/cust/cotalite:/cust/ecota
+06-30 20:52:23.001 19389 19389 I app_process: Opt gc perf enable = 1
+06-30 20:52:23.001 19389 19389 I app_process: ScopedPromotePriority logging = 0
+06-30 20:52:23.011 15151 18947 I Cloud[16.3.0.302]Config.HiCloudSysParamManager: graySwitch:1
+06-30 20:52:23.013 15151 18947 I Cloud[16.3.0.302]Album.GetVersionExecutor: checkFullUploadCursor fullUploadCursor: null
+06-30 20:52:23.016 15151 18947 I Cloud[16.3.0.302]Album.GetVersionExecutor: already cache version: CloudAlbumVersion{albumVersion='1000000269312', albumListVersion='1000000269312', latestVersion='1000000269312', clearVersion='', isDataMigrated='true'}
+06-30 20:52:23.017 15151 18947 I Cloud[16.3.0.302]Album.HiHttpCloudPhotoDriveExecutor: runTask execute s code:0
+06-30 20:52:23.023 15151 18947 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:23.024 15151 15151 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendCallbackMsg msgId: 9001
+06-30 20:52:23.026 15372 16798 D CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: get version success
+06-30 20:52:23.026 15372 16798 D CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: compareVersion
+06-30 20:52:23.027 15151 18952 I FormalHASDK: RecordTask==> record evt size: 23, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:23.028 15372 16798 I CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: CloudAlbumVersion{albumVersion='1000000269312', albumListVersion='1000000269312', latestVersion='1000000269312', clearVersion='', isDataMigrated='true'}
+06-30 20:52:23.029 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: Call AIDL: request cmd: 12
+06-30 20:52:23.029 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: sendPowerControlMessage cmd:12
+06-30 20:52:23.029 15372 16798 I CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: localAlbumVersion: 1000000269312, clearVersion:
+06-30 20:52:23.043 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: Call AIDL: report, cmd:syncstate stat:Stat{localAdded=420, localUpdated=0, localRecycleUpdated=0, cloudNormal=765, cloudRecycle=0, disconnectedTime=-1, sessionID=04001_01_1782823919_96738005}
+06-30 20:52:23.043 15372 16798 D CloudAlbumSDK[13.3.0.300].GeneralAlbumSyncLogic: sync complete
+06-30 20:52:23.043 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: Call AIDL: syncOpsReport, traceId: 04001_01_1782823919_96738005, syncType:19, errCode: 162, errMsg: null
+06-30 20:52:23.044 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: release lock general sync sdk
+06-30 20:52:23.044 15151 15167 I Cloud[16.3.0.302]Album.LockManager: releaseLock taskType: GENERAL_SYNC_SDK
+06-30 20:52:23.044 15151 15167 W Cloud[16.3.0.302]Album.LockManager: releaseLock taskMap isEmpty
+06-30 20:52:23.044 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumReFoundManager: startTask: null, null
+06-30 20:52:23.044 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumReFoundManager: isLostReFoundConditionAllow latestReFoundTime: 1782811215815, cloudPhotoAssetRefundPeriod: 7
+06-30 20:52:23.044 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumReFoundManager: isLostReFoundConditionAllow in period
+06-30 20:52:23.045 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumReFoundManager: isThumbFixConditionAllow in period, latestThumbFixTime: 1782811227763
+06-30 20:52:23.045 15151 15167 I Cloud[16.3.0.302]Album.ActiveDetector: stopDetect
+06-30 20:52:23.045 15151 15167 I Cloud[16.3.0.302]Album.PowerControlManager: isPowerAvailable availablePower: 209715200, lastPower: 0
+06-30 20:52:23.045 15151 15167 I Cloud[16.3.0.302]Album.AlbumUtil: reportPowerUsage
+06-30 20:52:23.047 15151 15167 I Cloud[16.3.0.302]Base.BaseUtil: provider packageName is: com.android.gallery3d
+06-30 20:52:23.048 15151 15167 I Cloud[16.3.0.302]Album.AlbumUtil: getUsedPower: startTime=1782823919550;realUsage=0;usedUploadTime=0;lastUpdateTime=0;normalizedUsage=0;netType=0;
+--------- beginning of system
+06-30 20:52:23.050  1650  4940 V ActivityManager: Successfully start provider ContentProviderRecord{98ab968 u0 com.android.gallery3d/com.huawei.gallery.provider.GalleryProvider} launchingApp=ProcessRecord{9649b05 15372:com.android.gallery3d/u0a20} caller pid= 15151
+06-30 20:52:23.050  2672  2800 W ScenarioService: number format exception! str:
+06-30 20:52:23.052  2971 19036 I HwEasyGoService: totalNum16
+06-30 20:52:23.053  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:23.059 15151 15167 I Cloud[16.3.0.302]Album.PowerControlManager: clearPowerCache
+06-30 20:52:23.061 15151 15419 I Cloud[16.3.0.302]Notify.UserSpaceUtil: getGradeCodeUseCache
+06-30 20:52:23.061 15151 15419 I Cloud[16.3.0.302]Notify.UserSpaceUtil: getGradeCodeUseCache, gradeCode is N
+06-30 20:52:23.065 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04020_01_1782823943_36361774
+06-30 20:52:23.065 15151 15167 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:23.065 15151 15167 I Cloud[16.3.0.302]Album.SyncTypeManager: syncType is:19
+06-30 20:52:23.065 15151 15167 I Cloud[16.3.0.302]Album.AlbumUtil: broadcastNotify totalNeedSpace:5579251589 isSpaceNotEnough:true
+06-30 20:52:23.066 15151 15167 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:0, eventId:mecloud_cloudphotospace_not_enough_sync_fail
+06-30 20:52:23.067 15151 15167 I Cloud[16.3.0.302]Base.NotEnoughSpUtil: record not enough time sign recordTimes: 1782823943066
+06-30 20:52:23.067 15151 15250 I Cloud[16.3.0.302]Base.UBAReport: isAnonymous false
+06-30 20:52:23.067 15151 18952 I FormalHASDK: RecordTask==> record evt size: 24, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:23.067 19389 19389 W app_process: DexFile /system/emui/base/jar/Mdm/hw_mdm_framework.jar is in boot class path but is not in a known location
+06-30 20:52:23.069 15151 18952 I FormalHASDK: RecordTask==> record evt size: 25, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:23.069 15151 15151 I Cloud[16.3.0.302]Sync.CommonReceiver: Receive broadcast, action=com.huawei.hicloud.intent.action.ALBUM_SYNC_NOTIFY
+06-30 20:52:23.069 15151 15151 I Cloud[16.3.0.302]Sync.CommonReceiver: ALBUM_SYNC_NOTIFY
+06-30 20:52:23.069 15151 15317 I Cloud[16.3.0.302]Notify.HiCloudNotification: executeFromAlbum, isAutoSync: true, isSpaceNotEnough: true, totalNeedSpace is: 5579251589
+06-30 20:52:23.069 15151 15317 I Cloud[16.3.0.302]Notify.HiCloudNotification: checkNotifyModuleEnable isInRedList=false
+06-30 20:52:23.069 15151 15317 I Cloud[16.3.0.302]Notify.NotificationConfigManager: getConfigFromFile
+06-30 20:52:23.069 15151 15317 I Cloud[16.3.0.302]Notify.HNCloudConfig: isExist
+06-30 20:52:23.069 15151 15317 I Cloud[16.3.0.302]Notify.BaseNotificationConfig: getConfigRaw
+06-30 20:52:23.070 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: report end dots is：{prepareTraceId=null, traceId=04001_01_1782823919_96738005, gradeCode=N, startPlugged=1, endPlugged=1, startNetworkType=1, endNetworkType=1, startForgound=0, endForeground=0, errorCode=001_162, errorReason=General.Changes.getStartCursor_0_OK, uploadSize=333152572, uploadCount=20, hasAssets=1, incFlag=1, startTime=1782823919557, endTime=1782823943069, thirdAppVersion=11.0.26.412, source=19, prepareTimes=0, firstStartTime=0}
+06-30 20:52:23.070 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: reportSdkOMEvent sessionId: 04001_01_1782823919_96738005, cmd: syncstate, code: 0, msg:  New:420 Cloud:765
+06-30 20:52:23.070 15151 15250 I Cloud[16.3.0.302]Base.UBAReport: isAnonymous false
+06-30 20:52:23.071 15151 15167 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:0, eventId:syncstate
+06-30 20:52:23.071 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: uploadStat is :Stat{localAdded=420, localUpdated=0, localRecycleUpdated=0, cloudNormal=765, cloudRecycle=0, disconnectedTime=-1, sessionID=04001_01_1782823919_96738005}
+06-30 20:52:23.071 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: isChinaAccount :true
+06-30 20:52:23.072 15151 18952 I FormalHASDK: RecordTask==> record evt size: 9, tag: clouddrive_cloudalbum, type: oper
+06-30 20:52:23.072 15151 15167 I Cloud[16.3.0.302]Album.CloudAlbumSdkServiceImpl: isIncrementalSync is :false localUpdated is :420 isSyncCompleted :false isFirstSync :true
+06-30 20:52:23.072 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:23.072 15151 15317 I Cloud[16.3.0.302]Base.BaseUtil: readConfigStr, read local config str success
+06-30 20:52:23.073 15151 15167 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04001_01_1782823919_96738005
+06-30 20:52:23.073 15151 15167 I Cloud[16.3.0.302]Album.SyncSessionManager: setVFCExecuted: false
+06-30 20:52:23.073 15151 15167 I Cloud[16.3.0.302]Album.SyncSessionManager: setSpaceFull: false
+06-30 20:52:23.074 15151 15167 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: unApplyByApplyType packageName: com.huawei.hidisk, applyType: auto-album-sync_apply
+06-30 20:52:23.074  2672  3625 I PowerKit_Impl: unapply pkg: com.huawei.hidisk resource:65535 timeout:-1 reason:auto-album-sync_apply
+06-30 20:52:23.074  2672  3625 I AppResManager: App end request interaction: {com.huawei.hidisk app: com.huawei.hidisk resType: 65535 time: 13705625 startTime: 12805625 group: album applyReason: auto-album-sync_apply usageStartTime: 12805625 usageEndTime: 12829132}
+06-30 20:52:23.074  2672  3625 I AppResManager: pkgAndGroup remaining: com.huawei.hidisk_album , remainingCount: 10, remainingTime: 1677806
+06-30 20:52:23.074  2672  3625 I PowerKit_Impl: onPowerBaseLineUsing callingPkg:com.huawei.hidisk appAndGroup:com.huawei.hidisk_album usage duration:1677806 usage count:10 extend:
+06-30 20:52:23.074  2672  3625 I PowerKit_Impl: report resource baseline usage:com.huawei.hidisk appAndGroup:com.huawei.hidisk_album usage duration:1677806 usage count:10 extend: to pid: 15151
+06-30 20:52:23.074  2672  3625 I AppResManager: cancel Request interaction : {com.huawei.hidisk app: com.huawei.hidisk resType: 65535 time: 13705625 startTime: 12805625 group: album applyReason: auto-album-sync_apply usageStartTime: 12805625 usageEndTime: 12829132}
+06-30 20:52:23.074  2672  2822 I PGServer: report state:12 event type:1 pid:-1 uid:0 pkg:com.huawei.hidisk#13705618 to pid: 1650
+06-30 20:52:23.075 15151 18952 I FormalHASDK: RecordTask==> record evt size: 10, tag: clouddrive_cloudalbum, type: oper
+06-30 20:52:23.075 15151 15168 I PowerKitApi: onPowerBaseLineUsing callingPkg:com.huawei.hidisk appAndGroup:com.huawei.hidisk_album usage duration:1677806 usage Count:10 extend:
+06-30 20:52:23.076 15151 18952 I FormalHASDK: RecordTask==> record evt size: 26, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:23.077  2672  3625 I PowerKit_Impl: unapply pkg: com.huawei.hidisk resource:512 timeout:-1 reason:auto-album-sync_apply
+06-30 20:52:23.077  2672  3625 I AppResManager: App end request interaction: {com.huawei.hidisk app: com.huawei.hidisk resType: 512 time: 13705618 startTime: 12805618 group: album applyReason: auto-album-sync_apply usageStartTime: 12805618 usageEndTime: 12829135}
+06-30 20:52:23.077  2672  3625 I AppResManager: pkgAndGroup remaining: com.huawei.hidisk_album , remainingCount: 10, remainingTime: 1654296
+06-30 20:52:23.077  2672  3625 I PowerKit_Impl: onPowerBaseLineUsing callingPkg:com.huawei.hidisk appAndGroup:com.huawei.hidisk_album usage duration:1654296 usage count:10 extend:
+06-30 20:52:23.077  2672  3625 I PowerKit_Impl: report resource baseline usage:com.huawei.hidisk appAndGroup:com.huawei.hidisk_album usage duration:1654296 usage count:10 extend: to pid: 15151
+06-30 20:52:23.077  2672  3625 I AppResManager: cancel Request interaction : {com.huawei.hidisk app: com.huawei.hidisk resType: 512 time: 13705618 startTime: 12805618 group: album applyReason: auto-album-sync_apply usageStartTime: 12805618 usageEndTime: 12829135}
+06-30 20:52:23.077  2672  2822 I PGServer: report state:12 event type:2 pid:-1 uid:0 pkg:com.huawei.hidisk#13705618 to pid: 1650
+06-30 20:52:23.078 15151 18952 I FormalHASDK: RecordTask==> record evt size: 27, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:23.078 15151 15250 I Cloud[16.3.0.302]Base.UBAReport: isAnonymous false
+06-30 20:52:23.078 15151 15167 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: unApplyByApplyType applyType: auto-album-sync_apply, result: true
+06-30 20:52:23.079 15151 15167 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: unApplyByApplyType size is 0
+06-30 20:52:23.079 15151 15168 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: onPowerBaseLineUsing, appAndGroup=com.huawei.hidisk_album, usageDuration=1677806, usageCount=10
+06-30 20:52:23.079 15151 15167 I PowerKitApi: Disable state event, stateType: 50
+06-30 20:52:23.079 15151 15168 I PowerKitApi: onPowerBaseLineUsing callingPkg:com.huawei.hidisk appAndGroup:com.huawei.hidisk_album usage duration:1654296 usage Count:10 extend:
+06-30 20:52:23.079  2672  3625 I PowerKit_Impl: disable state type: 50 from pid: 15151
+06-30 20:52:23.079 15151 15167 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: powerKit unregisterListener sink success:true
+06-30 20:52:23.079 15151 15168 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: onPowerBaseLineUsing, appAndGroup=com.huawei.hidisk_album, usageDuration=1654296, usageCount=10
+06-30 20:52:23.080 15151 15167 I PowerKitApi: Disable state event, stateType: 51
+06-30 20:52:23.081  2672  3625 I PowerKit_Impl: disable state type: 51 from pid: 15151
+06-30 20:52:23.081 15151 15167 I Cloud[16.3.0.302]Sync.HiCloudPowerKitManager: unregisterBaseLineListener, isSuccsess=true
+06-30 20:52:23.081 15151 15167 I Cloud[16.3.0.302]Sync.CloudAlbumPowerKitManager: no need removeApply:user-sync_apply
+06-30 20:52:23.081 15151 15167 I Cloud[16.3.0.302]Sync.CloudAlbumPowerKitManager: no need removeApply:user-download_apply
+06-30 20:52:23.083 15151 15167 I Cloud[16.3.0.302]Album.SubscribeExecutor: cursor has been subscribed within one day
+06-30 20:52:23.085 15151 15419 I Cloud[16.3.0.302]Notify.UserSpaceUtil: getGradeCodeUseCache
+06-30 20:52:23.085 15151 15419 I Cloud[16.3.0.302]Notify.UserSpaceUtil: getGradeCodeUseCache, gradeCode is N
+06-30 20:52:23.088 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_cloudalbum, type:1, eventId:04020_01_1782823943_32553836
+06-30 20:52:23.090 15151 18952 I FormalHASDK: RecordTask==> record evt size: 28, tag: clouddrive_cloudalbum, type: maint
+06-30 20:52:23.092 19389 19389 D ICU     : Time zone APEX file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-30 20:52:23.099 19389 19389 I app_process: The ClassLoaderContext is a special shared library.
+06-30 20:52:23.099 19389 19389 I app_process: The ClassLoaderContext is a special shared library.
+06-30 20:52:23.100 19389 19389 I app_process: Reinit property: dalvik.vm.checkjni= false
+06-30 20:52:23.100 19389 19389 I app_process: ReInitProperties: persist.vm.debug.dumpapi= false
+06-30 20:52:23.102 19389 19389 W app_process: Qarth read proc_cmdline fail.
+06-30 20:52:23.102 19389 19389 I app_process: Qarth function Enabled: 1
+06-30 20:52:23.105 19389 19389 I HwPartBasicPlatformFactory: add android.common.HwPartBasicPlatformFactoryImpl to memory.
+06-30 20:52:23.110 19389 19389 I HWSERVICES: hwnative_get_component_register:libdrmbitmap,JNI
+06-30 20:52:23.112  2672  3625 I PowerKit_Impl: unapply pkg: com.android.gallery3d resource:65535 timeout:-1 reason:null
+06-30 20:52:23.112  2672  3625 I AppResManager: App cancel all request interaction: {com.android.gallery3d app: com.android.gallery3d resType: 65535 time: 14597366 startTime: 12813390 group: sync applyReason: auto-sync-apply for upload media. usageStartTime: 12813390 usageEndTime: 12829170}
+06-30 20:52:23.112  2672  3625 I AppResManager: pkgAndGroup remaining: com.android.gallery3d_sync , remainingCount: 10, remainingTime: 1768196
+06-30 20:52:23.112  2672  3625 I PowerKit_Impl: onPowerBaseLineUsing callingPkg:com.android.gallery3d appAndGroup:com.android.gallery3d_sync usage duration:1768196 usage count:10 extend:
+06-30 20:52:23.113  2672  3625 I AppResManager: cancel All Request interaction : com.android.gallery3d
+06-30 20:52:23.113  2672  2822 I PGServer: report state:12 event type:2 pid:-1 uid:0 pkg:com.android.gallery3d#14597366 to pid: 1650
+06-30 20:52:23.114 15151 15317 I Cloud[16.3.0.302]Notify.SpaceNoticeV3Manager: getConfigFromFile
+06-30 20:52:23.114  2672  2824 I Network_Firewall: China TimeZone and GC failed, remove com.easy.abroad
+06-30 20:52:23.114 19389 19389 V HwFrameworkFactory: successes to get AllImpl object and return....
+06-30 20:52:23.114 19389 19389 E Zygote  : register_com_android_internal_os_Zygote num = 0
+06-30 20:52:23.115 19389 19389 I         : power log dlsym ok
+06-30 20:52:23.116 19389 19389 E libc    : Access denied finding property "ro.config.vol_steps"
+06-30 20:52:23.116 15151 15317 I Cloud[16.3.0.302]Base.BaseUtil: readConfigStr, read local config str success
+06-30 20:52:23.116 19389 19389 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+06-30 20:52:23.117  2672  2824 I Network_Firewall: background mode and task, list:[]
+06-30 20:52:23.122 19389 19389 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-30 20:52:23.123 19389 19389 E libc    : Access denied finding property "persist.mygote.disable"
+06-30 20:52:23.127  1650  4940 I WindowManager: addWindowToken: displayid:0 binder:android.os.Binder@934feed token:WindowToken{919b789 android.os.Binder@934feed}
+06-30 20:52:23.128  1650  4940 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 20:52:23.131  1650  4940 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 20:52:23.135  1650  1650 I AS.AudioService: Accessibility volume enabled = false
+06-30 20:52:23.146 15151 15317 I Cloud[16.3.0.302]Notify.HiCloudNotification: executeFromAlbum check time is: 1800000, current time is: 1782823943069, lastNotify time is: 0
+06-30 20:52:23.146 15151 15317 I Cloud[16.3.0.302]Notify.HiCloudNotification: execNotifyAlbumSpaceNotEnough
+06-30 20:52:23.147 15151 15317 I Cloud[16.3.0.302]Notify.CBPushHandlerThread: doTask
+06-30 20:52:23.147 15151 15317 I Cloud[16.3.0.302]Notify.HiCloudNotification: send cmd: 6
+06-30 20:52:23.147 15151 15581 I Cloud[16.3.0.302]Notify.CBPushHandlerThread: exeCmdCheckRuleForAlbum
+06-30 20:52:23.147 15151 15581 I Cloud[16.3.0.302]Notify.NotificationConfigManager: getConfigFromFile
+06-30 20:52:23.147 15151 15581 I Cloud[16.3.0.302]Notify.HNCloudConfig: isExist
+06-30 20:52:23.147 15151 15581 I Cloud[16.3.0.302]Notify.BaseNotificationConfig: getConfigRaw
+06-30 20:52:23.148 15151 15581 I Cloud[16.3.0.302]Base.BaseUtil: readConfigStr, read local config str success
+06-30 20:52:23.157 15151 15581 I Cloud[16.3.0.302]Notify.SpaceNoticeV3Manager: getConfigFromFile
+06-30 20:52:23.158 15151 15581 I Cloud[16.3.0.302]Base.BaseUtil: readConfigStr, read local config str success
+06-30 20:52:23.169 15151 15581 I Cloud[16.3.0.302]Notify.CBPushHandlerThread: config not null
+06-30 20:52:23.169 15151 15581 I Cloud[16.3.0.302]Notify.CBPushHandlerThread: contryCode=CN
+06-30 20:52:23.169 15151 15581 I Cloud[16.3.0.302]Notify.CBPushHandlerThread: contry code CN
+06-30 20:52:23.169 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyUtil: checkNotifyRule totalNeedSpace:5579251589isFromAlbumtrue
+06-30 20:52:23.169 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyUtil: notifyCloudSpace countryCode = CN
+06-30 20:52:23.169 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyUtil: startNotifyThread
+06-30 20:52:23.170 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyUtil: doNotifyCloudSpace
+06-30 20:52:23.170 15151 15581 I Cloud[16.3.0.302]Notify.HNUtil: time=1782823943170 week=27 day=30 month=5 year=2026
+06-30 20:52:23.170 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyHelper: config everyDayMax=1, everyWeekMax=7, everyMonthMax=31
+06-30 20:52:23.171 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyHelper: queryCountByDay = 1
+06-30 20:52:23.172 15151 15581 I Cloud[16.3.0.302]Notify.CloudSpaceNotifyUtil: doNotifyCloudSpace from album and too freq
+06-30 20:52:23.173 15151 15419 I FormalHASDK: HAImpl==> onEvent. tag:clouddrive_common, type:1, eventId:07008_01_1782823943_86165027
+06-30 20:52:23.175 15151 18952 I FormalHASDK: RecordTask==> record evt size: 7, tag: clouddrive_common, type: maint
+06-30 20:52:23.190  1650  4936 W ActivityManager: stopServiceToken startId 21 is last, but have 1 remaining args
+06-30 20:52:23.274  1650  4940 D HwConnectivityServiceEx: set 1000 wlan0 value false
+06-30 20:52:23.374  7852  7852 I DEVMGR_KillPhoneServiceManager: 1600104310|R|I|Try to kill health enter
+06-30 20:52:23.375  7852  7852 I DEVMGR_KillPhoneServiceManager: 1600104310|R|I|Try to kill health after 10 seconds
+06-30 20:52:23.381  1115  1115 D WifiHAL : Setting APF program, halHandle = 0x7eaa430ae0
+06-30 20:52:23.381  1115  1115 I WifiHAL :
+06-30 20:52:23.381  1115  1115 I WifiHAL : createRequest: APF set program request
+06-30 20:52:23.382  1115  1115 I WifiHAL : Done!
+06-30 20:52:23.480  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:23.480  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:350,rsrp(rssi):-40,rsrq(noise):-88,rtt(chload):131,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 20:52:23.480  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:23.480  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-88,rtt(chload):131,buffhigh(uldelay):0,buffcomm(rtt):20
+06-30 20:52:23.480  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 20:52:23.481  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 20:52:23.481  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 20:52:23.482  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 20:52:23.482  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 20:52:23.483  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,350,1,2,4,0,312,108300,97500,10,10,0,1,0,0 CID 2 mMasterWifiRssi -24 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 20:52:23.484  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 20:52:23.484  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 20:52:23.484  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 20:52:23.552  2971 19036 I HwEasyGoService: totalNum17
+06-30 20:52:23.552  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:23.782  1650  2161 I HwBackgroundDexOptServiceEx: configPidProcess pid: -1
+06-30 20:52:23.994   675   675 I netd    : trafficSwapActiveStatsMap() <11.22ms>
+06-30 20:52:24.053  2971 19036 I HwEasyGoService: totalNum18
+06-30 20:52:24.053  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:24.134    47    47 W migration/6: type=1400 audit(0.0:9950): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:24.138 19389 19389 W AccessibilityInteractionClient: old interaction Id is: -1,current interaction Id is:0
+06-30 20:52:24.166    53    53 W migration/7: type=1400 audit(0.0:9951): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:24.186 19389 19389 W uiautomator: type=1400 audit(0.0:9952): avc: denied { read } for pid=19389 name="u:object_r:curved_side_prop:s0" dev="tmpfs" ino=16676 scontext=u:r:shell:s0 tcontext=u:object_r:curved_side_prop:s0 tclass=file permissive=0
+06-30 20:52:24.186 19389 19389 W uiautomator: type=1400 audit(0.0:9953): avc: denied { read } for pid=19389 name="u:object_r:curved_side_prop:s0" dev="tmpfs" ino=16676 scontext=u:r:shell:s0 tcontext=u:object_r:curved_side_prop:s0 tclass=file permissive=0
+06-30 20:52:24.189 19389 19389 I HwPartIawareFactory: add android.common.HwPartIawareFactoryImpl to memory.
+06-30 20:52:24.190 19389 19389 I HwApsImpl: APS: new HwApsImpl created
+06-30 20:52:24.191 19389 19389 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 20:52:24.191 19389 19389 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 20:52:24.218 19389 19389 W AccessibilityNodeInfoDumper: Fetch time: 4ms
+06-30 20:52:24.218  1650  4936 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@934feed token:WindowToken{919b789 android.os.Binder@934feed}
+06-30 20:52:24.219  1650  4936 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@934feed token:null
+06-30 20:52:24.219  1650  4936 W WindowManager: removeWindowToken: Attempted to remove non-existing token: android.os.Binder@934feed
+06-30 20:52:24.219  1650  4936 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 0
+06-30 20:52:24.220  1650  4936 I [SPMN]  : insert SYSTEM -- name = accelerometer_rotation, package = android, user = 0, value = 1
+06-30 20:52:24.220  1650  4936 I HwWindowManagerServiceEx: setLandAnimationInfo : false
+06-30 20:52:24.236 19389 19389 D AndroidRuntime: Shutting down VM
+06-30 20:52:24.384  1650  2161 I HwBackgroundDexOptServiceEx: configPidProcess pid: -1
+06-30 20:52:24.390    53    53 W migration/7: type=1400 audit(0.0:9954): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:24.503  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:24.503  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-85,rtt(chload):218,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 20:52:24.503  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:24.503  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-85,rtt(chload):218,buffhigh(uldelay):0,buffcomm(rtt):8
+06-30 20:52:24.504  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 20:52:24.504  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 20:52:24.504  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 20:52:24.505  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 20:52:24.505  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 20:52:24.506  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,312,1,2,4,0,312,108300,97500,10,10,0,131,286,0 CID 2 mMasterWifiRssi -25 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 20:52:24.507  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 20:52:24.507  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 20:52:24.507  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 20:52:24.524  1650  2047 I ActivityManager: sendIntentSender target:PendingIntentRecord{9858305 com.huawei.nearby broadcastIntent}, intent:flg=0x4 hwFlg=0x810
+06-30 20:52:24.524  1650  2047 E HwActivityTaskManagerServiceEx: isNeedInterceptStart isNeedInterceptAlarm getPackageUid exception
+06-30 20:52:24.525  1650  2047 W ActivityManager: Sending non-protected broadcast ChannelQualityMonitor.AlarmMeasureEvent from system uid 1000 pkg com.huawei.nearby
+06-30 20:52:24.527  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:24.528  2990  3065 I ChannelQualityMonitor: eventReceiver AlarmMeasureEvent
+06-30 20:52:24.528  1650  2019 V BroadcastQueue: Finished with ordered broadcast BroadcastRecord{992a090 u0 ChannelQualityMonitor.AlarmMeasureEvent}
+06-30 20:52:24.536  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:24.538  2990  3065 I ChannelQualityMonitor: startCheckDeviceState entry!!
+06-30 20:52:24.539  2672  3625 I PGServer: getTopFrontApp. calling pkg: com.huawei.nearby
+06-30 20:52:24.539  2672  3625 I PGServer: checkPkgType. calling pkg: com.huawei.nearby
+06-30 20:52:24.542  2990  3065 D ChannelQualityMonitor: get Wifi Traffic from system start =55325257
+06-30 20:52:24.554  2971 19036 I HwEasyGoService: totalNum19
+06-30 20:52:24.555  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:24.615 19407 19407 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 20:52:24.615 19407 19407 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 20:52:24.616 19407 19407 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:24.630   498   498 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@3.0::IMapper/default in either framework or device manifest.
+06-30 20:52:24.630 19407 19407 W Gralloc3: mapper 3.x is not supported
+06-30 20:52:24.713 19045 19100 D ZrHung.AppEyeUiProbe: stop UiProbe
+06-30 20:52:24.713 19045 19100 D ZrHung.AppEyeUiProbe: not watching, wait.
+06-30 20:52:24.739  1650  2108 I WificondControl: Noise: -84, Snr: 127, Chload: 122, rssi: -24, txBitrate: 108, rxBitrate: 97, frequency: 2417, UlDelay: -1, currentTxBytes: 13353608, currentTxPackets: 44875, currentTxFailed: 0, currentRxBytes: 45356683, currentRxPackets: 54277
+06-30 20:52:24.741  1650  2107 I WiFi_PRO: MSG_RETURN_AP_CURRY_RSSI rssi = -24
+06-30 20:52:24.741  1650  2107 I QosMonitor: queryRtt: rttType = 3
+06-30 20:52:24.741  1650  2197 I HuaweiWifiWatchdogStateMachine: POta txb txg rxg:0, 86, 0. Lr =0% Totpkt=86
+06-30 20:52:24.742  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+06-30 20:52:24.742  1650  2214 I HwDualBandManager: handle2gApStrongWifiRssiChange
+06-30 20:52:24.743  1650  2107 I QosMonitor: postEventFromNative: msg=100,arg1=4,arg2=10
+06-30 20:52:24.743  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+06-30 20:52:24.743  1650  2107 I QosMonitor: postEventFromNative: msg=100,arg1=0,arg2=10
+06-30 20:52:24.743  1650  2107 I MQoS    : rtt=316,tcpTxPkts=13661,tcpRxPkts=13284
+06-30 20:52:24.743  1650  2107 I QosMonitor: resetRtt: rttType = 3
+06-30 20:52:24.743  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+06-30 20:52:24.743  1650  2214 W HwDualBandManager: actualScan5gChannelList not exist
+06-30 20:52:24.744  1650 16994 D HwConnectivityServiceEx: set 1000 wlan0 value false
+06-30 20:52:24.744  1650  2197 I HuaweiWifiWatchdogStateMachine: PTcp RTT:316, rtt pkt=29, tcp_rx=39, tcp_tx=49, tcp_reTran=0, rtRate=0
+06-30 20:52:24.744  1650  2197 I HuaweiWifiWatchdogStateMachine: judge good link######, goodLinkLevel=3
+06-30 20:52:24.744  1650  2197 D HuaweiWifiWatchdogStateMachine: nothing to do.
+06-30 20:52:24.744  1650  2197 I HuaweiWifiWatchdogStateMachine: sendResultMsgToQM bssid:6e:9e:**:**:81:7b, qoslevel=3
+06-30 20:52:24.745  1650  2197 I HuaweiWifiWatchdogStateMachine: link good reported, good base rssi:-37
+06-30 20:52:24.745  1650  2197 I HuaweiWifiWatchdogStateMachine: start computeQosLevel tcpRtt = 316 ,rssi = -24 ,mBestSpeedInPeriod = 9677
+06-30 20:52:24.745  1650  2197 I HuaweiWifiWatchdogStateMachine: smoothConsecutiveQosResults, currentQosLevel = 3
+06-30 20:52:24.745  1650  2107 I WiFi_PRO_WifiProStateMachine: onNetworkQosChange, currentWifiLevel == 3, wifiNoInternet = false, updateUiOnly = true
+06-30 20:52:24.745  1650  2195 I WiFi_PRO_WifiProStateMachine: isSwitching = false, isDialogDisplayed = false, isAllowWiFiHandoverMobile = true, level = 3
+06-30 20:52:24.746  1650 16994 I MQoS    : QOS_level:0(0),wifi-link;SIM error;use level-0
+06-30 20:52:24.746  1650 16994 I MQoS    : skip-low-Level:0(0),wifi-link;SIM error;use level-0
+06-30 20:52:24.769 19411 19411 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:24.771  1650  2019 E UserInfoExt: setUserInfo: userInfo is null!
+06-30 20:52:24.771  1650  2019 E UserInfoExt: isClonedProfile: mUserInfo is null!
+06-30 20:52:24.771  1650  2019 E UserInfoExt: setUserInfo: userInfo is null!
+06-30 20:52:24.778  6261  6261 I MediaReceiver: onReceive android.intent.action.MEDIA_SCANNER_SCAN_FILE
+06-30 20:52:24.786  1650  4936 V BroadcastQueue: Finished with ordered broadcast BroadcastRecord{992a009 u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE}
+06-30 20:52:24.791  6261  6261 I MediaService: onCreate
+06-30 20:52:24.796  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:24.806  6261 19415 I ModernMediaScanner: scanFile isSingleFile true
+06-30 20:52:24.812  6261 19415 I ModernMediaScanner: max id 1832871
+06-30 20:52:24.813  6261 19415 I HwModernScannerEx: is skip white list false
+06-30 20:52:24.815  1650  2107 I TrafficMonitor: update:rxPkts:34,txPkts:38,rxBytes:17403,txBytes:6190
+06-30 20:52:24.815  1650  2107 I TrafficMonitor: gettimer:interval=2000
+06-30 20:52:24.820  6261 19415 W ExifInterface: Invalid image: ExifInterface got an unsupported image format file(ExifInterface supports JPEG and some RAW image formats only) or a corrupted JPEG file to ExifInterface.
+06-30 20:52:24.827  6261  7420 I MediaProvider: MSG_MEDIA_SYNC_NOTIFY_CHANGED
+06-30 20:52:24.831  6261 19368 E PhotoData: set database context com.android.providers.media
+06-30 20:52:24.836  1650  4940 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 20:52:24.837  1650  4940 D HwConnectivityServiceEx: set 10031 wlan0 value false
+06-30 20:52:24.837  1650  4940 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 20:52:24.837  1650  4940 I ConnectivityService: B uid 10031
+06-30 20:52:24.838  6261 19415 I HwMediaScannerImpl: handleScanSingleFile res content://media/external_primary/images/media/1832872
+06-30 20:52:24.838  6261 19368 I MediaLibraryServiceCore: activeList is empty.
+06-30 20:52:24.838  6261 19368 I MediaLibraryServiceCore: doRealtimeDataSynchronization can not be called !!
+06-30 20:52:24.838  6261 19368 I MediaLibraryService: stopSelfIfNecessary startId:2, startIds size 0
+06-30 20:52:24.839  6261 19415 D MediaIntentService: stopSelfIfNecessary startId:1, startIds size:0, mScanPaths size:0, skip:0
+06-30 20:52:24.840  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:24.841  6261  6261 D MediaIntentService: onDestroy
+06-30 20:52:24.852  1650  2019 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 20:52:24.853  1650  2019 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 20:52:24.853  1650  2019 I ConnectivityService: B uid 10031
+06-30 20:52:24.856 15372 15771 D FLTAG_SC: bindService from Intent: Intent { cmp=com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service }
+06-30 20:52:24.856 15372 15771 I FLTAG_FM: getRequireFeature it maybe not in a feature:com.huawei.gallery.media.CalcMd5Service
+06-30 20:52:24.856 15372 15771 D FLTAG_SC: Feature cannot been obtained
+06-30 20:52:24.856 15372 15771 D FLTAG_SC: Cannot resolve service information from features: Intent { cmp=com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service }
+06-30 20:52:24.864   761  8655 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:24.873  1650  1930 D ActivityManager: setPrivilegeType r: ServiceRecord{9811e29 u0 com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service}, interfaceDescriptor : com.huawei.gallery.service.IAsyncService
+06-30 20:52:24.873  2672  3625 I KStateManager: send binder call message, called pid:15372, calling pid:[1650]
+06-30 20:52:24.873   761  2299 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:24.931  3458  4192 I NcDftChip: NcChipDftEvent receive:NcChipDftEvent{Id=909009521, Length=464, Flag=0}
+06-30 20:52:24.932  3458  4180 I HotspotComponent: handleChipEvent
+06-30 20:52:25.054  2971 19036 I HwEasyGoService: totalNum20
+06-30 20:52:25.055  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:25.166 19420 19420 W app_process: type=1400 audit(0.0:9962): avc: denied { read } for pid=19420 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 20:52:25.166 19420 19420 I chatty  : uid=2000(shell) app_process identical 1 line
+06-30 20:52:25.166 19420 19420 W app_process: type=1400 audit(0.0:9964): avc: denied { read } for pid=19420 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 20:52:25.167 19420 19420 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 20:52:25.167 19420 19420 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 20:52:25.167 19420 19420 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:25.168 19420 19420 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-30 20:52:25.171 19420 19420 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ hw_mc.art.mt_dex_loader=1
+06-30 20:52:25.172 19420 19420 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ g_numThreads=4
+06-30 20:52:25.172 19420 19420 W app_process: [MemLeak.JavaTrack]: failed to dlopen libmemleak_tracker.so
+06-30 20:52:25.172 19420 19420 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+06-30 20:52:25.172 19420 19420 I AndroidRuntime: Using default boot image
+06-30 20:52:25.172 19420 19420 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+06-30 20:52:25.172 19420 19420 I AndroidRuntime: Leaving lock profiling enabled
+06-30 20:52:25.172 19420 19420 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+06-30 20:52:25.174 19420 19420 I         : HwCustType is 0
+06-30 20:52:25.174 19420 19420 E         : open file error
+06-30 20:52:25.174 19420 19420 I         : no cota live update cust policy found
+06-30 20:52:25.174 19420 19420 I         : GetCfgDirRealPolicyValue: custPolicyDirs: /system/emui/base:/system/emui/china:/vendor/etc:/odm/cust/all/cn:/odm/etc:/odm/hw_odm/HMA-AL00:/odm/special_cust/HMA-AL00/all/cn:/hw_product/etc:/hw_product/region_comm/china:/preas/china:/hw_product/hw_oem/HMA-AL00:/preload/HMA-AL00/all/cn:/cust/global:/cust/hw/cn:/version/cust/all/cn:/hw_product/special_cust/HMA-AL00/all/cn:/version/special_cust/HMA-AL00/all/cn:/cust/cotalite:/cust/ecota
+06-30 20:52:25.175 19420 19420 I app_process: Opt gc perf enable = 1
+06-30 20:52:25.175 19420 19420 I app_process: ScopedPromotePriority logging = 0
+06-30 20:52:25.234 19420 19420 W app_process: DexFile /system/emui/base/jar/Mdm/hw_mdm_framework.jar is in boot class path but is not in a known location
+06-30 20:52:25.258 19420 19420 D ICU     : Time zone APEX file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-30 20:52:25.262 19420 19420 W main    : type=1400 audit(0.0:9965): avc: denied { getattr } for pid=19420 path=2F646174612F686F7470617463682F66776B70617463686469722F66776B686F7470617463682E737573706963696F75732E484D412D4C475250312D43484E20342E302E302E313231 dev="sdd71" ino=900659 scontext=u:r:shell:s0 tcontext=u:object_r:hotpatch_file:s0 tclass=file permissive=0
+06-30 20:52:25.265 19420 19420 I app_process: The ClassLoaderContext is a special shared library.
+06-30 20:52:25.265 19420 19420 I app_process: Reinit property: dalvik.vm.checkjni= false
+06-30 20:52:25.265 19420 19420 I app_process: ReInitProperties: persist.vm.debug.dumpapi= false
+06-30 20:52:25.266 19420 19420 W app_process: Qarth read proc_cmdline fail.
+06-30 20:52:25.266 19420 19420 I app_process: Qarth function Enabled: 1
+06-30 20:52:25.267 19420 19420 I HwPartBasicPlatformFactory: add android.common.HwPartBasicPlatformFactoryImpl to memory.
+06-30 20:52:25.270 19420 19420 W main    : type=1400 audit(0.0:9966): avc: denied { read } for pid=19420 name="u:object_r:huawei_audio_public_read_prop:s0" dev="tmpfs" ino=16759 scontext=u:r:shell:s0 tcontext=u:object_r:huawei_audio_public_read_prop:s0 tclass=file permissive=0
+06-30 20:52:25.272 19420 19420 I HWSERVICES: hwnative_get_component_register:libdrmbitmap,JNI
+06-30 20:52:25.275 19420 19420 V HwFrameworkFactory: successes to get AllImpl object and return....
+06-30 20:52:25.275 19420 19420 E Zygote  : register_com_android_internal_os_Zygote num = 0
+06-30 20:52:25.276 19420 19420 I         : power log dlsym ok
+06-30 20:52:25.277 19420 19420 E libc    : Access denied finding property "ro.config.vol_steps"
+06-30 20:52:25.277 19420 19420 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+06-30 20:52:25.283 19420 19420 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+06-30 20:52:25.284 19420 19420 E libc    : Access denied finding property "persist.mygote.disable"
+06-30 20:52:25.286  1650  2059 I InputDispatcher: stylus touch down, set lcd event 1
+06-30 20:52:25.286   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5378
+06-30 20:52:25.286  1650  2059 I InputDispatcher: stylus touch down, set lcd event 1
+06-30 20:52:25.286   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5378, ret=2
+06-30 20:52:25.287  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:25.287  1650  1902 I NavigationBarPolicy: pointY:1057.0realSize.y:1496HIT_REGION_TO_MAX:21
+06-30 20:52:25.293  1650  2059 I InputDispatcher: stylus touch up, set lcd event 0
+06-30 20:52:25.294   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5379
+06-30 20:52:25.294  1650  2059 I InputDispatcher: stylus touch up, set lcd event 0
+06-30 20:52:25.294   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5379, ret=2
+06-30 20:52:25.297 19420 19420 D AndroidRuntime: Shutting down VM
+06-30 20:52:25.361 19253 19253 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+06-30 20:52:25.377  2971  3146 I OllieMsgCenter: publishEvt=2135097345
+06-30 20:52:25.377  2971  3146 E SpeedLimitTestNotifier: mIsTopActivity false
+06-30 20:52:25.394  2971  3146 I SpeedTestNotifier: is low speed scene
+06-30 20:52:25.534  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:25.534  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-84,rtt(chload):122,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 20:52:25.534  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:25.534  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-84,rtt(chload):122,buffhigh(uldelay):0,buffcomm(rtt):3
+06-30 20:52:25.534  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 20:52:25.535  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 20:52:25.535  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 20:52:25.535  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 20:52:25.535  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 20:52:25.536  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,312,1,2,4,0,312,108300,97500,10,10,0,1,0,0 CID 2 mMasterWifiRssi -24 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 20:52:25.536  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 20:52:25.536  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 20:52:25.536  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 20:52:25.545  2990  3065 D ChannelQualityMonitor: get Wifi Traffic from system start =55325337
+06-30 20:52:25.545  2990  3065 I ChannelQualityMonitor: getWifiTraffic 1s =80
+06-30 20:52:25.546  2990  3065 D ChannelQualityMonitor: noise invoke, ScanResult size=11
+06-30 20:52:25.546  2990  3065 I ChannelQualityMonitor: isCanStartScan = false: the scan result is new!
+06-30 20:52:25.546  2990  3065 I nStackXDNet: DNetGetAllChannel:[186] :Call
+06-30 20:52:25.547  2990  3065 I ChannelQualityMonitor: getChannelByDnet dnetChannelList size = 25
+06-30 20:52:25.547  2990  3065 I SyncChannelInfo: onChannelBeanRevice from local, channelBeanList size=26
+06-30 20:52:25.547  2990  3065 D CommonUtils: Current screen state isOn: true
+06-30 20:52:25.547  2990  3065 I SyncChannelInfo: lastOnlineChannelBeanList is null or size == 0
+06-30 20:52:25.547  2990  3065 I SyncChannelInfo: isLocalUsableChanged=false, isNetworkingUsableChanged=true
+06-30 20:52:25.547  2990  3065 I SyncChannelInfo: all usable infos for 5g is unchanged, no need to sync
+06-30 20:52:25.547  2990  3065 I ChannelQualityMonitor: startMeasure: [ChannelId=157, ApNum=1, chload=266, noise=-93] # [ChannelId=149, ApNum=4, chload=533, noise=-85] # [ChannelId=11, ApNum=1, chload=200, noise=-98] # [ChannelId=2, ApNum=1, chload=-1, noise=0] # [ChannelId=6, ApNum=1, chload=666, noise=-90] # [ChannelId=48, ApNum=1, chload=0, noise=-92] # [ChannelId=36, ApNum=2, chload=133, noise=-90] # [ChannelId=1, ApNum=0, chload=800, noise=-65] # [ChannelId=3, ApNum=0, chload=933, noise=-89] # [ChannelId=4, ApNum=0, chload=933, noise=-97] # [ChannelId=5, ApNum=0, chload=500, noise=-98] # [ChannelId=7, ApNum=0, chload=66, noise=-98] # [ChannelId=8, ApNum=0, chload=0, noise=-99] # [ChannelId=9, ApNum=0, chload=288, noise=-96] # [ChannelId=10, ApNum=0, chload=200, noise=-98] # [ChannelId=12, ApNum=0, chload=200, noise=-98] # [ChannelId=13, ApNum=0, chload=0, noise=-97] # [ChannelId=40, ApNum=0, chload=0, noise=-92] # [ChannelId=44, ApNum=0, chload=0, noise=-92] # [ChannelId=52, ApNum=0, chload=0, noise=-93] # [ChannelId=56, ApNum=0, chload=0, noise=-93] # [ChannelId=60, ApNum=0, chload=0, noise=-93] # [ChannelId=64, ApNum=0, chload=0, noise=-93] # [ChannelId=153, ApNum=0, chload=66, noise=-93] # [ChannelId=161, ApNum=0, chload=133, noise=-93] # [ChannelId=165, ApNum=0, chload=0, noise=-94] #
+06-30 20:52:25.547  2990  3065 I ChannelRating: onChannelBeanReceive size: 26
+06-30 20:52:25.547  2990  3065 I ReportConstructErrorType: reportChannelRatingStatistic, updateDuration = 1, countOfInfoType=1, infoType=1
+06-30 20:52:25.548  2990  3065 I ChannelRating: ch:157 load:266 noise:-93 sig:[2,-76,155] # ch:149 load:533 noise:-85 sig:[2,-53,155][2,-57,155][2,-62,155][2,-77,155] # ch:11 load:200 noise:-98 sig:[0,-83,-1] # ch:6 load:666 noise:-90 sig:[0,-79,-1] # ch:48 load:0 noise:-92 sig:[2,-75,42] # ch:36 load:133 noise:-90 sig:[2,-67,42][2,-71,42] # ch:1 load:800 noise:-65 sig:null # ch:3 load:933 noise:-89 sig:null # ch:4 load:933 noise:-97 sig:null # ch:5 load:500 noise:-98 sig:null # ch:7 load:66 noise:-98 sig:null # ch:8 load:0 noise:-99 sig:null # ch:9 load:288 noise:-96 sig:null # ch:10 load:200 noise:-98 sig:null # ch:12 load:200 noise:-98 sig:null # ch:13 load:0 noise:-97 sig:null # ch:40 load:0 noise:-92 sig:null # ch:44 load:0 noise:-92 sig:null # ch:52 load:0 noise:-93 sig:null # ch:56 load:0 noise:-93 sig:null # ch:60 load:0 noise:-93 sig:null # ch:64 load:0 noise:-93 sig:null # ch:153 load:66 noise:-93 sig:null # ch:161 load:133 noise:-93 sig:null # ch:165 load:0 noise:-94 sig:null #
+06-30 20:52:25.549  2990  3065 I ChannelRating: [ch:1 bw:0 left:1 right:1 score: 5.401662049861493] # [ch:3 bw:0 left:3 right:3 score: 1.357802400738681] # [ch:4 bw:0 left:4 right:4 score: 1.6265939058171655] # [ch:5 bw:0 left:5 right:5 score: 41.07781163434903] # [ch:6 bw:0 left:6 right:6 score: 49.28024007386889] # [ch:7 bw:0 left:7 right:7 score: 77.69086648199445] # [ch:8 bw:0 left:8 right:8 score: 86.71982456140351] # [ch:9 bw:0 left:9 right:9 score: 60.43002511542012] # [ch:10 bw:0 left:10 right:10 score: 71.76149584487534] # [ch:11 bw:0 left:11 right:11 score: 75.0] # [ch:12 bw:0 left:12 right:12 score: 75.0] # [ch:13 bw:0 left:13 right:13 score: 94.99999999999999] # [ch:36 bw:2 left:36 right:48 score: 68.02] # [ch:40 bw:2 left:36 right:48 score: 85.5097435897436] # [ch:44 bw:2 left:36 right:48 score: 85.5097435897436] # [ch:48 bw:2 left:36 right:48 score: 85.5097435897436] # [ch:52 bw:2 left:52 right:64 score: 84.87734564102564] # [ch:56 bw:2 left:52 right:64 score: 85.5097435897436] # [ch:60 bw:2 left:52 right:64 score: 85.5097435897436] # [ch:64 bw:2 left:52 right:64 score: 85.5097435897436] # [ch:149 bw:2 left:149 right:161 score: 36.419999999999995] # [ch:153 bw:2 left:149 right:161 score: 80.55917948717946] # [ch:157 bw:2 left:149 right:161 score: 65.55747008547009] # [ch:161 bw:2 left:149 right:161 score: 75.53360683760684] #
+06-30 20:52:25.555  2971 19036 I HwEasyGoService: totalNum21
+06-30 20:52:25.555  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:25.566  1650  2108 I WificondControl: Noise: -77, Snr: 127, Chload: 163, rssi: -24, txBitrate: 108, rxBitrate: 97, frequency: 2417, UlDelay: -1, currentTxBytes: 13353722, currentTxPackets: 44876, currentTxFailed: 0, currentRxBytes: 45356683, currentRxPackets: 54277
+06-30 20:52:25.567  1650  2108 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@8f0e10d
+06-30 20:52:25.569  1650 19031 I SEAPP_S_PolicyStorage: writeNoEncryptDatabaseImpl end
+06-30 20:52:25.703  2007  2009 E bms_file: file /sys/class/hw_power/charger/direct_charger_sc/direct_charge_succ is invalid
+06-30 20:52:25.709  2482  3877 W bt_btm  : btm_inq_db_new bda: 1b:a0:**:**:**:9e state: -1
+06-30 20:52:25.719  2007  2009 E bms_file: file /sys/class/hw_power/charger/direct_charger_sc/direct_charge_succ is invalid
+06-30 20:52:25.742  2007  2009 I chatty  : uid=1000(system) /vendor/bin/bms_behavior identical 2 lines
+06-30 20:52:25.743  2007  2009 E bms_file: file /sys/class/hw_power/charger/direct_charger_sc/direct_charge_succ is invalid
+06-30 20:52:25.744  2007  2009 I bms_behavior: monitor interval count 2537
+06-30 20:52:25.747   761  8655 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:25.758  1650  4936 V ActivityManager: Successfully start provider ContentProviderRecord{9788b56 u0 com.android.providers.media/.MediaProvider} launchingApp=ProcessRecord{98b89ad 6261:android.process.media/u0a15} caller pid= 15372
+06-30 20:52:25.759   761  2299 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:25.759  2672  2800 W ScenarioService: number format exception! str:
+06-30 20:52:25.807  1037  1082 D AwareLog: iawared: WorkingsetProcessCommand subCmd = 352, userId=10038, pid=19253, com.reversetutor.preview
+06-30 20:52:25.807  1037  1082 D AwareLog: iawared: WorkingsetStop com.reversetutor.preview
+06-30 20:52:25.828  6261  7440 I AutoCache: start auto cache 2
+06-30 20:52:25.828  6261  7440 I AutoCache: start auto cache 3
+06-30 20:52:25.828  6261  7440 I AutoCache: start auto cache 4-1
+06-30 20:52:25.828  6261  7440 I AutoCache: start immediate decoding.
+06-30 20:52:25.833  6261  7440 I AutoCache: scanFilesTable mItemCount 2
+06-30 20:52:25.987 19924 20402 E memtrack: Couldn't load memtrack module
+06-30 20:52:25.987 19924 20402 W android.os.Debug: failed to get memory consumption info: -1
+06-30 20:52:26.055  2971 19036 I HwEasyGoService: totalNum22
+06-30 20:52:26.056  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:26.154   675   675 I netd    : trafficSwapActiveStatsMap() <20.23ms>
+06-30 20:52:26.223  6261 19435 I DecodeUtils: decodeThumbnail filePath not exist : /storage/emulated/0/reverse_tutor_native_preview.png
+06-30 20:52:26.230    53    53 W migration/7: type=1400 audit(0.0:9977): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:26.230    47    47 W migration/6: type=1400 audit(0.0:9978): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:26.254    47    47 W migration/6: type=1400 audit(0.0:9979): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:26.262  2672  2824 W NetworkDualChannelCtrl: get booster para failed
+06-30 20:52:26.370    47    47 W migration/6: type=1400 audit(0.0:9980): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:26.378    47    47 W migration/6: type=1400 audit(0.0:9981): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:26.434  2926 15049 I HwSearchService: [IndexServiceGuarderHandler]: IndexRAMMonitor: 42MB ram is used, in which summary.code=11MB, summary.stack=0MB, summary.graphics=0MB, summary.java-heap=7MB, summary.native-heap=9MB, summary.system=9MB, summary.total-pss=42MB, summary.private-other=3MB, summary.total-swap=24MB,
+06-30 20:52:26.476 19436 19436 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 20:52:26.476 19436 19436 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 20:52:26.476 19436 19436 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:26.477 19436 19436 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-30 20:52:26.480 19436 19436 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ hw_mc.art.mt_dex_loader=1
+06-30 20:52:26.480 19436 19436 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ g_numThreads=4
+06-30 20:52:26.480 19436 19436 W app_process: [MemLeak.JavaTrack]: failed to dlopen libmemleak_tracker.so
+06-30 20:52:26.480 19436 19436 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+06-30 20:52:26.480 19436 19436 I AndroidRuntime: Using default boot image
+06-30 20:52:26.480 19436 19436 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+06-30 20:52:26.480 19436 19436 I AndroidRuntime: Leaving lock profiling enabled
+06-30 20:52:26.481 19436 19436 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+06-30 20:52:26.482 19436 19436 I         : HwCustType is 0
+06-30 20:52:26.482 19436 19436 E         : open file error
+06-30 20:52:26.482 19436 19436 I         : no cota live update cust policy found
+06-30 20:52:26.482 19436 19436 I         : GetCfgDirRealPolicyValue: custPolicyDirs: /system/emui/base:/system/emui/china:/vendor/etc:/odm/cust/all/cn:/odm/etc:/odm/hw_odm/HMA-AL00:/odm/special_cust/HMA-AL00/all/cn:/hw_product/etc:/hw_product/region_comm/china:/preas/china:/hw_product/hw_oem/HMA-AL00:/preload/HMA-AL00/all/cn:/cust/global:/cust/hw/cn:/version/cust/all/cn:/hw_product/special_cust/HMA-AL00/all/cn:/version/special_cust/HMA-AL00/all/cn:/cust/cotalite:/cust/ecota
+06-30 20:52:26.483 19436 19436 I app_process: Opt gc perf enable = 1
+06-30 20:52:26.483 19436 19436 I app_process: ScopedPromotePriority logging = 0
+06-30 20:52:26.540  2433  2762 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.bindService:1777 com.huawei.antivirus.features.plugin.PluginAntivirusEngineConnection.bindPluginService:132 com.huawei.antivirus.features.plugin.PluginAntivirusEngineConnection.init:57 com.huawei.aiprotection.AiPluginConnectionProxy.init:30 com.huawei.android.security.inspection.CloudQueryHelper.loadCloudClients:138
+06-30 20:52:26.540 19436 19436 W app_process: DexFile /system/emui/base/jar/Mdm/hw_mdm_framework.jar is in boot class path but is not in a known location
+06-30 20:52:26.545  1650  4936 I ActivityManager: power push bindservice callingPkg:com.huawei.systemmanager, pkg:com.huawei.securitypluginbase, callerApp pid:2433, pid:13766
+06-30 20:52:26.546   761  8655 D AudioPolicyService: getUidState(10181) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:26.548 13766 13784 D QihooCloudClient: setOption: countryCode = CN
+06-30 20:52:26.549 13766 13784 D QihooCloudClient: setOption: chipType = kirin980
+06-30 20:52:26.550  1650  2019 D HwConnectivityServiceEx: set 10181 wlan0 value true
+06-30 20:52:26.550  1650  2019 I ConnectivityService: B uid 10181
+06-30 20:52:26.551  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:26.551  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:325,rsrp(rssi):-40,rsrq(noise):-77,rtt(chload):163,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 20:52:26.551  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:26.551  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:325,rsrp(rssi):-40,rsrq(noise):-77,rtt(chload):163,buffhigh(uldelay):0,buffcomm(rtt):1
+06-30 20:52:26.551  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 20:52:26.551  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 20:52:26.552  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 20:52:26.552  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 20:52:26.552  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,325,1,2,4,0,325,108300,97500,10,10,0,0,0,0 CID 2 mMasterWifiRssi -24 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 20:52:26.553  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 20:52:26.553  1650  2019 V ActivityManager: Successfully start provider ContentProviderRecord{99c273b u0 com.huawei.systemmanager/com.huawei.securitycenter.antivirus.db.keyvalue.KeyValueDatabaseProvider} launchingApp=null caller pid= 2433
+06-30 20:52:26.553  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 20:52:26.553  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 20:52:26.556  2971 19036 I HwEasyGoService: totalNum23
+06-30 20:52:26.558  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 20:52:26.568 19436 19436 D ICU     : Time zone APEX file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-30 20:52:26.575  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:26.575 19436 19436 I app_process: The ClassLoaderContext is a special shared library.
+06-30 20:52:26.576 19436 19436 I app_process: The ClassLoaderContext is a special shared library.
+06-30 20:52:26.576 19436 19436 I app_process: Reinit property: dalvik.vm.checkjni= false
+06-30 20:52:26.576 19436 19436 I app_process: ReInitProperties: persist.vm.debug.dumpapi= false
+06-30 20:52:26.576 19436 19436 W app_process: Qarth read proc_cmdline fail.
+06-30 20:52:26.577 19436 19436 I app_process: Qarth function Enabled: 1
+06-30 20:52:26.578 19436 19436 I HwPartBasicPlatformFactory: add android.common.HwPartBasicPlatformFactoryImpl to memory.
+06-30 20:52:26.582 19436 19436 I HWSERVICES: hwnative_get_component_register:libdrmbitmap,JNI
+06-30 20:52:26.586 19436 19436 V HwFrameworkFactory: successes to get AllImpl object and return....
+06-30 20:52:26.586 19436 19436 E Zygote  : register_com_android_internal_os_Zygote num = 0
+06-30 20:52:26.586 19436 19436 I         : power log dlsym ok
+06-30 20:52:26.587 19436 19436 E libc    : Access denied finding property "ro.config.vol_steps"
+06-30 20:52:26.588 19436 19436 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+06-30 20:52:26.593 19436 19436 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-30 20:52:26.594 19436 19436 E libc    : Access denied finding property "persist.mygote.disable"
+06-30 20:52:26.596  1650  4936 D HwConnectivityServiceEx: set 10181 NULL value true
+06-30 20:52:26.596  1650  4936 I ConnectivityService: B uid 10181
+06-30 20:52:26.597  1650  4936 I chatty  : uid=1000(system) Binder:1650_16 identical 5 lines
+06-30 20:52:26.597  1650  4936 I ConnectivityService: B uid 10181
+06-30 20:52:26.597  1650  2019 I WindowManager: addWindowToken: displayid:0 binder:android.os.Binder@981e819 token:WindowToken{919b621 android.os.Binder@981e819}
+06-30 20:52:26.597  1650  4936 I ConnectivityService: B uid 10181
+06-30 20:52:26.598  1650  4936 I chatty  : uid=1000(system) Binder:1650_16 identical 17 lines
+06-30 20:52:26.598  1650  4936 I ConnectivityService: B uid 10181
+06-30 20:52:26.599  1650  2019 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 20:52:26.602  1650  2019 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 20:52:26.605  1650  1650 I AS.AudioService: Accessibility volume enabled = false
+06-30 20:52:26.622  1650  4936 I ConnectivityService: B uid 10181
+06-30 20:52:26.624  1650  4936 I chatty  : uid=1000(system) Binder:1650_16 identical 24 lines
+06-30 20:52:26.624  1650  4936 I ConnectivityService: B uid 10181
+06-30 20:52:26.627 13766 13784 I qvs-i   : Destroy handle: 505638895360
+06-30 20:52:26.744  2433  2771 I SmartChgBase/Arb_HidlParam: IsApplyExcept: can not GetRegexApplyExceptStr, return false. [ParamName:batt_status]
+06-30 20:52:26.744  2433  2771 I SmartChgBase/Arb_HidlParam: Apply.[moduleName:CVT, param:batt_status, detailsWithValue:source=trigger;event=heartbeat;chargestatus=stop;value=0;]
+06-30 20:52:26.750   758   758 I power_hidl: ExeSetState type=batt_status, value=0
+06-30 20:52:26.750   758   758 E power_hidl: type input error
+06-30 20:52:26.750  2433  2771 E SmartChgBase/Arb_HidlParam: SetHidlValue Fail: Hidl Set Fail [ret:1, module:CVT, scene:batt_status, value:0]
+06-30 20:52:26.752  2433  2771 I SmartChgBase/Public: set property vendor.smc.batt_status=0
+06-30 20:52:26.752  2433  2771 I SmartChgBase/Arb_HidlParam: batt_status successfully set to 0
+06-30 20:52:26.752  2433  2771 I SmartChgBase/Arb_HidlParam: Apply Skipped: IsApplyExcept return true. [moduleName:BASP, param:dc_vterm_dec, detailsWithValue:source=trigger;event=heartbeat;chargestatus=stop;value=50;]
+06-30 20:52:26.752  2433  2771 I SmartChgBase/Arb_HidlParam: Apply Skipped: IsApplyExcept return true. [moduleName:BASP, param:ichg_ratio, detailsWithValue:source=trigger;event=heartbeat;chargestatus=stop;value=80;]
+06-30 20:52:26.752  2433  2771 I SmartChgBase/Arb_HidlParam: Apply Skipped: IsApplyExcept return true. [moduleName:BASP, param:nondc_vterm_dec, detailsWithValue:source=trigger;event=heartbeat;chargestatus=stop;value=50;]
+06-30 20:52:26.752  2433  2771 I SmartChgBase/Arb_HidlParam: Apply Skipped: IsApplyExcept return true. [moduleName:ASW, param:soc_control, detailsWithValue:source=trigger;event=heartbeat;chargestatus=stop;value=1 95 100 1 1;]
+06-30 20:52:26.752  2433  2764 E SmartChgBase/File: file /data/user_de/0/com.huawei.systemmanager/files/smart_charge/base/mock/enable is invalid in IsFileExist
+06-30 20:52:26.753  2433  2764 E SmartChgBase/File: file /data/user_de/0/com.huawei.systemmanager/files/smart_charge/base/mock/enable is invalid in IsFileExist
+06-30 20:52:26.819  1650  2107 I TrafficMonitor: update:rxPkts:1,txPkts:3,rxBytes:72,txBytes:224
+06-30 20:52:26.819  1650  2107 I TrafficMonitor: gettimer:interval=2000
+06-30 20:52:27.056  2971 19036 I HwEasyGoService: totalNum24
+06-30 20:52:27.057  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:27.067  1029  1029 E Thermal-daemon:hw_thermal: [charger_ic] tempNew :32  tempOld :33
+06-30 20:52:27.069  1029  1029 E Thermal-daemon:hw_thermal: Report temperature: [charger_ic] temp :32  reportThreshold:1
+06-30 20:52:27.244  1650  4940 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 20:52:27.245  6261  7440 I AutoCache: scanFilesTable mItemCount 1
+06-30 20:52:27.245  1650  4940 D HwConnectivityServiceEx: set 10031 wlan0 value false
+06-30 20:52:27.246  1650  4940 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 20:52:27.246  1650  4940 I ConnectivityService: B uid 10031
+06-30 20:52:27.266  1650  4940 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 20:52:27.267  1650  4940 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 20:52:27.267  1650  4940 I ConnectivityService: B uid 10031
+06-30 20:52:27.363  2971  3146 I OllieMsgCenter: publishEvt=2135097345
+06-30 20:52:27.363  2971  3146 E SpeedLimitTestNotifier: mIsTopActivity false
+06-30 20:52:27.407  6261 19435 I DecodeUtils: decodeThumbnail filePath not exist : /storage/emulated/0/reverse_tutor_native_preview.png
+06-30 20:52:27.467   761  8655 D AudioPolicyService: getUidState(10022) cacheIter->second.first, return cacheIter->second.second(16)
+06-30 20:52:27.496 15372 15771 D FLTAG_SC: bindService from Intent: Intent { cmp=com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service }
+06-30 20:52:27.496 15372 15771 I FLTAG_FM: getRequireFeature it maybe not in a feature:com.huawei.gallery.media.CalcMd5Service
+06-30 20:52:27.496 15372 15771 D FLTAG_SC: Feature cannot been obtained
+06-30 20:52:27.496 15372 15771 D FLTAG_SC: Cannot resolve service information from features: Intent { cmp=com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service }
+06-30 20:52:27.507   761  8655 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:27.517   761  2299 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:27.518  1650  1930 D ActivityManager: setPrivilegeType r: ServiceRecord{9303b29 u0 com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service}, interfaceDescriptor : com.huawei.gallery.service.IAsyncService
+06-30 20:52:27.521  1650 18837 W AwareLog: AwareMem_Reclaim: generateCompressList procsGroups error!
+06-30 20:52:27.522    47    47 W migration/6: type=1400 audit(0.0:9991): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:27.522  1037  1082 D         : HibSTrategy::HibStrategySwapCandidateProcessAdd packageName com.huawei.hwid
+06-30 20:52:27.522  2672 18651 I PGServer: getTopFrontApp. calling pkg: android
+06-30 20:52:27.538    53    53 W migration/7: type=1400 audit(0.0:9992): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:27.551 13766 13784 I CloudHttpClient: shutdown called. id:52981072 cost:924
+06-30 20:52:27.556  2971 19036 I HwEasyGoService: totalNum25
+06-30 20:52:27.556  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:27.582  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:27.582  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:350,rsrp(rssi):-40,rsrq(noise):-86,rtt(chload):79,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 20:52:27.582  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 20:52:27.582  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:350,rsrp(rssi):-40,rsrq(noise):-86,rtt(chload):79,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 20:52:27.582  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 20:52:27.583  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 20:52:27.583  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 20:52:27.584  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 20:52:27.584  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 20:52:27.585  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,350,1,2,4,0,350,108300,97500,10,10,0,0,0,0 CID 2 mMasterWifiRssi -25 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 20:52:27.586  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 20:52:27.586  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 20:52:27.586  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 20:52:27.587  1037  2883 D AwareLog: HiberManagerService::DoReclaim ok, pid=3775, reclaimMode=hiber_anon
+06-30 20:52:27.587  1037  2883 D AwareLog: GetReclaimResult:reclaimKb=11264, swapKb=11264, swapUs=63515
+06-30 20:52:27.587  1037  2883 D         : HibStrategy::HibStrategySwapCandidateProcessRemove packageName is com.huawei.hwid
+06-30 20:52:27.587  1037  2883 D AwareLog: HiberManagerService::SendMessageToHiberTask successful
+06-30 20:52:27.588  1037  1082 D         : HibSTrategy::HibStrategySwapCandidateProcessAdd packageName com.huawei.hwid
+06-30 20:52:27.588  2672 18651 I PGServer: getTopFrontApp. calling pkg: android
+06-30 20:52:27.608 19436 19436 W AccessibilityInteractionClient: old interaction Id is: -1,current interaction Id is:0
+06-30 20:52:27.618   761  8655 D AudioPolicyService: getUidState(10181) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:27.618   761  8655 D AudioPolicyService: getUidState(10022) cacheIter->second.first, return cacheIter->second.second(11)
+06-30 20:52:27.630 19436 19436 W uiautomator: type=1400 audit(0.0:9993): avc: denied { read } for pid=19436 name="u:object_r:curved_side_prop:s0" dev="tmpfs" ino=16676 scontext=u:r:shell:s0 tcontext=u:object_r:curved_side_prop:s0 tclass=file permissive=0
+06-30 20:52:27.630 19436 19436 W uiautomator: type=1400 audit(0.0:9994): avc: denied { read } for pid=19436 name="u:object_r:curved_side_prop:s0" dev="tmpfs" ino=16676 scontext=u:r:shell:s0 tcontext=u:object_r:curved_side_prop:s0 tclass=file permissive=0
+06-30 20:52:27.632 19436 19436 I HwPartIawareFactory: add android.common.HwPartIawareFactoryImpl to memory.
+06-30 20:52:27.633 19436 19436 I HwApsImpl: APS: new HwApsImpl created
+06-30 20:52:27.634 19436 19436 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 20:52:27.635 19436 19436 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 20:52:27.673 19436 19436 W AccessibilityNodeInfoDumper: Fetch time: 5ms
+06-30 20:52:27.674  1650  4936 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@981e819 token:WindowToken{919b621 android.os.Binder@981e819}
+06-30 20:52:27.674  1650  4936 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@981e819 token:null
+06-30 20:52:27.674  1650  4936 W WindowManager: removeWindowToken: Attempted to remove non-existing token: android.os.Binder@981e819
+06-30 20:52:27.675  1650  4936 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 0
+06-30 20:52:27.675  1650  4936 I [SPMN]  : insert SYSTEM -- name = accelerometer_rotation, package = android, user = 0, value = 1
+06-30 20:52:27.676  1650  4936 I HwWindowManagerServiceEx: setLandAnimationInfo : false
+06-30 20:52:27.699 19436 19436 D AndroidRuntime: Shutting down VM
+06-30 20:52:27.814  1650  2107 I TrafficMonitor: expired arrive. level:-1
+06-30 20:52:27.814  1650  2107 I TrafficMonitor: during_ms:2004,period_ms:2000
+06-30 20:52:27.814  1650  2107 I TrafficMonitor: count:988,rx_sum:1,tx_sum:3,rxBytes:72,during_ms:2004,rx_speed:35.92814371257485,tx_speed:111.77644710578842,rto:0.3333333333333333
+06-30 20:52:27.814  1650  2107 I HuaweiWifiWatchdogStateMachine: Get speed information rx_speed = 35 ,tx_speed = 111 ,isSpeedOk = false ,mBestSpeedInPeriod = 35
+06-30 20:52:27.833  1037  2883 D AwareLog: HiberManagerService::DoReclaim ok, pid=3398, reclaimMode=hiber_anon
+06-30 20:52:27.833  1037  2883 D AwareLog: GetReclaimResult:reclaimKb=60664, swapKb=60664, swapUs=244336
+06-30 20:52:27.833  1037  2883 D         : HibStrategy::HibStrategySwapCandidateProcessRemove packageName is com.huawei.hwid
+06-30 20:52:27.833  1037  2883 D AwareLog: HiberManagerService::SendMessageToHiberTask successful
+06-30 20:52:27.834  1037  1082 D         : HibSTrategy::HibStrategySwapCandidateProcessAdd packageName com.android.systemui
+06-30 20:52:27.834  2672 18651 I PGServer: getTopFrontApp. calling pkg: android
+06-30 20:52:28.003  1037  2883 D AwareLog: HiberManagerService::DoReclaim ok, pid=2276, reclaimMode=hiber_anon
+06-30 20:52:28.003  1037  2883 D AwareLog: GetReclaimResult:reclaimKb=76372, swapKb=76372, swapUs=168849
+06-30 20:52:28.003  1037  2883 D         : HibStrategy::HibStrategySwapCandidateProcessRemove packageName is com.android.systemui
+06-30 20:52:28.003  1037  2883 D AwareLog: HiberManagerService::SendMessageToHiberTask successful
+06-30 20:52:28.013 19455 19455 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 20:52:28.013 19455 19455 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 20:52:28.014 19455 19455 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:28.021   498   498 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@3.0::IMapper/default in either framework or device manifest.
+06-30 20:52:28.022 19455 19455 W Gralloc3: mapper 3.x is not supported
+06-30 20:52:28.057  2971 19036 I HwEasyGoService: totalNum26
+06-30 20:52:28.057  2971 19036 I HwEasyGoService: NameNotFoundException
+06-30 20:52:28.154   761  2299 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:28.161 19459 19459 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 20:52:28.165  1650  4940 V ActivityManager: Successfully start provider ContentProviderRecord{9788b56 u0 com.android.providers.media/.MediaProvider} launchingApp=ProcessRecord{98b89ad 6261:android.process.media/u0a15} caller pid= 15372
+06-30 20:52:28.165  1650  4936 E UserInfoExt: setUserInfo: userInfo is null!
+06-30 20:52:28.165  1650  4936 E UserInfoExt: isClonedProfile: mUserInfo is null!
+06-30 20:52:28.165  1650  4936 E UserInfoExt: setUserInfo: userInfo is null!
+06-30 20:52:28.165   761  8655 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 20:52:28.174  6261  6261 I MediaReceiver: onReceive android.intent.action.MEDIA_SCANNER_SCAN_FILE
+06-30 20:52:28.181  1650  2019 V BroadcastQueue: Finished with ordered broadcast BroadcastRecord{9824475 u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE}
+06-30 20:52:28.184  6261  6261 I MediaService: onCreate
+06-30 20:52:28.188  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:28.199  6261 19463 I ModernMediaScanner: scanFile isSingleFile true
+06-30 20:52:28.207  6261 19463 I ModernMediaScanner: max id 1832872
+06-30 20:52:28.208  6261 19463 I HwModernScannerEx: is skip white list false
+06-30 20:52:28.215  6261 19463 W ExifInterface: Invalid image: ExifInterface got an unsupported image format file(ExifInterface supports JPEG and some RAW image formats only) or a corrupted JPEG file to ExifInterface.
+06-30 20:52:28.219  6261  7420 I MediaProvider: MSG_MEDIA_SYNC_NOTIFY_CHANGED
+06-30 20:52:28.222  6261 19368 E PhotoData: set database context com.android.providers.media
+06-30 20:52:28.228  6261 19463 I HwMediaScannerImpl: handleScanSingleFile res content://media/external_primary/images/media/1832873
+06-30 20:52:28.228  6261 19368 I MediaLibraryServiceCore: activeList is empty.
+06-30 20:52:28.228  6261 19368 I MediaLibraryServiceCore: doRealtimeDataSynchronization can not be called !!
+06-30 20:52:28.228  6261 19368 I MediaLibraryService: stopSelfIfNecessary startId:3, startIds size 0
+06-30 20:52:28.230    53    53 W migration/7: type=1400 audit(0.0:9995): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 20:52:28.230  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 20:52:28.230  1650  4940 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 20:52:28.230  6261 19463 D MediaIntentService: stopSelfIfNecessary startId:1, startIds size:0, mScanPaths size:0, skip:0
+06-30 20:52:28.231  1650  4936 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 20:52:28.231  1650  4936 I ConnectivityService: B uid 10031
+06-30 20:52:28.232  6261  6261 D MediaIntentService: onDestroy
+06-30 20:52:28.244  1650  4940 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 20:52:28.244  1650  2019 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 20:52:28.244  1650  2019 I ConnectivityService: B uid 10031
+06-30 20:52:28.409  6261  7440 I AutoCache: the storage may be no spare space or some pictures is missing.

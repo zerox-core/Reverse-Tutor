@@ -1,0 +1,73 @@
+{
+  "task_id": "NATIVE-P6-001",
+  "goal": "Run full legacy entry audit for LEG-001 to LEG-044.",
+  "non_goals": [
+    "Do not approve missing P0 behavior without explicit waiver.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Every LEG-001 through LEG-044 row is audited against implementation and evidence.",
+    "No P0 item is closed unless verified or explicitly waived.",
+    "P1 deferrals are documented with risk and user impact."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json"
+  ],
+  "module": "legacy-entry-parity",
+  "branch": "native/replacement-readiness",
+  "legacy_ids": [
+    "LEG-001..LEG-044"
+  ],
+  "dependencies": [
+    "NATIVE-P3-004",
+    "NATIVE-P4-007",
+    "NATIVE-P5-008"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/verification_result.json"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run full project JVM tests, lint, debug APK build",
+    "Run device matrix only when required devices/emulators are available",
+    "Validate legacy coverage registry and ADworkflo JSON",
+    "Do not build signed/replacement APK without explicit approval"
+  ],
+  "notes": [
+    "Generated as part of ADworkflo full-roadmap orchestration after NATIVE-P2-005 device verification.",
+    "Worker must keep implementation scoped to this task and update worker_state/verification_result/review_findings as required.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

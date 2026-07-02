@@ -1,0 +1,42 @@
+{
+  "task_id": "NATIVE-UX-004",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "replacement_readiness",
+      "finding": "UX-004 improves Phase 4 migration UI but does not prove full migration/export parity.",
+      "recommendation": "Keep LEG-031 and LEG-032 as P0 blockers until Phase 6 validates complete export/import parity, real migration sources, and broader device matrix."
+    },
+    {
+      "severity": "medium",
+      "area": "preset_export",
+      "finding": "Preset appears as a visible export choice with a deferred/unavailable state, not as a data-backed export.",
+      "recommendation": "Implement preset owner selection/export in the task that owns new-session templates or preset management, then convert the deferred state to a real export."
+    },
+    {
+      "severity": "medium",
+      "area": "ui_quality_matrix",
+      "finding": "UX-004 captured HMA-AL00 screenshots/XML for representative import/export sections, but did not run the full dark mode, dynamic type, TalkBack, IME, and small-screen matrix.",
+      "recommendation": "Keep all-up UI QA in NATIVE-UX-006 and do not treat UX-004 screenshot evidence as final visual acceptance."
+    },
+    {
+      "severity": "low",
+      "area": "navigation_density",
+      "finding": "The bottom navigation remains horizontally scrollable and Import/export can require a horizontal nav swipe on HMA-AL00.",
+      "recommendation": "Address top-level destination density in UX-003/UX-006 or a shell navigation follow-up; About and Import/export should eventually live under Settings per design docs."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-UX-004.json",
+    ".adworkflow/verification_result.json",
+    "tasks/native-android-ui-design-system.md",
+    "tasks/native-android-ui-acceptance-checklist.md",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/README.md"
+  ]
+}

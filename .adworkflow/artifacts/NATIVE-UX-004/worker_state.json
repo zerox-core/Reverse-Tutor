@@ -1,0 +1,55 @@
+{
+  "task_id": "NATIVE-UX-004",
+  "status": "verified",
+  "done": [
+    "Productized the native Import/export screen into a step-wise flow covering select, detect, validate, dry-run, mode, confirm, write, and result states.",
+    "Expanded ImportPipelineUiState with source file, document type, detect/validation labels, API key handling copy, target space, failed count, and next actions.",
+    "Expanded ExportPipelineUiState with document label, key-material exclusion/redaction copy, summary counts, and next actions.",
+    "Added data-backed graph snapshot export support in NativeExportRepository and exposed it in the Import/export UI.",
+    "Added a visible Preset export choice with a clear unavailable/deferred state because this preview has no selected preset owner yet.",
+    "Updated replacement-gated first-launch import prompt copy to state that direct IndexedDB migration is not used, API keys are not imported, and append/overwrite/new-space modes are chosen after validation.",
+    "Added Settings wipe post-result copy and a Return to Sessions affordance for safe empty-state recovery.",
+    "Updated Settings model tests and NativeExportRepository tests for the new UI summary fields, graph snapshot export, key-handling copy, and first-launch prompt copy.",
+    "Stabilized Phase4ImportExportDeviceTest for the longer productized UI by using scroll-aware assertions and standard button semantics for import modes.",
+    "Captured HMA-AL00 screenshot/XML evidence for the Import/export first viewport and export choices section."
+  ],
+  "changed_files": [
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/review_findings.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/worker_state.json",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-ui.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-ui.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-export-section.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-export-section.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/TEST-HMA-AL00-10-ux004.xml",
+    "tasks/native-android-next-workplan.md"
+  ],
+  "current_problem": "",
+  "next_action": "Archive NATIVE-UX-004 artifacts, rebuild codegraph/context, then continue with Phase 5 foundations NATIVE-P5-001 and NATIVE-P5-005 before NATIVE-UX-005.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "No signed or release APK was built.",
+    "Do not touch mobile/android/app/release.jks, mobile/android/app/build.gradle, mobile/capacitor.config.json, mobile/package.json, or static/app/index.html.",
+    "No real LLM provider/network call was made.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "First-launch import prompt remains preview-disabled by default; replacement-build behavior remains gated."
+  ],
+  "remaining_risks": [
+    "NATIVE-UX-004 is Phase 4 UI evidence, not replacement readiness.",
+    "LEG-031 remains a P0 blocker until complete export/import parity and delivery matrix are verified.",
+    "LEG-032 remains a P0 blocker until real replacement migration sources and broader device matrix are verified.",
+    "Preset export is represented as a visible deferred choice because selected preset ownership is outside this Phase 4 UI task.",
+    "Final dynamic type, dark mode, IME, TalkBack, and all-up UI matrix remain assigned to NATIVE-UX-006."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

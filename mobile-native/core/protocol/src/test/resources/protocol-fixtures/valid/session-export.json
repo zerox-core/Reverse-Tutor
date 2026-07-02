@@ -1,0 +1,18 @@
+{
+  "schema": "reverse_tutor_session_export_v1",
+  "version": 1,
+  "type": "session_export",
+  "created_at": "2026-07-01T00:00:00Z",
+  "session": {
+    "id": "session-fixture-1",
+    "title": "Synthetic session"
+  },
+  "messages": [
+    {
+      "id": "message-fixture-1",
+      "role": "user",
+      "text": "Synthetic teaching prompt",
+      "created_at": "2026-07-01T00:00:01Z"
+    }
+  ]
+}

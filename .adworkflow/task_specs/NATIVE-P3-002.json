@@ -1,0 +1,78 @@
+{
+  "task_id": "NATIVE-P3-002",
+  "goal": "Implement notifications and background settings surface.",
+  "non_goals": [
+    "Do not enable proactive behavior without product decision.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Completion/failure notifications are wired through Android notification APIs with permission-aware fallback state.",
+    "Settings exposes background/notification controls or explicit deferred state without enabling unapproved proactive behavior.",
+    "Device/emulator validation records notification permission and delivery behavior when feasible."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "fanout_workers",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":feature:chat/:feature:settings/:app",
+  "branch": "native/background-jobs",
+  "legacy_ids": [
+    "LEG-017",
+    "LEG-029",
+    "LEG-030"
+  ],
+  "dependencies": [
+    "NATIVE-P3-001"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/feature/chat/src/main/java",
+    "mobile-native/feature/chat/src/test/java",
+    "mobile-native/feature/settings/src/main/java",
+    "mobile-native/feature/settings/src/test/java",
+    "mobile-native/app/src/main/java",
+    "mobile-native/app/src/test/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run focused core:data/core:llm/feature:chat/feature:settings/app JVM tests",
+    "Run .\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "Run connected/device notification validation when available",
+    "Validate ADworkflo JSON and coverage registry"
+  ],
+  "notes": [
+    "Generated as part of ADworkflo full-roadmap orchestration after NATIVE-P2-005 device verification.",
+    "Worker must keep implementation scoped to this task and update worker_state/verification_result/review_findings as required.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

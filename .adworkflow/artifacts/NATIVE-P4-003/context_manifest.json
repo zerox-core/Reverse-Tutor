@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P4-003",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/Space.kt",
+    "mobile-native/core/model/src/test/java/com/reversetutor/core/model/SpaceDomainModelTest.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/NewSessionModels.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/NewSessionTemplatesTest.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_context_async_renders_cannot_overwrite_new_tab (tests/test_mobile_product_experience.py:294)",
+    "test_mobile_llm_resume_does_not_overwrite_unsaved_config_form (tests/test_llm_provider_presets.py:291)",
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)",
+    "test_mobile_new_session_can_optionally_import_documents_before_opening_turn (tests/test_mobile_persistence.py:141)",
+    "test_mobile_context_image_import_creates_source_anchor (tests/test_mobile_product_experience.py:331)",
+    "test_mobile_new_session_is_child_page_with_custom_preset_import_and_full_custom_page (tests/test_mobile_product_experience.py:396)",
+    "test_web_search_enabled_imports_mock_result_as_citable_source (tests/test_websearch.py:83)",
+    "test_pwa_context_images_are_imported_through_anchors (tests/test_image_memory.py:238)",
+    "test_supersede_kg_edge_marks_old_and_creates_active_new (tests/test_kg_schema.py:140)",
+    "test_mobile_document_import_records_pdf_readability_diagnostics (tests/test_mobile_persistence.py:171)",
+    "test_mobile_document_import_persists_temporal_source_memory (tests/test_mobile_persistence.py:203)",
+    "test_mobile_queued_user_messages_are_visible_and_reused_for_next_turn (tests/test_mobile_persistence.py:1018)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not hide spaces as an internal-only concept.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

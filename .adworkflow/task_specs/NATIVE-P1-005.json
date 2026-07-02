@@ -1,0 +1,71 @@
+{
+  "task_id": "NATIVE-P1-005",
+  "goal": "Create native legacy coverage registry for LEG-001 to LEG-044.",
+  "non_goals": [
+    "Do not implement Android feature behavior.",
+    "Do not mark unimplemented entries as verified.",
+    "Do not waive P0 or P1 legacy entries.",
+    "Do not change existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not build signed APKs."
+  ],
+  "acceptance_criteria": [
+    "Every LEG-001 through LEG-044 inventory item is present in the native coverage registry.",
+    "Every P0 and P1 item has a native owner.",
+    "Every P0 and P1 item has a planned verification surface.",
+    "Missing or partial P0 items are visible as replacement release blockers.",
+    "Current status uses only not_started, in_progress, implemented, verified, waived, or blocked.",
+    "No unimplemented entry is marked verified.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "coverage_matrix",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": "legacy-entry-parity",
+  "branch": "native/legacy-entry-parity",
+  "legacy_ids": [
+    "LEG-001..LEG-044"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/verification_result.json"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Validate the coverage registry includes exactly LEG-001 through LEG-044.",
+    "Validate each row has a gate, owner, planned task, status, release gate state, and verification surface.",
+    "Validate all statuses are from the allowed status vocabulary.",
+    "Validate no P0 item with missing/partial status is hidden as non-blocking.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json.",
+    "No Android Gradle build is required because this task changes planning/QA artifacts only."
+  ],
+  "notes": [
+    "This task creates a living release-gate registry. Later implementation tasks must update the relevant rows as evidence accumulates.",
+    "The registry should distinguish current foundation evidence from full replacement readiness."
+  ]
+}

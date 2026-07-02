@@ -1,0 +1,110 @@
+{
+  "task_id": "NATIVE-P4-002",
+  "commands": [
+    ".\\gradlew.bat :core:protocol:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:testDebugUnitTest --tests \"com.reversetutor.preview.theme.ReverseTutorTokenTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:lintDebug --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:protocol:testDebugUnitTest :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:compileDebugKotlin :app:lintDebug --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:protocol:testDebugUnitTest :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging app-debug.apk",
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts",
+    "Execution plan task-to-spec coverage check",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:protocol:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed in the P4-004 worker after adding protocol export payload builders and validator tests."
+    },
+    {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest --tests \"com.reversetutor.preview.theme.ReverseTutorTokenTest\" --no-daemon --stacktrace",
+      "notes": "Passed in the UX-002 worker after token API implementation."
+    },
+    {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed in the UX-002 worker after shared UI component hookup."
+    },
+    {
+      "command": ".\\gradlew.bat :app:lintDebug --no-daemon --stacktrace",
+      "notes": "Passed in the UX-002 worker."
+    },
+    {
+      "command": ".\\gradlew.bat :core:protocol:testDebugUnitTest :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after P4-002 protocol reader, import repository, and Settings import UI model implementation."
+    },
+    {
+      "command": ".\\gradlew.bat :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Passed after stopping Gradle/Kotlin build processes and running sequentially."
+    },
+    {
+      "command": ".\\gradlew.bat :app:compileDebugKotlin :app:lintDebug --no-daemon --stacktrace",
+      "notes": "Passed after adding Android VIEW/SEND import receive intent handling."
+    },
+    {
+      "command": ".\\gradlew.bat :core:protocol:testDebugUnitTest :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after external import receive integration."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "ConvertFrom-Json validation for ADworkflo JSON artifacts",
+      "notes": "Passed before this artifact update with 73 JSON files."
+    },
+    {
+      "command": "Execution plan task-to-spec coverage check",
+      "notes": "Passed; execution plan has 49 unique tasks and all have matching task specs."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; codegraph now indexes 150 files and 27292 source lines."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; refreshed NATIVE-P4-002 context from codegraph-index at L1-index with warning_count=0."
+    }
+  ],
+  "failed": [
+    {
+      "command": "Concurrent Gradle verification attempts",
+      "notes": "Failed due to Kotlin incremental cache corruption/file locks from parallel Gradle invocations. After stopping Gradle and rerunning sequentially, app compile and full test/lint/assembleDebug passed."
+    },
+    {
+      "command": ".\\gradlew.bat \"-Pkotlin.incremental=false\" ...",
+      "notes": "One non-incremental rerun attempt timed out or failed while concurrent builds held generated files; this was resolved by stopping Gradle processes and rerunning sequentially."
+    }
+  ],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No real LLM provider/network call was run.",
+    "No P4-002 device smoke was run yet for file picker, external receive intent, dry-run result screen, or import write UI.",
+    "No overwrite/new-space mode verification was run; those modes remain NATIVE-P4-003.",
+    "No Android share/save export validation was run; P4-004 remains only protocol-layer complete."
+  ],
+  "evidence": [
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/app/src/main/AndroidManifest.xml",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/export/ProtocolExportPayloads.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/theme/ReverseTutorTokens.kt",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "summary": "NATIVE-P4-002 native import pipeline is implemented and locally verified. Sidecar P4-004 protocol export builders and UX-002 shared UI foundation are also integrated and locally verified.",
+  "residual_risk": "Phase 4 is still incomplete until P4-003 import modes, full P4-004 export delivery, P4-006 first-launch prompt, and P4-007 device validation are complete."
+}

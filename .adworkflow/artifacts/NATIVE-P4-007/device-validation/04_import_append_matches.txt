@@ -1,0 +1,155 @@
+﻿
+mobile-native\qa\device-validation\2026-07-01-native-p4-007-hma-al00\04_import_append.xml:1:<?xml version='1.0' encodin
+g='UTF-8' standalone='yes' ?><hierarchy rotation="0"><node index="0" text="" resource-id="" class="android.widget.Frame
+Layout" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled=
+"true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bo
+unds="[0,0][720,1429]"><node index="0" text="" resource-id="" class="android.widget.LinearLayout" package="com.reverset
+utor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focu
+sed="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,0][720,1429]"><node
+index="0" text="" resource-id="android:id/content" class="android.widget.FrameLayout" package="com.reversetutor.preview
+" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false"
+scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,67][720,1429]"><node index="0" t
+ext="" resource-id="" class="androidx.compose.ui.platform.ComposeView" package="com.reversetutor.preview" content-desc=
+"" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="fal
+se" long-clickable="false" password="false" selected="false" bounds="[0,67][720,1429]"><node index="0" text="" resource
+-id="" class="android.view.View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" c
+lickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="f
+alse" selected="false" bounds="[0,67][720,1429]"><node index="0" text="" resource-id="" class="android.view.View" packa
+ge="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusa
+ble="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,67][
+720,1429]"><node index="0" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-
+desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable
+="false" long-clickable="false" password="false" selected="false" bounds="[0,208][720,1386]"><node index="0" text="" re
+source-id="" class="android.widget.ScrollView" package="com.reversetutor.preview" content-desc="" checkable="false" che
+cked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="true" long-clickable="false
+" password="false" selected="false" bounds="[0,208][720,1386]"><node index="0" text="Import/export" resource-id="" clas
+s="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clicka
+ble="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false"
+ selected="false" bounds="[41,249][360,316]" /><node index="1" text="shared-import.json" resource-id="" class="android.
+widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false"
+ enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="
+false" bounds="[41,330][273,378]" /><node index="2" text="Mode" resource-id="" class="android.widget.TextView" package=
+"com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable
+="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[41,398][1
+05,446]" /><node index="3" text="" resource-id="" class="android.widget.HorizontalScrollView" package="com.reversetutor
+.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused=
+"false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[41,460][679,542]"><node in
+dex="0" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-desc="" checkable="
+false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickab
+le="false" password="false" selected="false" bounds="[41,460][163,542]"><node index="0" text="Append" resource-id="" cl
+ass="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clic
+kable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="fals
+e" selected="false" bounds="[58,477][146,525]" /></node><node index="1" text="" resource-id="" class="android.view.View
+" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="true" enabled="true"
+focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[1
+77,460][317,542]"><node index="0" text="Overwrite" resource-id="" class="android.widget.TextView" package="com.reverset
+utor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focu
+sed="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[194,477][300,525]" /><
+/node><node index="2" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-desc=
+"" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false
+" long-clickable="false" password="false" selected="false" bounds="[331,460][486,542]"><node index="0" text="New space"
+ resource-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" ch
+ecked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="fal
+se" password="false" selected="false" bounds="[348,477][469,525]" /></node></node><node index="4" text="" resource-id="
+" class="android.view.View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clicka
+ble="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" s
+elected="false" bounds="[41,562][288,644]"><node index="0" text="Choose JSON" resource-id="" class="android.widget.Text
+View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="t
+rue" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" boun
+ds="[82,583][247,623]" /><node index="1" text="" resource-id="" class="android.widget.Button" package="com.reversetutor
+.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused=
+"false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[41,569][288,637]" /></node
+><node index="5" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-desc="" ch
+eckable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" lon
+g-clickable="false" password="false" selected="false" bounds="[302,562][438,644]"><node index="0" text="Dry run" resour
+ce-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="
+false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" pas
+sword="false" selected="false" bounds="[322,583][418,623]" /><node index="1" text="" resource-id="" class="android.widg
+et.Button" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabl
+ed="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false"
+ bounds="[302,569][438,637]" /></node><node index="6" text="" resource-id="" class="android.view.View" package="com.rev
+ersetutor.preview" content-desc="" checkable="false" checked="false" clickable="true" enabled="false" focusable="false"
+ focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[452,562][620,644]
+"><node index="0" text="Import" resource-id="" class="android.widget.TextView" package="com.reversetutor.preview" conte
+nt-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrolla
+ble="false" long-clickable="false" password="false" selected="false" bounds="[493,583][579,623]" /><node index="1" text
+="" resource-id="" class="android.widget.Button" package="com.reversetutor.preview" content-desc="" checkable="false" c
+hecked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="fa
+lse" password="false" selected="false" bounds="[452,569][620,637]" /></node><node index="7" text="schema:reverse_tutor_
+session_export_v1" resource-id="" class="android.widget.EditText" package="com.reversetutor.preview" content-desc="" ch
+eckable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" lon
+g-clickable="true" password="false" selected="false" bounds="[41,664][679,1014]"><node index="0" text="Import JSON" res
+ource-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checke
+d="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false"
+password="false" selected="false" bounds="[68,662][220,694]" /></node><node index="8" text="" resource-id="" class="and
+roid.view.View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false"
+enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="f
+alse" bounds="[41,1045][679,1386]"><node index="0" text="Dry run" resource-id="" class="android.widget.TextView" packag
+e="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusab
+le="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[65,1069
+][181,1114]" /><node index="1" text="Mode: Append" resource-id="" class="android.widget.TextView" package="com.reverset
+utor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focu
+sed="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[65,1128][233,1176]" />
+<node index="2" text="unknown" resource-id="" class="android.widget.TextView" package="com.reversetutor.preview" conten
+t-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollab
+le="false" long-clickable="false" password="false" selected="false" bounds="[65,1190][160,1238]" /><node index="3" text
+="Inserted" resource-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable
+="false" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-cli
+ckable="false" password="false" selected="false" bounds="[65,1252][159,1300]" /><node index="4" text="sessions: 0" reso
+urce-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked
+="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" p
+assword="false" selected="false" bounds="[65,1314][187,1362]" /><node index="5" text="messages: 0" resource-id="" class
+="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickab
+le="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false"
+selected="false" bounds="[65,1376][203,1386]" /></node></node></node><node index="1" text="" resource-id="" class="andr
+oid.view.View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" e
+nabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="fa
+lse" bounds="[0,67][720,208]"><node index="0" text="Import/export" resource-id="" class="android.widget.TextView" packa
+ge="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusa
+ble="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[34,87]
+[318,146]" /><node index="1" text="Migration preview" resource-id="" class="android.widget.TextView" package="com.rever
+setutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" f
+ocused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[34,153][254,188]" /
+><node index="2" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-desc="" ch
+eckable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" lon
+g-clickable="false" password="false" selected="false" bounds="[566,97][686,179]"><node index="0" text="Status" resource
+-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="fa
+lse" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" passw
+ord="false" selected="false" bounds="[586,121][666,156]" /><node index="1" text="" resource-id="" class="android.widget
+.Button" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled
+="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" b
+ounds="[566,97][686,179]" /></node></node><node index="2" text="" resource-id="" class="android.view.View" package="com
+.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="fa
+lse" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[0,1386][720,1
+429]"><node index="0" text="" resource-id="" class="android.widget.HorizontalScrollView" package="com.reversetutor.prev
+iew" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focused="fals
+e" scrollable="true" long-clickable="false" password="false" selected="false" bounds="[0,1386][720,1429]"><node index="
+0" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-desc="" checkable="false
+" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="f
+alse" password="false" selected="false" bounds="[20,1400][163,1429]"><node index="0" text="Sessions" resource-id="" cla
+ss="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" click
+able="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false
+" selected="false" bounds="[40,1414][143,1429]" /></node><node index="1" text="" resource-id="" class="android.view.Vie
+w" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="true" enabled="true"
+ focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[
+177,1400][273,1429]"><node index="0" text="Chat" resource-id="" class="android.widget.TextView" package="com.reversetut
+or.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled="true" focusable="false" focuse
+d="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[197,1414][253,1429]" /><
+/node><node index="2" text="" resource-id="" class="android.view.View" package="com.reversetutor.preview" content-desc=
+"" checkable="false" checked="false" clickable="true" enabled="true" focusable="true" focused="false" scrollable="false
+" long-clickable="false" password="false" selected="false" bounds="[287,1400][474,1429]"><node index="0" text="Context
+hub" resource-id="" class="android.widget.TextView" package="com.reversetutor.preview" content-desc="" checkable="false
+" checked="false" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable=
+"false" password="false" selected="false" bounds="[307,1414][454,1429]" /></node><node index="3" text="" resource-id=""
+ class="android.view.View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickab
+le="true" enabled="true" focusable="true" focused="false" scrollable="false" long-clickable="false" password="false" se
+lected="false" bounds="[488,1400][688,1429]"><node index="0" text="Global graph" resource-id="" class="android.widget.T
+extView" package="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="false" enabled
+="true" focusable="false" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" b
+ounds="[508,1414][668,1429]" /></node><node NAF="true" index="4" text="" resource-id="" class="android.view.View" packa
+ge="com.reversetutor.preview" content-desc="" checkable="false" checked="false" clickable="true" enabled="true" focusab
+le="true" focused="false" scrollable="false" long-clickable="false" password="false" selected="false" bounds="[702,1400
+][720,1429]" /></node></node></node></node></node></node></node><node index="1" text="" resource-id="android:id/statusB
+arBackground" class="android.view.View" package="com.reversetutor.preview" content-desc="" checkable="false" checked="f
+alse" clickable="false" enabled="true" focusable="false" focused="false" scrollable="false" long-clickable="false" pass
+word="false" selected="false" bounds="[0,0][720,67]" /></node></hierarchy>

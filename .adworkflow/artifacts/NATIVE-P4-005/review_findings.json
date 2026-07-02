@@ -1,0 +1,33 @@
+{
+  "task_id": "NATIVE-P4-005",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_validation",
+      "finding": "Local wipe flow is implemented and covered by JVM/build tests, but destructive wipe has not yet been run on HMA-AL00 with UI evidence.",
+      "recommendation": "Keep NATIVE-P4-007 as the device evidence gate for wipe, import, and export flows."
+    },
+    {
+      "severity": "medium",
+      "area": "protocol_depth",
+      "finding": "P4-001 protocol foundation validates top-level schema/type/version, unknown-field warnings, and secret redaction, but not full nested import semantics.",
+      "recommendation": "Implement deep mapping, transactions, and idempotency in NATIVE-P4-002/NATIVE-P4-003."
+    },
+    {
+      "severity": "low",
+      "area": "ux_scope",
+      "finding": "UX-001 created design-system and checklist documentation only.",
+      "recommendation": "Use UX-002/UX-003 to implement tokens/components and capture screenshots before claiming UI quality evidence."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/wipe/LocalDataWipeRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/wipe/LocalDataWipeRepositoryTest.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/VersionedProtocolSchemaValidatorTest.kt",
+    "tasks/native-android-ui-design-system.md",
+    "tasks/native-android-ui-acceptance-checklist.md"
+  ]
+}

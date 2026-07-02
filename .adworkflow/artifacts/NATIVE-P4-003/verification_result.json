@@ -1,0 +1,77 @@
+{
+  "task_id": "NATIVE-P4-003",
+  "commands": [
+    ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging app-debug.apk",
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts",
+    "Execution plan task-to-spec coverage check",
+    "Coverage registry validator",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after P4-003 import mode/idempotency implementation and P4-004 export repository foundation; only Android SDK XML compatibility warning was emitted."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level native JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "ConvertFrom-Json validation for ADworkflo JSON artifacts",
+      "notes": "Passed; validated 81 JSON files under .adworkflow and .codegraph."
+    },
+    {
+      "command": "Execution plan task-to-spec coverage check",
+      "notes": "Passed; execution plan has 49 tasks, 49 unique task ids, and no missing task specs."
+    },
+    {
+      "command": "Coverage registry validator",
+      "notes": "Passed; verified 44 LEG rows, verified=3, in_progress=30, not_started=11, and P0Blockers=29."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; codegraph now indexes 152 files and 28115 source lines."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; refreshed NATIVE-P4-003 context from codegraph-index at L1-index with warning_count=0."
+    }
+  ],
+  "failed": [
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Initial run failed because the sidecar NativeExportRepositoryTest had brittle full-JSON and default-space assertions. The export test was corrected to validate stable output and secret exclusion, then focused verification passed."
+    }
+  ],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No real LLM provider/network call was run.",
+    "No P4-003 device smoke was run yet for append/overwrite/new-space mode flows.",
+    "No Android share/save export validation was run; P4-004 Android delivery remains open.",
+    "No first-launch import prompt validation was run; P4-006 remains open."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/execution_plan.json",
+    ".adworkflow/task_specs/NATIVE-UX-004.json",
+    ".adworkflow/task_specs/NATIVE-UX-005.json"
+  ],
+  "summary": "NATIVE-P4-003 import modes and idempotency are implemented and locally verified. Sidecar P4-004 data-backed export repository foundation is integrated and locally verified.",
+  "residual_risk": "Phase 4 remains incomplete until P4-004 Android share/save delivery, P4-006 first-launch prompt, and P4-007 device validation are complete."
+}

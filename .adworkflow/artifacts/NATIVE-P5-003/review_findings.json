@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P5-003",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "graph_scope",
+      "finding": "GraphNode and GraphEdge are scoped by spaceId only. Context Hub session graph and Global graph currently render the same current-space snapshot with different UI modes.",
+      "recommendation": "Add session-aware graph projection or documented aggregation rules before claiming per-session graph parity in Phase 6."
+    },
+    {
+      "severity": "medium",
+      "area": "gesture_evidence",
+      "finding": "Native Canvas pan/zoom/tap selection is implemented, but automated HMA-AL00 evidence verifies routed Canvas presence, node chips, selection detail, relation display, and global mode rather than low-level multi-touch gesture physics.",
+      "recommendation": "Add a dedicated Compose UI or manual QA gesture matrix in NATIVE-UX-008 / NATIVE-P5-008 before replacement readiness."
+    },
+    {
+      "severity": "medium",
+      "area": "graph_parity",
+      "finding": "Node edit/save, semantic fragment/card review, graph lifecycle review, and richer relationship/evidence sections are not implemented in this slice.",
+      "recommendation": "Keep LEG-020 and LEG-025 open and complete NATIVE-P5-004 before Phase 6 parity audit."
+    },
+    {
+      "severity": "medium",
+      "area": "context_injection",
+      "finding": "Graph state is visible in Context Hub and Global graph, but graph/source/memory context is not yet injected into chat turns.",
+      "recommendation": "Complete NATIVE-P5-007 and keep source/memory context replacement blockers open."
+    },
+    {
+      "severity": "low",
+      "area": "large_graph",
+      "finding": "Large graphs are rendered and surfaced through a large-state summary, but clustering/filtering is deferred.",
+      "recommendation": "Add clustering/filtering or a product-approved fallback before replacement readiness for large legacy graphs."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-P5-003.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/graph/GraphRepository.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/KnowledgeGraphModels.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/KnowledgeGraphPanel.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5GraphDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-003-hma-al00/README.md"
+  ]
+}

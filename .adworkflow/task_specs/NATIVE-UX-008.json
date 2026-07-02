@@ -1,0 +1,82 @@
+{
+  "task_id": "NATIVE-UX-008",
+  "goal": "Specify native graph interaction states for pan, zoom, selection, detail sheets, edit affordances, and review parity.",
+  "non_goals": [
+    "Do not use WebView graph carry-over.",
+    "Do not waive graph P0 behavior without approval.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Graph interaction spec covers pan, zoom, node selection, edge affordances, detail sheet behavior, edit/review states, and empty/error states.",
+    "Native Canvas/Compose expectations are explicit and WebView carry-over is excluded.",
+    "Dependencies on graph engine, graph edit parity, and UX foundation work are recorded.",
+    "No prohibited package/signing/PWA release changes are made."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "fanout_workers",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "interaction_spec",
+    "graph_state_matrix",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":feature:memory graph-interaction",
+  "branch": "native/ui-ux-system",
+  "legacy_ids": [
+    "LEG-020",
+    "LEG-025"
+  ],
+  "dependencies": [
+    "NATIVE-UX-001",
+    "NATIVE-UX-002",
+    "NATIVE-UX-005",
+    "NATIVE-P5-003",
+    "NATIVE-P5-004"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-ui-ux-roadmap.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/feature/memory/src/main/java",
+    "mobile-native/feature/memory/src/test/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    "mobile-native/qa/device-validation"
+  ],
+  "verification_expectations": [
+    "Validate the interaction/state matrix is internally consistent with Phase 5 graph ownership.",
+    "Run JSON validation for modified ADworkflo specs.",
+    "If UI files are changed by the future worker, run Compose/UI state tests where available and capture screenshots when feasible."
+  ],
+  "notes": [
+    "Added as a Phase 5 UI/UX follow-up to split graph interaction decisions out of the broad NATIVE-UX-005 surface task.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "task_id": "NATIVE-UX-004",
+  "commands": [
+    ".\\gradlew.bat :feature:settings:testDebugUnitTest :core:data:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase4ImportExportDeviceTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "adb install -r mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb shell am start -n com.reversetutor.preview/.MainActivity",
+    "adb shell input swipe/tap to open Import/export from horizontal bottom navigation",
+    "adb shell uiautomator dump /sdcard/window.xml",
+    "adb exec-out screencap -p"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :feature:settings:testDebugUnitTest :core:data:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Passed after fixing a missing NativeExportSnapshot import and updating the model fixture document type."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase4ImportExportDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10 after stabilizing mode/result scroll assertions for the longer UX-004 page."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed after all UX-004 UI, model, repository, and instrumentation changes."
+    },
+    {
+      "command": "adb install -r app-debug.apk; adb shell am start -n com.reversetutor.preview/.MainActivity",
+      "notes": "Passed for internal debug preview install and launch; no signed/release APK was built."
+    },
+    {
+      "command": "adb uiautomator dump + screencap",
+      "notes": "Passed; captured Import/export first viewport and export-section XML/PNG evidence under the UX-004 HMA-AL00 evidence directory."
+    }
+  ],
+  "failed": [
+    {
+      "command": ".\\gradlew.bat :feature:settings:testDebugUnitTest :core:data:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "Initial run failed because SettingsFoundationModels referenced NativeExportSnapshot without an import; fixed and rerun passed."
+    },
+    {
+      "command": ".\\gradlew.bat :feature:settings:testDebugUnitTest :core:data:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+      "notes": "A model test initially expected Session export while its fixture had documentType=null; fixture was corrected to ProtocolDocumentType.SessionExport."
+    },
+    {
+      "command": "early UX-004 Phase4ImportExportDeviceTest runs",
+      "notes": "Initial failures were UI-test stability issues from duplicate exact text, offscreen result rows, and a horizontal mode selector. Labels were de-duplicated, assertions became scroll-aware, and mode controls now use standard buttons/FlowRow."
+    },
+    {
+      "command": "adb shell am start -n com.reversetutor.preview/.MainActivity",
+      "notes": "Initial evidence capture failed because the app was not installed after the test run; debug APK was reinstalled and evidence capture succeeded."
+    }
+  ],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "No replacement-build first-launch prompt was shown on device because preview builds intentionally disable it by default.",
+    "No all-up dark mode, large text, TalkBack, or IME screenshot matrix was run; that remains NATIVE-UX-006."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-ui.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-ui.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-export-section.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/import-export-export-section.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-ux-004-hma-al00/TEST-HMA-AL00-10-ux004.xml"
+  ],
+  "summary": "NATIVE-UX-004 is complete for the Phase 4 native preview surfaces. Import/export now has a step-wise Android UI, explicit safety copy, richer dry-run/result reports, graph snapshot export support, preset deferred state, wipe recovery affordance, and HMA-AL00 screenshot/XML plus automated verification evidence.",
+  "residual_risk": "This does not close replacement readiness or P0 migration blockers. LEG-031 and LEG-032 remain open until Phase 6 parity, real migration source coverage, and device matrix evidence are complete."
+}

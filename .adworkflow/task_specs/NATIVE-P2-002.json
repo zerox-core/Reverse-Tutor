@@ -1,0 +1,91 @@
+{
+  "task_id": "NATIVE-P2-002",
+  "goal": "Implement native new-session and templates flow with built-in templates, custom profile creation, preset JSON validation, and a safe source-import handoff.",
+  "non_goals": [
+    "Do not implement LLM generation.",
+    "Do not implement chat timeline, composer, quote, or message actions; those belong to NATIVE-P2-003.",
+    "Do not implement full import/export protocol payloads; those belong to Phase 4.",
+    "Do not implement local source file parsing or file picker; those belong to NATIVE-P5-005.",
+    "Do not store API keys or provider secrets in session presets.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness."
+  ],
+  "acceptance_criteria": [
+    "Sessions screen exposes a native New session entry.",
+    "User can create a session from built-in templates for school, exam, work, language, habit, and skill learning.",
+    "User can create a custom session with title, role, goal, and profile/personality text.",
+    "Created sessions persist through Room-backed repository behavior and appear in the session list.",
+    "Profile data is persisted in existing session settings without changing Room schema version 1.",
+    "Preset JSON is validated before use and rejects secret/key material.",
+    "Preset JSON can create a session after validation.",
+    "Initial source selection is represented as a safe deferred handoff to the sources module, not silent file loss.",
+    "Automated tests cover built-in templates, custom profile validation/persistence, and preset validation.",
+    "Legacy coverage registry is updated conservatively for LEG-008, LEG-009, LEG-010, LEG-011, and LEG-043.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":feature:chat/:feature:settings/:core:protocol",
+  "branch": "native/chat-main-flow",
+  "legacy_ids": [
+    "LEG-008",
+    "LEG-009",
+    "LEG-010",
+    "LEG-011",
+    "LEG-043"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/session/SessionRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/entity/Entities.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/SessionsScreen.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/SessionListModels.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Follow TDD: add failing tests before production implementation for templates, preset validation, and session creation persistence.",
+    "Run focused core protocol, core data, feature chat, and app JVM tests.",
+    "Run connected core data instrumentation if an ADB device is available.",
+    "Run native project test, lint, and app assembleDebug.",
+    "Install preview debug APK on the connected device and capture new-session/template/custom/preset smoke evidence when feasible.",
+    "Use app pid/package-specific logcat filtering to avoid global AndroidRuntime false positives.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json."
+  ],
+  "notes": [
+    "Existing PRD/ARCH/TODO and prior user approval are the design basis for this task.",
+    "Use existing Room schema v1 where possible; avoid schema changes unless tests prove they are necessary.",
+    "Preset validation in this task is a safe preview contract; full export/import schemas remain Phase 4 work."
+  ]
+}

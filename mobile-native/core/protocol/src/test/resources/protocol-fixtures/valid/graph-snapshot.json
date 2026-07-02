@@ -1,0 +1,21 @@
+{
+  "schema": "reverse_tutor_graph_snapshot_v1",
+  "version": 1,
+  "type": "graph_snapshot",
+  "created_at": "2026-07-01T00:00:00Z",
+  "nodes": [
+    {
+      "id": "node-fixture-1",
+      "kind": "concept",
+      "title": "Synthetic concept"
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-fixture-1",
+      "source_node_id": "node-fixture-1",
+      "target_node_id": "node-fixture-1",
+      "kind": "self"
+    }
+  ]
+}

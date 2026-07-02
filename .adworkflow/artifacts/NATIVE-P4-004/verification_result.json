@@ -1,0 +1,56 @@
+{
+  "task_id": "NATIVE-P4-004",
+  "commands": [
+    ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging app-debug.apk",
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts",
+    "Execution plan task-to-spec coverage check",
+    "Coverage registry validator",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:data:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after export repository foundation, Settings export state tests, DataModule wiring, and AppShell share/save wiring."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level native JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; codegraph now indexes 152 files and 28368 source lines."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; refreshed NATIVE-P4-004 context from codegraph-index at L1-index with warning_count=0."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No real LLM provider/network call was run.",
+    "No P4-004 device smoke was run yet for Android share/save targets.",
+    "No first-launch import prompt validation was run; P4-006 remains open."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md"
+  ],
+  "summary": "NATIVE-P4-004 native export flows are implemented and locally verified for current-session/full-backup data-backed export plus Settings share/save delivery wiring.",
+  "residual_risk": "Device validation remains open for P4-007; P4-006 first-launch import prompt is still required before Phase 4 validation."
+}

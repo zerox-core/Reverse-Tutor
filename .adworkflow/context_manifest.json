@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P5-007",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubModels.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/ContextHubModelsTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5SourcesDeviceTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/SourceImportInputFactory.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/shell/SourceImportInputFactoryTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/sources/SourceRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/sources/SourceRepositoryTest.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_turn_route_uses_context_before_source_hits_for_ambiguous_short_text (tests/test_mobile_persistence.py:1179)",
+    "test_mobile_source_memory_is_updated_lazily_when_chat_hits_a_node (tests/test_mobile_persistence.py:215)",
+    "test_mobile_pdf_sources_are_retrieved_for_each_llm_turn (tests/test_mobile_persistence.py:117)",
+    "test_mobile_document_import_persists_temporal_source_memory (tests/test_mobile_persistence.py:203)",
+    "test_mobile_second_layer_expands_only_hit_source_memory_branches (tests/test_mobile_persistence.py:226)",
+    "test_message_sources_endpoint_returns_cited_source (tests/test_sources_api.py:91)",
+    "test_upload_list_and_detail_return_card_ready_image_contract (tests/test_image_memory.py:113)",
+    "test_memory_api_returns_kg_nodes_and_edges (tests/test_kg_schema.py:189)",
+    "test_memory_overview_returns_all_categories (tests/test_memory_panel.py:107)",
+    "test_delete_invalid_kind_returns_422 (tests/test_memory_panel.py:249)",
+    "test_delete_nonexistent_id_returns_404 (tests/test_memory_panel.py:257)",
+    "test_mobile_graph_sheet_source_jumps_open_context_anchors (tests/test_mobile_persistence.py:738)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not make Python runtime mandatory.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

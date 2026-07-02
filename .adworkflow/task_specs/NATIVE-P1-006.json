@@ -1,0 +1,77 @@
+{
+  "task_id": "NATIVE-P1-006",
+  "goal": "Validate Phase 1 native foundation integration with a preview debug APK and recorded device evidence.",
+  "non_goals": [
+    "Do not implement new Android feature behavior.",
+    "Do not mark Phase 2+ legacy entries as verified.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not claim native replacement readiness."
+  ],
+  "acceptance_criteria": [
+    "Phase 1 native project compiles.",
+    "Focused Phase 1 unit and instrumentation checks pass.",
+    "Project-level native test and lint checks pass.",
+    "Preview debug APK installs and launches on the connected Android device.",
+    "Device validation records launch, navigation, back behavior, settings/about reachability, device identity, Android version, screenshots/XML, and result.",
+    "Coverage registry remains conservative and does not close non-verified P0 rows.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "validation_record",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": "qa/device-validation",
+  "branch": "native/integration-phase-1-foundation",
+  "legacy_ids": [
+    "LEG-001",
+    "LEG-002",
+    "LEG-039"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/verification_result.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppNavigation.kt"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run focused Phase 1 JVM tests for app shell, data preferences, and settings models.",
+    "Run connected data instrumentation if an ADB device is available.",
+    "Run native project test, lint, and app assembleDebug.",
+    "Inspect debug APK package id and confirm it remains com.reversetutor.preview.",
+    "Install preview debug APK on the connected device and capture launch/navigation/settings/about/back evidence.",
+    "Use app pid/package-specific logcat filtering to avoid global AndroidRuntime false positives.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json."
+  ],
+  "notes": [
+    "This task is a validation gate for Phase 1 foundation, not a feature implementation task.",
+    "The preview APK is not a signed or official replacement APK.",
+    "The legacy coverage registry remains the source of truth for replacement blockers."
+  ]
+}

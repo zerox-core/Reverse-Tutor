@@ -1,0 +1,46 @@
+{
+  "task_id": "NATIVE-P4-003",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_validation",
+      "finding": "P4-003 import modes have JVM/build/lint evidence, but no device smoke yet for selecting append/overwrite/new-space modes, typing overwrite confirmation, or validating result screens.",
+      "recommendation": "Keep NATIVE-P4-007 as the device evidence gate for import, export, wipe, first-launch prompt, and logcat checks."
+    },
+    {
+      "severity": "medium",
+      "area": "import_product_semantics",
+      "finding": "New-space mode is implemented as a stable source-derived imported space to satisfy idempotency. It intentionally does not create unlimited duplicate spaces on every rerun.",
+      "recommendation": "If the product later needs an explicit duplicate-copy mode, add it as a separate mode instead of weakening current idempotency."
+    },
+    {
+      "severity": "medium",
+      "area": "export_scope",
+      "finding": "P4-004 now has data-backed current-session and full-backup export foundations, but Android share/save delivery and Settings export actions are not implemented.",
+      "recommendation": "Finish P4-004 delivery surfaces before running P4-007 validation or claiming LEG-031 progress beyond in_progress."
+    },
+    {
+      "severity": "medium",
+      "area": "protocol_depth",
+      "finding": "The data-backed full-backup repository snapshot includes messages, but the current protocol full-backup builder does not serialize messages.",
+      "recommendation": "Decide in the remaining P4-004 work whether full-backup protocol v1 should include messages before replacement-readiness audit."
+    },
+    {
+      "severity": "low",
+      "area": "planning",
+      "finding": "A planning review found UX-004 and UX-005 dependency gaps; they have been tightened in task_specs and execution_plan.",
+      "recommendation": "Before executing UX-004/UX-005, refine their acceptance criteria into concrete layout/state/screenshot requirements."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "tasks/native-legacy-coverage-registry.md"
+  ]
+}

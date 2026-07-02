@@ -1,0 +1,68 @@
+{
+  "task_id": "NATIVE-P0-002",
+  "goal": "Initialize ADworkflo and create project-local execution artifacts.",
+  "non_goals": [
+    "Do not implement Android code.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "NATIVE-P0-002 satisfies the task goal and updates related LEG rows only when evidence exists.",
+    "Automated or device verification evidence is recorded in ADworkflo artifacts.",
+    "No prohibited package/signing/PWA release changes are made."
+  ],
+  "risk_level": "low",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": "ADworkflo orchestration",
+  "branch": "native/integration",
+  "legacy_ids": [
+    "LEG-001..LEG-044"
+  ],
+  "dependencies": [
+    "NATIVE-P0-001"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run focused tests",
+    "Run project test/lint/build",
+    "Validate ADworkflo JSON artifacts"
+  ],
+  "notes": [
+    "Generated as part of ADworkflo full-roadmap orchestration after NATIVE-P2-005 device verification.",
+    "Worker must keep implementation scoped to this task and update worker_state/verification_result/review_findings as required.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

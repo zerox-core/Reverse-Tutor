@@ -1,0 +1,82 @@
+{
+  "task_id": "NATIVE-UX-010",
+  "goal": "Run Phase 5 UI QA for Context Hub, graph interactions, source library, parser status, and evidence-reference flows.",
+  "non_goals": [
+    "Do not approve replacement readiness when P0 functional blockers remain.",
+    "Do not replace final all-up UI QA.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "Phase 5 UI QA covers Context Hub, graph interactions, source library, parser status, and evidence-reference flows.",
+    "Screenshots or explicit unavailable-device notes are recorded for the Phase 5 UI surface matrix.",
+    "Dynamic type, dark mode, touch targets, IME behavior where relevant, and error/empty/loading states are checked.",
+    "No prohibited package/signing/PWA release changes are made."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "phase5_ui_qa_matrix",
+    "screenshots",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": "qa/device-validation Phase-5-UI-quality",
+  "branch": "native/ui-ux-system",
+  "legacy_ids": [
+    "LEG-019..LEG-025",
+    "LEG-034..LEG-036"
+  ],
+  "dependencies": [
+    "NATIVE-UX-005",
+    "NATIVE-UX-007",
+    "NATIVE-UX-008",
+    "NATIVE-UX-009",
+    "NATIVE-P5-008"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-ui-ux-roadmap.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/feature/memory/src/main/java",
+    "mobile-native/feature/sources/src/main/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json"
+  ],
+  "verification_expectations": [
+    "Run Compose/UI state tests where available.",
+    "Run .\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace when feasible for the owning native project state.",
+    "Capture screenshots on small phone/main phone/emulator when feasible, or record unavailable-device notes.",
+    "Check touch targets, dynamic type, dark mode, IME where relevant, and safe area behavior."
+  ],
+  "notes": [
+    "Added as a Phase 5 UI/UX follow-up before the all-up NATIVE-UX-006 final UI QA matrix.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

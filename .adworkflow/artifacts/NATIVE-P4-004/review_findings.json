@@ -1,0 +1,33 @@
+{
+  "task_id": "NATIVE-P4-004",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_validation",
+      "finding": "Export share/save delivery is wired through Android intents, but no device smoke has verified chooser launch, document creation, or saved JSON readability.",
+      "recommendation": "Cover share/save in NATIVE-P4-007 with screenshot/logcat evidence and import-back validation where feasible."
+    },
+    {
+      "severity": "medium",
+      "area": "export_scope",
+      "finding": "Settings exposes current-session and full-backup export actions. Graph-snapshot and preset export support is validated at protocol level but not exposed as separate Settings actions.",
+      "recommendation": "Decide before P6 whether graph/preset need separate user-facing export controls or are adequately covered through full backup and preset management flows."
+    },
+    {
+      "severity": "medium",
+      "area": "protocol_depth",
+      "finding": "Full-backup repository snapshot includes messages, but the full-backup protocol builder does not serialize messages in v1.",
+      "recommendation": "Resolve full-backup message serialization before replacement-readiness audit if full conversation restore is required by LEG-031/LEG-032."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "tasks/native-legacy-coverage-registry.md"
+  ]
+}

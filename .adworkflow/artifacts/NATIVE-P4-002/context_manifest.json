@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P4-002",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/LlmProfileRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/LlmProfileRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/DatabaseSchema.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/SchemaPolicyTest.kt",
+    "mobile-native/core/llm/src/main/java/com/reversetutor/core/llm/LlmProfilePolicy.kt",
+    "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmProfilePolicyTest.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)",
+    "test_web_search_enabled_imports_mock_result_as_citable_source (tests/test_websearch.py:83)",
+    "test_delete_session_after_node_invalidation_leaves_no_orphan_edges (tests/test_kg_consistency.py:345)",
+    "test_runtime_memory_hint_is_bounded_and_uses_behavior_profile (tests/test_memory_architecture.py:92)",
+    "test_mobile_custom_profile_tags_and_runtime_hint_are_present (tests/test_mobile_product_experience.py:542)",
+    "_write_chunks (db.py:572)",
+    "_write_env_values (server.py:185)",
+    "test_mobile_update_download_opens_native_installer_when_available (tests/test_android_background_llm.py:180)",
+    "test_create_session_writes_initial_anchor (tests/test_engine.py:10)",
+    "test_empty_error_pattern_does_not_write_dirty_row (tests/test_error_log.py:87)",
+    "test_goal_mode_does_not_write_error_log (tests/test_error_log.py:174)",
+    "test_mastery_turn_writes_mastery_and_mastered_edge (tests/test_kg_consistency.py:294)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not use direct IndexedDB scraping.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

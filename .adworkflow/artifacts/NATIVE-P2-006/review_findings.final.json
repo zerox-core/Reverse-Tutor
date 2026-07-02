@@ -1,0 +1,32 @@
+{
+  "task_id": "NATIVE-P2-006",
+  "status": "approved",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_matrix",
+      "finding": "P2-006 true-device validation is limited to HMA-AL00 / Android 10 / API 29.",
+      "recommendation": "Keep Phase 6 replacement readiness blocked until a broader device matrix and final package identity runbook are executed."
+    },
+    {
+      "severity": "medium",
+      "area": "runtime_scope",
+      "finding": "The verified assistant reply uses FakeLlmGenerationRuntime and does not exercise live provider networking.",
+      "recommendation": "Keep live provider validation as a later explicit task with redacted diagnostics and no accidental secret export."
+    },
+    {
+      "severity": "medium",
+      "area": "ui_ux",
+      "finding": "UI/UX tasks are now explicit and expanded, but production polish and screenshot QA remain future work.",
+      "recommendation": "Start NATIVE-UX-001/002 before broad Phase 4/5 surface work so screens share the same visual language."
+    }
+  ],
+  "review_basis": [
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/execution_plan.json",
+    "tasks/native-legacy-coverage-registry.md"
+  ]
+}

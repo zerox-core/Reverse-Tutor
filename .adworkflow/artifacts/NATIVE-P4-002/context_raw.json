@@ -1,0 +1,320 @@
+{
+  "schema": "ADworkflo.context_raw.v1",
+  "task_id": "NATIVE-P4-002",
+  "source": "codegraph-index",
+  "matched_files": [
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/LlmProfileRepository.kt",
+      "language": "kotlin",
+      "loc": 102,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+      "language": "kotlin",
+      "loc": 439,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/LlmProfileRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 130,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 108,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/DatabaseSchema.kt",
+      "language": "kotlin",
+      "loc": 11,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/SchemaPolicyTest.kt",
+      "language": "kotlin",
+      "loc": 96,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/llm/src/main/java/com/reversetutor/core/llm/LlmProfilePolicy.kt",
+      "language": "kotlin",
+      "loc": 160,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmProfilePolicyTest.kt",
+      "language": "kotlin",
+      "loc": 99,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/model/src/main/java/com/reversetutor/core/model/LlmProfile.kt",
+      "language": "kotlin",
+      "loc": 25,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+      "language": "kotlin",
+      "loc": 253,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+      "language": "kotlin",
+      "loc": 46,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/LlmProfileSettingsModelTest.kt",
+      "language": "kotlin",
+      "loc": 42,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/preferences/AppPreferencesRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 63,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/ReverseTutorDatabaseDaoTest.kt",
+      "language": "kotlin",
+      "loc": 274,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+      "language": "kotlin",
+      "loc": 91,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt",
+      "language": "kotlin",
+      "loc": 108,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/SecretStore.kt",
+      "language": "kotlin",
+      "loc": 121,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+      "language": "kotlin",
+      "loc": 186,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/entity/Entities.kt",
+      "language": "kotlin",
+      "loc": 347,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/ReverseTutorDatabase.kt",
+      "language": "kotlin",
+      "loc": 74,
+      "is_test": false
+    }
+  ],
+  "matched_symbols": [
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_frontend_enqueues_and_imports_native_background_turns",
+      "line": 153,
+      "end_line": 177,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_web_search_enabled_imports_mock_result_as_citable_source",
+      "line": 83,
+      "end_line": 108,
+      "file": "tests/test_websearch.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_delete_session_after_node_invalidation_leaves_no_orphan_edges",
+      "line": 345,
+      "end_line": 362,
+      "file": "tests/test_kg_consistency.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_runtime_memory_hint_is_bounded_and_uses_behavior_profile",
+      "line": 92,
+      "end_line": 132,
+      "file": "tests/test_memory_architecture.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_custom_profile_tags_and_runtime_hint_are_present",
+      "line": 542,
+      "end_line": 562,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "_write_chunks",
+      "line": 572,
+      "end_line": 577,
+      "file": "db.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "_write_env_values",
+      "line": 185,
+      "end_line": 206,
+      "file": "server.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_update_download_opens_native_installer_when_available",
+      "line": 180,
+      "end_line": 192,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_create_session_writes_initial_anchor",
+      "line": 10,
+      "end_line": 24,
+      "file": "tests/test_engine.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_empty_error_pattern_does_not_write_dirty_row",
+      "line": 87,
+      "end_line": 97,
+      "file": "tests/test_error_log.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_goal_mode_does_not_write_error_log",
+      "line": 174,
+      "end_line": 184,
+      "file": "tests/test_error_log.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mastery_turn_writes_mastery_and_mastered_edge",
+      "line": 294,
+      "end_line": 315,
+      "file": "tests/test_kg_consistency.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_error_turn_writes_error_log_and_error_edge",
+      "line": 318,
+      "end_line": 342,
+      "file": "tests/test_kg_consistency.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_llm_extract_writes_returned_nodes_and_edges",
+      "line": 137,
+      "end_line": 168,
+      "file": "tests/test_kg_extractor.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_invalidate_kg_node_marks_invalidated",
+      "line": 77,
+      "end_line": 84,
+      "file": "tests/test_kg_schema.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_upsert_kg_node_reactivates_invalidated_node",
+      "line": 87,
+      "end_line": 95,
+      "file": "tests/test_kg_schema.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_invalidate_kg_edge_marks_invalidated_and_timestamp",
+      "line": 129,
+      "end_line": 137,
+      "file": "tests/test_kg_schema.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_memory_delete_invalidates_kg_node_and_edge",
+      "line": 203,
+      "end_line": 213,
+      "file": "tests/test_kg_schema.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_chat_json_retries_once_when_model_returns_invalid_json",
+      "line": 247,
+      "end_line": 264,
+      "file": "tests/test_llm.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_llm_resume_does_not_overwrite_unsaved_config_form",
+      "line": 291,
+      "end_line": 308,
+      "file": "tests/test_llm_provider_presets.py"
+    }
+  ],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "warnings": []
+}

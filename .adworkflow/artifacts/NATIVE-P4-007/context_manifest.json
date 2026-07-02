@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P4-007",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/export/ProtocolExportPayloads.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_export_uses_native_android_share_sheet (tests/test_android_background_llm.py:195)",
+    "test_mobile_preset_import_export_is_lightweight_and_safe (tests/test_mobile_product_experience.py:611)",
+    "test_pwa_context_images_are_imported_through_anchors (tests/test_image_memory.py:238)",
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)",
+    "test_mobile_new_session_can_optionally_import_documents_before_opening_turn (tests/test_mobile_persistence.py:141)",
+    "test_mobile_image_pdf_import_saves_preview_pages_for_vision_recovery (tests/test_mobile_persistence.py:433)",
+    "test_mobile_new_session_is_child_page_with_custom_preset_import_and_full_custom_page (tests/test_mobile_product_experience.py:396)",
+    "test_import_md_creates_chunks_and_fts_rows (tests/test_retrieval.py:31)",
+    "test_web_search_enabled_imports_mock_result_as_citable_source (tests/test_websearch.py:83)",
+    "export_session (server.py:706)",
+    "_import_doc (tests/test_clue_with_retrieval.py:47)",
+    "test_clue_student_reply_cites_imported_doc (tests/test_clue_with_retrieval.py:74)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not run destructive overwrite without fixture setup.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

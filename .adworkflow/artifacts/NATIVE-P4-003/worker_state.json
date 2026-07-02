@@ -1,0 +1,52 @@
+{
+  "task_id": "NATIVE-P4-003",
+  "status": "completed",
+  "done": [
+    "Implemented NativeImportMode Append, Overwrite, and NewSpace as first-class import modes.",
+    "Added destructive overwrite confirmation enforcement in NativeImportRepository and Settings Import/export UI.",
+    "Added overwrite write-set semantics that clear the target space inside the import transaction before writing replacement records and import batch audit data.",
+    "Added stable new-space import mapping with imported space IDs and source-ID-prefixed records so reruns do not create uncontrolled duplicates.",
+    "Updated Settings Import/export UI state and AppShell wiring so mode selection is user-visible and dry-run/import calls use the selected mode.",
+    "Added repository tests for overwrite confirmation, overwrite replacement intent, new-space stability, and append rerun idempotency.",
+    "Integrated sidecar NATIVE-P4-004 data-backed export repository foundation for current-session and full-backup protocol JSON without exporting secrets.",
+    "Tightened UX task dependencies so NATIVE-UX-004 waits on Phase 4 foundations and NATIVE-UX-005 waits on Phase 5 Context/source foundations."
+  ],
+  "changed_files": [
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/execution_plan.json",
+    ".adworkflow/task_specs/NATIVE-UX-004.json",
+    ".adworkflow/task_specs/NATIVE-UX-005.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/review_findings.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeExportRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeExportRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationScreen.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "tasks/native-android-next-workplan.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "current_problem": "NATIVE-P4-003 import modes and idempotency are implemented and locally verified. Phase 4 is still open because P4-004 Android share/save delivery, P4-006 first-launch prompt, and P4-007 device validation are not complete.",
+  "next_action": "Finish NATIVE-P4-004 Android export share/save delivery and Settings export actions, then implement NATIVE-P4-006 first-launch import prompt before running NATIVE-P4-007 device validation.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "Do not build signed or release APKs.",
+    "Do not call real LLM providers during automated or device smoke validation.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "Coverage registry remains conservative; P0 blockers are not reduced without full parity and device evidence.",
+    "NATIVE-P4-004 is only partly complete: protocol builders and data-backed export foundation are present, but Settings actions and Android share/save delivery remain open."
+  ],
+  "remaining_risks": [
+    "P4-003 has local JVM/build validation but no device smoke for append/overwrite/new-space UI flows.",
+    "Overwrite clearing is scoped to the target space and import transaction, but destructive behavior still needs device validation in P4-007.",
+    "New-space idempotency uses a stable source-derived space identity; product may later choose an explicit duplicate-as-new-copy option, but uncontrolled duplicates are avoided for now.",
+    "P4-004 full-backup snapshot stores messages in the repository result, but the current protocol full-backup builder does not serialize messages yet.",
+    "UX-004 and UX-005 dependency gaps are corrected in task specs/execution plan, but their detailed layout acceptance criteria still need refinement before execution."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

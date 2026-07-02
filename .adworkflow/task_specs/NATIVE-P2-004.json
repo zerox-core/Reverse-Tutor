@@ -1,0 +1,95 @@
+{
+  "task_id": "NATIVE-P2-004",
+  "goal": "Implement native LLM profile management and secure-key storage foundation across settings, core LLM contracts, and Room-backed profile persistence.",
+  "non_goals": [
+    "Do not call real LLM providers from automated tests or device smoke.",
+    "Do not implement streaming chat generation; that belongs to NATIVE-P2-005 and later background tasks.",
+    "Do not export API key material by default.",
+    "Do not import secret values from legacy exports unless a future PRD explicitly approves a secure key import flow.",
+    "Do not store API keys as plain Room or DataStore strings.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness."
+  ],
+  "acceptance_criteria": [
+    "A native LLM profile domain model supports provider name/type, base URL, model name, enabled state, capability flags, and secret references without storing raw keys in Room/DataStore.",
+    "Provider presets exist for common OpenAI-compatible, Anthropic-compatible, and custom/local-compatible profile creation.",
+    "Profile validation rejects blank names/models, malformed base URLs where required, missing provider types, and raw secret material in exportable/profile metadata.",
+    "Users can create, list, switch/enable, rename/update, and delete LLM profiles through a Room-backed repository.",
+    "A secure-key storage abstraction exists with an Android Keystore-backed implementation path and a deterministic fake for tests.",
+    "Saving or updating a profile stores API key material only through the secret store and persists only a secretRef in Room.",
+    "Deleting a profile deletes the associated secret reference when one exists.",
+    "Connection test behavior runs through a mock/provider abstraction and never calls real providers in automated tests.",
+    "Profile export/redaction foundation excludes or redacts key material by default.",
+    "Settings UI exposes an LLM profile management foundation with provider presets, profile list, active profile selection, delete confirmation, redacted key status, and mock connection result.",
+    "Automated tests cover profile validation, profile CRUD/switch/delete, secret store side effects, redacted export behavior, and mock connection diagnostics.",
+    "Connected Room instrumentation covers LLM profile insert/list/delete or equivalent DAO behavior.",
+    "Legacy coverage registry is updated conservatively for LEG-026, LEG-027, LEG-028, and LEG-031.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json"
+  ],
+  "module": ":feature:settings/:core:llm/:core:data",
+  "branch": "native/llm-runtime",
+  "legacy_ids": [
+    "LEG-026",
+    "LEG-027",
+    "LEG-028",
+    "LEG-031"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/ConversationModels.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/entity/Entities.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/core/llm/src/main/java",
+    "mobile-native/feature/settings/src/main/java",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Follow TDD: add failing tests before production implementation for validation, profile repository, secret-store behavior, redacted export, mock connection diagnostics, and settings UI model.",
+    "Run focused core llm, core data, feature settings, and app JVM tests.",
+    "Run connected core data instrumentation if an ADB device is available.",
+    "Run native project test, lint, and app assembleDebug.",
+    "Install preview debug APK on the connected device and capture settings/profile smoke evidence when feasible.",
+    "Use app pid/package-specific logcat filtering to avoid global AndroidRuntime false positives.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json and rebuild codegraph."
+  ],
+  "notes": [
+    "Existing PRD/ARCH/TODO and prior user approval are the design basis for this task.",
+    "Existing LlmProfileEntity has secretRef; prefer using it instead of changing schema version unless implementation proves a migration is necessary.",
+    "This task creates configuration and safety foundation only; live provider generation belongs to NATIVE-P2-005."
+  ]
+}

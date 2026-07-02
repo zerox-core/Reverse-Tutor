@@ -1,0 +1,80 @@
+﻿--------- beginning of main
+07-01 01:55:39.877 18977 18977 I setutor.previe: Late-enabling -Xcheck:jni
+07-01 01:55:39.896 18977 18977 E libc    : Access denied finding property "persist.device_config.runtime_native.use_app_image_startup_cache"
+07-01 01:55:39.896 18977 18977 E setutor.previe: LoadAppImageStartupCache enabled : 1
+07-01 01:55:39.896 18977 18977 E setutor.previe: Unknown bits set in runtime_flags: 0x8000
+07-01 01:55:39.898 18977 18977 I setutor.previe: Reinit property: dalvik.vm.checkjni= false
+07-01 01:55:39.898 18977 18977 I setutor.previe: ReInitProperties: persist.vm.debug.dumpapi= false
+--------- beginning of system
+07-01 01:55:39.909 18977 18977 D ActivityThread: Attach thread to application
+07-01 01:55:39.936 18977 18998 I ActivityThread: Init compatible state: true
+07-01 01:55:39.943 18977 18998 D HwFrameworkSecurityPartsFactory: HwFrameworkSecurityPartsFactory in.
+07-01 01:55:39.943 18977 18998 I HwFrameworkSecurityPartsFactory: add HwFrameworkSecurityPartsFactory to memory.
+07-01 01:55:39.943 18977 18998 D BehaviorCollectManager: hook process for AI virus second
+07-01 01:55:39.944 18977 18998 I BehaviorCollectManager: bindAnalyzerService: huawei.android.security.IAppBehaviorDataAnalyzer$Stub$Proxy@8d75b45 pid:18977
+07-01 01:55:39.955 18977 19000 I RtgSchedEvent: mRtgVideoEnable:false
+07-01 01:55:39.961 18977 18977 D ApplicationLoaders: createClassLoader zip: /data/app/com.reversetutor.preview-6gztdsvVzki2AxnyxQaM8w==/base.apk librarySearchPath: /data/app/com.reversetutor.preview-6gztdsvVzki2AxnyxQaM8w==/lib/arm64 libraryPermittedPath: /data/user/0/com.reversetutor.preview parent: java.lang.BootClassLoader@2b6d746 targetSdkVersion: 34 isBundled: false classLoaderName: null sharedLibraries: null
+07-01 01:55:40.096 18977 18977 I setutor.previe: HwMultiThreadDexLoader location /data/app/com.reversetutor.preview-6gztdsvVzki2AxnyxQaM8w==/base.apk start threadNum=4
+07-01 01:55:40.159 18977 18998 I HwApiCacheMangerEx: apicache path=/storage/emulated/0 state=mounted key=com.reversetutor.preview#10038#256
+07-01 01:55:40.159 18977 18998 I HwApiCacheMangerEx: need clear apicache,because volumes changed,oldCnt=0 newCnt=1
+07-01 01:55:40.160 18977 18998 I HwApiCacheMangerEx: apicache path=/storage/emulated/0 state=mounted key=com.reversetutor.preview#10038#0
+07-01 01:55:40.160 18977 18998 I HwApiCacheMangerEx: need clear apicache,because volumes changed,oldCnt=1 newCnt=1
+07-01 01:55:40.162 18977 18998 I AwareBitmapCacher: init processName:com.reversetutor.preview pid=18977 uid=10038
+07-01 01:55:40.164 18977 19013 E AwareLog: AtomicFileUtils: readFileLines file not exist: android.util.AtomicFile@80bbe66
+07-01 01:55:40.175 18977 18977 I HwTypeface: updateFont: scale=1.0
+07-01 01:55:40.176 18977 18977 I FontFamily: buildHwFonts: add Font {nativePtr=505638409152, path=/data/skin/fonts/DroidSansChinese.ttf, style=FontStyle { weight=400, slant=0}, ttcIndex=0, axes=, localeList=, buffer=java.nio.DirectByteBuffer[pos=0 lim=6972836 cap=6972836], isFontWeightVariable=false} to [Font {nativePtr=505638409152, path=/data/skin/fonts/DroidSansChinese.ttf, style=FontStyle { weight=400, slant=0}, ttcIndex=0, axes=, localeList=, buffer=java.nio.DirectByteBuffer[pos=0 lim=6972836 cap=6972836], isFontWeightVariable=false}]
+07-01 01:55:40.176 18977 18977 D SystemFonts: isUsingHwThemeFonts: online invariable font existed
+07-01 01:55:40.176 18977 18977 I ActivityThread: finishPreloaded preloadStatus 0
+07-01 01:55:40.176 18977 18977 I RmeSchedManager: init Rme, version is: v1.0
+07-01 01:55:40.177 18977 18977 I RmeSchedManager: init Rme, version is: v1.0
+07-01 01:55:40.189 18977 18977 D OpenGLRenderer: disableOutlineDraw is true
+07-01 01:55:40.192 18977 19014 I OpenGLRenderer: RenderThread: progress name = [com.reversetutor.preview], viewCornerType = 0
+07-01 01:55:40.193 18977 19016 I iGraphics: [0020080c] pn: com.reversetutor.preview, p: 18977
+07-01 01:55:40.193 18977 19016 I iGraphics: [0030080c] no spt app: com.reversetutor.preview
+07-01 01:55:40.207 18977 18977 V ActivityThread: callActivityOnCreate
+07-01 01:55:40.219 18977 18977 I DecorView[]: pkgName:com.reversetutor.preview old windowMode:0 new windoMode:1, isFixedSize:false
+07-01 01:55:40.240 18977 18977 D ActivityThread: add activity client record, r= ActivityRecord{937e025 token=android.os.BinderProxy@d055af2 {com.reversetutor.preview/com.reversetutor.preview.MainActivity}} token= android.os.BinderProxy@d055af2
+07-01 01:55:40.245 18977 18977 I HwPartMagicWindowFactory: add android.common.HwPartMagicWindowFactoryImpl to memory.
+07-01 01:55:40.249 18977 18977 D MouseWheelSynthesizer: mMoveStepInDp: 64, mMoveStepInPixel: 109, mUpTimeDelayed: 100
+07-01 01:55:40.250 18977 18977 D ViewRootImpl: ViewRootImpl mIsInProductivePCDisplay: false
+07-01 01:55:40.250 18977 18977 I HwPartPowerOfficeFactory: add HwPartPowerOfficeFactoryImpl to memory.
+07-01 01:55:40.254 18977 18977 D InputEventReceiver: dispatchInputInterval 1000000
+07-01 01:55:40.255 18977 18977 I RmeSchedManager: init Rme, version is: v1.0
+07-01 01:55:40.260 18977 19017 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=1, mIsHiTouchRestricted=false
+07-01 01:55:40.460 18977 18977 W setutor.previe: Accessing hidden method Landroid/view/View;->getViewRootImpl()Landroid/view/ViewRootImpl; (greylist, reflection, allowed)
+07-01 01:55:40.460 18977 18977 W setutor.previe: Accessing hidden field Landroid/view/View$AttachInfo;->mVisibleInsets:Landroid/graphics/Rect; (greylist, reflection, allowed)
+07-01 01:55:40.460 18977 18977 W setutor.previe: Accessing hidden field Landroid/view/ViewRootImpl;->mAttachInfo:Landroid/view/View$AttachInfo; (greylist, reflection, allowed)
+07-01 01:55:40.509 18977 18977 W setutor.previe: Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/Rect;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+07-01 01:55:40.509 18977 18977 W setutor.previe: Accessing hidden method Landroid/graphics/Canvas;->drawPatch(Landroid/graphics/NinePatch;Landroid/graphics/RectF;Landroid/graphics/Paint;)V (greylist-max-o, linking, denied)
+07-01 01:55:40.596 18977 18977 W setutor.previe: Class androidx.compose.runtime.snapshots.SnapshotStateList failed lock verification and will run slower.
+07-01 01:55:40.596 18977 18977 W setutor.previe: Common causes for lock verification issues are non-optimized dex code
+07-01 01:55:40.596 18977 18977 W setutor.previe: and incorrect proguard optimizations.
+07-01 01:55:40.636 18977 19014 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+07-01 01:55:40.660 18977 19014 W Gralloc3: mapper 3.x is not supported
+07-01 01:55:40.712 18977 19014 D OpenGLRenderer: disableOutlineDraw is true
+07-01 01:55:40.719 18977 18977 D DecorView: showOrHideHighlightView: hasFocus=true; winMode=1; isMrgNull=true
+07-01 01:55:40.722 18977 18977 W InputMethodManager: startInputReason = 1
+07-01 01:55:40.728 18977 18977 W InputMethodManager: startInputReason = 5
+07-01 01:55:40.752 18977 19063 I StubController: system app validUid:10038, isFriend:false
+07-01 01:55:40.846 18977 18977 I HwViewRootImpl: removeInvalidNode jank list is null
+07-01 01:55:44.625 18977 18977 I Hwaps   : APS: EventAnalyzed: initAPS: version is 11.0.0.4
+07-01 01:55:44.626 18977 18977 D Hwaps   : Fpsrequest create,type:EXACTLY_IDENTIFY
+07-01 01:55:44.626 18977 18977 D Hwaps   : Fpsrequest create,type:EXACTLY_IDENTIFY
+07-01 01:55:44.626 18977 18977 D Hwaps   : Fpsrequest create,type:OPENGL_SETTING
+07-01 01:55:44.626 18977 18977 D Hwaps   : FpsController create
+07-01 01:55:44.629 18977 18977 D Hwaps   : APS: EventAnalyzed: reInitFpsPara :mBaseFps = 60; mMaxFps = 60
+07-01 01:55:44.630 18977 18977 W Settings: Setting device_provisioned has moved from android.provider.Settings.Secure to android.provider.Settings.Global.
+07-01 01:55:44.631 18977 18977 V HiTouch_HiTouchSensor: User setup is finished.
+07-01 01:55:44.664 18977 18977 W HwApsManager: HwApsManagerService, registerCallback, start !
+07-01 01:55:44.664 18977 18977 D Hwaps   : APS: EventAnalyzed: registerCallbackInApsManagerService, mPkgName:com.reversetutor.preview; result = true
+07-01 01:55:45.163 18977 18977 I AwareBitmapCacher: init lrucache size: 2097152 pid=18977
+07-01 01:55:46.222 18977 19169 D ProfileInstaller: Installing profile for com.reversetutor.preview
+07-01 01:55:48.388 18977 18977 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+07-01 01:55:51.851 18977 18977 V InputMethodManager: dispatchInputEvent
+07-01 01:55:51.855 18977 18977 V InputMethodManager: dispatchInputEvent
+07-01 01:55:51.922 18977 18977 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+07-01 01:55:55.465 18977 18977 V InputMethodManager: dispatchInputEvent
+07-01 01:55:55.468 18977 18977 V InputMethodManager: dispatchInputEvent
+07-01 01:55:55.550 18977 18977 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+07-01 01:55:59.164 18977 18977 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+07-01 01:56:02.796 18977 18977 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time

@@ -1,0 +1,320 @@
+{
+  "schema": "ADworkflo.context_raw.v1",
+  "task_id": "NATIVE-P4-003",
+  "source": "codegraph-index",
+  "matched_files": [
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+      "language": "kotlin",
+      "loc": 539,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 209,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/model/src/main/java/com/reversetutor/core/model/Space.kt",
+      "language": "kotlin",
+      "loc": 17,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/model/src/test/java/com/reversetutor/core/model/SpaceDomainModelTest.kt",
+      "language": "kotlin",
+      "loc": 191,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+      "language": "kotlin",
+      "loc": 253,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+      "language": "kotlin",
+      "loc": 46,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/NewSessionModels.kt",
+      "language": "kotlin",
+      "loc": 110,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/NewSessionTemplatesTest.kt",
+      "language": "kotlin",
+      "loc": 66,
+      "is_test": false
+    },
+    {
+      "score": 2,
+      "path": "mobile-native/core/model/src/main/java/com/reversetutor/core/model/SourceModels.kt",
+      "language": "kotlin",
+      "loc": 43,
+      "is_test": false
+    },
+    {
+      "score": 2,
+      "path": "mobile-native/feature/sources/src/main/java/com/reversetutor/feature/sources/SourcesModule.kt",
+      "language": "kotlin",
+      "loc": 6,
+      "is_test": false
+    },
+    {
+      "score": 2,
+      "path": "tests/test_process_summary_modes.py",
+      "language": "python",
+      "loc": 71,
+      "is_test": true
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 91,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+      "language": "kotlin",
+      "loc": 114,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppNavigation.kt",
+      "language": "kotlin",
+      "loc": 83,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+      "language": "kotlin",
+      "loc": 512,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/theme/ReverseTutorTheme.kt",
+      "language": "kotlin",
+      "loc": 56,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/theme/ReverseTutorTokens.kt",
+      "language": "kotlin",
+      "loc": 335,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorActions.kt",
+      "language": "kotlin",
+      "loc": 62,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorDialogs.kt",
+      "language": "kotlin",
+      "loc": 86,
+      "is_test": false
+    },
+    {
+      "score": 1,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/ui/ReverseTutorScaffold.kt",
+      "language": "kotlin",
+      "loc": 165,
+      "is_test": false
+    }
+  ],
+  "matched_symbols": [
+    {
+      "score": 6,
+      "type": "function",
+      "name": "test_mobile_context_async_renders_cannot_overwrite_new_tab",
+      "line": 294,
+      "end_line": 317,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_llm_resume_does_not_overwrite_unsaved_config_form",
+      "line": 291,
+      "end_line": 308,
+      "file": "tests/test_llm_provider_presets.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_frontend_enqueues_and_imports_native_background_turns",
+      "line": 153,
+      "end_line": 177,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_new_session_can_optionally_import_documents_before_opening_turn",
+      "line": 141,
+      "end_line": 157,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_context_image_import_creates_source_anchor",
+      "line": 331,
+      "end_line": 343,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_mobile_new_session_is_child_page_with_custom_preset_import_and_full_custom_page",
+      "line": 396,
+      "end_line": 421,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 4,
+      "type": "function",
+      "name": "test_web_search_enabled_imports_mock_result_as_citable_source",
+      "line": 83,
+      "end_line": 108,
+      "file": "tests/test_websearch.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_pwa_context_images_are_imported_through_anchors",
+      "line": 238,
+      "end_line": 247,
+      "file": "tests/test_image_memory.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_supersede_kg_edge_marks_old_and_creates_active_new",
+      "line": 140,
+      "end_line": 152,
+      "file": "tests/test_kg_schema.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_document_import_records_pdf_readability_diagnostics",
+      "line": 171,
+      "end_line": 178,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_document_import_persists_temporal_source_memory",
+      "line": 203,
+      "end_line": 212,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_queued_user_messages_are_visible_and_reused_for_next_turn",
+      "line": 1018,
+      "end_line": 1053,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_streaming_bubble_follows_newer_user_messages_and_shows_thinking_summary",
+      "line": 1277,
+      "end_line": 1378,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_mobile_context_anchor_import_accepts_images_as_source_material",
+      "line": 247,
+      "end_line": 259,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_import_md_creates_chunks_and_fts_rows",
+      "line": 31,
+      "end_line": 46,
+      "file": "tests/test_retrieval.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "test_due_review_does_not_interrupt_user_progress",
+      "line": 94,
+      "end_line": 102,
+      "file": "tests/test_review_scheduling.py"
+    },
+    {
+      "score": 3,
+      "type": "function",
+      "name": "_import_doc",
+      "line": 48,
+      "end_line": 58,
+      "file": "tests/test_sources_api.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "test_android_background_llm_plugin_sources_exist_and_are_registered",
+      "line": 24,
+      "end_line": 124,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "test_mobile_export_uses_native_android_share_sheet",
+      "line": 195,
+      "end_line": 225,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 2,
+      "type": "function",
+      "name": "_import_doc",
+      "line": 47,
+      "end_line": 57,
+      "file": "tests/test_clue_with_retrieval.py"
+    }
+  ],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "warnings": []
+}

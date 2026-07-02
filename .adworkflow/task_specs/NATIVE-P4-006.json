@@ -1,0 +1,75 @@
+{
+  "task_id": "NATIVE-P4-006",
+  "goal": "Design replacement-build first-launch import prompt.",
+  "non_goals": [
+    "Do not switch official package id.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "acceptance_criteria": [
+    "First-launch import guidance is designed for replacement builds without switching package id in preview builds.",
+    "The prompt routes to the supported export-file import path and explains API-key non-migration.",
+    "Runbook notes package/cover-install dependencies and approval gates."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "fanout_workers",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":app/:feature:settings",
+  "branch": "native/import-export",
+  "legacy_ids": [
+    "LEG-032"
+  ],
+  "dependencies": [
+    "NATIVE-P4-002",
+    "NATIVE-P4-004"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/prd-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/feature/settings/src/main/java",
+    "mobile-native/feature/settings/src/test/java",
+    "mobile-native/app/src/main/java",
+    "mobile-native/app/src/test/java"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run core:protocol/core:data/feature:settings JVM fixture and transaction tests",
+    "Run .\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "Run import/export fixture smoke and device validation when feasible",
+    "Validate ADworkflo JSON and coverage registry"
+  ],
+  "notes": [
+    "Generated as part of ADworkflo full-roadmap orchestration after NATIVE-P2-005 device verification.",
+    "Worker must keep implementation scoped to this task and update worker_state/verification_result/review_findings as required.",
+    "Use deterministic tests and fakes; real LLM/provider/network/device actions require explicit scope and evidence."
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "task_id": "NATIVE-P5-007",
+  "commands": [
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+    ".\\gradlew.bat :core:llm:testDebugUnitTest --tests com.reversetutor.core.llm.LlmGenerationLifecycleTest :core:data:testDebugUnitTest --tests com.reversetutor.core.data.llm.ChatGenerationRepositoryTest :feature:chat:testDebugUnitTest --tests com.reversetutor.feature.chat.ChatContextEvidenceTest --tests com.reversetutor.feature.chat.ChatUiStateTest :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\aapt.exe dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk"
+  ],
+  "passed": [
+    {
+      "command": "prepare_context.py",
+      "notes": "Passed. Context generated for NATIVE-P5-007 from codegraph-index with context_level L1-index and warning_count 0."
+    },
+    {
+      "command": "focused P5-007 JVM/app compile command",
+      "notes": "Passed after context builder relevance filtering was added. Covers LLM payload evidence, ChatGenerationRepository source footer, ChatContextEvidence relevance/filter/fallback behavior, and app Kotlin compile."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed. Project-level native JVM tests, Android lint, and internal debug APK build passed after P5-007."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed via SDK build-tools 35.0.0 aapt. Package remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "No new device-specific P5-007 instrumentation test was added; this slice is covered by JVM tests and full app build/lint.",
+    "No strict cited_chunk_ids parser or clickable source citation UI was implemented."
+  ],
+  "evidence": [
+    "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmGenerationLifecycleTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/ChatGenerationRepositoryTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatContextEvidenceTest.kt",
+    ".adworkflow/artifacts/NATIVE-P5-007/README.md"
+  ],
+  "summary": "NATIVE-P5-007 is complete for the native preview context-injection slice. Memory/source context evidence is collected with lightweight relevance filtering, injected into the LLM turn request/payload, and shown as visible source references on generated assistant messages.",
+  "residual_risk": "This is not full citation parity. Exact cited chunk resolution, clickable citations, row highlighting, advanced retrieval/routing, and complex source extraction remain follow-up work."
+}

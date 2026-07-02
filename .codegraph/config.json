@@ -1,0 +1,49 @@
+{
+  "project_size": "large",
+  "context_strategy": "architecture-first-l2-codegraph-after-code-exists",
+  "include": [
+    "mobile-native",
+    "tests",
+    "tasks",
+    ".adworkflow"
+  ],
+  "exclude": [
+    ".git",
+    "node_modules",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    "__pycache__",
+    ".next",
+    ".turbo",
+    "coverage",
+    ".gradle"
+  ],
+  "languages": [
+    "kotlin",
+    "java",
+    "javascript",
+    "python",
+    "xml",
+    "gradle"
+  ],
+  "test_patterns": [
+    "tests",
+    "__tests__",
+    "*.test.*",
+    "*.spec.*",
+    "src/test",
+    "src/androidTest"
+  ],
+  "supported_queries": [
+    "find_definition",
+    "find_references",
+    "callers",
+    "callees",
+    "impacted_files",
+    "tests_for",
+    "get_slice",
+    "summarize_file"
+  ]
+}

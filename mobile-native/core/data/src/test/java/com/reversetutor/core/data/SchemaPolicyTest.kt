@@ -1,0 +1,95 @@
+package com.reversetutor.core.data
+
+import com.reversetutor.core.data.local.DatabaseSchema
+import com.reversetutor.core.data.local.entity.AnchorEntity
+import com.reversetutor.core.data.local.entity.BackgroundJobEntity
+import com.reversetutor.core.data.local.entity.ErrorLogEntity
+import com.reversetutor.core.data.local.entity.ExportRecordEntity
+import com.reversetutor.core.data.local.entity.GraphEdgeEntity
+import com.reversetutor.core.data.local.entity.GraphNodeEntity
+import com.reversetutor.core.data.local.entity.ImportBatchEntity
+import com.reversetutor.core.data.local.entity.LlmProfileEntity
+import com.reversetutor.core.data.local.entity.MemoryItemEntity
+import com.reversetutor.core.data.local.entity.MessageAttachmentEntity
+import com.reversetutor.core.data.local.entity.MessageEntity
+import com.reversetutor.core.data.local.entity.MessageQuoteEntity
+import com.reversetutor.core.data.local.entity.NoteEntity
+import com.reversetutor.core.data.local.entity.SessionEntity
+import com.reversetutor.core.data.local.entity.SessionSettingsEntity
+import com.reversetutor.core.data.local.entity.SourceChunkEntity
+import com.reversetutor.core.data.local.entity.SourceEntity
+import com.reversetutor.core.data.local.entity.SpaceEntity
+import com.reversetutor.core.data.local.entity.toDomain
+import com.reversetutor.core.data.local.entity.toEntity
+import com.reversetutor.core.model.Space
+import com.reversetutor.core.model.SpaceKind
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SchemaPolicyTest {
+    @Test
+    fun databaseSchemaStartsAtVersionOneAndExportsSchema() {
+        assertEquals(1, DatabaseSchema.version)
+        assertTrue(DatabaseSchema.exportSchema)
+        assertTrue(DatabaseSchema.migrations.isEmpty())
+    }
+
+    @Test
+    fun userOwnedEntitiesCarrySpaceId() {
+        val entityTypes = listOf(
+            SessionEntity::class.java,
+            MessageEntity::class.java,
+            MessageAttachmentEntity::class.java,
+            MessageQuoteEntity::class.java,
+            LlmProfileEntity::class.java,
+            SessionSettingsEntity::class.java,
+            AnchorEntity::class.java,
+            NoteEntity::class.java,
+            ErrorLogEntity::class.java,
+            MemoryItemEntity::class.java,
+            GraphNodeEntity::class.java,
+            GraphEdgeEntity::class.java,
+            SourceEntity::class.java,
+            SourceChunkEntity::class.java,
+            BackgroundJobEntity::class.java,
+            ImportBatchEntity::class.java,
+            ExportRecordEntity::class.java
+        )
+
+        entityTypes.forEach { entityType ->
+            assertTrue(
+                "${entityType.simpleName} must expose spaceId",
+                entityType.declaredFields.any { it.name == "spaceId" }
+            )
+        }
+    }
+
+    @Test
+    fun spaceEntityRoundTripsToDomainModel() {
+        val domain = Space(
+            id = "space-1",
+            name = "Imported backup",
+            kind = SpaceKind.Imported,
+            createdAtEpochMillis = 100L,
+            updatedAtEpochMillis = 200L,
+            sourceImportId = "import-1"
+        )
+
+        val entity = domain.toEntity()
+        val roundTrip = entity.toDomain()
+
+        assertEquals(
+            SpaceEntity(
+                id = "space-1",
+                name = "Imported backup",
+                kind = "Imported",
+                createdAtEpochMillis = 100L,
+                updatedAtEpochMillis = 200L,
+                sourceImportId = "import-1"
+            ),
+            entity
+        )
+        assertEquals(domain, roundTrip)
+    }
+}

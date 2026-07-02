@@ -1,0 +1,77 @@
+{
+  "task_id": "NATIVE-P2-006",
+  "commands": [
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts and task specs",
+    "Execution plan task-to-task_spec coverage check",
+    "PowerShell coverage registry validator for tasks/native-legacy-coverage-registry.md",
+    ".\\gradlew.bat :app:assembleDebugAndroidTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest --no-daemon --stacktrace",
+    "adb shell am instrument -w -e class com.reversetutor.preview.Phase2CoreLoopDeviceTest com.reversetutor.preview.test/androidx.test.runner.AndroidJUnitRunner",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging app-debug.apk",
+    "adb uiautomator dump + screencap after instrumentation",
+    "adb logcat -d --pid <appPid>"
+  ],
+  "passed": [
+    {
+      "command": "ConvertFrom-Json validation for ADworkflo JSON artifacts and task specs",
+      "notes": "Passed; validated 63 JSON files after expanded UX task specs and P2-006 artifact updates."
+    },
+    {
+      "command": "Execution plan task-to-task_spec coverage check",
+      "notes": "Passed; execution_plan has 49 tasks and all have corresponding .adworkflow/task_specs/<task_id>.json files."
+    },
+    {
+      "command": "PowerShell coverage registry validator for tasks/native-legacy-coverage-registry.md",
+      "notes": "Passed; coverage_rows=44, verified=3, in_progress=29, not_started=12, p0_blockers=29."
+    },
+    {
+      "command": ".\\gradlew.bat :app:assembleDebugAndroidTest --no-daemon --stacktrace",
+      "notes": "Passed after adding app-level Phase2CoreLoopDeviceTest and Compose UI test dependencies."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10 / API 29."
+    },
+    {
+      "command": "adb shell am instrument -w -e class com.reversetutor.preview.Phase2CoreLoopDeviceTest com.reversetutor.preview.test/androidx.test.runner.AndroidJUnitRunner",
+      "notes": "Passed with OK (1 test); evidence saved as 10-instrumentation-phase2-core-loop.txt."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level native JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name is com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "adb uiautomator dump + screencap after instrumentation",
+      "notes": "Passed; captured Sessions launch and persisted Exam sprint chat containing P2-006-no-model, P2-006-mock-generation, Assistant, and Mock generation ready."
+    },
+    {
+      "command": "adb logcat -d --pid <appPid>",
+      "notes": "Passed; pid-scoped logcat captured for com.reversetutor.preview and no FATAL EXCEPTION, ANR, AndroidRuntime, process-death, Exception, or Error signatures were found."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No real LLM provider/network call was run.",
+    "No Phase 6 replacement device matrix was run."
+  ],
+  "evidence": [
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/10-instrumentation-phase2-core-loop.txt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/11-post-instrumentation-launch.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/11-post-instrumentation-launch.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/12-post-instrumentation-chat.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/12-post-instrumentation-chat.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/13-pid-logcat.txt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p2-006-hma-al00-phase2/android-test-report/",
+    ".adworkflow/execution_plan.json",
+    ".adworkflow/task_specs/"
+  ],
+  "summary": "NATIVE-P2-006 is verified for the internal native preview core loop on HMA-AL00: session creation, no-model path, fake-runtime assistant reply, restart/activity recreation persistence, safe package identity, and no pid-scoped crash signatures.",
+  "residual_risk": "This completes Phase 2 preview validation only. It does not close replacement readiness, live-provider readiness, background generation safety, import/export parity, graph/source parity, or final UI/device matrix requirements."
+}

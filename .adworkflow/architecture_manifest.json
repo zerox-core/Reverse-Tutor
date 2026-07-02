@@ -1,0 +1,138 @@
+{
+  "schema": "ADworkflo.architecture_manifest.v1",
+  "created_at": "2026-06-30T07:39:54.787484+00:00",
+  "project_size": "large",
+  "classification_source": "product_docs_explicit_native_android_migration",
+  "expected_complexity_score": 34,
+  "context_strategy": "architecture-first-l2-codegraph-after-code-exists",
+  "execution_mode": "orchestrator-with-workers-and-reviewers",
+  "analysis_basis": [
+    {
+      "path": "tasks/prd-native-android-migration.md",
+      "chars": 32433
+    },
+    {
+      "path": "tasks/native-legacy-entry-inventory.md",
+      "chars": 12167
+    },
+    {
+      "path": "tasks/arch-native-android-migration.md",
+      "chars": 23996
+    },
+    {
+      "path": "tasks/project-native-android-migration.md",
+      "chars": 13792
+    },
+    {
+      "path": "tasks/todo-native-android-migration.md",
+      "chars": 26547
+    }
+  ],
+  "planned_modules": [
+    ":app",
+    ":core:protocol",
+    ":core:model",
+    ":core:data",
+    ":core:llm",
+    ":feature:chat",
+    ":feature:memory",
+    ":feature:sources",
+    ":feature:settings",
+    "qa/device-validation",
+    "package-release",
+    "legacy-entry-parity"
+  ],
+  "module_boundaries": {
+    ":app": "Android entry point, package identity, top-level navigation, theme, dependency wiring.",
+    ":core:protocol": "Versioned import/export, turn, LLM profile, graph, job, and validation contracts.",
+    ":core:model": "Shared domain models and user-visible spaces.",
+    ":core:data": "Room schema, DAOs, repositories, DataStore preferences, secret storage adapter, import transaction coordinator.",
+    ":core:llm": "Direct Android provider strategies, streaming parser, diagnostics, capability handling, future optional Python proxy interface.",
+    ":feature:chat": "Session list, session creation, chat timeline, composer, quote, message actions, generation presentation.",
+    ":feature:memory": "Context hub, anchors, notes, errors, per-session settings, native graph, global graph/insights.",
+    ":feature:sources": "Android file picker, source metadata, parser status, local parsers, source snippets, image sources.",
+    ":feature:settings": "LLM profile UI, app settings, import/export/wipe UI, diagnostics, about/update surfaces.",
+    "qa/device-validation": "Phase APK validation records, device matrix, screenshots or failure notes.",
+    "package-release": "Preview package, official package switch, signing/cover-install readiness, PWA exit evidence.",
+    "legacy-entry-parity": "LEG-001 to LEG-044 release-gate tracking."
+  },
+  "data_stores": [
+    "Room(SQLite)",
+    "DataStore",
+    "Android Keystore-backed secret storage",
+    "Android file storage/SAF references"
+  ],
+  "agent_features": [
+    "direct_llm_provider_runtime",
+    "streaming_generation",
+    "background_generation_jobs",
+    "local_memory_and_knowledge_graph",
+    "source_context_injection",
+    "versioned_import_export_protocols"
+  ],
+  "platforms": [
+    "native_android",
+    "transition_pwa_capacitor",
+    "python_reference_api_tests"
+  ],
+  "risk_areas": [
+    "legacy data import corruption or uncontrolled duplication",
+    "API key leakage through storage or export",
+    "background result attached to wrong or deleted session",
+    "graph interaction parity gap",
+    "source parser inconsistency across file types",
+    "official package switch or signing mistake",
+    "behavior drift from Python/PWA protocol baseline",
+    "premature PWA retirement before parity evidence"
+  ],
+  "release_gates": [
+    "all P0 legacy entries implemented or explicitly waived",
+    "P1 entries have native path, reduced version, or no-data-loss deferral",
+    "append overwrite and new-space import modes verified",
+    "phase APK validation record exists for each requested phase APK",
+    "replacement readiness device matrix complete",
+    "cover-install validation complete before com.reversetutor.app replacement",
+    "PWA exit explicitly approved"
+  ],
+  "branch_strategy": [
+    "native/integration",
+    "native/android-foundation",
+    "native/local-data",
+    "native/chat-main-flow",
+    "native/llm-runtime",
+    "native/background-jobs",
+    "native/import-export",
+    "native/memory-graph",
+    "native/sources",
+    "native/settings-profile",
+    "native/legacy-entry-parity",
+    "native/package-release"
+  ],
+  "recommended_artifacts": [
+    "task_spec.json",
+    "task_specs/<task_id>.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json",
+    "module_skills.md",
+    "execution_plan.json",
+    "device_validation_records",
+    "legacy_entry_coverage_matrix"
+  ],
+  "recommended_next_actions": [
+    "Use execution_plan.json to create scoped module task specs.",
+    "Prepare context from architecture manifest before native files exist.",
+    "Start implementation with NATIVE-P1-001 only after user requests code work.",
+    "Require reviewer pass for high-risk data, import, LLM, background, graph, source, and package tasks.",
+    "Build codegraph after mobile-native implementation files exist."
+  ],
+  "open_questions": [
+    "Exact first supported legacy export schema version.",
+    "Exact older or lower-end Android validation target.",
+    "Parser library choices for PDF, DOCX, PPTX, and EPUB.",
+    "Whether proactive behavior ships in first native replacement release.",
+    "No-model fallback behavior: legacy mock parity or clearer no-model state.",
+    "Final official package switch and signing runbook."
+  ]
+}

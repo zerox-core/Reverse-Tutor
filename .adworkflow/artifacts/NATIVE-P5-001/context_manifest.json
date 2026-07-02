@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P5-001",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5ContextHubDeviceTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/SessionListUiStateTest.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubModels.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+    "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/ContextHubModelsTest.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/shell/AppNavigationStateTest.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/NewSessionModels.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/SessionListModels.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_graph_falls_back_to_chat_fragments_for_light_chat_only_sessions (tests/test_mobile_persistence.py:260)",
+    "test_mobile_graph_sheet_source_jumps_open_context_anchors (tests/test_mobile_persistence.py:738)",
+    "test_mobile_header_without_session_does_not_reference_graph_node_state (tests/test_mobile_persistence.py:765)",
+    "test_retrieve_empty_context_without_graph_data (tests/test_kg_retrieval.py:24)",
+    "test_mobile_context_avatar_and_session_info_are_editable_without_layout_drift (tests/test_mobile_product_experience.py:155)",
+    "test_pwa_context_images_are_imported_through_anchors (tests/test_image_memory.py:238)",
+    "test_delete_session_removes_only_that_sessions_graph (tests/test_kg_consistency.py:102)",
+    "test_run_turn_graph_extraction_is_session_isolated (tests/test_kg_consistency.py:119)",
+    "test_retrieve_context_is_session_isolated (tests/test_kg_retrieval.py:159)",
+    "test_mobile_insights_graph_builds_document_outline_branches_from_full_source_text (tests/test_mobile_persistence.py:130)",
+    "test_mobile_graph_sheet_can_jump_to_chat_and_edit_source_node (tests/test_mobile_persistence.py:604)",
+    "test_mobile_chat_long_press_can_create_note_nodes_in_graph (tests/test_mobile_persistence.py:753)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not complete graph renderer.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "native_llm_profile_v1",
+  "version": 1,
+  "type": "llm_profile",
+  "id": "profile-unsafe-fixture",
+  "name": "Unsafe fixture",
+  "provider": "openai_compatible",
+  "api_type": "openai_compatible",
+  "base_url": "https://example.invalid/v1",
+  "model": "fixture-model",
+  "api_key": "sk-test-secret",
+  "secretRef": "secretRef-123",
+  "secret_status": "included",
+  "capabilities": {
+    "vision": true
+  }
+}

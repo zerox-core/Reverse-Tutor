@@ -1,0 +1,456 @@
+package com.reversetutor.feature.memory
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.reversetutor.core.data.graph.GraphRepository
+import com.reversetutor.core.data.graph.GraphNodeEditInput
+import com.reversetutor.core.data.memory.MemoryRepository
+import kotlinx.coroutines.launch
+
+@Composable
+fun ContextHubRoute(
+    memoryRepository: MemoryRepository,
+    graphRepository: GraphRepository,
+    sessionId: String?,
+    sessionTitle: String?,
+    onOpenChat: () -> Unit,
+    onOpenSources: () -> Unit,
+    onOpenChatEvidence: (String) -> Unit = { onOpenChat() },
+    onOpenSourceEvidence: (String) -> Unit = { onOpenSources() },
+    onOpenSettings: () -> Unit,
+    graphScope: GraphScope = GraphScope.Session,
+    modifier: Modifier = Modifier
+) {
+    val scope = rememberCoroutineScope()
+    var state by remember(sessionId, sessionTitle) {
+        mutableStateOf(
+            ContextHubUiState.fromActiveSession(
+                sessionId = sessionId,
+                sessionTitle = sessionTitle
+            )
+        )
+    }
+    var refreshKey by remember(sessionId, sessionTitle, graphScope) { mutableIntStateOf(0) }
+
+    fun saveGraphNode(
+        node: GraphLayoutNode,
+        label: String,
+        status: com.reversetutor.core.model.GraphNodeStatus = node.status
+    ) {
+        scope.launch {
+            graphRepository.updateNode(
+                input = GraphNodeEditInput(
+                    id = node.id,
+                    label = label,
+                    kind = node.kind,
+                    status = status,
+                    sourceMemoryId = node.sourceMemoryId
+                ),
+                nowEpochMillis = System.currentTimeMillis()
+            )
+            refreshKey += 1
+        }
+    }
+
+    LaunchedEffect(sessionId, sessionTitle, graphScope, refreshKey) {
+        val memorySnapshot = memoryRepository.snapshot()
+        val graphSnapshot = graphRepository.snapshot()
+        val graphState = KnowledgeGraphUiState.from(
+            nodes = graphSnapshot.nodes,
+            edges = graphSnapshot.edges,
+            scope = graphScope,
+            memoryItems = memorySnapshot.items
+        )
+        state = ContextHubUiState.fromMemorySnapshot(
+            sessionId = sessionId,
+            sessionTitle = sessionTitle,
+            graphState = graphState,
+            snapshot = ContextMemorySnapshot(
+                anchors = memorySnapshot.anchors.map {
+                    ContextMemoryEntry(
+                        id = it.id,
+                        title = it.title,
+                        body = it.body,
+                        sourceMessageId = it.sourceMessageId,
+                        sourceId = it.sourceId
+                    )
+                },
+                notes = memorySnapshot.notes.map {
+                    ContextMemoryEntry(
+                        id = it.id,
+                        title = it.title,
+                        body = it.body,
+                        sourceMessageId = it.sourceMessageId
+                    )
+                },
+                errors = memorySnapshot.errors.map {
+                    ContextErrorEntry(
+                        id = it.id,
+                        title = it.title,
+                        detail = it.detail,
+                        sourceMessageId = it.sourceMessageId,
+                        resolved = it.resolved
+                    )
+                }
+            )
+        )
+    }
+
+    ContextHubScreen(
+        state = state,
+        onOpenChat = onOpenChat,
+        onOpenSources = onOpenSources,
+        onOpenSettings = onOpenSettings,
+        onGraphNodeLabelSave = { node, label ->
+            saveGraphNode(node = node, label = label)
+        },
+        onGraphNodeReviewAction = { node, action ->
+            saveGraphNode(node = node, label = node.label, status = action.targetStatus)
+        },
+        onOpenGraphChatEvidence = onOpenChatEvidence,
+        onOpenGraphSourceEvidence = onOpenSourceEvidence,
+        modifier = modifier
+    )
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+fun GlobalGraphRoute(
+    graphRepository: GraphRepository,
+    onOpenChat: () -> Unit,
+    onOpenSources: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scope = rememberCoroutineScope()
+    var state by remember {
+        mutableStateOf(KnowledgeGraphUiState.loading(scope = GraphScope.Global))
+    }
+    var selectedNodeId by remember { mutableStateOf<String?>(null) }
+    var refreshKey by remember { mutableIntStateOf(0) }
+
+    fun saveGraphNode(
+        node: GraphLayoutNode,
+        label: String,
+        status: com.reversetutor.core.model.GraphNodeStatus = node.status
+    ) {
+        scope.launch {
+            graphRepository.updateNode(
+                input = GraphNodeEditInput(
+                    id = node.id,
+                    label = label,
+                    kind = node.kind,
+                    status = status,
+                    sourceMemoryId = node.sourceMemoryId
+                ),
+                nowEpochMillis = System.currentTimeMillis()
+            )
+            refreshKey += 1
+        }
+    }
+
+    LaunchedEffect(refreshKey) {
+        val snapshot = graphRepository.snapshot()
+        state = KnowledgeGraphUiState.from(
+            nodes = snapshot.nodes,
+            edges = snapshot.edges,
+            selectedNodeId = selectedNodeId,
+            scope = GraphScope.Global
+        )
+    }
+
+    val selectedState = state.withSelection(selectedNodeId)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = "Global graph",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Cross-session graph view for the current native data space.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        KnowledgeGraphPanel(
+            state = selectedState,
+            onSelectedNodeChange = { selectedNodeId = it },
+            editable = false,
+            onNodeLabelSave = { node, label ->
+                saveGraphNode(node = node, label = label)
+            },
+            onNodeReviewAction = { node, action ->
+                saveGraphNode(node = node, label = node.label, status = action.targetStatus)
+            },
+            onOpenChatEvidence = { node -> node.sourceMessageId?.let { onOpenChat() } },
+            onOpenSourceEvidence = { node -> node.sourceId?.let { onOpenSources() } }
+        )
+        Spacer(modifier = Modifier.height(18.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = onOpenChat) {
+                Text("Open chat")
+            }
+            TextButton(onClick = onOpenSources) {
+                Text("Sources")
+            }
+            TextButton(onClick = onOpenSettings) {
+                Text("Settings")
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+fun ContextHubScreen(
+    state: ContextHubUiState,
+    onOpenChat: () -> Unit,
+    onOpenSources: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onGraphNodeLabelSave: (GraphLayoutNode, String) -> Unit = { _, _ -> },
+    onGraphNodeReviewAction: (GraphLayoutNode, GraphNodeReviewAction) -> Unit = { _, _ -> },
+    onOpenGraphChatEvidence: (String) -> Unit = {},
+    onOpenGraphSourceEvidence: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var selectedSection by remember(state.sessionId) {
+        mutableStateOf(ContextHubSection.Overview)
+    }
+    var selectedGraphNodeId by remember(state.sessionId, state.graphState.scope) {
+        mutableStateOf<String?>(null)
+    }
+    val selectedState = state.sections.firstOrNull { it.section == selectedSection }
+        ?: state.sections.first()
+    val selectedGraphState = state.graphState.withSelection(selectedGraphNodeId)
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = "Context hub",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Session: ${state.sessionTitle}",
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = state.sessionStatusLabel,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        ContextHubNotice(hasActiveSession = state.hasActiveSession)
+        Spacer(modifier = Modifier.height(18.dp))
+        ContextHubOverview(lines = state.overviewLines)
+        Spacer(modifier = Modifier.height(18.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            state.sections.forEach { item ->
+                FilterChip(
+                    selected = item.section == selectedSection,
+                    onClick = { selectedSection = item.section },
+                    label = { Text(item.section.label) }
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        if (selectedSection == ContextHubSection.Graph) {
+            KnowledgeGraphPanel(
+                state = selectedGraphState,
+                onSelectedNodeChange = { selectedGraphNodeId = it },
+                onNodeLabelSave = onGraphNodeLabelSave,
+                onNodeReviewAction = onGraphNodeReviewAction,
+                onOpenChatEvidence = { node ->
+                    node.sourceMessageId?.let(onOpenGraphChatEvidence)
+                },
+                onOpenSourceEvidence = { node ->
+                    node.sourceId?.let(onOpenGraphSourceEvidence)
+                }
+            )
+        } else {
+            ContextHubSectionPanel(state = selectedState)
+        }
+        Spacer(modifier = Modifier.height(18.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = onOpenChat) {
+                Text("Return to chat")
+            }
+            TextButton(onClick = onOpenSources) {
+                Text("Sources")
+            }
+            TextButton(onClick = onOpenSettings) {
+                Text("Settings")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContextHubNotice(hasActiveSession: Boolean) {
+    val container = if (hasActiveSession) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.errorContainer
+    }
+    val content = if (hasActiveSession) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onErrorContainer
+    }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = container,
+        contentColor = content,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = if (hasActiveSession) {
+                "This shell is linked to the active chat session. Empty and deferred sections are intentional until Phase 5 data work lands."
+            } else {
+                "No active session is attached. Open a session before using Graph, Anchors, Notes, Errors, or Session settings."
+            },
+            modifier = Modifier.padding(14.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+private fun ContextHubOverview(lines: List<String>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "Overview",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium
+            )
+            lines.forEach { line ->
+                Text(text = line, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContextHubSectionPanel(state: ContextHubSectionState) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.section.label,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = state.title,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        text = state.statusLabel,
+                        modifier = Modifier
+                            .heightIn(min = 32.dp)
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+            Text(text = state.body, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = "Next actions",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            state.nextActions.forEach { action ->
+                Text(text = action, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}

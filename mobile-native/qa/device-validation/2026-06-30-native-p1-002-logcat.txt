@@ -1,0 +1,502 @@
+﻿--------- beginning of main
+06-30 18:08:04.878  1650  4984 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+--------- beginning of system
+06-30 18:08:04.878  1650  4984 I WindowManager: addWindow: Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} client:android.os.BinderProxy@9813aa9 currentDisplayId:0 requestDisplayId:0 token:Token{988492b ActivityRecord{9348705 u0 com.reversetutor.preview/.MainActivity t7}}
+06-30 18:08:04.879 30169 30169 D InputEventReceiver: dispatchInputInterval 1000000
+06-30 18:08:04.888 30169 31019 D HiTouch_PressGestureDetector: onAttached, package=com.reversetutor.preview, windowType=2, mIsHiTouchRestricted=false
+06-30 18:08:04.913 30169 30211 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+06-30 18:08:04.927 30169 30169 I HwViewRootImpl: removeInvalidNode all the node in jank list is out of time
+06-30 18:08:04.930  1650  1905 I WindowManager: dispatchResized : win = Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} drawState = READY_TO_SHOW
+06-30 18:08:04.933  1650  2107 I TrafficMonitor: expired arrive. level:-1
+06-30 18:08:04.933  1650  2107 I TrafficMonitor: during_ms:2003,period_ms:2000
+06-30 18:08:04.933  1650  2107 I TrafficMonitor: count:455,rx_sum:0,tx_sum:0,rxBytes:0,during_ms:2003,rx_speed:0.0,tx_speed:0.0,rto:0.0
+06-30 18:08:04.933  1650  2107 I HuaweiWifiWatchdogStateMachine: Get speed information rx_speed = 0 ,tx_speed = 0 ,isSpeedOk = false ,mBestSpeedInPeriod = 0
+06-30 18:08:04.940  1650  1902 D StatusBarManagerService: win:Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity}mIsColorEnable:truelight:false
+06-30 18:08:04.940  1650  1902 I StatusBarDisable: setFlags what=0 which=1 pkg=Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity}
+06-30 18:08:04.941  2276  2958 D HwCommandQueue: CommandQueue, set Launcher StatusBar Color
+06-30 18:08:04.941  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+06-30 18:08:04.941  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+06-30 18:08:04.941  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+06-30 18:08:04.952 30169 30211 D OpenGLRenderer: disableOutlineDraw is true
+06-30 18:08:04.953 30169 30169 W InputMethodManager: startInputReason = 1
+06-30 18:08:04.954  1650  3451 I HwOcrImeController: updateMultiWindow topActivity = ComponentInfo{com.reversetutor.preview/com.reversetutor.preview.MainActivity} windowMode = 1 mIsInMultiScreen = false
+06-30 18:08:04.954  1650  3451 I HwOcrImeController: updateUser userId = 0 mIsOwnerUser = true
+06-30 18:08:04.954  1650  3451 I HwOcrImeController: setOcrImeSupportProp mIsOcrImeValid = true mIsHardKeyboardAvailable = false mIsInMultiScreen = false mIsOwnerUser = true
+06-30 18:08:04.954  1650  3451 I HwOcrImeController: ocr ime supported!
+06-30 18:08:04.955  1650  3451 I HwOcrImeController: setOcrImeSupportProp mIsOcrImeValid = true mIsHardKeyboardAvailable = false mIsInMultiScreen = false mIsOwnerUser = true
+06-30 18:08:04.955  1650  3451 I HwOcrImeController: ocr ime supported!
+06-30 18:08:04.956  1650  3451 D HwInputMethodManagerService: isSecMethodUsing = false
+06-30 18:08:04.956  1650  3451 I HwInputMethodManagerService: hideCurrentInputLocked resetIfCurrentIsOcrIme res = false mCurClient = ClientState{98790e2 uid=10038 pid=30169 displayId=0}
+06-30 18:08:04.958 30169 30169 D DecorView: showOrHideHighlightView: hasFocus=false; winMode=1; isMrgNull=true
+06-30 18:08:04.958 12624 12624 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+06-30 18:08:04.995  1049  1390 E ScreemCommon: fail to extract lcd fps mode!
+06-30 18:08:04.995  1049  1390 W ScreemCommon: ProcessEntry, not beta version or commercial log off
+06-30 18:08:05.488  1650  2108 I WificondControl: Noise: -85, Snr: 127, Chload: 192, rssi: -29, txBitrate: 96, rxBitrate: 86, frequency: 2417, UlDelay: -1, currentTxBytes: 10327323, currentTxPackets: 26609, currentTxFailed: 0, currentRxBytes: 20304511, currentRxPackets: 26385
+06-30 18:08:05.491  1650  2108 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@8f0e10d
+06-30 18:08:05.578    47    47 W migration/6: type=1400 audit(0.0:4808): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:05.578    53    53 W migration/7: type=1400 audit(0.0:4809): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:05.588  2926 15049 I HwSearchService: [IndexServiceGuarderHandler]: IndexRAMMonitor: 50MB ram is used, in which summary.code=22MB, summary.stack=0MB, summary.graphics=0MB, summary.java-heap=4MB, summary.native-heap=7MB, summary.system=11MB, summary.total-pss=49MB, summary.private-other=3MB, summary.total-swap=26MB,
+06-30 18:08:05.656  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:05.657  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:350,rsrp(rssi):-40,rsrq(noise):-85,rtt(chload):192,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:05.657  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:05.657  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:350,rsrp(rssi):-40,rsrq(noise):-85,rtt(chload):192,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:05.657  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 18:08:05.657  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 18:08:05.657  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 18:08:05.658  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 18:08:05.659  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 18:08:05.660  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,350,1,2,4,0,350,96300,86700,10,10,0,0,0,0 CID 2 mMasterWifiRssi -29 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 18:08:05.660  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 18:08:05.661  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 18:08:05.661  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 18:08:05.694    53    53 W migration/7: type=1400 audit(0.0:4810): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:05.694    47    47 W migration/6: type=1400 audit(0.0:4811): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:05.938    47    47 W migration/6: type=1400 audit(0.0:4812): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:05.941  1650  2107 I TrafficMonitor: update:rxPkts:0,txPkts:2,rxBytes:0,txBytes:120
+06-30 18:08:05.942  1650  2107 I TrafficMonitor: gettimer:interval=2000
+06-30 18:08:06.029 31020 31020 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 18:08:06.029 31020 31020 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 18:08:06.029 31020 31020 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 18:08:06.030 31020 31020 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-30 18:08:06.033 31020 31020 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ hw_mc.art.mt_dex_loader=1
+06-30 18:08:06.033 31020 31020 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ g_numThreads=4
+06-30 18:08:06.034 31020 31020 W app_process: [MemLeak.JavaTrack]: failed to dlopen libmemleak_tracker.so
+06-30 18:08:06.034 31020 31020 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+06-30 18:08:06.034 31020 31020 I AndroidRuntime: Using default boot image
+06-30 18:08:06.034 31020 31020 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+06-30 18:08:06.034 31020 31020 I AndroidRuntime: Leaving lock profiling enabled
+06-30 18:08:06.034 31020 31020 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+06-30 18:08:06.036 31020 31020 I         : HwCustType is 0
+06-30 18:08:06.036 31020 31020 E         : open file error
+06-30 18:08:06.036 31020 31020 I         : no cota live update cust policy found
+06-30 18:08:06.036 31020 31020 I         : GetCfgDirRealPolicyValue: custPolicyDirs: /system/emui/base:/system/emui/china:/vendor/etc:/odm/cust/all/cn:/odm/etc:/odm/hw_odm/HMA-AL00:/odm/special_cust/HMA-AL00/all/cn:/hw_product/etc:/hw_product/region_comm/china:/preas/china:/hw_product/hw_oem/HMA-AL00:/preload/HMA-AL00/all/cn:/cust/global:/cust/hw/cn:/version/cust/all/cn:/hw_product/special_cust/HMA-AL00/all/cn:/version/special_cust/HMA-AL00/all/cn:/cust/cotalite:/cust/ecota
+06-30 18:08:06.037 31020 31020 I app_process: Opt gc perf enable = 1
+06-30 18:08:06.037 31020 31020 I app_process: ScopedPromotePriority logging = 0
+06-30 18:08:06.099 31020 31020 W app_process: DexFile /system/emui/base/jar/Mdm/hw_mdm_framework.jar is in boot class path but is not in a known location
+06-30 18:08:06.121 31020 31020 D ICU     : Time zone APEX file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-30 18:08:06.127 31020 31020 I app_process: The ClassLoaderContext is a special shared library.
+06-30 18:08:06.128 31020 31020 I app_process: The ClassLoaderContext is a special shared library.
+06-30 18:08:06.128 31020 31020 I app_process: Reinit property: dalvik.vm.checkjni= false
+06-30 18:08:06.128 31020 31020 I app_process: ReInitProperties: persist.vm.debug.dumpapi= false
+06-30 18:08:06.128 31020 31020 W app_process: Qarth read proc_cmdline fail.
+06-30 18:08:06.128 31020 31020 I app_process: Qarth function Enabled: 1
+06-30 18:08:06.130 31020 31020 I HwPartBasicPlatformFactory: add android.common.HwPartBasicPlatformFactoryImpl to memory.
+06-30 18:08:06.134 31020 31020 I HWSERVICES: hwnative_get_component_register:libdrmbitmap,JNI
+06-30 18:08:06.138 31020 31020 V HwFrameworkFactory: successes to get AllImpl object and return....
+06-30 18:08:06.138 31020 31020 E Zygote  : register_com_android_internal_os_Zygote num = 0
+06-30 18:08:06.138 31020 31020 I         : power log dlsym ok
+06-30 18:08:06.139 31020 31020 E libc    : Access denied finding property "ro.config.vol_steps"
+06-30 18:08:06.140 31020 31020 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+06-30 18:08:06.146 31020 31020 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-30 18:08:06.146 31020 31020 E libc    : Access denied finding property "persist.mygote.disable"
+06-30 18:08:06.149  1650  3451 I WindowManager: addWindowToken: displayid:0 binder:android.os.Binder@99037b9 token:WindowToken{979d8f9 android.os.Binder@99037b9}
+06-30 18:08:06.150  1650  3451 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 18:08:06.153  1650  3451 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 18:08:06.156  1650  1650 I AS.AudioService: Accessibility volume enabled = false
+06-30 18:08:06.680  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:06.680  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-84,rtt(chload):152,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:06.680  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:06.680  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-84,rtt(chload):152,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:06.680  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 18:08:06.681  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 18:08:06.682  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 18:08:06.682  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 18:08:06.683  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,312,1,2,4,0,312,96300,86700,10,10,0,1,0,0 CID 2 mMasterWifiRssi -29 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 18:08:06.684  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 18:08:06.684  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 18:08:06.684  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 18:08:06.688  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 18:08:06.872  5914 31036 I CAWARENESS_34447_DeviceInfoUtil: isUsbConnected true
+06-30 18:08:06.872  5914 31036 I CAWARENESS_34447_MemoryMonitor: release memory
+06-30 18:08:06.878    47    47 W migration/6: type=1400 audit(0.0:4822): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:06.878    53    53 W migration/7: type=1400 audit(0.0:4823): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:06.901  5914 31036 I i.engineservic: Explicit concurrent copying GC freed 30913(2102KB) AllocSpace objects, 0(0B) LOS objects, 56% free, 4790KB/10MB, paused 40us total 28.664ms DisableRefAccess:0.63ms(0.628ms)
+06-30 18:08:06.901  5914 31036 I CAWARENESS_34447_MemoryMonitor: VersionCode: 1000034447 Hiai name: 14.0.7.303 memory(kB) static totalPss: 42537, dalvikPss: 5608, nativePss: 9780, otherPss: 20857, swapPss: 6292
+06-30 18:08:06.902  5914 31036 I CAWARENESS_34447_MemoryMonitor: App Summary:summary.code: 10380 kB	summary.stack: 24 kB	summary.graphics: 0 kB	summary.java-heap: 7228 kB	summary.native-heap: 9776 kB	summary.system: 11469 kB	summary.total-pss: 42537 kB	summary.private-other: 3660 kB	summary.total-swap: 24864 kB
+06-30 18:08:06.994    53    53 W migration/7: type=1400 audit(0.0:4824): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:06.994    47    47 W migration/6: type=1400 audit(0.0:4825): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:07.047  1650  2108 I WificondControl: Noise: -88, Snr: 127, Chload: 114, rssi: -29, txBitrate: 96, rxBitrate: 86, frequency: 2417, UlDelay: -1, currentTxBytes: 10327511, currentTxPackets: 26611, currentTxFailed: 0, currentRxBytes: 20304511, currentRxPackets: 26385
+06-30 18:08:07.049  1650  2107 I WiFi_PRO: MSG_RETURN_AP_CURRY_RSSI rssi = -29
+06-30 18:08:07.049  1650  2107 I QosMonitor: queryRtt: rttType = 3
+06-30 18:08:07.050  1650  2214 I HwDualBandManager: handle2gApStrongWifiRssiChange
+06-30 18:08:07.050  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+06-30 18:08:07.050  1650  2197 I HuaweiWifiWatchdogStateMachine: POta txb txg rxg:0, 5, 0. Lr =0% Totpkt=5
+06-30 18:08:07.051  1650  2107 I QosMonitor: postEventFromNative: msg=100,arg1=4,arg2=10
+06-30 18:08:07.051  1650  2107 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 8
+06-30 18:08:07.051  1650  2107 I QosMonitor: postEventFromNative: msg=100,arg1=0,arg2=10
+06-30 18:08:07.051  1650  2107 I MQoS    : rtt=352,tcpTxPkts=8648,tcpRxPkts=10635
+06-30 18:08:07.051  1650 16994 D HwConnectivityServiceEx: set 1000 wlan0 value false
+06-30 18:08:07.052  1650  2197 I HuaweiWifiWatchdogStateMachine: PTcp RTT:0, rtt pkt=0, tcp_rx=0, tcp_tx=2, tcp_reTran=2, rtRate=1
+06-30 18:08:07.053  1650  2197 I HuaweiWifiWatchdogStateMachine: start computeQosLevel tcpRtt = 0 ,rssi = -29 ,mBestSpeedInPeriod = 0
+06-30 18:08:07.053  1650  2197 I HuaweiWifiWatchdogStateMachine: smoothConsecutiveQosResults, currentQosLevel = 3
+06-30 18:08:07.053  1650 16994 I MQoS    : QOS_level:0(0),wifi-link;SIM error;use level-0
+06-30 18:08:07.055  1650  2214 W HwDualBandManager: actualScan5gChannelList not exist
+06-30 18:08:07.151  1007  1022 E bastetd : [ProxySocket    ] NotifySocketErrState# No record found by comm prop, state=196619
+06-30 18:08:07.160 31020 31020 W AccessibilityInteractionClient: old interaction Id is: -1,current interaction Id is:0
+06-30 18:08:07.186    47    47 W migration/6: type=1400 audit(0.0:4826): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:07.192 31020 31020 I HwPartIawareFactory: add android.common.HwPartIawareFactoryImpl to memory.
+06-30 18:08:07.192 31020 31020 I HwApsImpl: APS: new HwApsImpl created
+06-30 18:08:07.193 31020 31020 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 18:08:07.194 31020 31020 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 18:08:07.222 31020 31020 W AccessibilityNodeInfoDumper: Fetch time: 3ms
+06-30 18:08:07.223  1650  4984 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@99037b9 token:WindowToken{979d8f9 android.os.Binder@99037b9}
+06-30 18:08:07.223  1650  4984 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@99037b9 token:null
+06-30 18:08:07.223  1650  4984 W WindowManager: removeWindowToken: Attempted to remove non-existing token: android.os.Binder@99037b9
+06-30 18:08:07.224  1650  4984 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 0
+06-30 18:08:07.224  1650  4984 I [SPMN]  : insert SYSTEM -- name = accelerometer_rotation, package = android, user = 0, value = 1
+06-30 18:08:07.225  1650  4984 I HwWindowManagerServiceEx: setLandAnimationInfo : false
+06-30 18:08:07.245 31020 31020 D AndroidRuntime: Shutting down VM
+06-30 18:08:07.547  1650  2047 W AlarmManager: WAKEUP alarm trigger action = ALARM_ACTION(10000) package name is: com.tencent.mm tag: *walarm*:ALARM_ACTION(10000) window:0 originWhen:2973605 when:2973605 maxWhen:2973605
+06-30 18:08:07.547 21920 22125 I mars::stn: [longlink_connect_monitor.cc:544, OnHeartbeatAlarmReceived]:longlink_progress on_heartbeat_alarm, time: 2973605, is_noop_timeout:false
+06-30 18:08:07.548  1650  2047 I ActivityManager: sendIntentSender target:PendingIntentRecord{98d8d41 com.tencent.mm broadcastIntent}, intent:flg=0x4 hwFlg=0x810
+06-30 18:08:07.549  1650  2047 E HwActivityTaskManagerServiceEx: isNeedInterceptStart isNeedInterceptAlarm getPackageUid exception
+06-30 18:08:07.550  1650  4984 D HwConnectivityServiceEx: set 10125 wlan0 value false
+06-30 18:08:07.553  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.567  1650  1936 I chatty  : uid=1000(system) PowerManagerSer identical 4 lines
+06-30 18:08:07.569  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.570  1650  4984 W ProcBatteryStats: timer is running , not start, name: com.tencent.mm, uid: 10125, tag: MicroMsg.PlatformCommC2JavaCallBack
+06-30 18:08:07.571  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.577  1650  1936 I chatty  : uid=1000(system) PowerManagerSer identical 4 lines
+06-30 18:08:07.578  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.579  1650  2641 V BroadcastQueue: Finished with ordered broadcast BroadcastRecord{930e8fc u0 ALARM_ACTION(10000)}
+06-30 18:08:07.585  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.586  1650  4984 I AlarmManager: remove alarm:Alarm{99267cb type 2 when 2981606 PendingIntent{98e5d4d: PendingIntentRecord{9913de9 com.tencent.mm broadcastIntent}}com.tencent.mm procName com.tencent.mm:push} according to operation:9079ae5
+06-30 18:08:07.600  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.606  1650  1936 I chatty  : uid=1000(system) PowerManagerSer identical 2 lines
+06-30 18:08:07.608  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.614 31038 31038 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 18:08:07.614 31038 31038 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 18:08:07.614 21920 22385 I mars::stn: [longlink_connect_monitor.cc:538, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 2973672, time interval:210000
+06-30 18:08:07.615 31038 31038 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 18:08:07.617  1650  4984 I AlarmManager: remove alarm:Alarm{99267cb type 2 when 3183667 PendingIntent{9897a3d: PendingIntentRecord{97ccde9 com.tencent.mm broadcastIntent}}com.tencent.mm procName com.tencent.mm:push} according to operation:9897b05
+06-30 18:08:07.630 21920 22385 I mars::stn: [longlink_connect_monitor.cc:538, OnHeartbeatAlarmSet]:longlink_progress on_heartbeat_set, time: 2973688, time interval:210000
+06-30 18:08:07.631   498   498 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@3.0::IMapper/default in either framework or device manifest.
+06-30 18:08:07.632 31038 31038 W Gralloc3: mapper 3.x is not supported
+06-30 18:08:07.690  1650  3451 I AlarmManager: remove alarm:Alarm{99266ab type 2 when 2981652 PendingIntent{9897b15: PendingIntentRecord{97ccddd com.tencent.mm broadcastIntent}}com.tencent.mm procName com.tencent.mm:push} according to operation:990364d
+06-30 18:08:07.703  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.704  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:07.704  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:350,rsrp(rssi):-40,rsrq(noise):-88,rtt(chload):114,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:07.705  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:07.705  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:303,rsrp(rssi):-40,rsrq(noise):-88,rtt(chload):114,buffhigh(uldelay):0,buffcomm(rtt):56
+06-30 18:08:07.705  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 18:08:07.705  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 18:08:07.705  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 18:08:07.706  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.707  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 18:08:07.707  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 18:08:07.708  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,350,1,2,4,0,303,96300,86700,10,10,0,0,0,0 CID 2 mMasterWifiRssi -29 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 18:08:07.708  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 18:08:07.708  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 18:08:07.709  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 18:08:07.710  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.711  1650  1936 I chatty  : uid=1000(system) PowerManagerSer identical 1 line
+06-30 18:08:07.770  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.778 31042 31042 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 18:08:07.783  1650  3451 E UserInfoExt: setUserInfo: userInfo is null!
+06-30 18:08:07.783  1650  3451 E UserInfoExt: isClonedProfile: mUserInfo is null!
+06-30 18:08:07.783  1650  3451 E UserInfoExt: setUserInfo: userInfo is null!
+06-30 18:08:07.791  6261  6261 I MediaReceiver: onReceive android.intent.action.MEDIA_SCANNER_SCAN_FILE
+06-30 18:08:07.797  1650  4984 V BroadcastQueue: Finished with ordered broadcast BroadcastRecord{930e932 u0 android.intent.action.MEDIA_SCANNER_SCAN_FILE}
+06-30 18:08:07.800  6261  6261 I MediaService: onCreate
+06-30 18:08:07.804  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.816  6261 31046 I ModernMediaScanner: scanFile isSingleFile true
+06-30 18:08:07.824  6261 31046 I ModernMediaScanner: max id 1832867
+06-30 18:08:07.826  6261 31046 I HwModernScannerEx: is skip white list false
+06-30 18:08:07.835  6261 31046 W ExifInterface: Invalid image: ExifInterface got an unsupported image format file(ExifInterface supports JPEG and some RAW image formats only) or a corrupted JPEG file to ExifInterface.
+06-30 18:08:07.840  6261  7420 I MediaProvider: MSG_MEDIA_SYNC_NOTIFY_CHANGED
+06-30 18:08:07.845  6261 30775 E PhotoData: set database context com.android.providers.media
+06-30 18:08:07.851  6261 31046 I HwMediaScannerImpl: handleScanSingleFile res content://media/external_primary/images/media/1832868
+06-30 18:08:07.852  1650  3451 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 18:08:07.852  6261 30775 I MediaLibraryServiceCore: activeList is empty.
+06-30 18:08:07.852  6261 30775 I MediaLibraryServiceCore: doRealtimeDataSynchronization can not be called !!
+06-30 18:08:07.852  6261 30775 I MediaLibraryService: stopSelfIfNecessary startId:4, startIds size 0
+06-30 18:08:07.853  6261 31046 D MediaIntentService: stopSelfIfNecessary startId:1, startIds size:0, mScanPaths size:0, skip:0
+06-30 18:08:07.853  1650  4984 D HwConnectivityServiceEx: set 10031 wlan0 value false
+06-30 18:08:07.853  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.853  1650  4984 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 18:08:07.853  1650  4984 I ConnectivityService: B uid 10031
+06-30 18:08:07.854  6261  6261 D MediaIntentService: onDestroy
+06-30 18:08:07.869  1650  3451 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 18:08:07.870  1650  3451 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 18:08:07.870  1650  3451 I ConnectivityService: B uid 10031
+06-30 18:08:07.928  1650  2047 W AlarmManager: WAKEUP alarm trigger action = com.huawei.push.alarm.HEARTBEAT package name is: android tag: *walarm*:com.huawei.push.alarm.HEARTBEAT window:0 originWhen:2973987 when:2973986 maxWhen:2973986
+06-30 18:08:07.928  1650  2047 I ActivityManager: sendIntentSender target:PendingIntentRecord{9861069 android broadcastIntent}, intent:flg=0x4 hwFlg=0x810
+06-30 18:08:07.929  1650  2047 E HwActivityTaskManagerServiceEx: isNeedInterceptStart isNeedInterceptAlarm getPackageUid exception
+06-30 18:08:07.932  4523  4523 I PushLog110123300: [main-1]action is com.huawei.push.alarm.HEARTBEAT
+06-30 18:08:07.932  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.933  1650  3451 V BroadcastQueue: Finished with ordered broadcast BroadcastRecord{930e875 u0 com.huawei.push.alarm.HEARTBEAT}
+06-30 18:08:07.935  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.935  4523  4559 I PushLog110123300: [ReceiverDispatcher-199]heartbeatArrive, send heart beat
+06-30 18:08:07.936  4523  4559 I PushLog110123300: [ReceiverDispatcher-199]enter AlarmTools:setExactAlarm(action:com.huawei.android.push.intent.HEARTBEAT_RSP_TIMEOUT interval:10000ms expectTriggerTime:1782814097936
+06-30 18:08:07.941  4523  4559 I PushLog110123300: [ReceiverDispatcher-199]charging
+06-30 18:08:07.941  4523  4559 I PushLog110123300: [ReceiverDispatcher-199]send msg to server:0x46, subCmdId:0xFF
+06-30 18:08:07.944  1650  2107 I TrafficMonitor: update:rxPkts:2,txPkts:3,rxBytes:137,txBytes:197
+06-30 18:08:07.944  1650  2107 I TrafficMonitor: gettimer:interval=2000
+06-30 18:08:07.991  1650  1936 I chatty  : uid=1000(system) PowerManagerSer identical 2 lines
+06-30 18:08:07.992  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]enter cancelAlarm(Action=com.huawei.android.push.intent.RESPONSE_FAIL
+06-30 18:08:07.992  4523  4559 I ent.PushServic: Explicit concurrent copying GC freed 2471(283KB) AllocSpace objects, 10(264KB) LOS objects, 76% free, 1845KB/7989KB, paused 131us total 48.102ms DisableRefAccess:0.73ms(0.728ms)
+06-30 18:08:07.992  4523  4559 I PushLog110123300: [ReceiverDispatcher-199]call gc finished.
+06-30 18:08:07.994  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:07.994  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]msg received from server:0x47, subCmdId:0xFF
+06-30 18:08:07.994  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]enter cancelAlarm(Action=com.huawei.android.push.intent.HEARTBEAT_RSP_TIMEOUT
+06-30 18:08:07.996  1650  2641 I AlarmManager: remove alarm:Alarm{992674d type 0 when 1782814097936 PendingIntent{980e09d: PendingIntentRecord{992be69 android broadcastIntent}}android procName com.huawei.android.pushagent.PushService} according to operation:8fd68ed
+06-30 18:08:08.006  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]enter adjustHeartBeat: findHeartBeat:true,RspTimeOut:false,beatInterval:300000,bestHBSuccessCount:2,range:[180000,300000],heartBeatRetryCount:0
+06-30 18:08:08.006  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]judgeFindBestHB and isBestHBTimeOut: false, isOffset: false
+06-30 18:08:08.007  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]isGoodNetWork:rssi = -29
+06-30 18:08:08.008  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]charging
+06-30 18:08:08.008  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]after delayHeartBeatReq, is charging, nextHeartBeatTime will be 180000ms later
+06-30 18:08:08.008  4523  5838 I PushLog110123300: [SocketRead_17:19:18-216]enter AlarmTools:setExactAlarm(action:com.huawei.push.alarm.HEARTBEAT interval:180000ms expectTriggerTime:1782814268008
+06-30 18:08:08.014  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:08.038    47    47 W migration/6: type=1400 audit(0.0:4834): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:08.038    53    53 W migration/7: type=1400 audit(0.0:4835): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:08.130 31051 31051 W app_process: type=1400 audit(0.0:4836): avc: denied { read } for pid=31051 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 18:08:08.133 31051 31051 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 18:08:08.133 31051 31051 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 18:08:08.133 31051 31051 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 18:08:08.134 31051 31051 I chatty  : uid=2000(shell) app_process identical 1 line
+06-30 18:08:08.134 31051 31051 W app_process: type=1400 audit(0.0:4838): avc: denied { read } for pid=31051 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 18:08:08.134 31051 31051 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-30 18:08:08.137 31051 31051 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ hw_mc.art.mt_dex_loader=1
+06-30 18:08:08.137 31051 31051 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ g_numThreads=4
+06-30 18:08:08.137 31051 31051 W app_process: [MemLeak.JavaTrack]: failed to dlopen libmemleak_tracker.so
+06-30 18:08:08.138 31051 31051 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+06-30 18:08:08.138 31051 31051 I AndroidRuntime: Using default boot image
+06-30 18:08:08.138 31051 31051 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+06-30 18:08:08.138 31051 31051 I AndroidRuntime: Leaving lock profiling enabled
+06-30 18:08:08.138 31051 31051 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+06-30 18:08:08.140 31051 31051 I         : HwCustType is 0
+06-30 18:08:08.140 31051 31051 E         : open file error
+06-30 18:08:08.140 31051 31051 I         : no cota live update cust policy found
+06-30 18:08:08.140 31051 31051 I         : GetCfgDirRealPolicyValue: custPolicyDirs: /system/emui/base:/system/emui/china:/vendor/etc:/odm/cust/all/cn:/odm/etc:/odm/hw_odm/HMA-AL00:/odm/special_cust/HMA-AL00/all/cn:/hw_product/etc:/hw_product/region_comm/china:/preas/china:/hw_product/hw_oem/HMA-AL00:/preload/HMA-AL00/all/cn:/cust/global:/cust/hw/cn:/version/cust/all/cn:/hw_product/special_cust/HMA-AL00/all/cn:/version/special_cust/HMA-AL00/all/cn:/cust/cotalite:/cust/ecota
+06-30 18:08:08.140 31051 31051 I app_process: Opt gc perf enable = 1
+06-30 18:08:08.140 31051 31051 I app_process: ScopedPromotePriority logging = 0
+06-30 18:08:08.144  2482  3877 W bt_btm  : btm_inq_db_new bda: 23:85:**:**:**:60 state: -1
+06-30 18:08:08.145  2482  2586 W bt_btif : Remote device:15:3a:**:**:**:f8, no link key or ble key found
+06-30 18:08:08.199 31051 31051 W app_process: DexFile /system/emui/base/jar/Mdm/hw_mdm_framework.jar is in boot class path but is not in a known location
+06-30 18:08:08.217  1650  1936 I chatty  : uid=1000(system) PowerManagerSer identical 1 line
+06-30 18:08:08.224 31051 31051 D ICU     : Time zone APEX file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-30 18:08:08.230 31051 31051 I app_process: The ClassLoaderContext is a special shared library.
+06-30 18:08:08.231 31051 31051 I app_process: Reinit property: dalvik.vm.checkjni= false
+06-30 18:08:08.231 31051 31051 I app_process: ReInitProperties: persist.vm.debug.dumpapi= false
+06-30 18:08:08.231 31051 31051 W app_process: Qarth read proc_cmdline fail.
+06-30 18:08:08.231 31051 31051 I app_process: Qarth function Enabled: 1
+06-30 18:08:08.234 31051 31051 I HwPartBasicPlatformFactory: add android.common.HwPartBasicPlatformFactoryImpl to memory.
+06-30 18:08:08.238 31051 31051 I HWSERVICES: hwnative_get_component_register:libdrmbitmap,JNI
+06-30 18:08:08.241 31051 31051 V HwFrameworkFactory: successes to get AllImpl object and return....
+06-30 18:08:08.241 31051 31051 E Zygote  : register_com_android_internal_os_Zygote num = 0
+06-30 18:08:08.242 31051 31051 I         : power log dlsym ok
+06-30 18:08:08.243 31051 31051 E libc    : Access denied finding property "ro.config.vol_steps"
+06-30 18:08:08.243 31051 31051 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+06-30 18:08:08.249 31051 31051 D AndroidRuntime: Calling main entry com.android.commands.input.Input
+06-30 18:08:08.250 31051 31051 E libc    : Access denied finding property "persist.mygote.disable"
+06-30 18:08:08.250  1650  4984 D HwCustPhoneWindowManager: answer call by keyCode = 4, down = true, isSupVolumnkeyAnswerCall = false
+06-30 18:08:08.250  1650  4984 I HwPhoneWindowManager: enter wakeupNoteEditor
+06-30 18:08:08.251  1650  4984 I WindowManager: interceptKeyBeforeQueueing: key 4 , result : 1
+06-30 18:08:08.252  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:08.252   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5378
+06-30 18:08:08.252   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5378, ret=2
+06-30 18:08:08.253 30169 30169 V InputMethodManager: dispatchInputEvent
+06-30 18:08:08.253 12624 12624 I CeliaKeyboard_LatinIME: special scene onKeyDown is return
+06-30 18:08:08.255  1650  4984 D HwCustPhoneWindowManager: answer call by keyCode = 4, down = false, isSupVolumnkeyAnswerCall = false
+06-30 18:08:08.255  1650  4984 I HwPhoneWindowManager: enter wakeupNoteEditor
+06-30 18:08:08.255  1650  4984 I WindowManager: interceptKeyBeforeQueueing: key 4 , result : 1
+06-30 18:08:08.255   749   790 W uniperf server: EnterActionProc DoParse failed, cmdId=5379
+06-30 18:08:08.255   749   790 D uniperf hal: do UniPerfEvent failed, cmdId=5379, ret=2
+06-30 18:08:08.256 30169 30169 V InputMethodManager: dispatchInputEvent
+06-30 18:08:08.257 31051 31051 D AndroidRuntime: Shutting down VM
+06-30 18:08:08.276 30169 30169 I ViewRootImpl: dispatchDetachedFromWindow in doDie
+06-30 18:08:08.298   766  1718 W BufferQueueProducer: [com.reversetutor.preview/com.reversetutor.preview.MainActivity#1]:1397: disconnect: not connected (req=1)
+06-30 18:08:08.298 30169 30211 W libEGL  : EGLNativeWindowType 0x75c0dd2790 disconnect failed
+06-30 18:08:08.299  1650  4984 I WindowManager: removeIfPossible: Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} callers=com.android.server.wm.WindowState.removeIfPossible:5180652 com.android.server.wm.WindowManagerService.removeWindow:4785460 android.view.IWindowSession$Stub.onTransact:5337532 com.android.server.wm.Session.onTransact:6798308 android.os.Binder.execTransactInternal:6281140
+06-30 18:08:08.302  1650  4984 I WindowManager: Not removing Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity EXITING} due to exit animation
+06-30 18:08:08.302  1650  4984 I WindowManager: Changing focus from Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity EXITING} to Window{98f6559 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} displayId=0 Callers=com.android.server.wm.RootWindowContainer.updateFocusedWindowLocked:6692920 com.android.server.wm.WindowManagerService.updateFocusedWindowLocked:6692396 com.android.server.wm.WindowState.setupWindowForRemoveOnExit:4990212 com.android.server.wm.WindowState.removeIfPossible:5184976
+06-30 18:08:08.304  1650  4984 I HwDisplayContentEx: currentFocus windowstate not null
+06-30 18:08:08.304  1650  4984 D ZrHung.AppEyeTransparentWindow: TransparentWindow cancelCheckFreezeScreen
+06-30 18:08:08.304  1650  4984 I HwDisplayContentEx: trans currentFocus windowstate not null
+06-30 18:08:08.304  1650  4984 D ZrHung.AppEyeTransparentWindow: TransparentWindow mHungConfigStatus = 0,mHungConfigEnable = 1
+06-30 18:08:08.309  1650  1902 D StatusBarManagerService: win:Window{98f6559 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity}mIsColorEnable:truelight:false
+06-30 18:08:08.309  2276  2958 D HwCommandQueue: CommandQueue, set Launcher StatusBar Color
+06-30 18:08:08.309  1650  1902 I StatusBarDisable: setFlags what=0 which=1 pkg=Window{98f6559 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity}
+06-30 18:08:08.309  2276  2276 I StatusBarLayout: refreshTint: tint: e5ffffff, area:Rect(0, 0 - 0, 0)
+06-30 18:08:08.310  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+06-30 18:08:08.311  2276  2276 I HwStatusBarCapsuleHelper: onUiModeChanged
+06-30 18:08:08.313 30169 30169 D DecorView: showOrHideHighlightView: hasFocus=true; winMode=1; isMrgNull=true
+06-30 18:08:08.314 30169 30169 W InputMethodManager: startInputReason = 1
+06-30 18:08:08.315  1650  2641 D InputDispatcher: Window handle Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} has no registered input channel
+06-30 18:08:08.316  1650  4984 I HwOcrImeController: updateMultiWindow topActivity = ComponentInfo{com.reversetutor.preview/com.reversetutor.preview.MainActivity} windowMode = 1 mIsInMultiScreen = false
+06-30 18:08:08.316  1650  4984 I HwOcrImeController: updateUser userId = 0 mIsOwnerUser = true
+06-30 18:08:08.316  1650  4984 I HwOcrImeController: setOcrImeSupportProp mIsOcrImeValid = true mIsHardKeyboardAvailable = false mIsInMultiScreen = false mIsOwnerUser = true
+06-30 18:08:08.316  1650  4984 I HwOcrImeController: ocr ime supported!
+06-30 18:08:08.317  1650  4984 I HwOcrImeController: setOcrImeSupportProp mIsOcrImeValid = true mIsHardKeyboardAvailable = false mIsInMultiScreen = false mIsOwnerUser = true
+06-30 18:08:08.317  1650  4984 I HwOcrImeController: ocr ime supported!
+06-30 18:08:08.319  1650  4984 D HwInputMethodManagerService: isSecMethodUsing = false
+06-30 18:08:08.319  1650  4984 I HwInputMethodManagerService: hideCurrentInputLocked resetIfCurrentIsOcrIme res = false mCurClient = ClientState{98790e2 uid=10038 pid=30169 displayId=0}
+06-30 18:08:08.321 12624 12624 I CeliaKeyboard_DarkModeUtils: previousModeType = 16 modeType = 16
+06-30 18:08:08.395  1650  1905 I WindowManager: Exit animation finished in Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity EXITING}: remove=true
+06-30 18:08:08.396  1650  1905 E WindowManager: win=Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity EXITING} destroySurfaces: appStopped=false win.mWindowRemovalAllowed=true win.mRemoveOnExit=true
+06-30 18:08:08.397  1650  1905 I WindowManager: postWindowRemoveCleanupLocked: Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity}
+06-30 18:08:08.397  1650  1905 I WindowManager: Removing Window{990c0b1 u0 com.reversetutor.preview/com.reversetutor.preview.MainActivity} from AppWindowToken{93486c6 token=Token{988492b ActivityRecord{9348705 u0 com.reversetutor.preview/.MainActivity t7}}}
+06-30 18:08:08.502  1650  2108 I WificondControl: Noise: -83, Snr: 42, Chload: 392, rssi: -29, txBitrate: 96, rxBitrate: 97, frequency: 2417, UlDelay: -1, currentTxBytes: 10327810, currentTxPackets: 26614, currentTxFailed: 0, currentRxBytes: 20304648, currentRxPackets: 26387
+06-30 18:08:08.505  1650  2108 V HwWifiServiceFactory: get AllImpl object = com.android.server.wifi.HwWifiServiceFactoryImpl@8f0e10d
+06-30 18:08:08.581  1650  4984 W ProcBatteryStats: timer is not running , not stop, name: com.tencent.mm, uid: 10125, tag: MicroMsg.PlatformCommC2JavaCallBack
+06-30 18:08:08.582  1650  1936 I PowerManagerService: handleSandman: wakefulness: 1,startDreaming: false
+06-30 18:08:08.666   675   675 I netd    : trafficSwapActiveStatsMap() <14.89ms>
+06-30 18:08:08.727  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:08.727  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-83,rtt(chload):392,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:08.727  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:08.727  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-83,rtt(chload):392,buffhigh(uldelay):0,buffcomm(rtt):52
+06-30 18:08:08.728  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 18:08:08.728  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 18:08:08.729  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 18:08:08.729  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 18:08:08.730  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,312,1,2,4,0,312,96300,97500,10,10,0,2,1,0 CID 2 mMasterWifiRssi -29 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 18:08:08.731  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 18:08:08.731  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 18:08:08.731  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 18:08:08.735  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 18:08:08.740  1650  4984 D HwConnectivityServiceEx: set 1000 wlan0 value false
+06-30 18:08:08.741  2433  2762 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.bindService:1777 com.huawei.antivirus.features.plugin.PluginAntivirusEngineConnection.bindPluginService:132 com.huawei.antivirus.features.plugin.PluginAntivirusEngineConnection.init:57 com.huawei.aiprotection.AiPluginConnectionProxy.init:30 com.huawei.android.security.inspection.CloudQueryHelper.loadCloudClients:138
+06-30 18:08:08.748  1650  4984 I ActivityManager: power push bindservice callingPkg:com.huawei.systemmanager, pkg:com.huawei.securitypluginbase, callerApp pid:2433, pid:27450
+06-30 18:08:08.748   761  5842 D AudioPolicyService: getUidState(10181) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:08.754 27450 27499 D QihooCloudClient: setOption: countryCode = CN
+06-30 18:08:08.755 27450 27499 D QihooCloudClient: setOption: chipType = kirin980
+06-30 18:08:08.757  1650  4989 D HwConnectivityServiceEx: set 10181 wlan0 value true
+06-30 18:08:08.757  1650  4989 I ConnectivityService: B uid 10181
+06-30 18:08:08.761   761  5842 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:08.762  1650  2641 V ActivityManager: Successfully start provider ContentProviderRecord{98e1f5f u0 com.huawei.systemmanager/com.huawei.securitycenter.antivirus.db.keyvalue.KeyValueDatabaseProvider} launchingApp=null caller pid= 2433
+06-30 18:08:08.770  1650  4989 V ActivityManager: Successfully start provider ContentProviderRecord{9788b56 u0 com.android.providers.media/.MediaProvider} launchingApp=ProcessRecord{98b89ad 6261:android.process.media/u0a15} caller pid= 21708
+06-30 18:08:08.770   761  5842 D AudioPolicyService: getUidState(10022) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:08.771   761  5842 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:08.771  2672  2800 W ScenarioService: number format exception! str:
+06-30 18:08:08.790  1650  4984 D HwConnectivityServiceEx: set 10181 NULL value true
+06-30 18:08:08.791  1650  4984 I ConnectivityService: B uid 10181
+06-30 18:08:08.793  1650  4984 I chatty  : uid=1000(system) Binder:1650_1D identical 24 lines
+06-30 18:08:08.793  1650  4984 I ConnectivityService: B uid 10181
+06-30 18:08:08.796 27450 27499 I qvs-i   : Destroy handle: 505822095360
+06-30 18:08:08.841  6261  7440 I AutoCache: start auto cache 2
+06-30 18:08:08.841  6261  7440 I AutoCache: start auto cache 3
+06-30 18:08:08.841  6261  7440 I AutoCache: start auto cache 4-1
+06-30 18:08:08.841  6261  7440 I AutoCache: start immediate decoding.
+06-30 18:08:08.850  6261  7440 I AutoCache: scanFilesTable mItemCount 2
+06-30 18:08:09.125  6261  6294 W System  : A resource failed to call close.
+06-30 18:08:09.125  6261  6294 W System  : A resource failed to call close.
+06-30 18:08:09.228  6261 30796 I DecodeUtils: decodeThumbnail filePath not exist : /storage/emulated/0/reverse_tutor_native_preview.png
+06-30 18:08:09.246   675   675 I netd    : trafficSwapActiveStatsMap() <14.74ms>
+06-30 18:08:09.300  2007  2009 E bms_file: file /sys/class/hw_power/charger/direct_charger_sc/direct_charge_succ is invalid
+06-30 18:08:09.347  2007  2009 I chatty  : uid=1000(system) /vendor/bin/bms_behavior identical 3 lines
+06-30 18:08:09.348  2007  2009 E bms_file: file /sys/class/hw_power/charger/direct_charger_sc/direct_charge_succ is invalid
+06-30 18:08:09.349  2007  2009 I bms_behavior: monitor interval count 585
+06-30 18:08:09.358    47    47 W migration/6: type=1400 audit(0.0:4844): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:09.358    53    53 W migration/7: type=1400 audit(0.0:4845): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:09.445 31066 31066 D skia    : HME hme_jpeg_dec version=JPEG_DEC_16.12.1, releasetime=12:06:23 May 10 2021
+06-30 18:08:09.445 31066 31066 D skia    : HME SkHmeDecFunction1 constructor ok
+06-30 18:08:09.445 31066 31066 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 18:08:09.446 31066 31066 W app_process: type=1400 audit(0.0:4846): avc: denied { read } for pid=31066 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 18:08:09.446 31066 31066 W app_process: type=1400 audit(0.0:4847): avc: denied { read } for pid=31066 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 18:08:09.446 31066 31066 W app_process: type=1400 audit(0.0:4848): avc: denied { read } for pid=31066 name="u:object_r:device_config_runtime_native_boot_prop:s0" dev="tmpfs" ino=16689 scontext=u:r:shell:s0 tcontext=u:object_r:device_config_runtime_native_boot_prop:s0 tclass=file permissive=0
+06-30 18:08:09.446 31066 31066 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-30 18:08:09.449 31066 31066 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ hw_mc.art.mt_dex_loader=1
+06-30 18:08:09.449 31066 31066 I app_process: HwDexFileLoaderInit mt_dexfile_loader_fn_ g_numThreads=4
+06-30 18:08:09.449 31066 31066 W app_process: [MemLeak.JavaTrack]: failed to dlopen libmemleak_tracker.so
+06-30 18:08:09.450 31066 31066 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_apex_image"
+06-30 18:08:09.450 31066 31066 I AndroidRuntime: Using default boot image
+06-30 18:08:09.450 31066 31066 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.disable_lock_profiling"
+06-30 18:08:09.450 31066 31066 I AndroidRuntime: Leaving lock profiling enabled
+06-30 18:08:09.450 31066 31066 E libc    : Access denied finding property "persist.device_config.runtime_native_boot.enable_generational_cc"
+06-30 18:08:09.452 31066 31066 I         : HwCustType is 0
+06-30 18:08:09.452 31066 31066 E         : open file error
+06-30 18:08:09.452 31066 31066 I         : no cota live update cust policy found
+06-30 18:08:09.452 31066 31066 I         : GetCfgDirRealPolicyValue: custPolicyDirs: /system/emui/base:/system/emui/china:/vendor/etc:/odm/cust/all/cn:/odm/etc:/odm/hw_odm/HMA-AL00:/odm/special_cust/HMA-AL00/all/cn:/hw_product/etc:/hw_product/region_comm/china:/preas/china:/hw_product/hw_oem/HMA-AL00:/preload/HMA-AL00/all/cn:/cust/global:/cust/hw/cn:/version/cust/all/cn:/hw_product/special_cust/HMA-AL00/all/cn:/version/special_cust/HMA-AL00/all/cn:/cust/cotalite:/cust/ecota
+06-30 18:08:09.452 31066 31066 I app_process: Opt gc perf enable = 1
+06-30 18:08:09.452 31066 31066 I app_process: ScopedPromotePriority logging = 0
+06-30 18:08:09.512 31066 31066 W app_process: DexFile /system/emui/base/jar/Mdm/hw_mdm_framework.jar is in boot class path but is not in a known location
+06-30 18:08:09.537 31066 31066 D ICU     : Time zone APEX file found: /apex/com.android.tzdata/etc/icu/icu_tzdata.dat
+06-30 18:08:09.544 31066 31066 I app_process: The ClassLoaderContext is a special shared library.
+06-30 18:08:09.544 31066 31066 I app_process: The ClassLoaderContext is a special shared library.
+06-30 18:08:09.545 31066 31066 I app_process: Reinit property: dalvik.vm.checkjni= false
+06-30 18:08:09.545 31066 31066 I app_process: ReInitProperties: persist.vm.debug.dumpapi= false
+06-30 18:08:09.545 31066 31066 W app_process: Qarth read proc_cmdline fail.
+06-30 18:08:09.545 31066 31066 I app_process: Qarth function Enabled: 1
+06-30 18:08:09.547 31066 31066 I HwPartBasicPlatformFactory: add android.common.HwPartBasicPlatformFactoryImpl to memory.
+06-30 18:08:09.551 31066 31066 I HWSERVICES: hwnative_get_component_register:libdrmbitmap,JNI
+06-30 18:08:09.554 31066 31066 V HwFrameworkFactory: successes to get AllImpl object and return....
+06-30 18:08:09.554 31066 31066 E Zygote  : register_com_android_internal_os_Zygote num = 0
+06-30 18:08:09.555 31066 31066 I         : power log dlsym ok
+06-30 18:08:09.556 31066 31066 E libc    : Access denied finding property "ro.config.vol_steps"
+06-30 18:08:09.556 31066 31066 W app_process: JNI RegisterNativeMethods: attempt to register 0 native methods for android.media.AudioAttributes
+06-30 18:08:09.562 31066 31066 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-30 18:08:09.562 31066 31066 E libc    : Access denied finding property "persist.mygote.disable"
+06-30 18:08:09.565  1650  4984 I WindowManager: addWindowToken: displayid:0 binder:android.os.Binder@988d5bd token:WindowToken{979d8c9 android.os.Binder@988d5bd}
+06-30 18:08:09.567  1650  4984 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 18:08:09.569  1650  4984 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 1
+06-30 18:08:09.574  1650  1650 I AS.AudioService: Accessibility volume enabled = false
+06-30 18:08:09.759  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:09.759  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-86,rtt(chload):335,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:09.759  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:09.759  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-86,rtt(chload):335,buffhigh(uldelay):0,buffcomm(rtt):20
+06-30 18:08:09.759  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 18:08:09.759  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 18:08:09.759  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 18:08:09.760 27450 27499 I CloudHttpClient: shutdown called. id:213603588 cost:963
+06-30 18:08:09.761  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 18:08:09.761  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 18:08:09.762  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,312,1,2,4,0,312,96300,97500,10,10,0,1,0,0 CID 2 mMasterWifiRssi -29 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 18:08:09.763  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 18:08:09.763  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 18:08:09.763  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 18:08:09.793   761   761 D AudioPolicyService: getUidState(10181) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:09.793   761   761 D AudioPolicyService: getUidState(10022) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:09.947  1650  2107 I TrafficMonitor: update:rxPkts:1,txPkts:2,rxBytes:92,txBytes:153
+06-30 18:08:09.948  1650  2107 I TrafficMonitor: gettimer:interval=2000
+06-30 18:08:10.248  6261  7440 I AutoCache: scanFilesTable mItemCount 1
+06-30 18:08:10.252  1650  4984 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 18:08:10.253  1650  4984 D HwConnectivityServiceEx: set 10031 wlan0 value false
+06-30 18:08:10.253  1650  4984 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 18:08:10.253  1650  4984 I ConnectivityService: B uid 10031
+06-30 18:08:10.272  1650  4984 D PGGoogleServicePolicy: prevent gms/gsf hold partial wakelock
+06-30 18:08:10.273  1650  4984 I ConnectivityService: HAware B uid 10031 pid 4263
+06-30 18:08:10.273  1650  4984 I ConnectivityService: B uid 10031
+06-30 18:08:10.410  6261 30796 I DecodeUtils: decodeThumbnail filePath not exist : /storage/emulated/0/reverse_tutor_native_preview.png
+06-30 18:08:10.493 21708 22077 D FLTAG_SC: bindService from Intent: Intent { cmp=com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service }
+06-30 18:08:10.493 21708 22077 I FLTAG_FM: getRequireFeature it maybe not in a feature:com.huawei.gallery.media.CalcMd5Service
+06-30 18:08:10.494 21708 22077 D FLTAG_SC: Feature cannot been obtained
+06-30 18:08:10.494 21708 22077 D FLTAG_SC: Cannot resolve service information from features: Intent { cmp=com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service }
+06-30 18:08:10.505   761   761 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:10.518   761   761 D AudioPolicyService: getUidState(10020) !cacheIter->second.first, return PROCESS_STATE_UNKNOWN
+06-30 18:08:10.518  1650  1930 D ActivityManager: setPrivilegeType r: ServiceRecord{98847a9 u0 com.android.gallery3d/com.huawei.gallery.media.CalcMd5Service}, interfaceDescriptor : com.huawei.gallery.service.IAsyncService
+06-30 18:08:10.575 31066 31066 W AccessibilityInteractionClient: old interaction Id is: -1,current interaction Id is:0
+06-30 18:08:10.602    47    47 W migration/6: type=1400 audit(0.0:4854): avc: granted { setsched } for pid=47 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:10.606 31066 31066 W uiautomator: type=1400 audit(0.0:4855): avc: denied { read } for pid=31066 name="u:object_r:curved_side_prop:s0" dev="tmpfs" ino=16676 scontext=u:r:shell:s0 tcontext=u:object_r:curved_side_prop:s0 tclass=file permissive=0
+06-30 18:08:10.606 31066 31066 W uiautomator: type=1400 audit(0.0:4856): avc: denied { read } for pid=31066 name="u:object_r:curved_side_prop:s0" dev="tmpfs" ino=16676 scontext=u:r:shell:s0 tcontext=u:object_r:curved_side_prop:s0 tclass=file permissive=0
+06-30 18:08:10.610 31066 31066 I HwPartIawareFactory: add android.common.HwPartIawareFactoryImpl to memory.
+06-30 18:08:10.610 31066 31066 I HwApsImpl: APS: new HwApsImpl created
+06-30 18:08:10.611 31066 31066 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 18:08:10.612 31066 31066 E libc    : Access denied finding property "ro.config.hw_curved_side_disp"
+06-30 18:08:10.618    53    53 W migration/7: type=1400 audit(0.0:4857): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:10.641 31066 31066 W AccessibilityNodeInfoDumper: Fetch time: 6ms
+06-30 18:08:10.642  1650  4984 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@988d5bd token:WindowToken{979d8c9 android.os.Binder@988d5bd}
+06-30 18:08:10.643  1650  4984 I WindowManager: removeWindowToken: displayid:0 binder:android.os.Binder@988d5bd token:null
+06-30 18:08:10.643  1650  4984 W WindowManager: removeWindowToken: Attempted to remove non-existing token: android.os.Binder@988d5bd
+06-30 18:08:10.643  1650  4984 I [SPMN]  : insert SECURE -- name = accessibility_enabled, package = android, user = 0, value = 0
+06-30 18:08:10.644  1650  4984 I [SPMN]  : insert SYSTEM -- name = accelerometer_rotation, package = android, user = 0, value = 1
+06-30 18:08:10.644  1650  4984 I HwWindowManagerServiceEx: setLandAnimationInfo : false
+06-30 18:08:10.662 31066 31066 D AndroidRuntime: Shutting down VM
+06-30 18:08:10.775  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:10.775  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:7,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-86,rtt(chload):335,buffhigh(uldelay):0,buffcomm(rtt):0
+06-30 18:08:10.775  2971  4304 E Booster_Qoe: PreprocessModemData, IsCellularCtx false
+06-30 18:08:10.775  2971  4304 I Booster_Qoe: AdaBoostPredict rlt,index:2,NisPsSlow:0,NProba:312,rsrp(rssi):-40,rsrq(noise):-86,rtt(chload):335,buffhigh(uldelay):0,buffcomm(rtt):8
+06-30 18:08:10.775  2971  3146 I NetworkQoeProxy: setChannelQoeValid invalid channel id = 4
+06-30 18:08:10.775  2971  3146 I NetworkQoeProxy: calcChannelNoRx dnsData is not present
+06-30 18:08:10.777  2971  3146 E FourNetCombinationChr: getNetworkQoeInfo failed, qoeTcpDataOpt is null
+06-30 18:08:10.777  2971  3146 D NpdcpAliveManager: ro.odm.npdcp_alive_cfg_enable is false
+06-30 18:08:10.778  1650  2195 I WiFi_PRO_WifiProStateMachine: APP_SERVICE_QOE_NOTIFY Qoe info 10038,4,0,312,1,2,4,0,312,96300,97500,10,10,0,0,0,0 CID 2 mMasterWifiRssi -29 mMasterCardAmbr 1048576 mSlaveCardAmbr 1048576
+06-30 18:08:10.779  1650  2195 I HwWifiProServiceProxy: ctrlHwWifiNetwork pkgName: WIFIPRO_SERVICE interfaceId: 9
+06-30 18:08:10.779  1650  2195 I WiFi_PRO_WifiProStateMachine: isWifi2WifiProcess = false, mIsNeedIgnoreQoeUpdate = false, mIsAppInBlacklist = false, mIsAppInBlacklistFullScreen = false, mIsWiFiNoInternet false, screen on = true, full screen = false, isLandscapeMode = false, mNotifyWifiLinkPoorReason = -1
+06-30 18:08:10.780  1650  2195 I WiFi_PRO_WifiProStateMachine: mChannelQoeBadCnt = 0, mAppQoeBadCnt = 0, mNetworkSlowReason = 0, mNetworkSlowChannelBadCnt = 0
+06-30 18:08:10.783  2971  4304 I Collector: HandleRawWifiInfo: flag:0, netId:0!
+06-30 18:08:10.794    53    53 W migration/7: type=1400 audit(0.0:4858): avc: granted { setsched } for pid=53 scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=process
+06-30 18:08:10.905 31084 31084 D HiTraceC: entered HiTraceInit, Log Registered: 1
+06-30 18:08:10.942  1650  2107 I TrafficMonitor: expired arrive. level:-1
+06-30 18:08:10.942  1650  2107 I TrafficMonitor: during_ms:2004,period_ms:2000
+06-30 18:08:10.942  1650  2107 I TrafficMonitor: count:458,rx_sum:1,tx_sum:2,rxBytes:92,during_ms:2004,rx_speed:45.908183632734534,tx_speed:76.34730538922156,rto:0.5
+06-30 18:08:10.942  1650  2107 I HuaweiWifiWatchdogStateMachine: Get speed information rx_speed = 45 ,tx_speed = 76 ,isSpeedOk = false ,mBestSpeedInPeriod = 45

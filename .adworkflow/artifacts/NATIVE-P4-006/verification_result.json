@@ -1,0 +1,51 @@
+{
+  "task_id": "NATIVE-P4-006",
+  "commands": [
+    ".\\gradlew.bat :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging app-debug.apk",
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts",
+    "Coverage registry validator",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+      "notes": "Passed after first-launch prompt state and AppShell wiring."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level native JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; codegraph now indexes 152 files and 28442 source lines."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; refreshed NATIVE-P4-006 context from codegraph-index at L1-index with warning_count=0."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No device prompt screenshot validation was run yet; P4-007 remains open.",
+    "No real LLM provider/network call was run."
+  ],
+  "evidence": [
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsFoundationModels.kt",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "tasks/native-first-launch-import-prompt-runbook.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md"
+  ],
+  "summary": "NATIVE-P4-006 first-launch import prompt is implemented as a replacement-build-gated, preview-disabled prompt with runbook notes and local verification.",
+  "residual_risk": "Phase 4 still requires P4-007 device validation before import/export/wipe/prompt behavior can be considered validated."
+}

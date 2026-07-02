@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P4-005",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/preferences/AppPreferencesRepositoryTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/DatabaseSchema.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/entity/Entities.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/ReverseTutorDatabase.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/preferences/AppPreferencesRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/LlmProfileRepository.kt"
+  ],
+  "relevant_symbols": [
+    "test_retrieve_empty_context_without_graph_data (tests/test_kg_retrieval.py:24)",
+    "test_mobile_session_row_swipe_sets_presence_and_long_press_has_management_menu (tests/test_mobile_product_experience.py:345)",
+    "_content_from_openai_data (llm.py:374)",
+    "_content_from_anthropic_data (llm.py:389)",
+    "test_mobile_session_list_clears_stale_keyboard_state_so_bottom_nav_returns (tests/test_mobile_persistence.py:854)",
+    "test_active_user_normal_turn_returns_action (tests/test_adapters.py:50)",
+    "test_android_main_activity_refreshes_stale_app_shell_cache_on_native_upgrade (tests/test_android_background_llm.py:127)",
+    "test_clue_student_no_local_hit_falls_back_gracefully (tests/test_clue_with_retrieval.py:92)",
+    "test_should_extract_blocks_default_blacklist_in_user_input (tests/test_kg_gate.py:90)",
+    "test_mobile_free_glm_can_be_explicitly_selected_after_user_api_exists (tests/test_llm_provider_presets.py:248)",
+    "test_mobile_proactive_conversation_has_global_modes_and_local_dispatch (tests/test_llm_provider_presets.py:340)",
+    "test_mobile_llm_keeps_local_api_snapshot_for_local_first_routing (tests/test_mobile_persistence.py:22)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not change import modes.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

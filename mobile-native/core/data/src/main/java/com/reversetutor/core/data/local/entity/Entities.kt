@@ -1,0 +1,496 @@
+package com.reversetutor.core.data.local.entity
+
+import androidx.room.Entity
+import androidx.room.Index
+import androidx.room.PrimaryKey
+import com.reversetutor.core.model.Message
+import com.reversetutor.core.model.MessageAttachment
+import com.reversetutor.core.model.MessageQuote
+import com.reversetutor.core.model.MessageRole
+import com.reversetutor.core.model.Anchor
+import com.reversetutor.core.model.ErrorLog
+import com.reversetutor.core.model.GraphEdge
+import com.reversetutor.core.model.GraphNode
+import com.reversetutor.core.model.GraphNodeKind
+import com.reversetutor.core.model.GraphNodeStatus
+import com.reversetutor.core.model.LlmProfile
+import com.reversetutor.core.model.LlmProviderKind
+import com.reversetutor.core.model.MemoryItem
+import com.reversetutor.core.model.MemoryItemKind
+import com.reversetutor.core.model.Note
+import com.reversetutor.core.model.SessionSettings
+import com.reversetutor.core.model.Space
+import com.reversetutor.core.model.SpaceKind
+import com.reversetutor.core.model.TutorSession
+
+@Entity(tableName = "spaces")
+data class SpaceEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val kind: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+    val sourceImportId: String? = null
+)
+
+@Entity(tableName = "sessions", indices = [Index("spaceId"), Index("updatedAtEpochMillis")])
+data class SessionEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val title: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+    val pinned: Boolean = false,
+    val archived: Boolean = false,
+    val llmProfileId: String? = null,
+    val settingsId: String? = null,
+    val sourceImportId: String? = null
+)
+
+@Entity(tableName = "messages", indices = [Index("spaceId"), Index("sessionId")])
+data class MessageEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val sessionId: String,
+    val role: String,
+    val text: String,
+    val createdAtEpochMillis: Long,
+    val parentMessageId: String? = null,
+    val sourceImportId: String? = null
+)
+
+@Entity(tableName = "message_attachments", indices = [Index("spaceId"), Index("messageId")])
+data class MessageAttachmentEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val messageId: String,
+    val name: String,
+    val mimeType: String? = null,
+    val uri: String? = null,
+    val sourceId: String? = null
+)
+
+@Entity(tableName = "message_quotes", indices = [Index("spaceId"), Index("messageId")])
+data class MessageQuoteEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val messageId: String,
+    val quotedMessageId: String,
+    val excerpt: String
+)
+
+@Entity(tableName = "llm_profiles", indices = [Index("spaceId")])
+data class LlmProfileEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val name: String,
+    val provider: String,
+    val model: String,
+    val secretRef: String? = null,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long,
+    val baseUrl: String? = null,
+    val enabled: Boolean = true
+)
+
+@Entity(tableName = "session_settings", indices = [Index("spaceId"), Index("sessionId")])
+data class SessionSettingsEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val sessionId: String,
+    val llmProfileId: String? = null,
+    val systemPrompt: String? = null
+)
+
+@Entity(tableName = "anchors", indices = [Index("spaceId")])
+data class AnchorEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val title: String,
+    val body: String,
+    val createdAtEpochMillis: Long,
+    val sourceMessageId: String? = null,
+    val sourceId: String? = null
+)
+
+@Entity(tableName = "notes", indices = [Index("spaceId")])
+data class NoteEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val title: String,
+    val body: String,
+    val createdAtEpochMillis: Long,
+    val sourceMessageId: String? = null
+)
+
+@Entity(tableName = "error_logs", indices = [Index("spaceId")])
+data class ErrorLogEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val title: String,
+    val detail: String,
+    val createdAtEpochMillis: Long,
+    val sourceMessageId: String? = null,
+    val resolved: Boolean = false
+)
+
+@Entity(tableName = "memory_items", indices = [Index("spaceId")])
+data class MemoryItemEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val kind: String,
+    val title: String,
+    val body: String,
+    val createdAtEpochMillis: Long,
+    val sourceMessageId: String? = null,
+    val sourceId: String? = null
+)
+
+@Entity(tableName = "graph_nodes", indices = [Index("spaceId")])
+data class GraphNodeEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val label: String,
+    val kind: String,
+    val createdAtEpochMillis: Long,
+    val status: String = "Active",
+    val sourceMemoryId: String? = null
+)
+
+@Entity(tableName = "graph_edges", indices = [Index("spaceId"), Index("fromNodeId"), Index("toNodeId")])
+data class GraphEdgeEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val fromNodeId: String,
+    val toNodeId: String,
+    val relation: String,
+    val createdAtEpochMillis: Long,
+    val sourceMemoryId: String? = null
+)
+
+@Entity(tableName = "sources", indices = [Index("spaceId"), Index("type")])
+data class SourceEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val title: String,
+    val type: String,
+    val parserStatus: String,
+    val createdAtEpochMillis: Long,
+    val uri: String? = null,
+    val extractedText: String? = null,
+    val importBatchId: String? = null
+)
+
+@Entity(tableName = "source_chunks", indices = [Index("spaceId"), Index("sourceId")])
+data class SourceChunkEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val sourceId: String,
+    val chunkIndex: Int,
+    val text: String,
+    val tokenEstimate: Int? = null
+)
+
+@Entity(tableName = "background_jobs", indices = [Index("spaceId"), Index("sessionId"), Index("status")])
+data class BackgroundJobEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val kind: String,
+    val status: String,
+    val createdAtEpochMillis: Long,
+    val sessionId: String? = null,
+    val completedAtEpochMillis: Long? = null,
+    val errorMessage: String? = null
+)
+
+@Entity(tableName = "import_batches", indices = [Index("spaceId"), Index("status")])
+data class ImportBatchEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val sourceFileName: String,
+    val sourceSchema: String,
+    val mode: String,
+    val status: String,
+    val startedAtEpochMillis: Long,
+    val completedAtEpochMillis: Long? = null,
+    val insertedCountsJson: String = "{}",
+    val skippedCountsJson: String = "{}",
+    val warningsJson: String = "[]",
+    val errorsJson: String = "[]"
+)
+
+@Entity(tableName = "export_records", indices = [Index("spaceId"), Index("status")])
+data class ExportRecordEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val schema: String,
+    val targetFileName: String,
+    val status: String,
+    val createdAtEpochMillis: Long,
+    val completedAtEpochMillis: Long? = null,
+    val warningsJson: String = "[]"
+)
+
+fun Space.toEntity(): SpaceEntity = SpaceEntity(
+    id = id,
+    name = name,
+    kind = kind.name,
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    sourceImportId = sourceImportId
+)
+
+fun SpaceEntity.toDomain(): Space = Space(
+    id = id,
+    name = name,
+    kind = SpaceKind.valueOf(kind),
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    sourceImportId = sourceImportId
+)
+
+fun TutorSession.toEntity(): SessionEntity = SessionEntity(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    pinned = pinned,
+    archived = archived,
+    llmProfileId = llmProfileId,
+    settingsId = settingsId,
+    sourceImportId = sourceImportId
+)
+
+fun SessionEntity.toDomain(): TutorSession = TutorSession(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    pinned = pinned,
+    archived = archived,
+    llmProfileId = llmProfileId,
+    settingsId = settingsId,
+    sourceImportId = sourceImportId
+)
+
+fun Message.toEntity(): MessageEntity = MessageEntity(
+    id = id,
+    spaceId = spaceId,
+    sessionId = sessionId,
+    role = role.name,
+    text = text,
+    createdAtEpochMillis = createdAtEpochMillis,
+    parentMessageId = parentMessageId,
+    sourceImportId = sourceImportId
+)
+
+fun MessageEntity.toDomain(): Message = Message(
+    id = id,
+    spaceId = spaceId,
+    sessionId = sessionId,
+    role = MessageRole.valueOf(role),
+    text = text,
+    createdAtEpochMillis = createdAtEpochMillis,
+    parentMessageId = parentMessageId,
+    sourceImportId = sourceImportId
+)
+
+fun MessageAttachment.toEntity(): MessageAttachmentEntity = MessageAttachmentEntity(
+    id = id,
+    spaceId = spaceId,
+    messageId = messageId,
+    name = name,
+    mimeType = mimeType,
+    uri = uri,
+    sourceId = sourceId
+)
+
+fun MessageAttachmentEntity.toDomain(): MessageAttachment = MessageAttachment(
+    id = id,
+    spaceId = spaceId,
+    messageId = messageId,
+    name = name,
+    mimeType = mimeType,
+    uri = uri,
+    sourceId = sourceId
+)
+
+fun MessageQuote.toEntity(): MessageQuoteEntity = MessageQuoteEntity(
+    id = id,
+    spaceId = spaceId,
+    messageId = messageId,
+    quotedMessageId = quotedMessageId,
+    excerpt = excerpt
+)
+
+fun MessageQuoteEntity.toDomain(): MessageQuote = MessageQuote(
+    id = id,
+    spaceId = spaceId,
+    messageId = messageId,
+    quotedMessageId = quotedMessageId,
+    excerpt = excerpt
+)
+
+fun LlmProfile.toEntity(): LlmProfileEntity = LlmProfileEntity(
+    id = id,
+    spaceId = spaceId,
+    name = name,
+    provider = provider.name,
+    model = model,
+    secretRef = secretRef,
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    baseUrl = baseUrl,
+    enabled = enabled
+)
+
+fun LlmProfileEntity.toDomain(): LlmProfile = LlmProfile(
+    id = id,
+    spaceId = spaceId,
+    name = name,
+    provider = runCatching { LlmProviderKind.valueOf(provider) }.getOrDefault(LlmProviderKind.Custom),
+    model = model,
+    secretRef = secretRef,
+    createdAtEpochMillis = createdAtEpochMillis,
+    updatedAtEpochMillis = updatedAtEpochMillis,
+    baseUrl = baseUrl,
+    enabled = enabled
+)
+
+fun SessionSettings.toEntity(): SessionSettingsEntity = SessionSettingsEntity(
+    id = id,
+    spaceId = spaceId,
+    sessionId = sessionId,
+    llmProfileId = llmProfileId,
+    systemPrompt = systemPrompt
+)
+
+fun SessionSettingsEntity.toDomain(): SessionSettings = SessionSettings(
+    id = id,
+    spaceId = spaceId,
+    sessionId = sessionId,
+    llmProfileId = llmProfileId,
+    systemPrompt = systemPrompt
+)
+
+fun Anchor.toEntity(): AnchorEntity = AnchorEntity(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    body = body,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId,
+    sourceId = sourceId
+)
+
+fun AnchorEntity.toDomain(): Anchor = Anchor(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    body = body,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId,
+    sourceId = sourceId
+)
+
+fun Note.toEntity(): NoteEntity = NoteEntity(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    body = body,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId
+)
+
+fun NoteEntity.toDomain(): Note = Note(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    body = body,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId
+)
+
+fun ErrorLog.toEntity(): ErrorLogEntity = ErrorLogEntity(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    detail = detail,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId,
+    resolved = resolved
+)
+
+fun ErrorLogEntity.toDomain(): ErrorLog = ErrorLog(
+    id = id,
+    spaceId = spaceId,
+    title = title,
+    detail = detail,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId,
+    resolved = resolved
+)
+
+fun MemoryItem.toEntity(): MemoryItemEntity = MemoryItemEntity(
+    id = id,
+    spaceId = spaceId,
+    kind = kind.name,
+    title = title,
+    body = body,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId,
+    sourceId = sourceId
+)
+
+fun MemoryItemEntity.toDomain(): MemoryItem = MemoryItem(
+    id = id,
+    spaceId = spaceId,
+    kind = runCatching { MemoryItemKind.valueOf(kind) }.getOrDefault(MemoryItemKind.Fact),
+    title = title,
+    body = body,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMessageId = sourceMessageId,
+    sourceId = sourceId
+)
+
+fun GraphNode.toEntity(): GraphNodeEntity = GraphNodeEntity(
+    id = id,
+    spaceId = spaceId,
+    label = label,
+    kind = kind.name,
+    createdAtEpochMillis = createdAtEpochMillis,
+    status = status.name,
+    sourceMemoryId = sourceMemoryId
+)
+
+fun GraphNodeEntity.toDomain(): GraphNode = GraphNode(
+    id = id,
+    spaceId = spaceId,
+    label = label,
+    kind = runCatching { GraphNodeKind.valueOf(kind) }.getOrDefault(GraphNodeKind.Other),
+    createdAtEpochMillis = createdAtEpochMillis,
+    status = runCatching { GraphNodeStatus.valueOf(status) }.getOrDefault(GraphNodeStatus.Active),
+    sourceMemoryId = sourceMemoryId
+)
+
+fun GraphEdge.toEntity(): GraphEdgeEntity = GraphEdgeEntity(
+    id = id,
+    spaceId = spaceId,
+    fromNodeId = fromNodeId,
+    toNodeId = toNodeId,
+    relation = relation,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMemoryId = sourceMemoryId
+)
+
+fun GraphEdgeEntity.toDomain(): GraphEdge = GraphEdge(
+    id = id,
+    spaceId = spaceId,
+    fromNodeId = fromNodeId,
+    toNodeId = toNodeId,
+    relation = relation,
+    createdAtEpochMillis = createdAtEpochMillis,
+    sourceMemoryId = sourceMemoryId
+)

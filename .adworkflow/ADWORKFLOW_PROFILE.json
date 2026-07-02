@@ -1,0 +1,78 @@
+{
+  "project_size": "large",
+  "context_strategy": "architecture-first-l2-codegraph-after-code-exists",
+  "classification_source": "product_docs_explicit_native_android_migration",
+  "execution_mode": "orchestrator-with-workers-and-reviewers",
+  "expected_complexity_score": 34,
+  "source_file_count": 81,
+  "source_line_count": 16914,
+  "languages": [
+    "java",
+    "javascript",
+    "python",
+    "kotlin_planned"
+  ],
+  "include_dirs": [
+    "tasks",
+    ".adworkflow",
+    "mobile-native",
+    "tests"
+  ],
+  "supported_queries": [
+    "find_definition",
+    "find_references",
+    "callers",
+    "callees",
+    "impacted_files",
+    "tests_for",
+    "get_slice",
+    "summarize_file"
+  ],
+  "planned_modules": [
+    ":app",
+    ":core:protocol",
+    ":core:model",
+    ":core:data",
+    ":core:llm",
+    ":feature:chat",
+    ":feature:memory",
+    ":feature:sources",
+    ":feature:settings",
+    "qa/device-validation",
+    "package-release",
+    "legacy-entry-parity"
+  ],
+  "data_stores": [
+    "Room(SQLite)",
+    "DataStore",
+    "Android Keystore-backed secret storage",
+    "Android file storage/SAF references"
+  ],
+  "agent_features": [
+    "direct_llm_provider_runtime",
+    "streaming_generation",
+    "background_generation_jobs",
+    "local_memory_and_knowledge_graph",
+    "source_context_injection",
+    "versioned_import_export_protocols"
+  ],
+  "risk_areas": [
+    "legacy data import corruption or uncontrolled duplication",
+    "API key leakage through storage or export",
+    "background result attached to wrong or deleted session",
+    "graph interaction parity gap",
+    "source parser inconsistency across file types",
+    "official package switch or signing mistake",
+    "behavior drift from Python/PWA protocol baseline",
+    "premature PWA retirement before parity evidence"
+  ],
+  "first_layer_docs": [
+    "tasks/prd-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/todo-native-android-migration.md"
+  ],
+  "active_task_spec": ".adworkflow/task_spec.json",
+  "active_execution_plan": ".adworkflow/execution_plan.json"
+}

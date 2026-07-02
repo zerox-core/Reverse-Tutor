@@ -1,0 +1,48 @@
+{
+  "task_id": "NATIVE-P4-007",
+  "status": "verified",
+  "done": [
+    "Added Phase4ImportExportDeviceTest app-level instrumentation coverage for valid JSON import, append, new-space, overwrite confirmation, current-session export readiness, full-backup export readiness, share/save enablement, local wipe confirmation, and package id assertion.",
+    "Ran Phase4ImportExportDeviceTest on connected HMA-AL00 / Android 10 / API 29; report shows tests=1, failures=0, errors=0.",
+    "Ran project-level native JVM tests, Android lint, and internal debug APK build after the P4-007 updates.",
+    "Confirmed debug package remains com.reversetutor.preview with versionName 0.1.0-native-preview and versionCode 1.",
+    "Reinstalled and relaunched the debug APK after instrumentation, captured screenshot/XML, and captured pid-scoped logcat without app crash/exception signatures.",
+    "Updated coverage registry conservatively: LEG-033 is verified/closed; LEG-031 and LEG-032 remain P0 blockers until Phase 6 migration/export parity matrix.",
+    "Fixed ADworkflo plan audit findings by splitting UX-004/UX-005 batch dependencies, correcting NATIVE-UX-010 execution_mode, and restoring NATIVE-P1-003 high-risk reviewer gate."
+  ],
+  "changed_files": [
+    ".adworkflow/PROJECT.md",
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/execution_plan.json",
+    ".adworkflow/review_findings.json",
+    ".adworkflow/task_specs/NATIVE-P1-003.json",
+    ".adworkflow/task_specs/NATIVE-UX-010.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/worker_state.json",
+    ".codegraph/index.json",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/README.md",
+    "tasks/native-android-next-workplan.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "current_problem": "",
+  "next_action": "Archive NATIVE-P4-007 artifacts, then continue with NATIVE-UX-004 or Phase 5 foundation tasks according to the updated execution plan.",
+  "must_keep_context": [
+    "Internal package id remains com.reversetutor.preview.",
+    "No signed or release APK was built.",
+    "Do not touch mobile/android/app/release.jks, mobile/android/app/build.gradle, mobile/capacitor.config.json, mobile/package.json, or static/app/index.html.",
+    "No real LLM provider/network call was made by the app under test.",
+    "PWA/Capacitor remains transition/export source until Phase 6 and explicit approval.",
+    "First-launch import prompt remains preview-disabled by default; replacement-build behavior remains gated."
+  ],
+  "remaining_risks": [
+    "P4-007 is single-device internal preview evidence, not final replacement approval.",
+    "LEG-031 remains a P0 blocker until complete export parity and delivery matrix are verified.",
+    "LEG-032 remains a P0 blocker until real replacement migration sources and broader device matrix are verified.",
+    "Full-backup export repository snapshots messages, but current full-backup protocol JSON still does not serialize message records.",
+    "Manual ADB ACTION_SEND/ACTION_VIEW attempts in 02_* through 08_* remain diagnostic-only because their dry-run counts were zero."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

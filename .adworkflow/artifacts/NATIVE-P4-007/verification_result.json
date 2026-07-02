@@ -1,0 +1,87 @@
+{
+  "task_id": "NATIVE-P4-007",
+  "commands": [
+    ".\\gradlew.bat :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase4ImportExportDeviceTest\" --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "aapt dump badging app-debug.apk",
+    "adb install -r app-debug.apk; adb shell am start -n com.reversetutor.preview/.MainActivity; adb exec-out screencap; adb shell uiautomator dump",
+    "adb logcat --pid=<appPid> -d -v time",
+    "ConvertFrom-Json validation for active ADworkflo JSON artifacts",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor"
+  ],
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+      "notes": "Passed after removing an incompatible Compose test import."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest \"-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase4ImportExportDeviceTest\" --no-daemon --stacktrace",
+      "notes": "Passed on HMA-AL00 / Android 10 / API 29. XML report: tests=1, failures=0, errors=0."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed; project-level native JVM tests, Android lint, and internal debug APK build succeeded."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed; package name remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "adb install -r app-debug.apk; adb shell am start -n com.reversetutor.preview/.MainActivity; adb exec-out screencap; adb shell uiautomator dump",
+      "notes": "Passed after Gradle instrumentation cleanup; post-run screenshot/XML captured under P4-007 evidence."
+    },
+    {
+      "command": "adb logcat --pid=<appPid> -d -v time",
+      "notes": "Passed; app-pid logcat had no FATAL EXCEPTION, AndroidRuntime, IllegalStateException, SQLiteException, SecurityException, AssertionError, or Exception matches."
+    },
+    {
+      "command": "ConvertFrom-Json validation for active ADworkflo JSON artifacts",
+      "notes": "Passed for execution_plan, worker_state, verification_result, review_findings, and corrected task specs."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; codegraph now indexes 153 files and 28587 source lines."
+    },
+    {
+      "command": "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor",
+      "notes": "Passed; refreshed NATIVE-P4-007 context from codegraph-index at L1-index with warning_count=0."
+    }
+  ],
+  "failed": [
+    {
+      "command": ".\\gradlew.bat :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+      "notes": "Initial run failed on an unresolved Compose test import; fixed before final verification."
+    },
+    {
+      "command": ".\\gradlew.bat :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=...",
+      "notes": "Initial PowerShell invocation parsed the Gradle property as a task; rerun with quoted property passed."
+    },
+    {
+      "command": "early Phase4ImportExportDeviceTest runs",
+      "notes": "Initial failures were test assertion stability issues around long text fields, offscreen result rows, and duplicate export filename text. Test helpers were tightened and final run passed."
+    }
+  ],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "Share chooser and ACTION_CREATE_DOCUMENT system UI were not opened in instrumentation; the test verifies export JSON readiness and enabled Share/Save actions to avoid system picker flakiness.",
+    "Replacement-build first-launch prompt was not shown on device because preview builds intentionally disable it by default; P4-006 covers gated prompt state locally and Phase 6 owns replacement-build package policy."
+  ],
+  "evidence": [
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/README.md",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/android-test-results/TEST-HMA-AL00-10-app.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/android-test-results/phase4-instrumentation-logcat.txt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/09_aapt_badging.txt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/11_launch_after_install.png",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/11_launch_after_install.xml",
+    "mobile-native/qa/device-validation/2026-07-01-native-p4-007-hma-al00/11_pid_logcat.txt",
+    "tasks/native-legacy-coverage-registry.md",
+    "tasks/native-android-next-workplan.md"
+  ],
+  "summary": "NATIVE-P4-007 Phase 4 device validation is complete for the internal native preview on HMA-AL00. Import modes, export readiness, wipe confirmation, package id, and no-crash relaunch have deterministic evidence.",
+  "residual_risk": "This is not replacement readiness. LEG-031 and LEG-032 remain P0 blockers pending Phase 6 migration/export parity and device matrix; PWA/Capacitor remains the transition/export source."
+}

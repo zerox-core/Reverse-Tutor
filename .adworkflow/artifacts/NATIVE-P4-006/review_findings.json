@@ -1,0 +1,27 @@
+{
+  "task_id": "NATIVE-P4-006",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "device_validation",
+      "finding": "The first-launch import prompt is implemented and locally tested, but no device screenshot or interaction evidence exists yet.",
+      "recommendation": "Validate prompt confirm/dismiss behavior in NATIVE-P4-007."
+    },
+    {
+      "severity": "medium",
+      "area": "replacement_policy",
+      "finding": "The prompt is disabled by default in preview builds and has no persisted seen flag yet.",
+      "recommendation": "Persist seen state only when replacement-build package/signing policy is finalized in Phase 6."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/feature/settings/src/test/java/com/reversetutor/feature/settings/SettingsFoundationModelTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "tasks/native-first-launch-import-prompt-runbook.md",
+    "tasks/native-legacy-coverage-registry.md"
+  ]
+}

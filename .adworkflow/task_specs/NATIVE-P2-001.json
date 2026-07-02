@@ -1,0 +1,89 @@
+{
+  "task_id": "NATIVE-P2-001",
+  "goal": "Implement the native Android session list and core session actions for the Phase 2 user loop.",
+  "non_goals": [
+    "Do not implement LLM generation.",
+    "Do not implement new-session templates or custom profile creation; those belong to NATIVE-P2-002.",
+    "Do not implement chat timeline, composer, quote, or message actions; those belong to NATIVE-P2-003.",
+    "Do not implement real export payload generation; expose a safe disabled/placeholder export entry only.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness."
+  ],
+  "acceptance_criteria": [
+    "Sessions screen renders real native session list state instead of the generic placeholder.",
+    "Session list supports search/filter, pinned-first ordering, status/unread metadata, and avatar visibility placeholders.",
+    "Session actions include open, rename, pin/unpin, delete with destructive confirmation, export entry placeholder, and avatar action placeholder.",
+    "Session mutations persist through Room-backed DAO/repository behavior.",
+    "Empty state and deferred proactive/LLM states are explicit and safe.",
+    "Repository/DAO tests cover rename, pin/unpin, delete/archive behavior, and list ordering.",
+    "UI/state tests cover search/filter/action state without requiring real LLM calls.",
+    "Legacy coverage registry is updated conservatively for LEG-005, LEG-006, LEG-007, and LEG-038.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":feature:chat/:core:data",
+  "branch": "native/chat-main-flow",
+  "legacy_ids": [
+    "LEG-005",
+    "LEG-006",
+    "LEG-007",
+    "LEG-038"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    "tasks/native-legacy-coverage-registry.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    ".adworkflow/PROJECT.md",
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/ConversationModels.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/entity/Entities.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/ReverseTutorDatabase.kt",
+    "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/ReverseTutorDatabaseDaoTest.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatModule.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/MainActivity.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppNavigation.kt"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Follow TDD: add failing tests before production implementation for repository/session action behavior.",
+    "Run focused core data tests and feature chat/app JVM tests.",
+    "Run connected core data instrumentation if an ADB device is available.",
+    "Run native project test, lint, and app assembleDebug.",
+    "Install preview debug APK on the connected device and capture session-list/action smoke evidence when feasible.",
+    "Use app pid/package-specific logcat filtering to avoid global AndroidRuntime false positives.",
+    "Validate ADworkflo JSON artifacts with ConvertFrom-Json."
+  ],
+  "notes": [
+    "This task starts the Phase 2 core user loop but does not complete the full chat loop.",
+    "Export and avatar actions may be visible but must be labeled as deferred until their owning tasks implement the payload/picker behavior.",
+    "Proactive behavior remains a product open question, so the UI should show an explicit deferred/disabled state rather than pretending it is active."
+  ]
+}

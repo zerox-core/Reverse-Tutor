@@ -1,0 +1,1503 @@
+{
+  "schema": "ADworkflo.execution_plan.v1",
+  "mvp_id": "native-android-migration",
+  "source_docs": [
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/project-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md"
+  ],
+  "worker_policy": {
+    "worker_limit": "unbounded-by-design",
+    "batching_rule": "driven-by-todo-modules-and-arch-dependencies",
+    "handoff_outputs": [
+      "diff_or_changed_file_summary",
+      "worker_state.json",
+      "verification_result.json"
+    ],
+    "review_required_for_risk_levels": [
+      "high"
+    ]
+  },
+  "batches": [
+    {
+      "batch_id": "batch-0-docs",
+      "phase": "0",
+      "parallel": false,
+      "depends_on": [],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P0-001",
+          "todo_id": "NATIVE-P0-001",
+          "module": "PM/Architecture",
+          "goal": "Finalize first-layer native migration documents.",
+          "non_goals": [
+            "Do not implement Android code."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P0-001.json",
+          "expected_outputs": [
+            "planning_docs",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "low"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-0-workflow",
+      "phase": "0",
+      "parallel": false,
+      "depends_on": [
+        "batch-0-docs"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P0-002",
+          "todo_id": "NATIVE-P0-002",
+          "module": "ADworkflo orchestration",
+          "goal": "Initialize ADworkflo and create project-local execution artifacts.",
+          "non_goals": [
+            "Do not implement Android code."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "adworkflo",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P0-002.json",
+          "expected_outputs": [
+            "architecture_manifest.json",
+            "module_skills.md",
+            "execution_plan.json",
+            "worker_state.json"
+          ],
+          "risk_level": "low"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-0-protocol-strategy",
+      "phase": "0",
+      "parallel": false,
+      "depends_on": [
+        "batch-0-workflow"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P0-003",
+          "todo_id": "NATIVE-P0-003",
+          "module": ":core:protocol",
+          "goal": "Prepare protocol fixture strategy before implementation.",
+          "non_goals": [
+            "Do not commit real user data.",
+            "Do not implement full import/export logic."
+          ],
+          "legacy_ids": [
+            "LEG-010",
+            "LEG-031",
+            "LEG-032",
+            "LEG-043"
+          ],
+          "module_skill": "native-protocol",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P0-003.json",
+          "expected_outputs": [
+            "fixture_strategy",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-1-scaffold",
+      "phase": "1",
+      "parallel": false,
+      "depends_on": [
+        "batch-0-protocol-strategy"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P1-001",
+          "todo_id": "NATIVE-P1-001",
+          "module": ":app",
+          "goal": "Scaffold mobile-native Gradle project and baseline modules.",
+          "non_goals": [
+            "Do not modify existing mobile/ release package or signing files.",
+            "Do not implement feature behavior beyond launch shell."
+          ],
+          "legacy_ids": [
+            "LEG-001"
+          ],
+          "module_skill": "native-app-shell",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P1-001.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-1-foundation-parallel",
+      "phase": "1",
+      "parallel": true,
+      "depends_on": [
+        "batch-1-scaffold"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P1-002",
+          "todo_id": "NATIVE-P1-002",
+          "module": ":app",
+          "goal": "Implement app shell, theme foundation, navigation host, and back behavior model.",
+          "non_goals": [
+            "Do not complete feature internals."
+          ],
+          "legacy_ids": [
+            "LEG-001",
+            "LEG-002",
+            "LEG-039",
+            "LEG-040"
+          ],
+          "module_skill": "native-app-shell",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P1-002.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P1-003",
+          "todo_id": "NATIVE-P1-003",
+          "module": ":core:model/:core:data",
+          "goal": "Implement core model and Room schema foundation.",
+          "non_goals": [
+            "Do not implement import UI.",
+            "Do not store API keys as plain strings."
+          ],
+          "legacy_ids": [
+            "LEG-005",
+            "LEG-012",
+            "LEG-020",
+            "LEG-026",
+            "LEG-031",
+            "LEG-032",
+            "LEG-034"
+          ],
+          "module_skill": "native-data",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P1-003.json",
+          "expected_outputs": [
+            "patch",
+            "migration_notes",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P1-005",
+          "todo_id": "NATIVE-P1-005",
+          "module": "legacy-entry-parity",
+          "goal": "Create native legacy coverage registry for LEG-001 to LEG-044.",
+          "non_goals": [
+            "Do not mark unimplemented entries as verified."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P1-005.json",
+          "expected_outputs": [
+            "coverage_matrix",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-1-settings-validation",
+      "phase": "1",
+      "parallel": true,
+      "depends_on": [
+        "batch-1-foundation-parallel"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P1-004",
+          "todo_id": "NATIVE-P1-004",
+          "module": ":feature:settings",
+          "goal": "Implement settings foundation with persisted theme/avatar/memo placeholders.",
+          "non_goals": [
+            "Do not implement full LLM profile manager yet."
+          ],
+          "legacy_ids": [
+            "LEG-003",
+            "LEG-004",
+            "LEG-037",
+            "LEG-038",
+            "LEG-044"
+          ],
+          "module_skill": "native-settings",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P1-004.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P1-006",
+          "todo_id": "NATIVE-P1-006",
+          "module": "qa/device-validation",
+          "goal": "Validate Phase 1 integration when preview APK is requested.",
+          "non_goals": [
+            "Do not build signed APK without explicit request."
+          ],
+          "legacy_ids": [
+            "LEG-001",
+            "LEG-002",
+            "LEG-039"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P1-006.json",
+          "expected_outputs": [
+            "validation_record",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-2-core-loop-parallel-a",
+      "phase": "2",
+      "parallel": true,
+      "depends_on": [
+        "batch-1-settings-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P2-001",
+          "todo_id": "NATIVE-P2-001",
+          "module": ":feature:chat",
+          "goal": "Implement session list and session actions.",
+          "non_goals": [
+            "Do not implement LLM generation."
+          ],
+          "legacy_ids": [
+            "LEG-005",
+            "LEG-006",
+            "LEG-007",
+            "LEG-038"
+          ],
+          "module_skill": "native-chat",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P2-001.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P2-004",
+          "todo_id": "NATIVE-P2-004",
+          "module": ":feature:settings/:core:llm/:core:data",
+          "goal": "Implement LLM profiles and secure key storage.",
+          "non_goals": [
+            "Do not export API keys by default.",
+            "Do not call real providers in automated tests."
+          ],
+          "legacy_ids": [
+            "LEG-026",
+            "LEG-027",
+            "LEG-028",
+            "LEG-031"
+          ],
+          "module_skill": "native-llm",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P2-004.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-2-core-loop-parallel-b",
+      "phase": "2",
+      "parallel": true,
+      "depends_on": [
+        "batch-2-core-loop-parallel-a"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P2-002",
+          "todo_id": "NATIVE-P2-002",
+          "module": ":feature:chat/:feature:settings/:core:protocol",
+          "goal": "Implement new session and templates flow.",
+          "non_goals": [
+            "Do not complete source parser module."
+          ],
+          "legacy_ids": [
+            "LEG-008",
+            "LEG-009",
+            "LEG-010",
+            "LEG-011",
+            "LEG-043"
+          ],
+          "module_skill": "native-chat",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P2-002.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P2-003",
+          "todo_id": "NATIVE-P2-003",
+          "module": ":feature:chat/:core:data",
+          "goal": "Implement chat timeline, composer, quote, image draft, and message actions.",
+          "non_goals": [
+            "Do not implement background WorkManager jobs."
+          ],
+          "legacy_ids": [
+            "LEG-012",
+            "LEG-013",
+            "LEG-014",
+            "LEG-015",
+            "LEG-018",
+            "LEG-041"
+          ],
+          "module_skill": "native-chat",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P2-003.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P2-005",
+          "todo_id": "NATIVE-P2-005",
+          "module": ":core:llm/:feature:chat/:core:data",
+          "goal": "Implement direct provider runtime and generation lifecycle.",
+          "non_goals": [
+            "Do not require Python runtime.",
+            "Do not implement background notification path yet."
+          ],
+          "legacy_ids": [
+            "LEG-016",
+            "LEG-018",
+            "LEG-042"
+          ],
+          "module_skill": "native-llm",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P2-005.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-2-validation",
+      "phase": "2",
+      "parallel": false,
+      "depends_on": [
+        "batch-2-core-loop-parallel-b"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P2-006",
+          "todo_id": "NATIVE-P2-006",
+          "module": "qa/device-validation",
+          "goal": "Validate Phase 2 core loop integration when preview APK is requested.",
+          "non_goals": [
+            "Do not call real LLM unless the user explicitly asks for manual device validation."
+          ],
+          "legacy_ids": [
+            "LEG-005..LEG-018",
+            "LEG-026..LEG-028",
+            "LEG-041",
+            "LEG-042",
+            "LEG-043"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P2-006.json",
+          "expected_outputs": [
+            "validation_record",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-3-background",
+      "phase": "3",
+      "parallel": false,
+      "depends_on": [
+        "batch-2-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P3-001",
+          "todo_id": "NATIVE-P3-001",
+          "module": ":feature:chat/:core:data/:core:llm",
+          "goal": "Implement WorkManager generation jobs with stale/deleted-session isolation.",
+          "non_goals": [
+            "Do not implement official release packaging."
+          ],
+          "legacy_ids": [
+            "LEG-016",
+            "LEG-017"
+          ],
+          "module_skill": "native-background",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P3-001.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-3-reliability-parallel",
+      "phase": "3",
+      "parallel": true,
+      "depends_on": [
+        "batch-3-background"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P3-002",
+          "todo_id": "NATIVE-P3-002",
+          "module": ":feature:chat/:feature:settings/:app",
+          "goal": "Implement notifications and background settings surface.",
+          "non_goals": [
+            "Do not enable proactive behavior without product decision."
+          ],
+          "legacy_ids": [
+            "LEG-017",
+            "LEG-029",
+            "LEG-030"
+          ],
+          "module_skill": "native-background",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P3-002.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P3-003",
+          "todo_id": "NATIVE-P3-003",
+          "module": ":feature:settings/:core:data/:core:llm",
+          "goal": "Implement diagnostics and error records.",
+          "non_goals": [
+            "Do not expose secrets in diagnostics."
+          ],
+          "legacy_ids": [
+            "LEG-023",
+            "LEG-028",
+            "LEG-044"
+          ],
+          "module_skill": "native-settings",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P3-003.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-3-validation",
+      "phase": "3",
+      "parallel": false,
+      "depends_on": [
+        "batch-3-reliability-parallel"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P3-004",
+          "todo_id": "NATIVE-P3-004",
+          "module": "qa/device-validation",
+          "goal": "Validate Phase 3 background and reliability integration when preview APK is requested.",
+          "non_goals": [
+            "Do not build signed APK without explicit request."
+          ],
+          "legacy_ids": [
+            "LEG-016",
+            "LEG-017",
+            "LEG-023",
+            "LEG-028",
+            "LEG-029",
+            "LEG-030",
+            "LEG-044"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P3-004.json",
+          "expected_outputs": [
+            "validation_record",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-4-protocol-and-wipe",
+      "phase": "4",
+      "parallel": true,
+      "depends_on": [
+        "batch-2-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P4-001",
+          "todo_id": "NATIVE-P4-001",
+          "module": ":core:protocol",
+          "goal": "Implement versioned protocol schemas and fixture validation.",
+          "non_goals": [
+            "Do not implement native import UI."
+          ],
+          "legacy_ids": [
+            "LEG-010",
+            "LEG-031",
+            "LEG-032",
+            "LEG-043"
+          ],
+          "module_skill": "native-protocol",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-001.json",
+          "expected_outputs": [
+            "patch",
+            "fixtures",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P4-005",
+          "todo_id": "NATIVE-P4-005",
+          "module": ":feature:settings/:core:data",
+          "goal": "Implement destructive local data wipe with confirmation.",
+          "non_goals": [
+            "Do not change import modes."
+          ],
+          "legacy_ids": [
+            "LEG-033"
+          ],
+          "module_skill": "native-settings",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-005.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-4-import-export",
+      "phase": "4",
+      "parallel": true,
+      "depends_on": [
+        "batch-4-protocol-and-wipe"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P4-002",
+          "todo_id": "NATIVE-P4-002",
+          "module": ":feature:settings/:core:data/:core:protocol",
+          "goal": "Implement native import pipeline with validation, dry-run, write, and result screen.",
+          "non_goals": [
+            "Do not use direct IndexedDB scraping."
+          ],
+          "legacy_ids": [
+            "LEG-032"
+          ],
+          "module_skill": "native-data",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-002.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P4-004",
+          "todo_id": "NATIVE-P4-004",
+          "module": ":feature:settings/:core:protocol/:core:data",
+          "goal": "Implement native export flows.",
+          "non_goals": [
+            "Do not export API keys by default."
+          ],
+          "legacy_ids": [
+            "LEG-006",
+            "LEG-010",
+            "LEG-031"
+          ],
+          "module_skill": "native-protocol",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-004.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-4-modes-release-prompt",
+      "phase": "4",
+      "parallel": true,
+      "depends_on": [
+        "batch-4-import-export"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P4-003",
+          "todo_id": "NATIVE-P4-003",
+          "module": ":core:data/:feature:settings",
+          "goal": "Implement append, overwrite, and new-space import modes with idempotency.",
+          "non_goals": [
+            "Do not hide spaces as an internal-only concept."
+          ],
+          "legacy_ids": [
+            "LEG-032"
+          ],
+          "module_skill": "native-data",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-003.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P4-006",
+          "todo_id": "NATIVE-P4-006",
+          "module": ":app/:feature:settings",
+          "goal": "Design replacement-build first-launch import prompt.",
+          "non_goals": [
+            "Do not switch official package id."
+          ],
+          "legacy_ids": [
+            "LEG-032"
+          ],
+          "module_skill": "native-package-release",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-006.json",
+          "expected_outputs": [
+            "patch_or_runbook",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-4-validation",
+      "phase": "4",
+      "parallel": false,
+      "depends_on": [
+        "batch-4-modes-release-prompt"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P4-007",
+          "todo_id": "NATIVE-P4-007",
+          "module": "qa/device-validation",
+          "goal": "Validate Phase 4 import/export integration when preview APK is requested.",
+          "non_goals": [
+            "Do not run destructive overwrite without fixture setup."
+          ],
+          "legacy_ids": [
+            "LEG-010",
+            "LEG-031",
+            "LEG-032",
+            "LEG-033"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P4-007.json",
+          "expected_outputs": [
+            "validation_record",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-5-memory-sources-start",
+      "phase": "5",
+      "parallel": true,
+      "depends_on": [
+        "batch-2-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P5-001",
+          "todo_id": "NATIVE-P5-001",
+          "module": ":feature:memory/:app",
+          "goal": "Implement context hub shell.",
+          "non_goals": [
+            "Do not complete graph renderer."
+          ],
+          "legacy_ids": [
+            "LEG-019",
+            "LEG-024"
+          ],
+          "module_skill": "native-memory-graph",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-001.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P5-005",
+          "todo_id": "NATIVE-P5-005",
+          "module": ":feature:sources/:core:data",
+          "goal": "Implement source library and simple local parsers.",
+          "non_goals": [
+            "Do not silently discard unsupported files."
+          ],
+          "legacy_ids": [
+            "LEG-011",
+            "LEG-021",
+            "LEG-034",
+            "LEG-036"
+          ],
+          "module_skill": "native-sources",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-005.json",
+          "expected_outputs": [
+            "patch",
+            "parser_status_update",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-5-memory-graph-parallel",
+      "phase": "5",
+      "parallel": true,
+      "depends_on": [
+        "batch-5-memory-sources-start"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P5-002",
+          "todo_id": "NATIVE-P5-002",
+          "module": ":feature:memory/:core:data/:feature:sources",
+          "goal": "Implement anchors, notes, and errors.",
+          "non_goals": [
+            "Do not complete global graph browsing."
+          ],
+          "legacy_ids": [
+            "LEG-021",
+            "LEG-022",
+            "LEG-023"
+          ],
+          "module_skill": "native-memory-graph",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-002.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-P5-003",
+          "todo_id": "NATIVE-P5-003",
+          "module": ":feature:memory/:core:data",
+          "goal": "Implement native knowledge graph engine.",
+          "non_goals": [
+            "Do not use WebView graph carry-over."
+          ],
+          "legacy_ids": [
+            "LEG-020",
+            "LEG-025"
+          ],
+          "module_skill": "native-memory-graph",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-003.json",
+          "expected_outputs": [
+            "patch",
+            "graph_parity_notes",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P5-006",
+          "todo_id": "NATIVE-P5-006",
+          "module": ":feature:sources/:feature:chat/:core:llm",
+          "goal": "Implement image source import and complex parser status.",
+          "non_goals": [
+            "Do not claim full local parsing for deferred complex formats."
+          ],
+          "legacy_ids": [
+            "LEG-018",
+            "LEG-034",
+            "LEG-035"
+          ],
+          "module_skill": "native-sources",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-006.json",
+          "expected_outputs": [
+            "patch",
+            "parser_status_update",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-5-graph-context-integration",
+      "phase": "5",
+      "parallel": true,
+      "depends_on": [
+        "batch-5-memory-graph-parallel"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P5-004",
+          "todo_id": "NATIVE-P5-004",
+          "module": ":feature:memory/:core:data",
+          "goal": "Implement graph edit and review parity.",
+          "non_goals": [
+            "Do not waive graph P0 behavior without approval."
+          ],
+          "legacy_ids": [
+            "LEG-020",
+            "LEG-025"
+          ],
+          "module_skill": "native-memory-graph",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-004.json",
+          "expected_outputs": [
+            "patch",
+            "graph_parity_checklist",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P5-007",
+          "todo_id": "NATIVE-P5-007",
+          "module": ":feature:chat/:feature:memory/:feature:sources/:core:llm",
+          "goal": "Integrate memory and source context into chat turn protocol.",
+          "non_goals": [
+            "Do not make Python runtime mandatory."
+          ],
+          "legacy_ids": [
+            "LEG-012",
+            "LEG-021",
+            "LEG-022",
+            "LEG-023",
+            "LEG-036"
+          ],
+          "module_skill": "native-chat",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-007.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-5-validation",
+      "phase": "5",
+      "parallel": false,
+      "depends_on": [
+        "batch-5-graph-context-integration"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P5-008",
+          "todo_id": "NATIVE-P5-008",
+          "module": "qa/device-validation",
+          "goal": "Validate Phase 5 memory, graph, and sources integration when preview APK is requested.",
+          "non_goals": [
+            "Do not call partial graph as replacement-ready."
+          ],
+          "legacy_ids": [
+            "LEG-019..LEG-025",
+            "LEG-034..LEG-036"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P5-008.json",
+          "expected_outputs": [
+            "validation_record",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-6-replacement-readiness",
+      "phase": "6",
+      "parallel": false,
+      "depends_on": [
+        "batch-3-validation",
+        "batch-4-validation",
+        "batch-5-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P6-001",
+          "todo_id": "NATIVE-P6-001",
+          "module": "legacy-entry-parity",
+          "goal": "Run full legacy entry audit for LEG-001 to LEG-044.",
+          "non_goals": [
+            "Do not approve missing P0 behavior without explicit waiver."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P6-001.json",
+          "expected_outputs": [
+            "coverage_matrix",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-6-package-device-guide",
+      "phase": "6",
+      "parallel": true,
+      "depends_on": [
+        "batch-6-replacement-readiness"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P6-002",
+          "todo_id": "NATIVE-P6-002",
+          "module": "package-release",
+          "goal": "Prepare replacement package readiness and cover-install runbook.",
+          "non_goals": [
+            "Do not switch package id or sign replacement build without explicit approval."
+          ],
+          "legacy_ids": [
+            "LEG-001",
+            "LEG-030",
+            "LEG-032",
+            "LEG-044"
+          ],
+          "module_skill": "native-package-release",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P6-002.json",
+          "expected_outputs": [
+            "runbook",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P6-003",
+          "todo_id": "NATIVE-P6-003",
+          "module": "qa/device-validation",
+          "goal": "Run regression and replacement readiness device matrix.",
+          "non_goals": [
+            "Do not mark unavailable device coverage as passed."
+          ],
+          "legacy_ids": [
+            "all P0/P1 IDs"
+          ],
+          "module_skill": "native-qa-parity",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P6-003.json",
+          "expected_outputs": [
+            "device_matrix",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "high"
+        },
+        {
+          "task_id": "NATIVE-P6-004",
+          "todo_id": "NATIVE-P6-004",
+          "module": "PM/Architecture",
+          "goal": "Write user migration guide.",
+          "non_goals": [
+            "Do not promise migration of API keys."
+          ],
+          "legacy_ids": [
+            "LEG-031",
+            "LEG-032",
+            "LEG-044"
+          ],
+          "module_skill": "native-package-release",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P6-004.json",
+          "expected_outputs": [
+            "migration_guide",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-6-pwa-exit-decision",
+      "phase": "6",
+      "parallel": false,
+      "depends_on": [
+        "batch-6-package-device-guide"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-P6-005",
+          "todo_id": "NATIVE-P6-005",
+          "module": "PM/Architecture",
+          "goal": "Record PWA exit decision after replacement evidence is complete.",
+          "non_goals": [
+            "Do not remove PWA/Capacitor path without explicit approval."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "native-package-release",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-P6-005.json",
+          "expected_outputs": [
+            "pwa_exit_decision",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-foundation",
+      "phase": "UX",
+      "parallel": false,
+      "depends_on": [
+        "batch-2-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-001",
+          "todo_id": "NATIVE-UX-001",
+          "module": ":app/:feature:chat/:feature:settings design-system",
+          "goal": "Define native Android product UI design system, screen hierarchy, and acceptance checklist.",
+          "non_goals": [
+            "Do not claim functional parity changes.",
+            "Do not redesign away legacy entry points before parity is stable."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-001.json",
+          "expected_outputs": [
+            "design_system_doc",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-UX-002",
+          "todo_id": "NATIVE-UX-002",
+          "module": ":app shared-compose-components",
+          "goal": "Implement token-driven Compose theme and reusable component foundation.",
+          "non_goals": [
+            "Do not rewrite all feature screens in one task."
+          ],
+          "legacy_ids": [
+            "LEG-001",
+            "LEG-002",
+            "LEG-037",
+            "LEG-041"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-002.json",
+          "expected_outputs": [
+            "patch",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-core-pages",
+      "phase": "UX",
+      "parallel": true,
+      "depends_on": [
+        "batch-ux-foundation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-003",
+          "todo_id": "NATIVE-UX-003",
+          "module": ":feature:chat/:feature:settings",
+          "goal": "Polish core-loop UI layouts for Sessions, Chat, composer, generation states, and LLM settings.",
+          "non_goals": [
+            "Do not add live provider calls.",
+            "Do not change import/export behavior."
+          ],
+          "legacy_ids": [
+            "LEG-005..LEG-018",
+            "LEG-026..LEG-028",
+            "LEG-041",
+            "LEG-042",
+            "LEG-043"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-003.json",
+          "expected_outputs": [
+            "patch",
+            "screenshots",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-phase4-import-export",
+      "phase": "UX",
+      "parallel": false,
+      "depends_on": [
+        "batch-ux-foundation",
+        "batch-4-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-004",
+          "todo_id": "NATIVE-UX-004",
+          "module": ":feature:settings import-export-ui",
+          "goal": "Design and implement import/export, wipe, import result, and first-launch prompt UI patterns after protocol foundations exist.",
+          "non_goals": [
+            "Do not implement protocol validation outside Phase 4 ownership."
+          ],
+          "legacy_ids": [
+            "LEG-010",
+            "LEG-031",
+            "LEG-032",
+            "LEG-033"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-004.json",
+          "depends_on": [
+            "NATIVE-UX-001",
+            "NATIVE-UX-002",
+            "NATIVE-P4-001",
+            "NATIVE-P4-002",
+            "NATIVE-P4-003",
+            "NATIVE-P4-004",
+            "NATIVE-P4-005",
+            "NATIVE-P4-006"
+          ],
+          "expected_outputs": [
+            "patch_or_design_overrides",
+            "screenshots",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-phase5-surfaces",
+      "phase": "UX",
+      "parallel": false,
+      "depends_on": [
+        "batch-ux-foundation",
+        "batch-5-graph-context-integration"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-005",
+          "todo_id": "NATIVE-UX-005",
+          "module": ":feature:memory/:feature:sources graph-source-ui",
+          "goal": "Design and implement Context hub, graph, source library, parser status, and evidence-reference UI patterns as Phase 5 surfaces land.",
+          "non_goals": [
+            "Do not use WebView graph carry-over.",
+            "Do not label partial parser support as complete."
+          ],
+          "legacy_ids": [
+            "LEG-019..LEG-025",
+            "LEG-034..LEG-036"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-005.json",
+          "depends_on": [
+            "NATIVE-UX-001",
+            "NATIVE-UX-002",
+            "NATIVE-P5-001",
+            "NATIVE-P5-005"
+          ],
+          "expected_outputs": [
+            "patch_or_design_overrides",
+            "screenshots",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-phase5-detail-specs",
+      "phase": "UX",
+      "parallel": true,
+      "depends_on": [
+        "batch-ux-phase5-surfaces",
+        "batch-5-graph-context-integration"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-007",
+          "todo_id": "NATIVE-UX-007",
+          "module": ":feature:memory context-hub-ia",
+          "goal": "Specify Context Hub information architecture, navigation hierarchy, object grouping, and evidence-reference placement.",
+          "non_goals": [
+            "Do not implement graph engine behavior.",
+            "Do not change Phase 5 data ownership."
+          ],
+          "legacy_ids": [
+            "LEG-019",
+            "LEG-021",
+            "LEG-022",
+            "LEG-023",
+            "LEG-024"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-007.json",
+          "expected_outputs": [
+            "ia_spec",
+            "screen_flow_notes",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-UX-008",
+          "todo_id": "NATIVE-UX-008",
+          "module": ":feature:memory graph-interaction",
+          "goal": "Specify native graph interaction states for pan, zoom, selection, detail sheets, edit affordances, and review parity.",
+          "non_goals": [
+            "Do not use WebView graph carry-over.",
+            "Do not waive graph P0 behavior without approval."
+          ],
+          "legacy_ids": [
+            "LEG-020",
+            "LEG-025"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-008.json",
+          "expected_outputs": [
+            "interaction_spec",
+            "graph_state_matrix",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        },
+        {
+          "task_id": "NATIVE-UX-009",
+          "todo_id": "NATIVE-UX-009",
+          "module": ":feature:sources parser-status-ui",
+          "goal": "Specify source library and parser status UI for supported, partial, deferred, unsupported, failed, and recovery states.",
+          "non_goals": [
+            "Do not claim full local parsing for deferred complex formats.",
+            "Do not silently discard unsupported files."
+          ],
+          "legacy_ids": [
+            "LEG-011",
+            "LEG-034",
+            "LEG-035",
+            "LEG-036"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-009.json",
+          "expected_outputs": [
+            "parser_status_ui_spec",
+            "state_copy_matrix",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-phase5-ui-qa",
+      "phase": "UX",
+      "parallel": false,
+      "depends_on": [
+        "batch-ux-phase5-detail-specs",
+        "batch-5-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-010",
+          "todo_id": "NATIVE-UX-010",
+          "module": "qa/device-validation Phase-5-UI-quality",
+          "goal": "Run Phase 5 UI QA for Context Hub, graph interactions, source library, parser status, and evidence-reference flows.",
+          "non_goals": [
+            "Do not approve replacement readiness when P0 functional blockers remain.",
+            "Do not replace final all-up UI QA."
+          ],
+          "legacy_ids": [
+            "LEG-019..LEG-025",
+            "LEG-034..LEG-036"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-010.json",
+          "expected_outputs": [
+            "phase5_ui_qa_matrix",
+            "screenshots",
+            "worker_state.json",
+            "verification_result.json"
+          ],
+          "risk_level": "medium"
+        }
+      ]
+    },
+    {
+      "batch_id": "batch-ux-final-qa",
+      "phase": "UX",
+      "parallel": false,
+      "depends_on": [
+        "batch-ux-core-pages",
+        "batch-ux-phase4-import-export",
+        "batch-ux-phase5-ui-qa",
+        "batch-3-validation",
+        "batch-4-validation",
+        "batch-5-validation"
+      ],
+      "tasks": [
+        {
+          "task_id": "NATIVE-UX-006",
+          "todo_id": "NATIVE-UX-006",
+          "module": "qa/device-validation UI-quality",
+          "goal": "Run final UI quality, accessibility, dynamic type, dark mode, IME, and device screenshot matrix before replacement readiness.",
+          "non_goals": [
+            "Do not approve replacement readiness when P0 functional blockers remain."
+          ],
+          "legacy_ids": [
+            "LEG-001..LEG-044"
+          ],
+          "module_skill": "native-ui-ux",
+          "task_spec_path": ".adworkflow/task_specs/NATIVE-UX-006.json",
+          "expected_outputs": [
+            "ui_qa_matrix",
+            "screenshots",
+            "worker_state.json",
+            "verification_result.json",
+            "review_findings.json"
+          ],
+          "risk_level": "high"
+        }
+      ]
+    }
+  ],
+  "integration_tasks": [
+    "NATIVE-P1-006",
+    "NATIVE-P2-006",
+    "NATIVE-P3-004",
+    "NATIVE-P4-007",
+    "NATIVE-P5-008",
+    "NATIVE-P6-003",
+    "NATIVE-UX-010",
+    "NATIVE-UX-006"
+  ],
+  "review_required_tasks": [
+    "NATIVE-P1-003",
+    "NATIVE-P2-004",
+    "NATIVE-P2-005",
+    "NATIVE-P3-001",
+    "NATIVE-P4-001",
+    "NATIVE-P4-002",
+    "NATIVE-P4-003",
+    "NATIVE-P4-004",
+    "NATIVE-P5-003",
+    "NATIVE-P5-004",
+    "NATIVE-P5-005",
+    "NATIVE-P5-006",
+    "NATIVE-P6-002",
+    "NATIVE-UX-006"
+  ],
+  "open_questions": [
+    "Exact first supported legacy export schema version.",
+    "Exact older or lower-end Android validation target.",
+    "Parser library choices for PDF, DOCX, PPTX, and EPUB.",
+    "Whether proactive behavior ships in first native replacement release.",
+    "No-model fallback behavior: legacy mock parity or clearer no-model state.",
+    "Final official package switch and signing runbook.",
+    "Final Android visual identity and design-token approval before public replacement release.",
+    "Exact UI device matrix screenshots required for replacement readiness."
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "task_id": "NATIVE-P5-005",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "source_reprocess",
+      "finding": "Reprocess currently uses the stored extracted text and does not reopen the original content URI.",
+      "recommendation": "Add persisted URI permissions, local source-copy metadata, and original-file re-read semantics before claiming full source import parity."
+    },
+    {
+      "severity": "medium",
+      "area": "source_import_transaction",
+      "finding": "Source and chunk writes are coordinated by repository calls but not yet wrapped in a dedicated Room transaction boundary.",
+      "recommendation": "Introduce a transaction-backed source import coordinator before replacement readiness or broader parser ingestion."
+    },
+    {
+      "severity": "medium",
+      "area": "complex_parsers",
+      "finding": "Complex formats remain visible as future-assisted or unsupported instead of being parsed locally.",
+      "recommendation": "Keep PDF, DOCX, PPTX, EPUB, image/OCR, and richer HTML behavior in NATIVE-P5-006 and later parser tasks."
+    },
+    {
+      "severity": "low",
+      "area": "device_evidence",
+      "finding": "P5-005 has HMA-AL00 instrumentation evidence, but not manual system document picker screenshots.",
+      "recommendation": "Capture real picker interaction screenshots during the later Phase 5 validation or Phase 6 device matrix once manual install is explicitly approved."
+    }
+  ],
+  "resolved_review_points": [
+    {
+      "area": "binary_file_reading",
+      "finding": "Original implementation attempted to read every selected file as UTF-8 text before parser classification.",
+      "resolution": "Added SourceImportInputFactory so unsupported/binary selections do not read body text and still produce visible source records."
+    },
+    {
+      "area": "large_text_reading",
+      "finding": "Text selections used unbounded readText.",
+      "resolution": "Added readSourceTextWithinLimit with a 500000-character cap; over-limit text returns null and is stored as failed/visible instead of loading indefinitely."
+    },
+    {
+      "area": "instrumentation_selector",
+      "finding": "Device test clicked duplicate Reprocess text and could target the unsupported card.",
+      "resolution": "Added stable source action test tags and made Phase5SourcesDeviceTest click the Markdown source action by source id."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_specs/NATIVE-P5-005.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/sources/SourceRepository.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/SourceImportInputFactory.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/feature/sources/src/main/java/com/reversetutor/feature/sources/SourcesModels.kt",
+    "mobile-native/feature/sources/src/main/java/com/reversetutor/feature/sources/SourcesScreen.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/sources/SourceRepositoryTest.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/shell/SourceImportInputFactoryTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5SourcesDeviceTest.kt",
+    "mobile-native/qa/device-validation/2026-07-01-native-p5-005-hma-al00/README.md"
+  ]
+}

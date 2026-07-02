@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-UX-004",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/ProtocolImportReader.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/ProtocolImportReaderTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/migration/NativeImportRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/core/protocol/src/main/java/com/reversetutor/core/protocol/export/ProtocolExportPayloads.kt",
+    "mobile-native/core/protocol/src/test/java/com/reversetutor/core/protocol/export/ProtocolExportPayloadBuilderTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_frontend_enqueues_and_imports_native_background_turns (tests/test_android_background_llm.py:153)",
+    "test_mobile_export_uses_native_android_share_sheet (tests/test_android_background_llm.py:195)",
+    "test_pwa_context_images_are_imported_through_anchors (tests/test_image_memory.py:238)",
+    "test_verification_status_none_does_not_increase_existing_score (tests/test_mastery_evidence_weighting.py:12)",
+    "test_mobile_update_download_opens_native_installer_when_available (tests/test_android_background_llm.py:180)",
+    "test_has_learning_evidence_true_when_correctness_at_least_half (tests/test_kg_gate.py:143)",
+    "test_mobile_free_glm_can_be_explicitly_selected_after_user_api_exists (tests/test_llm_provider_presets.py:248)",
+    "test_mobile_prompt_adapts_when_goal_is_not_learning (tests/test_llm_provider_presets.py:330)",
+    "test_failed_verification_rolls_back_high_score (tests/test_mastery_evidence_weighting.py:94)",
+    "test_mobile_preset_import_export_is_lightweight_and_safe (tests/test_mobile_product_experience.py:611)",
+    "test_goal_and_companion_state_tables_exist_and_are_initialized (tests/test_mode_skeleton.py:114)",
+    "test_import_md_creates_chunks_and_fts_rows (tests/test_retrieval.py:31)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not implement protocol validation outside Phase 4 ownership.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

@@ -1,0 +1,79 @@
+{
+  "task_id": "NATIVE-P1-004",
+  "goal": "Add native settings foundation with DataStore-backed theme/avatar/memo placeholders and native about/diagnostics metadata.",
+  "non_goals": [
+    "Do not implement full LLM profile CRUD.",
+    "Do not implement real provider connection tests.",
+    "Do not implement app update download/install behavior.",
+    "Do not implement full memo editor gestures.",
+    "Do not implement secure key storage.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not build signed APKs."
+  ],
+  "acceptance_criteria": [
+    "Settings route is reachable from the native app shell.",
+    "About/diagnostics route displays native app metadata.",
+    "DataStore-backed app preferences include theme, global avatar visibility, and memo placeholders.",
+    "Local preferences persist across repository/app recreation.",
+    "PWA install hints are not carried into native about UI.",
+    "No API key values are stored in DataStore.",
+    "Verification evidence is recorded in .adworkflow/verification_result.json."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "solo_worker",
+  "allowed_actions": [
+    "read",
+    "edit",
+    "test"
+  ],
+  "required_outputs": [
+    "patch_or_changed_file_summary",
+    "context_raw.json",
+    "context_manifest.json",
+    "worker_state.json",
+    "verification_result.json"
+  ],
+  "module": ":feature:settings,:core:data,:app",
+  "branch": "native/settings-profile",
+  "legacy_ids": [
+    "LEG-003",
+    "LEG-004",
+    "LEG-037",
+    "LEG-038",
+    "LEG-044"
+  ],
+  "read_first": [
+    "AGENTS.md",
+    "tasks/arch-native-android-migration.md",
+    "tasks/todo-native-android-migration.md",
+    "tasks/native-legacy-entry-inventory.md",
+    ".adworkflow/permissions.md",
+    ".adworkflow/verification_commands.md",
+    ".adworkflow/module_skills.md",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/SettingsModule.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppNavigation.kt"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Write failing tests before production settings implementation.",
+    "Run :core:data:testDebugUnitTest.",
+    "Run :core:data:connectedDebugAndroidTest if an ADB device is available.",
+    "Run :feature:settings:testDebugUnitTest.",
+    "Run app module tests for navigation/reachability if changed.",
+    "Run native Gradle assembleDebug, test, and lint.",
+    "If ADB device is available, install and launch preview and capture settings/about reachability evidence."
+  ],
+  "notes": [
+    "This is a settings foundation task. Full settings feature parity arrives in later tasks.",
+    "Use DataStore only for lightweight preferences; do not store raw API keys."
+  ]
+}

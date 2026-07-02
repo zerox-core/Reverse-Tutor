@@ -1,0 +1,14 @@
+{
+  "schema": "native_import_result_v1",
+  "version": 1,
+  "type": "import_result",
+  "status": "completed",
+  "mode": "new_space",
+  "inserted_counts": {
+    "sessions": 1,
+    "messages": 1
+  },
+  "skipped_counts": {},
+  "warnings": [],
+  "errors": []
+}
