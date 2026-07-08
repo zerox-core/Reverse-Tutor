@@ -10,22 +10,36 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.llm.LlmProfileRepository
@@ -45,6 +59,7 @@ import com.reversetutor.core.llm.MockLlmConnectionTester
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.feature.chat.ChatRoute
 import com.reversetutor.feature.chat.ChatImageDraft
+import com.reversetutor.feature.chat.NewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.memory.ContextHubRoute
 import com.reversetutor.feature.memory.GlobalGraphRoute
@@ -59,13 +74,12 @@ import com.reversetutor.feature.settings.LlmProfileSettingsUiState
 import com.reversetutor.feature.settings.NativeDiagnosticsInfo
 import com.reversetutor.feature.settings.SettingsFoundationScreen
 import com.reversetutor.feature.settings.SettingsUiState
+import com.reversetutor.preview.background.BackgroundGenerationWorker
 import com.reversetutor.preview.theme.ReverseTutorDesign
 import com.reversetutor.preview.theme.ReverseTutorStatusTone
 import com.reversetutor.preview.ui.ReverseTutorActionButton
 import com.reversetutor.preview.ui.ReverseTutorActionTone
 import com.reversetutor.preview.ui.ReverseTutorConfirmationDialog
-import com.reversetutor.preview.ui.ReverseTutorNavigationItem
-import com.reversetutor.preview.ui.ReverseTutorNavigationStrip
 import com.reversetutor.preview.ui.ReverseTutorScaffold
 import com.reversetutor.preview.ui.ReverseTutorScreenSurface
 import com.reversetutor.preview.ui.ReverseTutorStatusStrip
@@ -75,6 +89,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 @Composable
 fun AppShell(
@@ -83,6 +99,7 @@ fun AppShell(
     messageRepository: MessageRepository,
     llmProfileRepository: LlmProfileRepository,
     chatGenerationRepository: ChatGenerationRepository,
+    backgroundGenerationRepository: BackgroundGenerationRepository? = null,
     sourceRepository: SourceRepository,
     memoryRepository: MemoryRepository,
     graphRepository: GraphRepository,
@@ -97,9 +114,11 @@ fun AppShell(
     var navigationState by remember { mutableStateOf(AppNavigationState()) }
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var activeSessionTitle by remember { mutableStateOf<String?>(null) }
+    var challengeJoined by remember { mutableStateOf(false) }
     var showFirstLaunchImportPrompt by remember(firstLaunchImportPromptState) {
         mutableStateOf(firstLaunchImportPromptState.shouldShow)
     }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
     BackHandler {
         val transition = navigationState.handleSystemBack()
@@ -116,70 +135,137 @@ fun AppShell(
         }
     }
 
-    ReverseTutorScaffold(
-        topBar = {
-            PreviewTopBar(
-                destination = navigationState.current,
-                onStatusClick = {
-                    navigationState = navigationState.openModal(AppModal.Status)
+    LaunchedEffect(navigationState.drawerOpen) {
+        if (navigationState.drawerOpen) {
+            drawerState.open()
+        } else {
+            drawerState.close()
+        }
+    }
+    LaunchedEffect(drawerState) {
+        snapshotFlow { drawerState.currentValue }
+            .map { it == DrawerValue.Open }
+            .distinctUntilChanged()
+            .collect { open ->
+                if (!open && navigationState.drawerOpen) {
+                    navigationState = navigationState.closeDrawer()
                 }
-            )
-        },
-        bottomBar = {
-            DestinationStrip(
+            }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            AppDrawer(
                 current = navigationState.current,
                 onDestinationClick = {
                     navigationState = navigationState.navigate(it)
+                },
+                onImportExportClick = {
+                    navigationState = navigationState.navigate(AppDestination.ImportExport)
                 }
             )
         }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            DestinationContent(
-                destination = navigationState.current,
-                appPreferences = appPreferences,
-                sessionRepository = sessionRepository,
-                messageRepository = messageRepository,
-                llmProfileRepository = llmProfileRepository,
-                chatGenerationRepository = chatGenerationRepository,
-                sourceRepository = sourceRepository,
-                memoryRepository = memoryRepository,
-                graphRepository = graphRepository,
-                localDataWipeRepository = localDataWipeRepository,
-                nativeImportRepository = nativeImportRepository,
-                nativeExportRepository = nativeExportRepository,
-                initialImportText = initialImportText,
-                initialImportFileName = initialImportFileName,
-                activeSessionId = activeSessionId,
-                activeSessionTitle = activeSessionTitle,
-                onOpenChat = {
-                    navigationState = navigationState.navigate(AppDestination.Chat)
-                },
-                onOpenSession = { session ->
-                    activeSessionId = session.id
-                    activeSessionTitle = session.title
-                    navigationState = navigationState.navigate(AppDestination.Chat)
-                },
-                onOpenContextHub = {
-                    navigationState = navigationState.navigate(AppDestination.ContextHub)
-                },
-                onOpenSources = {
-                    navigationState = navigationState.navigate(AppDestination.Sources)
-                },
-                onOpenSessions = {
-                    navigationState = navigationState.navigate(AppDestination.Sessions)
-                },
-                onOpenSettings = {
-                    navigationState = navigationState.navigate(AppDestination.Settings)
-                },
-                onOpenAbout = {
-                    navigationState = navigationState.navigate(AppDestination.About)
+    ) {
+        ReverseTutorScaffold(
+            topBar = {
+                if (navigationState.current != AppDestination.Challenge &&
+                    navigationState.current != AppDestination.Sessions
+                ) {
+                    PreviewTopBar(
+                        destination = navigationState.current,
+                        activeSessionTitle = activeSessionTitle,
+                        onNavigationClick = {
+                            if (navigationState.current.usesDrawerNavigation()) {
+                                navigationState = navigationState.openDrawer()
+                            } else {
+                                val transition = navigationState.handleSystemBack()
+                                navigationState = transition.state
+                            }
+                        },
+                        onStatusClick = {
+                            navigationState = navigationState.openModal(AppModal.Status)
+                        },
+                        onChallengeClick = {
+                            navigationState = navigationState.navigate(AppDestination.Challenge)
+                        },
+                        onNewSessionClick = {
+                            navigationState = navigationState.navigate(AppDestination.NewSession)
+                        }
+                    )
                 }
-            )
+            }
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                DestinationContent(
+                    destination = navigationState.current,
+                    appPreferences = appPreferences,
+                    sessionRepository = sessionRepository,
+                    messageRepository = messageRepository,
+                    llmProfileRepository = llmProfileRepository,
+                    chatGenerationRepository = chatGenerationRepository,
+                    backgroundGenerationRepository = backgroundGenerationRepository,
+                    sourceRepository = sourceRepository,
+                    memoryRepository = memoryRepository,
+                    graphRepository = graphRepository,
+                    localDataWipeRepository = localDataWipeRepository,
+                    nativeImportRepository = nativeImportRepository,
+                    nativeExportRepository = nativeExportRepository,
+                    initialImportText = initialImportText,
+                    initialImportFileName = initialImportFileName,
+                    activeSessionId = activeSessionId,
+                    activeSessionTitle = activeSessionTitle,
+                    challengeJoined = challengeJoined,
+                    onOpenChat = {
+                        navigationState = navigationState.navigate(AppDestination.Chat)
+                    },
+                    onOpenSession = { session ->
+                        activeSessionId = session.id
+                        activeSessionTitle = session.title
+                        navigationState = navigationState.navigate(AppDestination.Chat)
+                    },
+                    onOpenContextHub = {
+                        navigationState = navigationState.navigate(AppDestination.ContextHub)
+                    },
+                    onOpenGlobalGraph = {
+                        navigationState = navigationState.navigate(AppDestination.GlobalGraph)
+                    },
+                    onOpenSources = {
+                        navigationState = navigationState.navigate(AppDestination.Sources)
+                    },
+                    onOpenSessions = {
+                        navigationState = navigationState.navigate(AppDestination.Sessions)
+                    },
+                    onOpenChallenge = {
+                        navigationState = navigationState.navigate(AppDestination.Challenge)
+                    },
+                    onChallengeJoined = {
+                        challengeJoined = true
+                        navigationState = navigationState.navigate(AppDestination.Sessions)
+                    },
+                    onOpenNewSession = {
+                        navigationState = navigationState.navigate(AppDestination.NewSession)
+                    },
+                    onSessionCreated = { session ->
+                        activeSessionId = session.id
+                        activeSessionTitle = session.title
+                        navigationState = navigationState.navigate(AppDestination.Chat)
+                    },
+                    onOpenSettings = {
+                        navigationState = navigationState.navigate(AppDestination.Settings)
+                    },
+                    onOpenImportExport = {
+                        navigationState = navigationState.navigate(AppDestination.ImportExport)
+                    },
+                    onOpenAbout = {
+                        navigationState = navigationState.navigate(AppDestination.About)
+                    }
+                )
+            }
         }
     }
 
@@ -209,36 +295,128 @@ fun AppShell(
 @Composable
 private fun PreviewTopBar(
     destination: AppDestination,
-    onStatusClick: () -> Unit
+    activeSessionTitle: String?,
+    onNavigationClick: () -> Unit,
+    onStatusClick: () -> Unit,
+    onChallengeClick: () -> Unit,
+    onNewSessionClick: () -> Unit
 ) {
+    val title = if (destination == AppDestination.Chat && !activeSessionTitle.isNullOrBlank()) {
+        activeSessionTitle
+    } else {
+        destination.title
+    }
     ReverseTutorTopAppBar(
-        title = destination.title,
+        title = title,
         subtitle = destination.status,
-        actionLabel = "Status",
-        onActionClick = onStatusClick
+        navigationLabel = if (destination.usesDrawerNavigation()) "菜单" else "返回",
+        onNavigationClick = onNavigationClick,
+        actionLabel = if (destination == AppDestination.Sessions) null else "状态",
+        onActionClick = onStatusClick,
+        actions = {
+            if (destination == AppDestination.Sessions) {
+                ReverseTutorActionButton(
+                    label = "挑战",
+                    onClick = onChallengeClick,
+                    tone = ReverseTutorActionTone.Quiet
+                )
+                ReverseTutorActionButton(
+                    label = "新建",
+                    onClick = onNewSessionClick
+                )
+            }
+        }
     )
 }
 
 @Composable
-private fun DestinationStrip(
+private fun AppDrawer(
     current: AppDestination,
-    onDestinationClick: (AppDestination) -> Unit
+    onDestinationClick: (AppDestination) -> Unit,
+    onImportExportClick: () -> Unit
 ) {
-    val items = AppDestination.entries.map { destination ->
-        ReverseTutorNavigationItem(
-            key = destination.route,
-            label = destination.title,
-            contentDescription = destination.title
-        )
+    val spacing = ReverseTutorDesign.spacing
+    val selectedDestination = when (current) {
+        AppDestination.GlobalGraph -> AppDestination.ContextHub
+        AppDestination.ImportExport,
+        AppDestination.About -> AppDestination.Settings
+        else -> current
     }
-    ReverseTutorNavigationStrip(
-        items = items,
-        selectedKey = current.route,
-        onItemSelected = { key ->
-            AppDestination.entries.firstOrNull { it.route == key }?.let(onDestinationClick)
+
+    ModalDrawerSheet(
+        modifier = Modifier.width(304.dp),
+        drawerContainerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(vertical = spacing.space4),
+            verticalArrangement = Arrangement.spacedBy(spacing.space1)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = spacing.space5, vertical = spacing.space3),
+                verticalArrangement = Arrangement.spacedBy(spacing.space2)
+            ) {
+                Text(
+                    text = "反转家教",
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = "默认空间",
+                        modifier = Modifier.padding(horizontal = spacing.space3, vertical = spacing.space2),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+            AppDestination.drawerItems.forEach { item ->
+                NavigationDrawerItem(
+                    label = { Text(if (item.enabled) item.label else "${item.label}（暂未开放）") },
+                    selected = item.enabled && item.destination == selectedDestination,
+                    onClick = {
+                        if (item.enabled) {
+                            onDestinationClick(item.destination)
+                        }
+                    },
+                    modifier = Modifier.padding(horizontal = spacing.space3),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = spacing.space5, vertical = spacing.space3),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "数据管理",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    TextButton(onClick = onImportExportClick) {
+                        Text("导入/导出")
+                    }
+                }
+            }
         }
-    )
+    }
 }
+
+private fun AppDestination.usesDrawerNavigation(): Boolean =
+    AppDestination.drawerItems.any { it.enabled && it.destination == this }
 
 @Composable
 private fun DestinationContent(
@@ -248,6 +426,7 @@ private fun DestinationContent(
     messageRepository: MessageRepository,
     llmProfileRepository: LlmProfileRepository,
     chatGenerationRepository: ChatGenerationRepository,
+    backgroundGenerationRepository: BackgroundGenerationRepository?,
     sourceRepository: SourceRepository,
     memoryRepository: MemoryRepository,
     graphRepository: GraphRepository,
@@ -258,12 +437,19 @@ private fun DestinationContent(
     initialImportFileName: String?,
     activeSessionId: String?,
     activeSessionTitle: String?,
+    challengeJoined: Boolean,
     onOpenChat: () -> Unit,
     onOpenSession: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
     onOpenContextHub: () -> Unit,
+    onOpenGlobalGraph: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenSessions: () -> Unit,
+    onOpenChallenge: () -> Unit,
+    onChallengeJoined: () -> Unit,
+    onOpenNewSession: () -> Unit,
+    onSessionCreated: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenImportExport: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     val diagnostics = remember {
@@ -394,7 +580,26 @@ private fun DestinationContent(
             SessionsRoute(
                 sessionRepository = sessionRepository,
                 avatarVisible = appPreferences.globalAvatarVisible,
-                onOpenSession = onOpenSession
+                challengeJoined = challengeJoined,
+                onOpenSession = onOpenSession,
+                onNewSession = onOpenNewSession,
+                onOpenChallenge = onOpenChallenge
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.NewSession) {
+            NewSessionRoute(
+                sessionRepository = sessionRepository,
+                onCreated = onSessionCreated,
+                onCancel = onOpenSessions
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.Challenge) {
+            ChallengeRoute(
+                joined = challengeJoined,
+                onBack = onOpenSessions,
+                onJoin = onChallengeJoined
             )
             return@ReverseTutorScreenSurface
         }
@@ -402,6 +607,7 @@ private fun DestinationContent(
             ChatRoute(
                 messageRepository = messageRepository,
                 chatGenerationRepository = chatGenerationRepository,
+                backgroundGenerationRepository = backgroundGenerationRepository,
                 memoryRepository = memoryRepository,
                 sourceRepository = sourceRepository,
                 sessionId = activeSessionId,
@@ -413,6 +619,9 @@ private fun DestinationContent(
                 },
                 onImageDraftConsumed = {
                     pendingChatImageDraft = null
+                },
+                onBackgroundGenerationQueued = { jobId ->
+                    BackgroundGenerationWorker.enqueue(context, jobId)
                 },
                 onOpenContextHub = onOpenContextHub
             )
@@ -434,7 +643,8 @@ private fun DestinationContent(
                     pendingSourceEvidenceTarget = sourceId
                     onOpenSources()
                 },
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                onOpenGlobalGraph = onOpenGlobalGraph
             )
             return@ReverseTutorScreenSurface
         }
@@ -512,9 +722,10 @@ private fun DestinationContent(
                         val result = localDataWipeRepository.wipeLocalData(System.currentTimeMillis())
                         llmProfiles = llmProfileRepository.listProfiles()
                         llmConnectionResult = null
-                        wipeStatusLabel = "Local data wiped. Default preview restored. Secrets removed: ${result.deletedSecretRefCount}."
+                        wipeStatusLabel = "本地数据已清空。已恢复默认预览，并移除密钥引用 ${result.deletedSecretRefCount} 个。"
                     }
                 },
+                onOpenImportExport = onOpenImportExport,
                 onReturnToSessions = {
                     onOpenSessions()
                 }
@@ -570,7 +781,7 @@ private fun DestinationContent(
                 onExportCurrentSession = {
                     val sessionId = activeSessionId
                     if (sessionId == null) {
-                        exportState = ExportPipelineUiState.unavailable("Open a session before exporting the current session.")
+                        exportState = ExportPipelineUiState.unavailable("请先打开一个会话，再导出当前会话。")
                     } else {
                         scope.launch {
                             exportState = ExportPipelineUiState.from(
@@ -602,8 +813,8 @@ private fun DestinationContent(
                 },
                 onExportPreset = {
                     exportState = ExportPipelineUiState.unavailable(
-                        message = "Preset export is represented in the protocol, but this preview has no selected preset owner yet.",
-                        kindLabel = "Preset"
+                        message = "协议已支持预设导出，但当前预览还没有选择预设归属。",
+                        kindLabel = "预设"
                     )
                 },
                 onShareExport = {
@@ -647,8 +858,8 @@ private fun DestinationContent(
             )
             Spacer(modifier = Modifier.height(spacing.space3))
             ReverseTutorStatusStrip(
-                title = "Internal preview placeholder",
-                message = "This surface keeps the native product shell reachable while feature UI lands.",
+                title = "预览占位",
+                message = "当前页面仍保留在 native 壳内，后续会继续补齐对应界面。",
                 tone = ReverseTutorStatusTone.Info
             )
             Spacer(modifier = Modifier.height(spacing.space6))
@@ -658,6 +869,7 @@ private fun DestinationContent(
                 onOpenContextHub = onOpenContextHub,
                 onOpenSources = onOpenSources,
                 onOpenSettings = onOpenSettings,
+                onOpenImportExport = onOpenImportExport,
                 onOpenAbout = onOpenAbout
             )
         }
@@ -673,7 +885,7 @@ private fun Context.shareExportText(
         .putExtra(Intent.EXTRA_TITLE, fileName)
         .putExtra(Intent.EXTRA_SUBJECT, fileName)
         .putExtra(Intent.EXTRA_TEXT, json)
-    startActivity(Intent.createChooser(intent, "Share export"))
+    startActivity(Intent.createChooser(intent, "共享导出"))
 }
 
 private fun Context.tryPersistReadPermission(uri: android.net.Uri) {
@@ -716,6 +928,7 @@ private fun PreviewActions(
     onOpenContextHub: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenImportExport: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
     val spacing = ReverseTutorDesign.spacing
@@ -725,28 +938,35 @@ private fun PreviewActions(
         verticalArrangement = Arrangement.spacedBy(spacing.space2)
     ) {
         if (destination != AppDestination.Chat) {
-            ReverseTutorActionButton(label = "Open chat", onClick = onOpenChat)
+            ReverseTutorActionButton(label = "打开聊天", onClick = onOpenChat)
         }
         if (destination == AppDestination.Chat) {
-            ReverseTutorActionButton(label = "Open context hub", onClick = onOpenContextHub)
+            ReverseTutorActionButton(label = "打开脉络", onClick = onOpenContextHub)
         }
         if (destination != AppDestination.Sources) {
             ReverseTutorActionButton(
-                label = "Sources",
+                label = "资料",
                 onClick = onOpenSources,
                 tone = ReverseTutorActionTone.Quiet
             )
         }
         if (destination != AppDestination.Settings) {
             ReverseTutorActionButton(
-                label = "Settings",
+                label = "设置",
                 onClick = onOpenSettings,
+                tone = ReverseTutorActionTone.Quiet
+            )
+        }
+        if (destination != AppDestination.ImportExport) {
+            ReverseTutorActionButton(
+                label = "导入与导出",
+                onClick = onOpenImportExport,
                 tone = ReverseTutorActionTone.Quiet
             )
         }
         if (destination != AppDestination.About) {
             ReverseTutorActionButton(
-                label = "About",
+                label = "诊断",
                 onClick = onOpenAbout,
                 tone = ReverseTutorActionTone.Quiet
             )
@@ -760,10 +980,10 @@ private fun StatusDialog(
     onDismiss: () -> Unit
 ) {
     ReverseTutorConfirmationDialog(
-        title = "Preview status",
-        body = "Current route: ${destination.route}",
-        confirmLabel = "Close",
-        dismissLabel = "Dismiss",
+        title = "预览状态",
+        body = "当前页面：${destination.title}",
+        confirmLabel = "关闭",
+        dismissLabel = "返回",
         onConfirm = onDismiss,
         onDismiss = onDismiss,
         tone = ReverseTutorStatusTone.Info
