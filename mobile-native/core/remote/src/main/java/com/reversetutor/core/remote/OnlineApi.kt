@@ -2,21 +2,32 @@ package com.reversetutor.core.remote
 
 import com.reversetutor.core.model.SyncEnvelope
 
+object OnlineSyncEntityTypes {
+    val Allowed: Set<String> = setOf(
+        "activity_progress",
+        "study_plan",
+        "sync_summary",
+        "user_setting"
+    )
+
+    fun isAllowed(entityType: String): Boolean = entityType in Allowed
+}
+
 interface OnlineApi {
-    fun listActivities(): OnlineResult<List<OnlineActivity>>
-    fun getActivity(activityId: String): OnlineResult<OnlineActivity>
-    fun activityLeaderboard(activityId: String): OnlineResult<List<ActivityProgress>>
-    fun joinActivity(activityId: String, write: OnlineWriteIdentity): OnlineResult<ActivityProgress>
-    fun updateActivityProgress(
+    suspend fun listActivities(): OnlineResult<List<OnlineActivity>>
+    suspend fun getActivity(activityId: String): OnlineResult<OnlineActivity>
+    suspend fun activityLeaderboard(activityId: String): OnlineResult<List<ActivityProgress>>
+    suspend fun joinActivity(activityId: String, write: OnlineWriteIdentity): OnlineResult<ActivityProgress>
+    suspend fun updateActivityProgress(
         activityId: String,
         write: OnlineWriteIdentity,
         progress: Long
     ): OnlineResult<ActivityProgress>
 
-    fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse>
-    fun pullSync(request: SyncPullRequest): OnlineResult<SyncPullResponse>
-    fun weeklyInsight(request: WeeklyInsightRequest): OnlineResult<WeeklyInsight>
-    fun latestRelease(): OnlineResult<OnlineRelease>
+    suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse>
+    suspend fun pullSync(request: SyncPullRequest): OnlineResult<SyncPullResponse>
+    suspend fun weeklyInsight(request: WeeklyInsightRequest): OnlineResult<WeeklyInsight>
+    suspend fun latestRelease(): OnlineResult<OnlineRelease>
 }
 
 sealed interface OnlineResult<out T> {
@@ -49,18 +60,35 @@ data class ActivityProgress(
 data class SyncPushRequest(
     val userId: String,
     val deviceId: String,
-    val items: List<SyncEnvelope>
+    val items: List<SyncEnvelope>,
+    val cursor: String? = null
 )
 
 data class SyncPushResponse(
-    val acceptedEnvelopeIds: List<String>,
+    val cursor: String?,
+    val items: List<SyncPushItemResult>
+) {
+    val acceptedEnvelopeIds: List<String>
+        get() = items.filter { it.accepted }.map { it.envelopeId }
+
     val rejectedEnvelopeIds: List<String>
+        get() = items.filterNot { it.accepted }.map { it.envelopeId }
+}
+
+data class SyncPushItemResult(
+    val envelopeId: String,
+    val entityId: String,
+    val accepted: Boolean,
+    val remoteRevision: Long? = null,
+    val errorCode: String? = null,
+    val retryable: Boolean = false
 )
 
 data class SyncPullRequest(
     val userId: String,
     val deviceId: String,
-    val cursor: String? = null
+    val cursor: String? = null,
+    val spaceId: String = ""
 )
 
 data class SyncPullResponse(
