@@ -1,0 +1,46 @@
+{
+  "task_id": "NATIVE-BACKEND-PROTOCOL-STABILIZE-001",
+  "status": "verified",
+  "done": [
+    "Defined GraphScope, GraphEmptyReason, GraphSnapshot, and GraphSnapshotResult contracts.",
+    "Implemented global and session graph snapshots with provenance-based session node lookup.",
+    "Kept the legacy snapshot(spaceId) compatibility method for the frozen frontend.",
+    "Implemented an independent WidgetLayoutRepository with complete transactional replacement.",
+    "Removed the legacy single-widget LearningRepositoryImpl persistence path that could write Sync Outbox.",
+    "Locked sync allowlist, secret isolation, background model snapshots, retry identity, and stale-attempt behavior with regression tests.",
+    "Verified that this task changed no frontend path."
+  ],
+  "commits": [
+    "b689128 feat: define graph snapshot contracts",
+    "17b1fe0 feat: query global and session graph snapshots",
+    "ac84942 feat: persist complete widget layouts locally",
+    "594c8db test: lock native backend protocol boundaries",
+    "088943f refactor: isolate widget layout persistence"
+  ],
+  "changed_files": [
+    "mobile-native/core/model/src/main/java/com/reversetutor/core/model/GraphModels.kt",
+    "mobile-native/core/model/src/test/java/com/reversetutor/core/model/GraphSnapshotContractTest.kt",
+    "mobile-native/core/domain/src/main/java/com/reversetutor/core/domain/RepositoryContracts.kt",
+    "mobile-native/core/domain/src/test/java/com/reversetutor/core/domain/ConversationRunCoordinatorTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/DataModule.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/graph/GraphRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/learning/LearningRepositoryImpl.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/learning/WidgetLayoutRepositoryImpl.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/Daos.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local/dao/HybridDaos.kt",
+    "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/ReverseTutorDatabaseDaoTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/DomainRepositoryIntegrationTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/graph/GraphRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/learning/WidgetLayoutValidationTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/migration/NativeImportRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/online/OnlineRepositoryAdaptersTest.kt"
+  ],
+  "current_problem": "",
+  "remaining_risks": [
+    "Room instrumentation tests were compiled but not executed on a connected Android device.",
+    "No real model provider call was made; provider-facing behavior remains covered by fakes and contract tests.",
+    "The worktree contains unrelated pre-existing frontend and workflow changes that were not modified or committed by this task."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

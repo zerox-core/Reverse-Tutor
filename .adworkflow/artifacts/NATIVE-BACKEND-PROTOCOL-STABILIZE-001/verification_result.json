@@ -1,0 +1,37 @@
+{
+  "task_id": "NATIVE-BACKEND-PROTOCOL-STABILIZE-001",
+  "status": "passed",
+  "head": "088943f",
+  "passed": [
+    {
+      "command": ".\\gradlew.bat :core:model:testDebugUnitTest :core:domain:testDebugUnitTest :core:protocol:testDebugUnitTest :core:llm:testDebugUnitTest :core:remote:testDebugUnitTest :core:data:testDebugUnitTest :core:data:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+      "result": "PASS; 147 core JVM tests, 0 failures, 0 errors, 0 skipped; Android test Kotlin compilation passed."
+    },
+    {
+      "command": "py -m pytest tests/test_online_hybrid_api.py -q",
+      "result": "PASS; 7 passed."
+    },
+    {
+      "command": "py -m pytest -q --ignore=tests/test_project_homepage.py",
+      "result": "PASS; 429 passed."
+    },
+    {
+      "command": "rg -n '当前聊天记录过少|无法生成节点|请再聊会天吧' mobile-native/core",
+      "result": "PASS; no backend UI copy found."
+    },
+    {
+      "command": "rg -n 'widget_layout' mobile-native/core/remote mobile-native/core/data/src/main/java/com/reversetutor/core/data/online",
+      "result": "PASS; widget layout is absent from online sync implementation."
+    },
+    {
+      "command": "git diff --name-only e4a9d64..HEAD",
+      "result": "PASS; 16 backend files changed and 0 files matched mobile-native/app/, mobile-native/feature/, static/app/, or mobile/."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "Connected Android instrumentation execution.",
+    "Real provider network calls.",
+    "Frontend build, rendering, or UI tests because frontend work was explicitly frozen."
+  ]
+}
