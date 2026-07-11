@@ -57,10 +57,10 @@ interface ModelConnectionDao {
 
 @Dao
 interface TurnRunDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertRun(run: TurnRunEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertSnapshot(snapshot: ContextSnapshotEntity)
 
     @Query("SELECT * FROM turn_runs WHERE id = :id")
@@ -197,9 +197,6 @@ interface SyncDao {
 
     @Query("SELECT * FROM sync_cursors WHERE spaceId = :spaceId AND entityType = :entityType LIMIT 1")
     suspend fun getCursor(spaceId: String, entityType: String): SyncCursorEntity?
-
-    @Query("SELECT * FROM sync_cursors WHERE entityType = :entityType ORDER BY updatedAtEpochMillis DESC LIMIT 1")
-    suspend fun getLatestCursor(entityType: String): SyncCursorEntity?
 
     @Query("SELECT * FROM sync_conflicts WHERE spaceId = :spaceId AND state = 'Pending' ORDER BY createdAtEpochMillis ASC")
     suspend fun listPendingConflicts(spaceId: String): List<SyncConflictEntity>

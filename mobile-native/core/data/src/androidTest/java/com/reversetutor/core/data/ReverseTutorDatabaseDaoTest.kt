@@ -31,6 +31,10 @@ import com.reversetutor.core.domain.ConversationRunRepository
 import com.reversetutor.core.domain.GlobalSearchRepository
 import com.reversetutor.core.domain.LearningInsightRepository
 import com.reversetutor.core.domain.ModelConnectionRepository
+import com.reversetutor.core.domain.PersistTurnCompletion
+import com.reversetutor.core.domain.PersistTurnCompletionCommand
+import com.reversetutor.core.domain.PersistTurnRetryCommand
+import com.reversetutor.core.domain.PersistTurnRunCommand
 import com.reversetutor.core.domain.StudyPlanRepository
 import com.reversetutor.core.domain.SyncRepository
 import com.reversetutor.core.domain.TokenUsageRepository
@@ -262,6 +266,13 @@ class ReverseTutorDatabaseDaoTest {
                 updatedAtEpochMillis = 1L
             )
         )
+        database.sessionSettingsDao().upsert(
+            SessionSettingsEntity(
+                id = "settings-contract",
+                spaceId = "space-contract",
+                sessionId = "session-contract"
+            )
+        )
         val first = LlmProfileEntity(
             id = "profile-first",
             spaceId = "space-llm",
@@ -450,18 +461,85 @@ class ReverseTutorDatabaseDaoTest {
         assertEquals(binding, modelRepository.findBinding(binding.id))
         assertEquals(listOf(binding), modelRepository.listBindings("connection-contract"))
 
-        val runRepository: ConversationRunRepository = ConversationRunRepositoryImpl(database)
-        assertEquals(1L, runRepository.nextSequence("space-contract", "session-contract"))
-        val parent = contractRun("run-parent-0", "turn-parent", 0, TurnRunState.Running, 1L)
-        val staleParent = parent.copy(id = "run-parent-1", attempt = 1, createdAtEpochMillis = 3L)
-        val waiting = contractRun("run-waiting", "turn-child", 0, TurnRunState.Waiting, 2L)
-            .copy(parentTurnId = "turn-parent")
-        runRepository.saveRun(parent)
-        runRepository.saveRun(staleParent)
-        runRepository.saveRun(waiting)
-        assertEquals(3L, runRepository.nextSequence("space-contract", "session-contract"))
+        val sessionRepository: com.reversetutor.core.domain.SessionRepository =
+            com.reversetutor.core.data.session.SessionRepository(
+                database.spaceDao(),
+                database.sessionDao(),
+                database.sessionSettingsDao()
+            )
+        assertEquals(true, sessionRepository.setModelBinding("session-contract", binding.id))
+        assertEquals(binding.id, database.sessionDao().getById("session-contract")?.modelBindingId)
+        assertEquals(
+            binding.id,
+            database.sessionSettingsDao().getBySessionId("session-contract")?.modelBindingId
+        )
+
+        val runData = ConversationRunRepositoryImpl(database)
+        val runRepository: ConversationRunRepository = runData
+        val parent = runRepository.createRunWithSnapshot(
+            persistRunCommand(
+                runId = "run-parent-0",
+                snapshotId = "snapshot-parent",
+                turnId = "turn-parent",
+                initialState = TurnRunState.Running
+            )
+        )
+        val waiting = runRepository.createRunWithSnapshot(
+            persistRunCommand(
+                runId = "run-waiting",
+                snapshotId = "snapshot-waiting",
+                turnId = "turn-child",
+                initialState = TurnRunState.Waiting,
+                parentTurnId = "turn-parent"
+            )
+        )
+        assertEquals(1L, parent.sequence)
+        assertEquals(2L, waiting.sequence)
+        assertEquals(1L, runData.getSnapshot("snapshot-parent")?.maxSequence)
+
+        val replacement = requireNotNull(
+            runRepository.retryLatestAttempt(
+                PersistTurnRetryCommand(
+                    runId = parent.id,
+                    replacementRunId = "run-parent-1",
+                    initialState = TurnRunState.Running,
+                    createdAtEpochMillis = 3L
+                )
+            )
+        )
+        assertEquals(1, replacement.attempt)
+        assertEquals(parent.sequence, replacement.sequence)
+        assertEquals(TurnRunState.Discarded, runRepository.findRun(parent.id)?.state)
+        assertNull(
+            runRepository.retryLatestAttempt(
+                PersistTurnRetryCommand(
+                    runId = parent.id,
+                    replacementRunId = "run-parent-invalid",
+                    initialState = TurnRunState.Running,
+                    createdAtEpochMillis = 4L
+                )
+            )
+        )
+        assertEquals(
+            PersistTurnCompletion.StaleAttempt,
+            runRepository.completeCurrentAttempt(
+                PersistTurnCompletionCommand(parent.id, 0, "result-stale", 5L)
+            )
+        )
+        val completion = runRepository.completeCurrentAttempt(
+            PersistTurnCompletionCommand(replacement.id, 1, "result-current", 6L)
+        )
+        assertTrue(completion is PersistTurnCompletion.Accepted)
+        completion as PersistTurnCompletion.Accepted
+        assertEquals(listOf(waiting.id), completion.releasedRuns.map { it.id })
+        assertEquals(TurnRunState.Running, runRepository.findRun(waiting.id)?.state)
+        assertEquals(
+            PersistTurnCompletion.AlreadyTerminal,
+            runRepository.completeCurrentAttempt(
+                PersistTurnCompletionCommand(replacement.id, 1, "result-repeat", 7L)
+            )
+        )
         assertEquals("run-parent-1", runRepository.findLatestRun("turn-parent")?.id)
-        assertEquals(listOf("run-waiting"), runRepository.findWaitingRuns("turn-parent").map { it.id })
         assertEquals(false, runRepository.isSessionDeleted("session-contract"))
 
         val learning = LearningRepositoryImpl(database)
@@ -547,9 +625,6 @@ class ReverseTutorDatabaseDaoTest {
         assertEquals("Pending", failed?.status)
         now = requireNotNull(failed).nextAttemptAtEpochMillis
         assertEquals(listOf("outbox-contract"), sync.pendingEnvelopes().map { it.id })
-        sync.markSucceeded("outbox-contract", remoteRevision = 2L)
-        assertNull(database.syncDao().getOutbox("outbox-contract"))
-
         val cursor = SyncCursor(
             id = "cursor-contract",
             spaceId = "space-contract",
@@ -559,7 +634,16 @@ class ReverseTutorDatabaseDaoTest {
             updatedAtEpochMillis = now
         )
         assertEquals(cursor, sync.saveCursor(cursor))
-        assertEquals(cursor, sync.readCursor("study_plan_task"))
+        val otherCursor = cursor.copy(
+            id = "cursor-other",
+            spaceId = "space-other",
+            revision = 99L
+        )
+        sync.saveCursor(otherCursor)
+        sync.markSucceeded("outbox-contract", remoteRevision = 2L)
+        assertNull(database.syncDao().getOutbox("outbox-contract"))
+        assertEquals(2L, sync.readCursor("space-contract", "study_plan_task")?.revision)
+        assertEquals(99L, sync.readCursor("space-other", "study_plan_task")?.revision)
     }
 
     @Test
@@ -646,24 +730,25 @@ class ReverseTutorDatabaseDaoTest {
             createdAtEpochMillis = sequence
         )
 
-    private fun contractRun(
-        id: String,
+    private fun persistRunCommand(
+        runId: String,
+        snapshotId: String,
         turnId: String,
-        attempt: Int,
-        state: TurnRunState,
-        sequence: Long
-    ): TurnRun =
-        TurnRun(
-            id = id,
+        initialState: TurnRunState,
+        parentTurnId: String? = null
+    ): PersistTurnRunCommand =
+        PersistTurnRunCommand(
+            runId = runId,
+            snapshotId = snapshotId,
             spaceId = "space-contract",
-            turnId = turnId,
             sessionId = "session-contract",
-            userMessageId = "message-$id",
-            sequence = sequence,
-            contextVersion = sequence,
+            turnId = turnId,
+            userMessageId = "message-$runId",
             modelBindingId = "binding-contract",
-            attempt = attempt,
-            state = state,
-            createdAtEpochMillis = sequence
+            contextVersion = 1L,
+            contextMessageIds = listOf("context-1"),
+            parentTurnId = parentTurnId,
+            initialState = initialState,
+            createdAtEpochMillis = 2L
         )
 }

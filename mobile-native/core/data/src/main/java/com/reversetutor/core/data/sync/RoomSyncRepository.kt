@@ -1,5 +1,6 @@
 package com.reversetutor.core.data.sync
 
+import androidx.room.withTransaction
 import com.reversetutor.core.data.local.ReverseTutorDatabase
 import com.reversetutor.core.data.local.entity.toDomain
 import com.reversetutor.core.data.local.entity.toEntity
@@ -16,7 +17,21 @@ class RoomSyncRepository(
         database.syncDao().listReadyOutbox(nowEpochMillis(), limit).map { it.toDomain() }
 
     override suspend fun markSucceeded(envelopeId: String, remoteRevision: Long) {
-        database.syncDao().deleteOutbox(envelopeId)
+        database.withTransaction {
+            val envelope = database.syncDao().getOutbox(envelopeId) ?: return@withTransaction
+            val existing = database.syncDao().getCursor(envelope.spaceId, envelope.entityType)
+            database.syncDao().upsertCursor(
+                SyncCursor(
+                    id = existing?.id ?: cursorId(envelope.spaceId, envelope.entityType),
+                    spaceId = envelope.spaceId,
+                    entityType = envelope.entityType,
+                    cursor = existing?.cursor,
+                    revision = maxOf(existing?.revision ?: 0L, remoteRevision),
+                    updatedAtEpochMillis = nowEpochMillis()
+                ).toEntity()
+            )
+            database.syncDao().deleteOutbox(envelopeId)
+        }
     }
 
     override suspend fun markFailed(envelopeId: String, error: String, retryable: Boolean) {
@@ -36,8 +51,8 @@ class RoomSyncRepository(
         )
     }
 
-    override suspend fun readCursor(entityType: String): SyncCursor? =
-        database.syncDao().getLatestCursor(entityType)?.toDomain()
+    override suspend fun readCursor(spaceId: String, entityType: String): SyncCursor? =
+        database.syncDao().getCursor(spaceId, entityType)?.toDomain()
 
     override suspend fun saveCursor(cursor: SyncCursor): SyncCursor {
         database.syncDao().upsertCursor(cursor.toEntity())
@@ -68,6 +83,9 @@ class RoomSyncRepository(
         val exponent = (retryCount - 1).coerceIn(0, MaxRetryExponent)
         return (BaseRetryDelayMillis * (1L shl exponent)).coerceAtMost(MaxRetryDelayMillis)
     }
+
+    private fun cursorId(spaceId: String, entityType: String): String =
+        "cursor:$spaceId:$entityType"
 
     private companion object {
         const val PendingStatus = "Pending"

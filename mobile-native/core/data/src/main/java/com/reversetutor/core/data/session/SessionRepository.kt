@@ -19,6 +19,9 @@ class SessionRepository(
     override suspend fun sessionExists(sessionId: String): Boolean =
         sessionDao.getById(sessionId) != null
 
+    override suspend fun setModelBinding(sessionId: String, modelBindingId: String): Boolean =
+        sessionDao.setModelBinding(sessionId, modelBindingId)
+
     suspend fun ensurePreviewSeed(nowEpochMillis: Long) {
         ensureDefaultSpace(nowEpochMillis)
 

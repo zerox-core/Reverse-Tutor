@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.reversetutor.core.data.local.entity.AnchorEntity
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
 import com.reversetutor.core.data.local.entity.ErrorLogEntity
@@ -54,6 +55,21 @@ interface SessionDao {
 
     @Query("UPDATE sessions SET archived = 1, updatedAtEpochMillis = :updatedAtEpochMillis WHERE id = :id")
     suspend fun archive(id: String, updatedAtEpochMillis: Long): Int
+
+    @Query("UPDATE sessions SET modelBindingId = :modelBindingId WHERE id = :sessionId")
+    suspend fun updateSessionModelBinding(sessionId: String, modelBindingId: String): Int
+
+    @Query("UPDATE session_settings SET modelBindingId = :modelBindingId WHERE sessionId = :sessionId")
+    suspend fun updateSessionSettingsModelBinding(sessionId: String, modelBindingId: String): Int
+
+    @Transaction
+    suspend fun setModelBinding(sessionId: String, modelBindingId: String): Boolean {
+        val updated = updateSessionModelBinding(sessionId, modelBindingId)
+        if (updated > 0) {
+            updateSessionSettingsModelBinding(sessionId, modelBindingId)
+        }
+        return updated > 0
+    }
 }
 
 @Dao

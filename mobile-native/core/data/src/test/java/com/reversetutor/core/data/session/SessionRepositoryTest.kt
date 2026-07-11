@@ -171,6 +171,17 @@ private class FakeSessionDao : SessionDao {
         sessions[id] = existing.copy(archived = true, updatedAtEpochMillis = updatedAtEpochMillis)
         return 1
     }
+
+    override suspend fun updateSessionModelBinding(sessionId: String, modelBindingId: String): Int {
+        val existing = sessions[sessionId] ?: return 0
+        sessions[sessionId] = existing.copy(modelBindingId = modelBindingId)
+        return 1
+    }
+
+    override suspend fun updateSessionSettingsModelBinding(
+        sessionId: String,
+        modelBindingId: String
+    ): Int = 0
 }
 
 private class FakeSessionSettingsDao : SessionSettingsDao {
