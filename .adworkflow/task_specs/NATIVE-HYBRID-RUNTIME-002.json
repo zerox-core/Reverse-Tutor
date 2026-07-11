@@ -1,0 +1,33 @@
+{
+  "task_id": "NATIVE-HYBRID-RUNTIME-002",
+  "goal": "Implement injectable production OpenAI-compatible, Anthropic-compatible, and Gemini-native Android generation runtimes without making real network calls in tests.",
+  "non_goals": [
+    "Do not modify Compose, Room, Python APIs, or application wiring.",
+    "Do not place API keys in domain models, logs, test fixtures, or error messages.",
+    "Do not remove FakeLlmGenerationRuntime from deterministic tests.",
+    "Do not revert unrelated changes."
+  ],
+  "acceptance_criteria": [
+    "A composite runtime routes all three supported protocols.",
+    "Secrets are resolved only at execution time from secretRef.",
+    "Streaming and non-streaming provider responses are parsed.",
+    "Provider status and protocol failures map to retryable safe results.",
+    "Tests use a fake transport and perform zero real network calls."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "write_scope": ["mobile-native/core/llm"],
+  "do_not_touch": [
+    "mobile-native/app",
+    "mobile-native/feature",
+    "mobile-native/core/data",
+    "mobile-native/core/remote",
+    "server.py",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run core:llm JVM tests.",
+    "Run restricted secret-pattern scans.",
+    "Report required Gradle dependencies without editing controller-owned settings."
+  ]
+}
