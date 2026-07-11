@@ -3,9 +3,16 @@ package com.reversetutor.feature.chat
 import com.reversetutor.core.model.DomainError
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
+import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class ChatRunItemUiState(
     val id: String,
@@ -28,7 +35,11 @@ data class ChatRunItemUiState(
 data class ChatRunsUiState(
     val sessionId: String,
     val sessionModelBindingId: String?,
-    val runs: List<ChatRunItemUiState> = emptyList()
+    val runs: List<ChatRunItemUiState> = emptyList(),
+    val isLoading: Boolean = false,
+    val pendingRunIds: Set<String> = emptySet(),
+    val isModelSwitching: Boolean = false,
+    val errorMessage: String? = null
 )
 
 sealed interface ChatRunsUiAction {
@@ -39,10 +50,10 @@ sealed interface ChatRunsUiAction {
 }
 
 interface ChatRunsPort {
-    fun loadRuns(sessionId: String): List<TurnRun>
-    fun stopRun(runId: String): List<TurnRun>
-    fun retryRun(runId: String): List<TurnRun>
-    fun switchSessionModel(sessionId: String, modelBindingId: String)
+    suspend fun loadRuns(sessionId: String): List<TurnRun>
+    suspend fun stopRun(runId: String): List<TurnRun>
+    suspend fun retryRun(runId: String): List<TurnRun>
+    suspend fun switchSessionModel(sessionId: String, modelBindingId: String)
 }
 
 class FakeChatRunsPort(
@@ -50,14 +61,21 @@ class FakeChatRunsPort(
 ) : ChatRunsPort {
     var runs: List<TurnRun> = runs
         private set
+    var loadError: Throwable? = null
+    var stopError: Throwable? = null
+    var retryError: Throwable? = null
+    var modelSwitchError: Throwable? = null
     val stoppedRunIds = mutableListOf<String>()
     val retriedRunIds = mutableListOf<String>()
     val sessionModelChanges = mutableListOf<Pair<String, String>>()
 
-    override fun loadRuns(sessionId: String): List<TurnRun> =
-        runs.filter { it.sessionId == sessionId }
+    override suspend fun loadRuns(sessionId: String): List<TurnRun> {
+        loadError?.let { throw it }
+        return runs.filter { it.sessionId == sessionId }
+    }
 
-    override fun stopRun(runId: String): List<TurnRun> {
+    override suspend fun stopRun(runId: String): List<TurnRun> {
+        stopError?.let { throw it }
         stoppedRunIds += runId
         runs = runs.map { run ->
             if (run.id == runId) run.copy(state = TurnRunState.Cancelled) else run
@@ -65,7 +83,8 @@ class FakeChatRunsPort(
         return runs
     }
 
-    override fun retryRun(runId: String): List<TurnRun> {
+    override suspend fun retryRun(runId: String): List<TurnRun> {
+        retryError?.let { throw it }
         retriedRunIds += runId
         runs = runs.map { run ->
             if (run.id == runId) {
@@ -84,45 +103,152 @@ class FakeChatRunsPort(
         return runs
     }
 
-    override fun switchSessionModel(sessionId: String, modelBindingId: String) {
+    override suspend fun switchSessionModel(sessionId: String, modelBindingId: String) {
+        modelSwitchError?.let { throw it }
         sessionModelChanges += sessionId to modelBindingId
     }
+}
+
+fun interface ChatRunsViewModelFactory {
+    fun create(
+        sessionId: String,
+        initialModelBindingId: String?,
+        scope: CoroutineScope
+    ): ChatRunsViewModel
+}
+
+class ChatRunsPortViewModelFactory(
+    private val port: ChatRunsPort
+) : ChatRunsViewModelFactory {
+    override fun create(
+        sessionId: String,
+        initialModelBindingId: String?,
+        scope: CoroutineScope
+    ): ChatRunsViewModel =
+        ChatRunsViewModel(
+            sessionId = sessionId,
+            initialModelBindingId = initialModelBindingId,
+            port = port,
+            scope = scope
+        )
 }
 
 class ChatRunsViewModel(
     private val sessionId: String,
     initialModelBindingId: String?,
-    private val port: ChatRunsPort
+    private val port: ChatRunsPort,
+    private val scope: CoroutineScope = defaultChatRunsScope()
 ) {
     private val mutableUiState = MutableStateFlow(
         ChatRunsUiState(
             sessionId = sessionId,
-            sessionModelBindingId = initialModelBindingId,
-            runs = port.loadRuns(sessionId).toRunItems()
+            sessionModelBindingId = initialModelBindingId
         )
     )
     val uiState: StateFlow<ChatRunsUiState> = mutableUiState.asStateFlow()
+    private var refreshJob: Job? = null
+
+    init {
+        refresh()
+    }
 
     fun onAction(action: ChatRunsUiAction) {
-        mutableUiState.value = when (action) {
-            ChatRunsUiAction.Refresh -> mutableUiState.value.copy(
-                runs = port.loadRuns(sessionId).toRunItems()
-            )
-            is ChatRunsUiAction.Stop -> mutableUiState.value.copy(
-                runs = port.stopRun(action.runId)
-                    .filter { it.sessionId == sessionId }
-                    .toRunItems()
-            )
-            is ChatRunsUiAction.Retry -> mutableUiState.value.copy(
-                runs = port.retryRun(action.runId)
-                    .filter { it.sessionId == sessionId }
-                    .toRunItems()
-            )
-            is ChatRunsUiAction.SwitchSessionModel -> {
-                port.switchSessionModel(sessionId, action.modelBindingId)
-                mutableUiState.value.copy(
-                    sessionModelBindingId = action.modelBindingId
+        when (action) {
+            ChatRunsUiAction.Refresh -> refresh()
+            is ChatRunsUiAction.Stop -> runOperation(action.runId) {
+                port.stopRun(action.runId)
+            }
+            is ChatRunsUiAction.Retry -> runOperation(action.runId) {
+                port.retryRun(action.runId)
+            }
+            is ChatRunsUiAction.SwitchSessionModel -> switchSessionModel(action.modelBindingId)
+        }
+    }
+
+    private fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = scope.launch {
+            mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val runs = port.loadRuns(sessionId)
+                mutableUiState.update {
+                    it.copy(
+                        runs = runs.toRunItems(),
+                        isLoading = false,
+                        errorMessage = null
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = error.toChatRunsErrorMessage()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun runOperation(
+        runId: String,
+        operation: suspend () -> List<TurnRun>
+    ) {
+        scope.launch {
+            mutableUiState.update {
+                it.copy(
+                    pendingRunIds = it.pendingRunIds + runId,
+                    errorMessage = null
                 )
+            }
+            try {
+                val runs = operation()
+                mutableUiState.update {
+                    it.copy(
+                        runs = runs
+                            .filter { run -> run.sessionId == sessionId }
+                            .toRunItems(),
+                        pendingRunIds = it.pendingRunIds - runId,
+                        errorMessage = null
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        pendingRunIds = it.pendingRunIds - runId,
+                        errorMessage = error.toChatRunsErrorMessage()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun switchSessionModel(modelBindingId: String) {
+        scope.launch {
+            mutableUiState.update {
+                it.copy(isModelSwitching = true, errorMessage = null)
+            }
+            try {
+                port.switchSessionModel(sessionId, modelBindingId)
+                mutableUiState.update {
+                    it.copy(
+                        sessionModelBindingId = modelBindingId,
+                        isModelSwitching = false,
+                        errorMessage = null
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        isModelSwitching = false,
+                        errorMessage = error.toChatRunsErrorMessage()
+                    )
+                }
             }
         }
     }
@@ -140,3 +266,9 @@ private fun List<TurnRun>.toRunItems(): List<ChatRunItemUiState> =
             error = run.error
         )
     }
+
+private fun defaultChatRunsScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+private fun Throwable.toChatRunsErrorMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: "Unable to update conversation runs"

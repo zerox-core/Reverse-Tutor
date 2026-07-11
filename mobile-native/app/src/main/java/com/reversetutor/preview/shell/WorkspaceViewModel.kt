@@ -41,3 +41,11 @@ class WorkspaceViewModel(
             )
         }
 }
+
+fun interface WorkspaceViewModelFactory {
+    fun create(): WorkspaceViewModel
+}
+
+object DefaultWorkspaceViewModelFactory : WorkspaceViewModelFactory {
+    override fun create(): WorkspaceViewModel = WorkspaceViewModel()
+}

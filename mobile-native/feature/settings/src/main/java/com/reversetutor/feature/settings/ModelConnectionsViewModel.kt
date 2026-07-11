@@ -4,9 +4,16 @@ import com.reversetutor.core.model.ModelAvailability
 import com.reversetutor.core.model.ModelBinding
 import com.reversetutor.core.model.ModelProtocol
 import com.reversetutor.core.model.ProviderConnection
+import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class ProviderConnectionItemUiState(
     val id: String,
@@ -31,7 +38,10 @@ data class ModelConnectionsUiState(
     val connections: List<ProviderConnectionItemUiState> = emptyList(),
     val bindings: List<ModelBindingItemUiState> = emptyList(),
     val selectedConnectionId: String? = null,
-    val sessionModelBindingId: String? = null
+    val sessionModelBindingId: String? = null,
+    val isLoading: Boolean = false,
+    val isModelSwitching: Boolean = false,
+    val errorMessage: String? = null
 )
 
 sealed interface ModelConnectionsUiAction {
@@ -46,8 +56,8 @@ data class ModelConnectionsSnapshot(
 )
 
 interface ModelConnectionsPort {
-    fun loadSnapshot(): ModelConnectionsSnapshot
-    fun selectSessionModel(sessionId: String, modelBindingId: String)
+    suspend fun loadSnapshot(): ModelConnectionsSnapshot
+    suspend fun selectSessionModel(sessionId: String, modelBindingId: String)
 }
 
 class FakeModelConnectionsPort(
@@ -56,44 +66,132 @@ class FakeModelConnectionsPort(
 ) : ModelConnectionsPort {
     var connections: List<ProviderConnection> = connections
     var bindings: List<ModelBinding> = bindings
+    var loadError: Throwable? = null
+    var modelSwitchError: Throwable? = null
     val sessionModelChanges = mutableListOf<Pair<String, String>>()
 
-    override fun loadSnapshot(): ModelConnectionsSnapshot =
-        ModelConnectionsSnapshot(connections = connections, bindings = bindings)
+    override suspend fun loadSnapshot(): ModelConnectionsSnapshot {
+        loadError?.let { throw it }
+        return ModelConnectionsSnapshot(
+            connections = connections.toList(),
+            bindings = bindings.toList()
+        )
+    }
 
-    override fun selectSessionModel(sessionId: String, modelBindingId: String) {
+    override suspend fun selectSessionModel(sessionId: String, modelBindingId: String) {
+        modelSwitchError?.let { throw it }
         sessionModelChanges += sessionId to modelBindingId
     }
+}
+
+fun interface ModelConnectionsViewModelFactory {
+    fun create(
+        sessionId: String?,
+        initialSessionModelBindingId: String?,
+        scope: CoroutineScope
+    ): ModelConnectionsViewModel
+}
+
+class ModelConnectionsPortViewModelFactory(
+    private val port: ModelConnectionsPort
+) : ModelConnectionsViewModelFactory {
+    override fun create(
+        sessionId: String?,
+        initialSessionModelBindingId: String?,
+        scope: CoroutineScope
+    ): ModelConnectionsViewModel =
+        ModelConnectionsViewModel(
+            sessionId = sessionId,
+            initialSessionModelBindingId = initialSessionModelBindingId,
+            port = port,
+            scope = scope
+        )
 }
 
 class ModelConnectionsViewModel(
     private val sessionId: String?,
     initialSessionModelBindingId: String?,
-    private val port: ModelConnectionsPort
+    private val port: ModelConnectionsPort,
+    private val scope: CoroutineScope = defaultModelConnectionsScope()
 ) {
     private val mutableUiState = MutableStateFlow(
-        port.loadSnapshot().toUiState(
+        ModelConnectionsUiState(
             sessionModelBindingId = initialSessionModelBindingId
         )
     )
     val uiState: StateFlow<ModelConnectionsUiState> = mutableUiState.asStateFlow()
+    private var refreshJob: Job? = null
+
+    init {
+        refresh()
+    }
 
     fun onAction(action: ModelConnectionsUiAction) {
-        mutableUiState.value = when (action) {
-            ModelConnectionsUiAction.Refresh -> port.loadSnapshot().toUiState(
-                selectedConnectionId = mutableUiState.value.selectedConnectionId,
-                sessionModelBindingId = mutableUiState.value.sessionModelBindingId
-            )
-            is ModelConnectionsUiAction.SelectConnection -> mutableUiState.value.copy(
-                selectedConnectionId = action.connectionId
-            )
-            is ModelConnectionsUiAction.SelectSessionModel -> {
-                sessionId?.let {
-                    port.selectSessionModel(it, action.modelBindingId)
+        when (action) {
+            ModelConnectionsUiAction.Refresh -> refresh()
+            is ModelConnectionsUiAction.SelectConnection -> mutableUiState.update {
+                it.copy(selectedConnectionId = action.connectionId)
+            }
+            is ModelConnectionsUiAction.SelectSessionModel -> selectSessionModel(action.modelBindingId)
+        }
+    }
+
+    private fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = scope.launch {
+            mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val snapshot = port.loadSnapshot()
+                mutableUiState.update { current ->
+                    snapshot.toUiState(
+                        selectedConnectionId = current.selectedConnectionId,
+                        sessionModelBindingId = current.sessionModelBindingId,
+                        isLoading = false
+                    )
                 }
-                mutableUiState.value.copy(
-                    sessionModelBindingId = action.modelBindingId
-                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = error.toModelConnectionsErrorMessage()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun selectSessionModel(modelBindingId: String) {
+        val currentSessionId = sessionId
+        if (currentSessionId == null) {
+            mutableUiState.update {
+                it.copy(errorMessage = "A session is required to select a model")
+            }
+            return
+        }
+        scope.launch {
+            mutableUiState.update {
+                it.copy(isModelSwitching = true, errorMessage = null)
+            }
+            try {
+                port.selectSessionModel(currentSessionId, modelBindingId)
+                mutableUiState.update {
+                    it.copy(
+                        sessionModelBindingId = modelBindingId,
+                        isModelSwitching = false,
+                        errorMessage = null
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        isModelSwitching = false,
+                        errorMessage = error.toModelConnectionsErrorMessage()
+                    )
+                }
             }
         }
     }
@@ -101,7 +199,8 @@ class ModelConnectionsViewModel(
 
 private fun ModelConnectionsSnapshot.toUiState(
     selectedConnectionId: String? = null,
-    sessionModelBindingId: String?
+    sessionModelBindingId: String?,
+    isLoading: Boolean
 ): ModelConnectionsUiState =
     ModelConnectionsUiState(
         connections = connections.map { connection ->
@@ -126,5 +225,12 @@ private fun ModelConnectionsSnapshot.toUiState(
             )
         },
         selectedConnectionId = selectedConnectionId,
-        sessionModelBindingId = sessionModelBindingId
+        sessionModelBindingId = sessionModelBindingId,
+        isLoading = isLoading
     )
+
+private fun defaultModelConnectionsScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+private fun Throwable.toModelConnectionsErrorMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: "Unable to load model connections"

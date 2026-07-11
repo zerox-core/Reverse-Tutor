@@ -1,14 +1,23 @@
 package com.reversetutor.feature.chat
 
 import com.reversetutor.core.model.TutorSession
+import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class HomeUiState(
     val sessions: List<TutorSession> = emptyList(),
     val selectedSessionId: String? = null,
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
 sealed interface HomeUiAction {
@@ -18,40 +27,89 @@ sealed interface HomeUiAction {
 }
 
 interface HomePort {
-    fun loadLocalSessions(): List<TutorSession>
+    suspend fun loadLocalSessions(): List<TutorSession>
 }
 
 class FakeHomePort(
     localSessions: List<TutorSession> = emptyList()
 ) : HomePort {
     var localSessions: List<TutorSession> = localSessions
+    var loadError: Throwable? = null
 
-    override fun loadLocalSessions(): List<TutorSession> = localSessions
+    override suspend fun loadLocalSessions(): List<TutorSession> {
+        loadError?.let { throw it }
+        return localSessions.toList()
+    }
+}
+
+fun interface HomeViewModelFactory {
+    fun create(scope: CoroutineScope): HomeViewModel
+}
+
+class HomePortViewModelFactory(
+    private val port: HomePort,
+    private val initialOnline: Boolean = true
+) : HomeViewModelFactory {
+    override fun create(scope: CoroutineScope): HomeViewModel =
+        HomeViewModel(port = port, initialOnline = initialOnline, scope = scope)
 }
 
 class HomeViewModel(
     private val port: HomePort,
-    initialOnline: Boolean = true
+    initialOnline: Boolean = true,
+    private val scope: CoroutineScope = defaultHomeScope()
 ) {
     private val mutableUiState = MutableStateFlow(
-        HomeUiState(
-            sessions = port.loadLocalSessions(),
-            isOnline = initialOnline
-        )
+        HomeUiState(isOnline = initialOnline)
     )
     val uiState: StateFlow<HomeUiState> = mutableUiState.asStateFlow()
+    private var refreshJob: Job? = null
+
+    init {
+        refresh()
+    }
 
     fun onAction(action: HomeUiAction) {
-        mutableUiState.value = when (action) {
-            HomeUiAction.Refresh -> mutableUiState.value.copy(
-                sessions = port.loadLocalSessions()
-            )
-            is HomeUiAction.SelectSession -> mutableUiState.value.copy(
-                selectedSessionId = action.sessionId
-            )
-            is HomeUiAction.ConnectivityChanged -> mutableUiState.value.copy(
-                isOnline = action.isOnline
-            )
+        when (action) {
+            HomeUiAction.Refresh -> refresh()
+            is HomeUiAction.SelectSession -> mutableUiState.update {
+                it.copy(selectedSessionId = action.sessionId)
+            }
+            is HomeUiAction.ConnectivityChanged -> mutableUiState.update {
+                it.copy(isOnline = action.isOnline)
+            }
+        }
+    }
+
+    private fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = scope.launch {
+            mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val sessions = port.loadLocalSessions()
+                mutableUiState.update {
+                    it.copy(
+                        sessions = sessions,
+                        isLoading = false,
+                        errorMessage = null
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = error.toHomeErrorMessage()
+                    )
+                }
+            }
         }
     }
 }
+
+private fun defaultHomeScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+private fun Throwable.toHomeErrorMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: "Unable to load local sessions"

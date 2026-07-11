@@ -2,14 +2,23 @@ package com.reversetutor.feature.memory
 
 import com.reversetutor.core.model.StudyPlanTask
 import com.reversetutor.core.model.WeeklySummary
+import java.util.concurrent.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 data class WeeklyDashboardUiState(
     val summary: WeeklySummary? = null,
     val tasks: List<StudyPlanTask> = emptyList(),
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
 sealed interface WeeklyDashboardUiAction {
@@ -23,7 +32,7 @@ data class WeeklyDashboardSnapshot(
 )
 
 interface WeeklyDashboardPort {
-    fun loadLocalSnapshot(): WeeklyDashboardSnapshot
+    suspend fun loadLocalSnapshot(): WeeklyDashboardSnapshot
 }
 
 class FakeWeeklyDashboardPort(
@@ -32,35 +41,84 @@ class FakeWeeklyDashboardPort(
 ) : WeeklyDashboardPort {
     var summary: WeeklySummary? = summary
     var tasks: List<StudyPlanTask> = tasks
+    var loadError: Throwable? = null
 
-    override fun loadLocalSnapshot(): WeeklyDashboardSnapshot =
-        WeeklyDashboardSnapshot(summary = summary, tasks = tasks)
+    override suspend fun loadLocalSnapshot(): WeeklyDashboardSnapshot {
+        loadError?.let { throw it }
+        return WeeklyDashboardSnapshot(summary = summary, tasks = tasks.toList())
+    }
+}
+
+fun interface WeeklyDashboardViewModelFactory {
+    fun create(scope: CoroutineScope): WeeklyDashboardViewModel
+}
+
+class WeeklyDashboardPortViewModelFactory(
+    private val port: WeeklyDashboardPort,
+    private val initialOnline: Boolean = true
+) : WeeklyDashboardViewModelFactory {
+    override fun create(scope: CoroutineScope): WeeklyDashboardViewModel =
+        WeeklyDashboardViewModel(
+            port = port,
+            initialOnline = initialOnline,
+            scope = scope
+        )
 }
 
 class WeeklyDashboardViewModel(
     private val port: WeeklyDashboardPort,
-    initialOnline: Boolean = true
+    initialOnline: Boolean = true,
+    private val scope: CoroutineScope = defaultWeeklyDashboardScope()
 ) {
     private val mutableUiState = MutableStateFlow(
-        port.loadLocalSnapshot().toUiState(isOnline = initialOnline)
+        WeeklyDashboardUiState(isOnline = initialOnline)
     )
     val uiState: StateFlow<WeeklyDashboardUiState> = mutableUiState.asStateFlow()
+    private var refreshJob: Job? = null
+
+    init {
+        refresh()
+    }
 
     fun onAction(action: WeeklyDashboardUiAction) {
-        mutableUiState.value = when (action) {
-            WeeklyDashboardUiAction.RefreshLocal -> port.loadLocalSnapshot().toUiState(
-                isOnline = mutableUiState.value.isOnline
-            )
-            is WeeklyDashboardUiAction.ConnectivityChanged -> mutableUiState.value.copy(
-                isOnline = action.isOnline
-            )
+        when (action) {
+            WeeklyDashboardUiAction.RefreshLocal -> refresh()
+            is WeeklyDashboardUiAction.ConnectivityChanged -> mutableUiState.update {
+                it.copy(isOnline = action.isOnline)
+            }
+        }
+    }
+
+    private fun refresh() {
+        refreshJob?.cancel()
+        refreshJob = scope.launch {
+            mutableUiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                val snapshot = port.loadLocalSnapshot()
+                mutableUiState.update {
+                    it.copy(
+                        summary = snapshot.summary,
+                        tasks = snapshot.tasks,
+                        isLoading = false,
+                        errorMessage = null
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = error.toWeeklyDashboardErrorMessage()
+                    )
+                }
+            }
         }
     }
 }
 
-private fun WeeklyDashboardSnapshot.toUiState(isOnline: Boolean): WeeklyDashboardUiState =
-    WeeklyDashboardUiState(
-        summary = summary,
-        tasks = tasks,
-        isOnline = isOnline
-    )
+private fun defaultWeeklyDashboardScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+private fun Throwable.toWeeklyDashboardErrorMessage(): String =
+    message?.takeIf { it.isNotBlank() } ?: "Unable to load the weekly dashboard"

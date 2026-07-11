@@ -61,4 +61,32 @@ class WorkspaceViewModelTest {
         assertEquals(120, viewModel.uiState.value.verticalScrollOffsets[WorkspacePage.WeeklyDashboard])
         assertEquals(360, viewModel.uiState.value.verticalScrollOffsets[WorkspacePage.SessionHome])
     }
+
+    @Test
+    fun interactionBindingsDriveThePagerLocks() {
+        val viewModel = WorkspaceViewModel()
+        val bindings = WorkspaceInteractionBindings(viewModel::onAction)
+
+        bindings.onComposerFocusChanged(true)
+        assertFalse(viewModel.uiState.value.horizontalPagingEnabled)
+
+        bindings.onComposerFocusChanged(false)
+        bindings.onWidgetDragChanged(true)
+        assertFalse(viewModel.uiState.value.horizontalPagingEnabled)
+
+        bindings.onWidgetDragChanged(false)
+        bindings.onFullscreenGraphInteractionChanged(true)
+        assertFalse(viewModel.uiState.value.horizontalPagingEnabled)
+
+        bindings.onFullscreenGraphInteractionChanged(false)
+        assertTrue(viewModel.uiState.value.horizontalPagingEnabled)
+    }
+
+    @Test
+    fun workspacePagesMapToExistingTopLevelDestinations() {
+        assertEquals(AppDestination.ContextHub, WorkspacePage.WeeklyDashboard.destination)
+        assertEquals(AppDestination.Sessions, WorkspacePage.SessionHome.destination)
+        assertEquals(WorkspacePage.GlobalGraph, AppDestination.GlobalGraph.workspacePage)
+        assertEquals(WorkspacePage.Community, AppDestination.Community.workspacePage)
+    }
 }
