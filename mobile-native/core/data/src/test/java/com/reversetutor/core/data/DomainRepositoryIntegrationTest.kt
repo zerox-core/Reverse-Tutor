@@ -30,6 +30,11 @@ class DomainRepositoryIntegrationTest {
         assertAssignable<WidgetLayoutRepository, WidgetLayoutRepositoryImpl>()
         assertAssignable<GlobalSearchRepository, RoomGlobalSearchRepository>()
         assertAssignable<SyncRepository, RoomSyncRepository>()
+        assertTrue(
+            LearningRepositoryImpl::class.java.methods.none {
+                it.name == "saveWidgetPreference" || it.name == "listWidgetPreferences"
+            }
+        )
     }
 
     private inline fun <reified Contract : Any, reified Implementation : Any> assertAssignable() {

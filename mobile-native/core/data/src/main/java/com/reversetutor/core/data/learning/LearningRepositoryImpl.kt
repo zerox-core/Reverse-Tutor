@@ -11,7 +11,6 @@ import com.reversetutor.core.model.StudyPlanTask
 import com.reversetutor.core.model.SyncEnvelope
 import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.WeeklySummary
-import com.reversetutor.core.model.WidgetLayoutPreference
 
 class LearningRepositoryImpl(
     private val database: ReverseTutorDatabase
@@ -67,14 +66,4 @@ class LearningRepositoryImpl(
     suspend fun listTokenUsage(spaceId: String): List<TokenUsageRecord> =
         database.learningDao().listTokenUsage(spaceId).map { it.toDomain() }
 
-    suspend fun saveWidgetPreference(preference: WidgetLayoutPreference, outbox: SyncEnvelope? = null) {
-        require(outbox == null || outbox.entityId == preference.widgetId)
-        database.withTransaction {
-            database.learningDao().upsertWidgetPreference(preference.toEntity())
-            outbox?.let { database.syncDao().upsertOutbox(it.toEntity()) }
-        }
-    }
-
-    suspend fun listWidgetPreferences(spaceId: String): List<WidgetLayoutPreference> =
-        database.learningDao().listWidgetPreferences(spaceId).map { it.toDomain() }
 }
