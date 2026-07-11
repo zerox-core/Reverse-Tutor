@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+import httpx
+import pytest
+
+import server
+from adapters.online.service import online_service
+
+
+@pytest.fixture
+async def client():
+    online_service.reset()
+    transport = httpx.ASGITransport(app=server.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+async def test_activities_list_detail_and_join_are_idempotent(client):
+    listed = await client.get("/api/v1/activities")
+    assert listed.status_code == 200
+    activity = listed.json()["items"][0]
+
+    detail = await client.get(f"/api/v1/activities/{activity['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["revision"] == activity["revision"]
+
+    payload = {
+        "userId": "user-1",
+        "deviceId": "device-1",
+        "revision": activity["revision"],
+        "idempotencyKey": "join-1",
+    }
+    first = await client.post(f"/api/v1/activities/{activity['id']}/join", json=payload)
+    second = await client.post(f"/api/v1/activities/{activity['id']}/join", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json() == second.json()
+    assert online_service.activity_write_count == 1
+
+
+async def test_activity_idempotency_is_scoped_to_user_and_leaderboard_is_readable(client):
+    base = {
+        "deviceId": "device-1",
+        "revision": 1,
+        "idempotencyKey": "same-client-key",
+        "progress": 2,
+    }
+    first = await client.post(
+        "/api/v1/activities/focus-week/progress",
+        json={**base, "userId": "user-1"},
+    )
+    second = await client.post(
+        "/api/v1/activities/focus-week/progress",
+        json={**base, "userId": "user-2"},
+    )
+    leaderboard = await client.get("/api/v1/activities/focus-week/leaderboard")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert online_service.activity_write_count == 2
+    assert [row["userId"] for row in leaderboard.json()["items"]] == [
+        "user-1",
+        "user-2",
+    ]
+
+
+async def test_activity_progress_write_is_idempotent(client):
+    payload = {
+        "userId": "user-1",
+        "deviceId": "device-1",
+        "revision": 1,
+        "idempotencyKey": "progress-1",
+        "progress": 3,
+    }
+
+    first = await client.post("/api/v1/activities/focus-week/progress", json=payload)
+    second = await client.post("/api/v1/activities/focus-week/progress", json=payload)
+
+    assert first.status_code == 200
+    assert first.json() == second.json()
+    assert online_service.activity_write_count == 1
+
+
+async def test_sync_push_isolates_invalid_or_failed_items(client):
+    response = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "userId": "user-1",
+            "deviceId": "device-1",
+            "cursor": None,
+            "items": [
+                {
+                    "entityId": "plan-1",
+                    "entityType": "study_plan",
+                    "revision": 1,
+                    "idempotencyKey": "sync-ok",
+                    "payload": {"completed": True},
+                },
+                {
+                    "entityId": "message-1",
+                    "entityType": "chat_message",
+                    "revision": 1,
+                    "idempotencyKey": "sync-rejected",
+                    "payload": {"text": "private learning content"},
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["status"] for item in body["items"]] == ["accepted", "rejected"]
+    assert body["items"][1]["errorCode"] == "entity_type_not_syncable"
+
+
+async def test_sync_push_isolates_unexpected_item_failure(client, monkeypatch):
+    original = online_service._push_sync_item
+
+    def fail_one(request, item):
+        if item.entity_id == "plan-fail":
+            raise RuntimeError("temporary storage error")
+        return original(request, item)
+
+    monkeypatch.setattr(online_service, "_push_sync_item", fail_one)
+    response = await client.post(
+        "/api/v1/sync/push",
+        json={
+            "userId": "user-1",
+            "deviceId": "device-1",
+            "items": [
+                {
+                    "entityId": "plan-fail",
+                    "entityType": "study_plan",
+                    "revision": 1,
+                    "idempotencyKey": "sync-fail",
+                },
+                {
+                    "entityId": "plan-ok",
+                    "entityType": "study_plan",
+                    "revision": 1,
+                    "idempotencyKey": "sync-ok",
+                },
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert [item["status"] for item in response.json()["items"]] == [
+        "failed",
+        "accepted",
+    ]
+    assert response.json()["items"][0]["retryable"] is True
+
+
+async def test_sync_push_reuses_idempotent_result_and_pull_returns_cursor(client):
+    request = {
+        "userId": "user-1",
+        "deviceId": "device-1",
+        "items": [
+            {
+                "entityId": "plan-1",
+                "entityType": "study_plan",
+                "revision": 1,
+                "idempotencyKey": "sync-1",
+                "payload": {"completed": True},
+            }
+        ],
+    }
+
+    first = await client.post("/api/v1/sync/push", json=request)
+    second = await client.post("/api/v1/sync/push", json=request)
+    pulled = await client.post(
+        "/api/v1/sync/pull",
+        json={"userId": "user-1", "deviceId": "device-2", "cursor": None},
+    )
+
+    assert first.json() == second.json()
+    assert online_service.sync_write_count == 1
+    assert pulled.status_code == 200
+    assert pulled.json()["cursor"]
+    assert pulled.json()["items"][0]["entityType"] == "study_plan"
+
+
+async def test_weekly_insight_and_latest_release_are_available_without_learning_body(client):
+    insight = await client.post(
+        "/api/v1/insights/weekly",
+        json={
+            "userId": "user-1",
+            "deviceId": "device-1",
+            "spaceId": "space-1",
+            "weekStartEpochMillis": 1000,
+            "sourceRevision": 4,
+            "statistics": {"activeDays": 3, "completedTasks": 2},
+        },
+    )
+    release = await client.get("/api/v1/app/releases/latest")
+
+    assert insight.status_code == 200
+    assert insight.json()["sourceRevision"] == 4
+    assert "statistics" not in insight.json()
+    assert release.status_code == 200
+    assert release.json()["versionName"]
+    assert release.json()["minimumSupportedVersionCode"] >= 1

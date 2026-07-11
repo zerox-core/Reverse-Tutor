@@ -31,10 +31,12 @@ import engine
 import llm
 import vision
 from adapters import dispatch_webhook
+from adapters.online import router as online_router
 
 # --- App ---------------------------------------------------------------------
 
 app = FastAPI(title="Reverse Tutor", version="0.1.0")
+app.include_router(online_router)
 
 app.add_middleware(
     CORSMiddleware,
