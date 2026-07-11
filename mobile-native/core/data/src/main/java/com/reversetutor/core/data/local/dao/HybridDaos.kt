@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.reversetutor.core.data.local.entity.ContextSnapshotEntity
 import com.reversetutor.core.data.local.entity.EntityTombstoneEntity
 import com.reversetutor.core.data.local.entity.ModelBindingEntity
@@ -20,10 +21,10 @@ import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
 
 @Dao
 interface ModelConnectionDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertConnection(connection: ProviderConnectionEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Upsert
     suspend fun upsertBinding(binding: ModelBindingEntity)
 
     @Query("SELECT * FROM provider_connections WHERE id = :id")

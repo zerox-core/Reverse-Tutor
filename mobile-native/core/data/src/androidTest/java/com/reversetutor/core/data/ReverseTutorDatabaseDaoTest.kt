@@ -35,6 +35,7 @@ import com.reversetutor.core.domain.StudyPlanRepository
 import com.reversetutor.core.domain.SyncRepository
 import com.reversetutor.core.domain.TokenUsageRepository
 import com.reversetutor.core.model.ModelBinding
+import com.reversetutor.core.model.ModelAvailability
 import com.reversetutor.core.model.SearchTarget
 import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.core.model.StudyPlanTask
@@ -559,6 +560,76 @@ class ReverseTutorDatabaseDaoTest {
         )
         assertEquals(cursor, sync.saveCursor(cursor))
         assertEquals(cursor, sync.readCursor("study_plan_task"))
+    }
+
+    @Test
+    fun modelConnectionUpsertsPreserveBindingsAndReferencedRuns() = runBlocking {
+        database.spaceDao().upsert(
+            SpaceEntity("space-upsert", "Upsert", "Default", 1L, 1L)
+        )
+        val connection = ProviderConnectionEntity(
+            id = "connection-upsert",
+            spaceId = "space-upsert",
+            name = "Original",
+            protocol = "OpenAiCompatible",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L
+        )
+        val binding = ModelBindingEntity(
+            id = "binding-upsert",
+            spaceId = "space-upsert",
+            connectionId = connection.id,
+            modelId = "model-upsert",
+            displayName = "Model",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L
+        )
+        database.modelConnectionDao().upsertConnection(connection)
+        database.modelConnectionDao().upsertBinding(binding)
+
+        database.modelConnectionDao().upsertConnection(
+            connection.copy(name = "Updated", updatedAtEpochMillis = 2L)
+        )
+
+        assertEquals("Updated", database.modelConnectionDao().getConnection(connection.id)?.name)
+        assertEquals(binding.id, database.modelConnectionDao().getBinding(binding.id)?.id)
+
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-upsert",
+                spaceId = "space-upsert",
+                title = "Session",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L,
+                modelBindingId = binding.id
+            )
+        )
+        val run = TurnRun(
+            id = "run-upsert",
+            spaceId = "space-upsert",
+            turnId = "turn-upsert",
+            sessionId = "session-upsert",
+            userMessageId = "message-upsert",
+            sequence = 1L,
+            contextVersion = 1L,
+            modelBindingId = binding.id,
+            state = TurnRunState.Running,
+            createdAtEpochMillis = 1L
+        )
+        ConversationRunRepositoryImpl(database).saveRun(run)
+
+        database.modelConnectionDao().upsertBinding(
+            binding.copy(
+                availability = ModelAvailability.Available.name,
+                updatedAtEpochMillis = 3L
+            )
+        )
+
+        assertEquals(
+            ModelAvailability.Available.name,
+            database.modelConnectionDao().getBinding(binding.id)?.availability
+        )
+        assertEquals(run.id, database.turnRunDao().getById(run.id)?.id)
     }
 
     private fun run(id: String, turnId: String, sequence: Long): TurnRun =

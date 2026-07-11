@@ -79,7 +79,55 @@ class ReverseTutorDatabaseMigration2To3Test {
         database.close()
     }
 
+    @Test
+    fun migratesLegacyGeminiAndGeminiNativeProvidersToGeminiNativeProtocol() {
+        helper.createDatabase(GeminiTestDatabase, 2).apply {
+            execSQL(
+                "INSERT INTO spaces VALUES ('space-gemini', 'Gemini', 'Default', 1, 1, NULL)"
+            )
+            execSQL(
+                """
+                INSERT INTO llm_profiles VALUES (
+                    'profile-gemini', 'space-gemini', 'Gemini legacy', 'Gemini', 'gemini-legacy',
+                    NULL, 10, 20, NULL, 1
+                )
+                """.trimIndent()
+            )
+            execSQL(
+                """
+                INSERT INTO llm_profiles VALUES (
+                    'profile-gemini-native', 'space-gemini', 'Gemini native', 'GeminiNative', 'gemini-native',
+                    NULL, 11, 21, NULL, 1
+                )
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val database = helper.runMigrationsAndValidate(
+            GeminiTestDatabase,
+            3,
+            true,
+            DatabaseSchema.migration2To3
+        )
+        database.query(
+            """
+            SELECT id, protocol
+            FROM provider_connections
+            WHERE id IN ('connection-profile-gemini', 'connection-profile-gemini-native')
+            ORDER BY id
+            """.trimIndent()
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("GeminiNative", cursor.getString(1))
+            assertTrue(cursor.moveToNext())
+            assertEquals("GeminiNative", cursor.getString(1))
+        }
+        database.close()
+    }
+
     private companion object {
         const val TestDatabase = "reverse-tutor-migration-2-3-test"
+        const val GeminiTestDatabase = "reverse-tutor-migration-gemini-2-3-test"
     }
 }

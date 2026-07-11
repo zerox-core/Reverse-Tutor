@@ -53,7 +53,7 @@ object DatabaseSchema {
                 name,
                 CASE
                     WHEN provider = 'AnthropicCompatible' THEN 'AnthropicCompatible'
-                    WHEN provider = 'GeminiNative' THEN 'GeminiNative'
+                    WHEN provider IN ('Gemini', 'GeminiNative') THEN 'GeminiNative'
                     ELSE 'OpenAiCompatible'
                 END,
                 provider,
