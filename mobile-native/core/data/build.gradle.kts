@@ -31,7 +31,7 @@ kapt {
 
 dependencies {
     implementation(project(":core:model"))
-    implementation(project(":core:domain"))
+    api(project(":core:domain"))
     implementation(project(":core:protocol"))
     implementation(project(":core:llm"))
     implementation("androidx.datastore:datastore-preferences:1.0.0")
