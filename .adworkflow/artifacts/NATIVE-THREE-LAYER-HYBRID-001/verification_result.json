@@ -1,0 +1,41 @@
+{
+  "task_id": "NATIVE-THREE-LAYER-HYBRID-001",
+  "status": "passed_with_device_gap",
+  "checks": [
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "status": "passed",
+      "notes": "All registered native modules, JVM tests, lint, and debug APK assembly passed after final integration."
+    },
+    {
+      "command": "py -m pytest -q --ignore=tests/test_project_homepage.py",
+      "status": "passed",
+      "notes": "429 Python tests passed."
+    },
+    {
+      "command": "py -m pytest tests/test_online_hybrid_api.py -q",
+      "status": "passed",
+      "notes": "7 online hybrid API tests passed after final native integration."
+    },
+    {
+      "command": ":core:data:compileDebugAndroidTestKotlin",
+      "status": "passed",
+      "notes": "Room migration and DAO instrumentation sources compile."
+    },
+    {
+      "command": "frontend restricted import scan",
+      "status": "passed",
+      "notes": "No production Compose source imports DAO, Entity, SecretStore, OkHttp, Retrofit, or Ktor client types."
+    },
+    {
+      "command": "production runBlocking scan",
+      "status": "passed",
+      "notes": "No production domain, data, LLM, remote, app, or feature source uses runBlocking."
+    },
+    {
+      "command": ":core:data:connectedDebugAndroidTest",
+      "status": "not_run",
+      "notes": "No connected Android device or emulator was available."
+    }
+  ]
+}

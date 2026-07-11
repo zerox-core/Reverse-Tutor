@@ -1,0 +1,61 @@
+{
+  "task_id": "NATIVE-THREE-LAYER-HYBRID-001",
+  "status": "foundation_complete_with_followups",
+  "workers": [
+    {
+      "layer": "backend",
+      "agent_id": "019f50b6-9dbb-7f93-8345-9760d067d926",
+      "commits": [
+        "8ef281f",
+        "7561f5b",
+        "0174e5b",
+        "ee9ce36"
+      ]
+    },
+    {
+      "layer": "frontend",
+      "agent_id": "019f50c0-3e3c-7df0-a1f5-2e779221faee",
+      "commits": [
+        "27fc923",
+        "9b43730",
+        "20b7d3b"
+      ]
+    },
+    {
+      "layer": "data",
+      "agent_id": "019f50bf-f703-7b60-bc78-e3397482ce60",
+      "commits": [
+        "ec5149d",
+        "0ccd289",
+        "d0a6ece",
+        "04a12bd"
+      ]
+    }
+  ],
+  "controller_commits": [
+    "d1f7956",
+    "2a5fb3c"
+  ],
+  "completed_capabilities": [
+    "Shared hybrid domain models and error contracts",
+    "Suspendable repository boundaries",
+    "Atomic TurnRun create, retry, completion, and dependency release contracts",
+    "Room v3 schema and non-destructive v2-to-v3 migration",
+    "ProviderConnection and ModelBinding separation",
+    "Study plan, weekly summary, token, widget, search, sync, conflict, and tombstone persistence",
+    "Space-isolated sync cursors and outbox processing foundation",
+    "Optional Python activity, sync, weekly insight, and release metadata endpoints",
+    "Asynchronous frontend ports, loading/error states, and workspace pager host",
+    "Gradle registration for core:domain and core:remote"
+  ],
+  "remaining_work": [
+    "Replace FakeLlmGenerationRuntime with validated production HTTP provider runtimes",
+    "Implement Android OnlineApi transport and production Activity/Sync/Update repositories",
+    "Wire real repositories and coordinators into MainActivity/AppShell factories",
+    "Finish committed AppShell and feature screen integration without including unrelated existing UI changes",
+    "Run Room migration instrumentation on an attached emulator or device",
+    "Add production authentication and durable server storage for online APIs"
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}
