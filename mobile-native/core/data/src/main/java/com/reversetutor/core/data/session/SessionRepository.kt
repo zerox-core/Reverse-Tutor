@@ -15,7 +15,10 @@ class SessionRepository(
     private val spaceDao: SpaceDao,
     private val sessionDao: SessionDao,
     private val sessionSettingsDao: SessionSettingsDao
-) {
+) : com.reversetutor.core.domain.SessionRepository {
+    override suspend fun sessionExists(sessionId: String): Boolean =
+        sessionDao.getById(sessionId) != null
+
     suspend fun ensurePreviewSeed(nowEpochMillis: Long) {
         ensureDefaultSpace(nowEpochMillis)
 

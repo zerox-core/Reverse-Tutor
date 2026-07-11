@@ -15,6 +15,25 @@ import org.junit.Test
 
 class SessionRepositoryTest {
     @Test
+    fun sessionRepositoryImplementsDomainExistenceContract() = runBlocking {
+        val sessionDao = FakeSessionDao()
+        val repository: com.reversetutor.core.domain.SessionRepository =
+            SessionRepository(FakeSpaceDao(), sessionDao, FakeSessionSettingsDao())
+
+        assertEquals(false, repository.sessionExists("missing"))
+        sessionDao.upsert(
+            SessionEntity(
+                id = "session-domain",
+                spaceId = "default-space",
+                title = "Domain",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+        assertEquals(true, repository.sessionExists("session-domain"))
+    }
+
+    @Test
     fun listSessionsOrdersPinnedFirstThenRecentlyUpdatedAndHidesArchived() = runBlocking {
         val sessionDao = FakeSessionDao()
         val repository = SessionRepository(FakeSpaceDao(), sessionDao, FakeSessionSettingsDao())

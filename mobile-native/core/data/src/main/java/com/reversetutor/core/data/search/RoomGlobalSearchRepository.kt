@@ -2,17 +2,21 @@ package com.reversetutor.core.data.search
 
 import com.reversetutor.core.data.local.ReverseTutorDatabase
 import com.reversetutor.core.data.local.entity.SearchDocumentEntity
+import com.reversetutor.core.domain.GlobalSearchRepository
 import com.reversetutor.core.model.SearchTarget
 import com.reversetutor.core.model.SearchTargetType
 
 class RoomGlobalSearchRepository(
     private val database: ReverseTutorDatabase
-) {
+) : GlobalSearchRepository {
     suspend fun index(document: SearchDocument) {
         database.searchDocumentDao().upsert(document.toEntity())
     }
 
-    suspend fun search(spaceId: String, query: String, limit: Int = 50): List<SearchResult> {
+    override suspend fun search(spaceId: String, query: String, limit: Int): List<SearchTarget> =
+        searchResults(spaceId, query, limit).map { it.target }
+
+    suspend fun searchResults(spaceId: String, query: String, limit: Int = 50): List<SearchResult> {
         val normalized = normalize(query)
         if (normalized.isEmpty()) return emptyList()
         return database.searchDocumentDao().search(spaceId, normalized, limit).map { entity ->

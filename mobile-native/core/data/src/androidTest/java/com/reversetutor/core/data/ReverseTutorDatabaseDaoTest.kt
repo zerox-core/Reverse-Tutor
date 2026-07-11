@@ -21,14 +21,31 @@ import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
+import com.reversetutor.core.data.model.ModelConnectionRepositoryImpl
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
+import com.reversetutor.core.data.search.RoomGlobalSearchRepository
+import com.reversetutor.core.data.search.SearchDocument
 import com.reversetutor.core.data.session.SessionDeletionRepository
+import com.reversetutor.core.data.sync.RoomSyncRepository
+import com.reversetutor.core.domain.ConversationRunRepository
+import com.reversetutor.core.domain.GlobalSearchRepository
+import com.reversetutor.core.domain.LearningInsightRepository
+import com.reversetutor.core.domain.ModelConnectionRepository
+import com.reversetutor.core.domain.StudyPlanRepository
+import com.reversetutor.core.domain.SyncRepository
+import com.reversetutor.core.domain.TokenUsageRepository
+import com.reversetutor.core.model.ModelBinding
+import com.reversetutor.core.model.SearchTarget
+import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.core.model.StudyPlanTask
 import com.reversetutor.core.model.StudyPlanTaskState
 import com.reversetutor.core.model.SyncEnvelope
 import com.reversetutor.core.model.SyncOwnership
+import com.reversetutor.core.model.SyncCursor
+import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
+import com.reversetutor.core.model.WeeklySummary
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -394,6 +411,156 @@ class ReverseTutorDatabaseDaoTest {
         )
     }
 
+    @Test
+    fun domainRepositoryContractsUseTurnAttemptAndPersistSyncRetryState() = runBlocking {
+        database.spaceDao().upsert(
+            SpaceEntity("space-contract", "Contract", "Default", 1L, 1L)
+        )
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-contract",
+                spaceId = "space-contract",
+                title = "Contract",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+        database.modelConnectionDao().upsertConnection(
+            ProviderConnectionEntity(
+                id = "connection-contract",
+                spaceId = "space-contract",
+                name = "Provider",
+                protocol = "OpenAiCompatible",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+
+        val modelRepository: ModelConnectionRepository = ModelConnectionRepositoryImpl(database)
+        val binding = ModelBinding(
+            id = "binding-contract",
+            spaceId = "space-contract",
+            connectionId = "connection-contract",
+            modelId = "model-contract",
+            createdAtEpochMillis = 2L,
+            updatedAtEpochMillis = 2L
+        )
+        assertEquals(binding, modelRepository.saveBinding(binding))
+        assertEquals(binding, modelRepository.findBinding(binding.id))
+        assertEquals(listOf(binding), modelRepository.listBindings("connection-contract"))
+
+        val runRepository: ConversationRunRepository = ConversationRunRepositoryImpl(database)
+        assertEquals(1L, runRepository.nextSequence("space-contract", "session-contract"))
+        val parent = contractRun("run-parent-0", "turn-parent", 0, TurnRunState.Running, 1L)
+        val staleParent = parent.copy(id = "run-parent-1", attempt = 1, createdAtEpochMillis = 3L)
+        val waiting = contractRun("run-waiting", "turn-child", 0, TurnRunState.Waiting, 2L)
+            .copy(parentTurnId = "turn-parent")
+        runRepository.saveRun(parent)
+        runRepository.saveRun(staleParent)
+        runRepository.saveRun(waiting)
+        assertEquals(3L, runRepository.nextSequence("space-contract", "session-contract"))
+        assertEquals("run-parent-1", runRepository.findLatestRun("turn-parent")?.id)
+        assertEquals(listOf("run-waiting"), runRepository.findWaitingRuns("turn-parent").map { it.id })
+        assertEquals(false, runRepository.isSessionDeleted("session-contract"))
+
+        val learning = LearningRepositoryImpl(database)
+        val plans: StudyPlanRepository = learning
+        val insights: LearningInsightRepository = learning
+        val usage: TokenUsageRepository = learning
+        val task = StudyPlanTask(
+            id = "plan-contract",
+            spaceId = "space-contract",
+            title = "Plan",
+            state = StudyPlanTaskState.Planned,
+            createdAtEpochMillis = 4L,
+            updatedAtEpochMillis = 4L
+        )
+        assertEquals(task, plans.saveTask(task))
+        assertEquals(listOf(task), plans.listTasks("space-contract"))
+        val summary = WeeklySummary(
+            id = "summary-contract",
+            spaceId = "space-contract",
+            weekStartEpochMillis = 100L,
+            sourceRevision = 2L,
+            generatorVersion = "v1",
+            summary = "Summary"
+        )
+        assertEquals(summary, insights.saveWeeklySummary(summary))
+        assertEquals(
+            summary,
+            insights.findWeeklySummary("space-contract", 100L, 2L, "v1")
+        )
+        val tokenUsage = TokenUsageRecord(
+            id = "usage-contract",
+            spaceId = "space-contract",
+            turnId = "turn-parent",
+            attempt = 1
+        )
+        assertEquals(tokenUsage, usage.saveUsage(tokenUsage))
+
+        val detailedSearch = RoomGlobalSearchRepository(database)
+        detailedSearch.index(
+            SearchDocument(
+                id = "search-contract",
+                spaceId = "space-contract",
+                target = SearchTarget(
+                    type = SearchTargetType.Session,
+                    entityId = "session-contract",
+                    spaceId = "space-contract",
+                    sessionId = "session-contract"
+                ),
+                title = "Contract",
+                body = "Search target",
+                updatedAtEpochMillis = 5L
+            )
+        )
+        val search: GlobalSearchRepository = detailedSearch
+        assertEquals(
+            listOf("session-contract"),
+            search.search("space-contract", "search").map { it.entityId }
+        )
+        assertEquals("Contract", detailedSearch.searchResults("space-contract", "search").single().title)
+
+        var now = 1_000L
+        val sync: SyncRepository = RoomSyncRepository(database) { now }
+        val roomSync = sync as RoomSyncRepository
+        roomSync.enqueue(
+            SyncEnvelope(
+                id = "outbox-contract",
+                spaceId = "space-contract",
+                entityId = "plan-contract",
+                entityType = "study_plan_task",
+                ownerId = "owner",
+                deviceId = "device",
+                revision = 1L,
+                idempotencyKey = "outbox-contract-r1",
+                ownership = SyncOwnership.Shared,
+                updatedAtEpochMillis = now
+            )
+        )
+        assertEquals(listOf("outbox-contract"), sync.pendingEnvelopes().map { it.id })
+        sync.markFailed("outbox-contract", "offline", retryable = true)
+        assertTrue(sync.pendingEnvelopes().isEmpty())
+        val failed = database.syncDao().getOutbox("outbox-contract")
+        assertEquals(1, failed?.retryCount)
+        assertEquals("Pending", failed?.status)
+        now = requireNotNull(failed).nextAttemptAtEpochMillis
+        assertEquals(listOf("outbox-contract"), sync.pendingEnvelopes().map { it.id })
+        sync.markSucceeded("outbox-contract", remoteRevision = 2L)
+        assertNull(database.syncDao().getOutbox("outbox-contract"))
+
+        val cursor = SyncCursor(
+            id = "cursor-contract",
+            spaceId = "space-contract",
+            entityType = "study_plan_task",
+            cursor = "next",
+            revision = 2L,
+            updatedAtEpochMillis = now
+        )
+        assertEquals(cursor, sync.saveCursor(cursor))
+        assertEquals(cursor, sync.readCursor("study_plan_task"))
+    }
+
     private fun run(id: String, turnId: String, sequence: Long): TurnRun =
         TurnRun(
             id = id,
@@ -405,6 +572,27 @@ class ReverseTutorDatabaseDaoTest {
             contextVersion = sequence,
             modelBindingId = "binding-1",
             state = TurnRunState.Running,
+            createdAtEpochMillis = sequence
+        )
+
+    private fun contractRun(
+        id: String,
+        turnId: String,
+        attempt: Int,
+        state: TurnRunState,
+        sequence: Long
+    ): TurnRun =
+        TurnRun(
+            id = id,
+            spaceId = "space-contract",
+            turnId = turnId,
+            sessionId = "session-contract",
+            userMessageId = "message-$id",
+            sequence = sequence,
+            contextVersion = sequence,
+            modelBindingId = "binding-contract",
+            attempt = attempt,
+            state = state,
             createdAtEpochMillis = sequence
         )
 }

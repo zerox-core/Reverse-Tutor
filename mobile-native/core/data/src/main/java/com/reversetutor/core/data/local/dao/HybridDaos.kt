@@ -41,6 +41,9 @@ interface ModelConnectionDao {
     @Query("SELECT * FROM model_bindings WHERE spaceId = :spaceId ORDER BY isDefault DESC, updatedAtEpochMillis DESC")
     suspend fun listBindings(spaceId: String): List<ModelBindingEntity>
 
+    @Query("SELECT * FROM model_bindings WHERE connectionId = :connectionId ORDER BY isDefault DESC, updatedAtEpochMillis DESC")
+    suspend fun listBindingsByConnection(connectionId: String): List<ModelBindingEntity>
+
     @Query("SELECT COUNT(*) FROM sessions WHERE modelBindingId IN (SELECT id FROM model_bindings WHERE connectionId = :connectionId)")
     suspend fun countSessionBindings(connectionId: String): Int
 
@@ -61,6 +64,15 @@ interface TurnRunDao {
 
     @Query("SELECT * FROM turn_runs WHERE id = :id")
     suspend fun getById(id: String): TurnRunEntity?
+
+    @Query("SELECT COALESCE(MAX(sequence), 0) + 1 FROM turn_runs WHERE spaceId = :spaceId AND sessionId = :sessionId")
+    suspend fun nextSequence(spaceId: String, sessionId: String): Long
+
+    @Query("SELECT * FROM turn_runs WHERE turnId = :turnId ORDER BY attempt DESC, createdAtEpochMillis DESC, id DESC LIMIT 1")
+    suspend fun findLatestByTurnId(turnId: String): TurnRunEntity?
+
+    @Query("SELECT * FROM turn_runs WHERE parentTurnId = :parentTurnId AND state = 'Waiting' ORDER BY sequence ASC, attempt ASC")
+    suspend fun findWaitingByParentTurnId(parentTurnId: String): List<TurnRunEntity>
 
     @Query("SELECT * FROM turn_runs WHERE sessionId = :sessionId ORDER BY sequence ASC, attempt ASC")
     suspend fun listBySession(sessionId: String): List<TurnRunEntity>
@@ -97,6 +109,23 @@ interface LearningDao {
 
     @Query("SELECT * FROM weekly_summaries WHERE spaceId = :spaceId ORDER BY weekStartEpochMillis DESC")
     suspend fun listWeeklySummaries(spaceId: String): List<WeeklySummaryEntity>
+
+    @Query(
+        """
+        SELECT * FROM weekly_summaries
+        WHERE spaceId = :spaceId
+          AND weekStartEpochMillis = :weekStartEpochMillis
+          AND sourceRevision = :sourceRevision
+          AND generatorVersion = :generatorVersion
+        LIMIT 1
+        """
+    )
+    suspend fun findWeeklySummary(
+        spaceId: String,
+        weekStartEpochMillis: Long,
+        sourceRevision: Long,
+        generatorVersion: String
+    ): WeeklySummaryEntity?
 
     @Query("SELECT * FROM token_usage_records WHERE spaceId = :spaceId ORDER BY createdAtEpochMillis DESC")
     suspend fun listTokenUsage(spaceId: String): List<TokenUsageRecordEntity>
@@ -144,8 +173,32 @@ interface SyncDao {
     @Query("SELECT * FROM sync_outbox WHERE status = 'Pending' AND nextAttemptAtEpochMillis <= :nowEpochMillis ORDER BY updatedAtEpochMillis ASC LIMIT :limit")
     suspend fun listReadyOutbox(nowEpochMillis: Long, limit: Int): List<SyncOutboxEntity>
 
+    @Query("SELECT * FROM sync_outbox WHERE id = :id")
+    suspend fun getOutbox(id: String): SyncOutboxEntity?
+
+    @Query(
+        """
+        UPDATE sync_outbox
+        SET status = :status,
+            retryCount = :retryCount,
+            nextAttemptAtEpochMillis = :nextAttemptAtEpochMillis,
+            lastError = :lastError
+        WHERE id = :id
+        """
+    )
+    suspend fun updateOutboxFailure(
+        id: String,
+        status: String,
+        retryCount: Int,
+        nextAttemptAtEpochMillis: Long,
+        lastError: String
+    ): Int
+
     @Query("SELECT * FROM sync_cursors WHERE spaceId = :spaceId AND entityType = :entityType LIMIT 1")
     suspend fun getCursor(spaceId: String, entityType: String): SyncCursorEntity?
+
+    @Query("SELECT * FROM sync_cursors WHERE entityType = :entityType ORDER BY updatedAtEpochMillis DESC LIMIT 1")
+    suspend fun getLatestCursor(entityType: String): SyncCursorEntity?
 
     @Query("SELECT * FROM sync_conflicts WHERE spaceId = :spaceId AND state = 'Pending' ORDER BY createdAtEpochMillis ASC")
     suspend fun listPendingConflicts(spaceId: String): List<SyncConflictEntity>
