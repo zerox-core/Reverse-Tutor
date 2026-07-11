@@ -12,15 +12,28 @@ import com.reversetutor.core.data.local.entity.ImportBatchEntity
 import com.reversetutor.core.data.local.entity.LlmProfileEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
 import com.reversetutor.core.data.local.entity.MessageQuoteEntity
+import com.reversetutor.core.data.local.entity.ModelBindingEntity
+import com.reversetutor.core.data.local.entity.ProviderConnectionEntity
+import com.reversetutor.core.data.local.entity.SearchDocumentEntity
 import com.reversetutor.core.data.local.entity.SessionEntity
 import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
+import com.reversetutor.core.data.learning.LearningRepositoryImpl
+import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
+import com.reversetutor.core.data.session.SessionDeletionRepository
+import com.reversetutor.core.model.StudyPlanTask
+import com.reversetutor.core.model.StudyPlanTaskState
+import com.reversetutor.core.model.SyncEnvelope
+import com.reversetutor.core.model.SyncOwnership
+import com.reversetutor.core.model.TurnRun
+import com.reversetutor.core.model.TurnRunState
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -270,4 +283,128 @@ class ReverseTutorDatabaseDaoTest {
         assertEquals(1, database.llmProfileDao().deleteById("profile-first"))
         assertNull(database.llmProfileDao().getById("profile-first"))
     }
+
+    @Test
+    fun hybridRepositoriesKeepConcurrentRunsAndDeleteSessionTransactionally() = runBlocking {
+        database.spaceDao().upsert(
+            SpaceEntity("space-hybrid", "Hybrid", "Default", 1L, 1L)
+        )
+        database.modelConnectionDao().upsertConnection(
+            ProviderConnectionEntity(
+                id = "connection-1",
+                spaceId = "space-hybrid",
+                name = "Provider",
+                protocol = "OpenAiCompatible",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+        database.modelConnectionDao().upsertBinding(
+            ModelBindingEntity(
+                id = "binding-1",
+                spaceId = "space-hybrid",
+                connectionId = "connection-1",
+                modelId = "model-1",
+                displayName = "Model",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-hybrid",
+                spaceId = "space-hybrid",
+                title = "Hybrid",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L,
+                modelBindingId = "binding-1"
+            )
+        )
+        database.messageDao().insert(
+            MessageEntity(
+                id = "message-1",
+                spaceId = "space-hybrid",
+                sessionId = "session-hybrid",
+                role = "User",
+                text = "First",
+                createdAtEpochMillis = 2L
+            )
+        )
+        database.searchDocumentDao().upsert(
+            SearchDocumentEntity(
+                id = "search-session",
+                spaceId = "space-hybrid",
+                entityType = "Session",
+                entityId = "session-hybrid",
+                sessionId = "session-hybrid",
+                title = "Hybrid",
+                body = "Hybrid session",
+                normalizedText = "hybrid session",
+                updatedAtEpochMillis = 2L
+            )
+        )
+
+        val runs = ConversationRunRepositoryImpl(database)
+        runs.save(run("run-1", "turn-1", 1L))
+        runs.save(run("run-2", "turn-2", 2L))
+        assertEquals(listOf("run-1", "run-2"), runs.listActiveBySession("session-hybrid").map { it.id })
+
+        val learning = LearningRepositoryImpl(database)
+        learning.savePlanTask(
+            task = StudyPlanTask(
+                id = "plan-1",
+                spaceId = "space-hybrid",
+                title = "Review",
+                state = StudyPlanTaskState.Planned,
+                revision = 1L,
+                createdAtEpochMillis = 3L,
+                updatedAtEpochMillis = 3L
+            ),
+            outbox = SyncEnvelope(
+                id = "outbox-1",
+                spaceId = "space-hybrid",
+                entityId = "plan-1",
+                entityType = "study_plan_task",
+                ownerId = "owner-1",
+                deviceId = "device-1",
+                revision = 1L,
+                idempotencyKey = "plan-1-r1",
+                ownership = SyncOwnership.Shared,
+                updatedAtEpochMillis = 3L
+            )
+        )
+        assertEquals(listOf("plan-1"), learning.listPlanTasks("space-hybrid").map { it.id })
+        assertEquals(listOf("outbox-1"), database.syncDao().listReadyOutbox(3L, 10).map { it.id })
+
+        assertEquals(
+            true,
+            SessionDeletionRepository(database).deleteSession(
+                sessionId = "session-hybrid",
+                deletedAtEpochMillis = 10L,
+                revision = 2L,
+                idempotencyKey = "delete-session-hybrid"
+            )
+        )
+        assertNull(database.sessionDao().getById("session-hybrid"))
+        assertEquals(emptyList<TurnRun>(), runs.listBySession("session-hybrid"))
+        assertTrue(database.searchDocumentDao().search("space-hybrid", "hybrid", 10).isEmpty())
+        assertEquals(
+            "session-hybrid",
+            database.syncDao().getTombstone("session", "session-hybrid")?.entityId
+        )
+    }
+
+    private fun run(id: String, turnId: String, sequence: Long): TurnRun =
+        TurnRun(
+            id = id,
+            spaceId = "space-hybrid",
+            turnId = turnId,
+            sessionId = "session-hybrid",
+            userMessageId = "message-1",
+            sequence = sequence,
+            contextVersion = sequence,
+            modelBindingId = "binding-1",
+            state = TurnRunState.Running,
+            createdAtEpochMillis = sequence
+        )
 }

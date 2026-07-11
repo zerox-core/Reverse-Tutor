@@ -181,13 +181,77 @@ object VersionedProtocolSchemas {
                 "warnings" to ProtocolFieldKind.Array,
                 "errors" to ProtocolFieldKind.Array
             )
+        ),
+        VersionedProtocolContract(
+            schema = ProtocolModule.fullBackupSchema,
+            version = 2,
+            documentType = ProtocolDocumentType.FullBackup,
+            requiredFields = listOf(
+                "schema", "version", "type", "created_at", "sessions",
+                "provider_connections", "model_bindings", "graph"
+            ),
+            allowedFields = commonFields + setOf(
+                "created_at", "sessions", "provider_connections", "model_bindings", "graph"
+            ),
+            expectedFieldKinds = commonExpectedKinds + mapOf(
+                "created_at" to ProtocolFieldKind.Text,
+                "sessions" to ProtocolFieldKind.Array,
+                "provider_connections" to ProtocolFieldKind.Array,
+                "model_bindings" to ProtocolFieldKind.Array,
+                "graph" to ProtocolFieldKind.Object
+            )
+        ),
+        VersionedProtocolContract(
+            schema = ProtocolModule.sessionExportSchema,
+            version = 2,
+            documentType = ProtocolDocumentType.SessionExport,
+            requiredFields = listOf("schema", "version", "type", "created_at", "session", "messages"),
+            allowedFields = commonFields + setOf("created_at", "session", "messages"),
+            expectedFieldKinds = commonExpectedKinds + mapOf(
+                "created_at" to ProtocolFieldKind.Text,
+                "session" to ProtocolFieldKind.Object,
+                "messages" to ProtocolFieldKind.Array
+            )
+        ),
+        VersionedProtocolContract(
+            schema = ProtocolModule.graphSnapshotSchema,
+            version = 2,
+            documentType = ProtocolDocumentType.GraphSnapshot,
+            requiredFields = listOf("schema", "version", "type", "created_at", "nodes", "edges"),
+            allowedFields = commonFields + setOf("created_at", "nodes", "edges"),
+            expectedFieldKinds = commonExpectedKinds + mapOf(
+                "created_at" to ProtocolFieldKind.Text,
+                "nodes" to ProtocolFieldKind.Array,
+                "edges" to ProtocolFieldKind.Array
+            )
+        ),
+        VersionedProtocolContract(
+            schema = ProtocolModule.presetSchema,
+            version = 2,
+            documentType = ProtocolDocumentType.Preset,
+            requiredFields = listOf("schema", "version", "type", "title", "role", "goal", "profile"),
+            allowedFields = commonFields + setOf("title", "role", "goal", "profile", "sourceHandoff"),
+            expectedFieldKinds = commonExpectedKinds + mapOf(
+                "title" to ProtocolFieldKind.Text,
+                "role" to ProtocolFieldKind.Text,
+                "goal" to ProtocolFieldKind.Text,
+                "profile" to ProtocolFieldKind.Text,
+                "sourceHandoff" to ProtocolFieldKind.Text
+            )
         )
     )
 
-    private val bySchema: Map<String, VersionedProtocolContract> = all.associateBy { it.schema }
+    private val bySchemaAndVersion: Map<Pair<String, Int>, VersionedProtocolContract> =
+        all.associateBy { it.schema to it.version }
 
-    fun forSchema(schema: String?): VersionedProtocolContract? =
-        schema?.let { bySchema[it] }
+    fun forSchema(schema: String?, version: Int?): VersionedProtocolContract? =
+        if (schema == null || version == null) null else bySchemaAndVersion[schema to version]
+
+    fun supportsSchema(schema: String?): Boolean =
+        schema != null && all.any { it.schema == schema }
+
+    fun baselineForSchema(schema: String?): VersionedProtocolContract? =
+        all.filter { it.schema == schema }.minByOrNull { it.version }
 }
 
 object VersionedProtocolValidator {
@@ -219,14 +283,19 @@ object VersionedProtocolValidator {
         val schema = root.stringField("schema")
         val version = root.intField("version")
         val wireType = root.stringField("type")
-        val contract = VersionedProtocolSchemas.forSchema(schema)
+        val contract = VersionedProtocolSchemas.forSchema(schema, version)
+            ?: if (version == null) VersionedProtocolSchemas.baselineForSchema(schema) else null
         val errors = mutableListOf<String>()
         val warnings = mutableListOf<String>()
 
         if (schema.isNullOrBlank()) {
             errors += "Field schema is required."
-        } else if (contract == null) {
+        } else if (!VersionedProtocolSchemas.supportsSchema(schema)) {
             errors += "Unsupported schema: $schema."
+        } else if (version == null) {
+            errors += "Field version is required."
+        } else if (contract == null) {
+            errors += "Unsupported version $version for schema $schema."
         }
 
         val documentType = contract?.documentType ?: ProtocolDocumentType.fromWireType(wireType)

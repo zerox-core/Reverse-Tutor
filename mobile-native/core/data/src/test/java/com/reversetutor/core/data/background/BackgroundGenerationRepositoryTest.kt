@@ -1,0 +1,341 @@
+package com.reversetutor.core.data.background
+
+import com.reversetutor.core.data.llm.LlmProfileRepository
+import com.reversetutor.core.data.llm.SecretStore
+import com.reversetutor.core.data.local.dao.BackgroundJobDao
+import com.reversetutor.core.data.local.dao.LlmProfileDao
+import com.reversetutor.core.data.local.dao.MessageAttachmentDao
+import com.reversetutor.core.data.local.dao.MessageDao
+import com.reversetutor.core.data.local.dao.MessageQuoteDao
+import com.reversetutor.core.data.local.dao.SessionDao
+import com.reversetutor.core.data.local.entity.BackgroundJobEntity
+import com.reversetutor.core.data.local.entity.LlmProfileEntity
+import com.reversetutor.core.data.local.entity.MessageAttachmentEntity
+import com.reversetutor.core.data.local.entity.MessageEntity
+import com.reversetutor.core.data.local.entity.MessageQuoteEntity
+import com.reversetutor.core.data.local.entity.SessionEntity
+import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.llm.LlmCapabilities
+import com.reversetutor.core.llm.LlmGenerationRequest
+import com.reversetutor.core.llm.LlmGenerationResult
+import com.reversetutor.core.llm.LlmGenerationRuntime
+import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.model.BackgroundJobStatus
+import com.reversetutor.core.model.MessageRole
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class BackgroundGenerationRepositoryTest {
+    @Test
+    fun enqueuePersistsQueuedJobBeforeExecution() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val repository = repository(jobDao = jobDao)
+
+        val job = repository.enqueueGenerationJob(input(token = "token-current"), nowEpochMillis = 10L, jobId = "job-1")
+
+        assertEquals("job-1", job.id)
+        assertEquals(BackgroundJobStatus.Queued, job.status)
+        assertEquals("session-1", job.sessionId)
+        assertEquals("user-1", job.userMessageId)
+        assertEquals(LlmGenerationToken("token-current"), job.token)
+        assertEquals("Explain factoring", job.userText)
+        assertEquals("Queued", jobDao.getById("job-1")?.status)
+    }
+
+    @Test
+    fun runQueuedCurrentJobPersistsAssistantAndCompletesJob() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Success("Use common factors first."))
+        )
+        repository.enqueueGenerationJob(input(token = "token-current"), nowEpochMillis = 10L, jobId = "job-1")
+
+        val outcome = repository.runGenerationJob("job-1", nowEpochMillis = 20L)
+
+        assertEquals(BackgroundGenerationOutcome.Completed("assistant-token-current"), outcome)
+        val persisted = repository.getJob("job-1")
+        assertEquals(BackgroundJobStatus.Completed, persisted?.status)
+        assertEquals(20L, persisted?.startedAtEpochMillis)
+        assertEquals(20L, persisted?.completedAtEpochMillis)
+        val messages = messageRepository.listMessages("session-1")
+        assertEquals(listOf(MessageRole.Assistant), messages.map { it.role })
+        assertEquals("Use common factors first.", messages.single().text)
+    }
+
+    @Test
+    fun providerFailureMarksJobFailedWithoutAssistantMessage() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Failure("Rate limited"))
+        )
+        repository.enqueueGenerationJob(input(token = "token-failure"), nowEpochMillis = 10L, jobId = "job-1")
+
+        val outcome = repository.runGenerationJob("job-1", nowEpochMillis = 30L)
+
+        assertEquals(BackgroundGenerationOutcome.Failed("Rate limited"), outcome)
+        val persisted = repository.getJob("job-1")
+        assertEquals(BackgroundJobStatus.Failed, persisted?.status)
+        assertEquals("Rate limited", persisted?.errorMessage)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+    }
+
+    @Test
+    fun recoveryRequeuesRunningJobsAndCancellationPreventsExecution() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(jobDao = jobDao, messageRepository = messageRepository)
+        repository.enqueueGenerationJob(input(token = "token-current"), nowEpochMillis = 10L, jobId = "job-1")
+        jobDao.forceStatus("job-1", "Running", startedAtEpochMillis = 11L)
+
+        val recovered = repository.recoverInterruptedGenerationJobs(nowEpochMillis = 20L)
+
+        assertEquals(listOf("job-1"), recovered.map { it.id })
+        assertEquals(BackgroundJobStatus.Queued, repository.getJob("job-1")?.status)
+
+        assertEquals(1, repository.cancelSessionGenerationJobs("session-1", nowEpochMillis = 21L))
+        val outcome = repository.runGenerationJob("job-1", nowEpochMillis = 22L)
+
+        assertEquals(BackgroundGenerationOutcome.Cancelled, outcome)
+        assertEquals(BackgroundJobStatus.Cancelled, repository.getJob("job-1")?.status)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+    }
+
+    @Test
+    fun archivedSessionDiscardsJobBeforeWritingAssistantMessage() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val sessionDao = FakeSessionDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            jobDao = jobDao,
+            sessionDao = sessionDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Success("Late reply"))
+        )
+        repository.enqueueGenerationJob(input(token = "token-current"), nowEpochMillis = 10L, jobId = "job-1")
+        sessionDao.archive("session-1", updatedAtEpochMillis = 11L)
+
+        val outcome = repository.runGenerationJob("job-1", nowEpochMillis = 30L)
+
+        assertEquals(BackgroundGenerationOutcome.Discarded("Session is unavailable"), outcome)
+        assertEquals(BackgroundJobStatus.Discarded, repository.getJob("job-1")?.status)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+    }
+
+    @Test
+    fun newerIndependentJobDoesNotInvalidateAnOlderActiveJobInTheSameSession() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val runtime = CallbackRuntime {
+            jobDao.forceUpsert(
+                BackgroundJobEntity(
+                    id = "job-newer",
+                    spaceId = "default-space",
+                    kind = "Generation",
+                    status = "Queued",
+                    createdAtEpochMillis = 11L,
+                    sessionId = "session-1",
+                    userMessageId = "user-2",
+                    userText = "Newer prompt",
+                    generationToken = "token-newer"
+                )
+            )
+            LlmGenerationResult.Success("Old late reply")
+        }
+        val repository = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = runtime
+        )
+        repository.enqueueGenerationJob(input(token = "token-old"), nowEpochMillis = 10L, jobId = "job-old")
+
+        val outcome = repository.runGenerationJob("job-old", nowEpochMillis = 30L)
+
+        assertEquals(BackgroundGenerationOutcome.Completed("assistant-token-old"), outcome)
+        assertEquals(BackgroundJobStatus.Completed, repository.getJob("job-old")?.status)
+        assertEquals(listOf("Old late reply"), messageRepository.listMessages("session-1").map { it.text })
+    }
+
+    private fun repository(
+        jobDao: FakeBackgroundJobDao = FakeBackgroundJobDao(),
+        sessionDao: FakeSessionDao = FakeSessionDao(),
+        messageRepository: MessageRepository = MessageRepository(
+            FakeMessageDao(),
+            FakeMessageAttachmentDao(),
+            FakeMessageQuoteDao()
+        ),
+        runtime: LlmGenerationRuntime = StaticRuntime(LlmGenerationResult.Success("Mock generation ready"))
+    ): BackgroundGenerationRepository =
+        BackgroundGenerationRepository(
+            backgroundJobDao = jobDao,
+            sessionDao = sessionDao,
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(FakeLlmProfileDao.withActiveProfile(), FakeSecretStore()),
+            runtime = runtime
+        )
+
+    private fun input(token: String): BackgroundGenerationInput =
+        BackgroundGenerationInput(
+            spaceId = "default-space",
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Explain factoring",
+            token = LlmGenerationToken(token),
+            capabilities = LlmCapabilities()
+        )
+}
+
+private class FakeBackgroundJobDao : BackgroundJobDao {
+    private val jobs = linkedMapOf<String, BackgroundJobEntity>()
+
+    override suspend fun upsert(job: BackgroundJobEntity) {
+        jobs[job.id] = job
+    }
+
+    override suspend fun getById(id: String): BackgroundJobEntity? = jobs[id]
+
+    override suspend fun listGenerationByStatuses(statuses: List<String>): List<BackgroundJobEntity> =
+        jobs.values
+            .filter { it.kind == "Generation" && it.status in statuses }
+            .sortedBy { it.createdAtEpochMillis }
+
+    override suspend fun listGenerationBySession(sessionId: String): List<BackgroundJobEntity> =
+        jobs.values
+            .filter { it.kind == "Generation" && it.sessionId == sessionId }
+            .sortedBy { it.createdAtEpochMillis }
+
+    fun forceStatus(id: String, status: String, startedAtEpochMillis: Long? = null) {
+        jobs[id]?.let { existing ->
+            jobs[id] = existing.copy(status = status, startedAtEpochMillis = startedAtEpochMillis)
+        }
+    }
+
+    fun forceUpsert(job: BackgroundJobEntity) {
+        jobs[job.id] = job
+    }
+}
+
+private class FakeSessionDao : SessionDao {
+    private val sessions = linkedMapOf(
+        "session-1" to SessionEntity(
+            id = "session-1",
+            spaceId = "default-space",
+            title = "Session",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L
+        )
+    )
+
+    override suspend fun upsert(session: SessionEntity) {
+        sessions[session.id] = session
+    }
+
+    override suspend fun getById(id: String): SessionEntity? = sessions[id]
+
+    override suspend fun listBySpace(spaceId: String): List<SessionEntity> =
+        sessions.values.filter { it.spaceId == spaceId && !it.archived }
+
+    override suspend fun rename(id: String, title: String, updatedAtEpochMillis: Long): Int = 0
+
+    override suspend fun setPinned(id: String, pinned: Boolean, updatedAtEpochMillis: Long): Int = 0
+
+    override suspend fun archive(id: String, updatedAtEpochMillis: Long): Int {
+        val existing = sessions[id] ?: return 0
+        sessions[id] = existing.copy(archived = true, updatedAtEpochMillis = updatedAtEpochMillis)
+        return 1
+    }
+}
+
+private class FakeMessageDao : MessageDao {
+    private val messages = linkedMapOf<String, MessageEntity>()
+
+    override suspend fun insert(message: MessageEntity) {
+        messages[message.id] = message
+    }
+
+    override suspend fun listBySession(sessionId: String): List<MessageEntity> =
+        messages.values.filter { it.sessionId == sessionId }.sortedBy { it.createdAtEpochMillis }
+
+    override suspend fun deleteById(id: String): Int =
+        if (messages.remove(id) == null) 0 else 1
+}
+
+private class FakeMessageAttachmentDao : MessageAttachmentDao {
+    override suspend fun insert(attachment: MessageAttachmentEntity) = Unit
+
+    override suspend fun listByMessageId(messageId: String): List<MessageAttachmentEntity> = emptyList()
+
+    override suspend fun listByMessageIds(messageIds: List<String>): List<MessageAttachmentEntity> = emptyList()
+
+    override suspend fun deleteByMessageId(messageId: String): Int = 0
+}
+
+private class FakeMessageQuoteDao : MessageQuoteDao {
+    override suspend fun insert(quote: MessageQuoteEntity) = Unit
+
+    override suspend fun getByMessageId(messageId: String): MessageQuoteEntity? = null
+
+    override suspend fun deleteByMessageId(messageId: String): Int = 0
+}
+
+private class FakeLlmProfileDao : LlmProfileDao {
+    private val entities = linkedMapOf<String, LlmProfileEntity>()
+
+    override suspend fun upsert(profile: LlmProfileEntity) {
+        entities[profile.id] = profile
+    }
+
+    override suspend fun getById(id: String): LlmProfileEntity? = entities[id]
+
+    override suspend fun listBySpace(spaceId: String): List<LlmProfileEntity> =
+        entities.values.filter { it.spaceId == spaceId }
+
+    override suspend fun listAll(): List<LlmProfileEntity> = entities.values.toList()
+
+    override suspend fun setEnabledForSpace(spaceId: String, enabledProfileId: String, updatedAtEpochMillis: Long) = Unit
+
+    override suspend fun deleteById(id: String): Int = if (entities.remove(id) == null) 0 else 1
+
+    companion object {
+        fun withActiveProfile(): FakeLlmProfileDao =
+            FakeLlmProfileDao().also { dao ->
+                dao.entities["profile-1"] = LlmProfileEntity(
+                    id = "profile-1",
+                    spaceId = "default-space",
+                    name = "Work model",
+                    provider = "OpenAiCompatible",
+                    model = "gpt-4o-mini",
+                    secretRef = "llm-secret-profile-1",
+                    createdAtEpochMillis = 1L,
+                    updatedAtEpochMillis = 2L,
+                    baseUrl = "https://api.example.test/v1",
+                    enabled = true
+                )
+            }
+    }
+}
+
+private class FakeSecretStore : SecretStore {
+    override suspend fun put(ref: String, secret: String) = Unit
+    override suspend fun get(ref: String): String? = null
+    override suspend fun delete(ref: String) = Unit
+}
+
+private class StaticRuntime(
+    private val result: LlmGenerationResult
+) : LlmGenerationRuntime {
+    override fun generate(request: LlmGenerationRequest): LlmGenerationResult = result
+}
+
+private class CallbackRuntime(
+    private val block: () -> LlmGenerationResult
+) : LlmGenerationRuntime {
+    override fun generate(request: LlmGenerationRequest): LlmGenerationResult = block()
+}

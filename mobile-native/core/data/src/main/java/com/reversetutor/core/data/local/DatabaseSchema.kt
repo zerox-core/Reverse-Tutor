@@ -1,10 +1,359 @@
 package com.reversetutor.core.data.local
 
 import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 1
+    const val version = 3
     const val exportSchema = true
 
-    val migrations: Array<Migration> = emptyArray()
+    val migration1To2: Migration = object : Migration(1, 2) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN startedAtEpochMillis INTEGER")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN userMessageId TEXT")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN userText TEXT")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN generationToken TEXT")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN quoteExcerpt TEXT")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN imageAttachmentsPayload TEXT")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN contextEvidencePayload TEXT")
+        }
+    }
+
+    val migration2To3: Migration = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE sessions ADD COLUMN modelBindingId TEXT")
+            db.execSQL("UPDATE sessions SET modelBindingId = llmProfileId WHERE llmProfileId IS NOT NULL")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_sessions_modelBindingId ON sessions(modelBindingId)")
+            db.execSQL("ALTER TABLE session_settings ADD COLUMN modelBindingId TEXT")
+            db.execSQL("UPDATE session_settings SET modelBindingId = llmProfileId WHERE llmProfileId IS NOT NULL")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_session_settings_modelBindingId ON session_settings(modelBindingId)")
+
+            createHybridTables(db)
+            migrateLegacyProfiles(db)
+        }
+    }
+
+    val migrations: Array<Migration> = arrayOf(migration1To2, migration2To3)
+
+    private fun createHybridTables(db: SupportSQLiteDatabase) {
+        hybridTableSql.forEach(db::execSQL)
+        hybridIndexSql.forEach(db::execSQL)
+    }
+
+    private fun migrateLegacyProfiles(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            INSERT INTO provider_connections (
+                id, spaceId, name, protocol, providerName, baseUrl, secretRef, enabled,
+                createdAtEpochMillis, updatedAtEpochMillis
+            )
+            SELECT
+                'connection-' || id,
+                spaceId,
+                name,
+                CASE
+                    WHEN provider = 'AnthropicCompatible' THEN 'AnthropicCompatible'
+                    WHEN provider = 'GeminiNative' THEN 'GeminiNative'
+                    ELSE 'OpenAiCompatible'
+                END,
+                provider,
+                baseUrl,
+                secretRef,
+                enabled,
+                createdAtEpochMillis,
+                updatedAtEpochMillis
+            FROM llm_profiles
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            INSERT INTO model_bindings (
+                id, spaceId, connectionId, modelId, displayName, availability, isDefault, enabled,
+                lastCheckedAtEpochMillis, lastUsedAtEpochMillis, createdAtEpochMillis, updatedAtEpochMillis
+            )
+            SELECT
+                id,
+                spaceId,
+                'connection-' || id,
+                model,
+                model,
+                'Untested',
+                enabled,
+                enabled,
+                NULL,
+                NULL,
+                createdAtEpochMillis,
+                updatedAtEpochMillis
+            FROM llm_profiles
+            """.trimIndent()
+        )
+    }
+
+    private val hybridTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS provider_connections (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            name TEXT NOT NULL,
+            protocol TEXT NOT NULL,
+            providerName TEXT,
+            baseUrl TEXT,
+            secretRef TEXT,
+            enabled INTEGER NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS model_bindings (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            connectionId TEXT NOT NULL,
+            modelId TEXT NOT NULL,
+            displayName TEXT NOT NULL,
+            availability TEXT NOT NULL,
+            isDefault INTEGER NOT NULL,
+            enabled INTEGER NOT NULL,
+            lastCheckedAtEpochMillis INTEGER,
+            lastUsedAtEpochMillis INTEGER,
+            createdAtEpochMillis INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id),
+            FOREIGN KEY(connectionId) REFERENCES provider_connections(id) ON UPDATE NO ACTION ON DELETE CASCADE
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS context_snapshots (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            turnId TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            messageIdsPayload TEXT NOT NULL,
+            parentTurnId TEXT,
+            maxSequence INTEGER NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS turn_runs (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            turnId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            userMessageId TEXT NOT NULL,
+            sequence INTEGER NOT NULL,
+            contextVersion INTEGER NOT NULL,
+            modelBindingId TEXT NOT NULL,
+            parentTurnId TEXT,
+            contextSnapshotId TEXT,
+            attempt INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            startedAtEpochMillis INTEGER,
+            completedAtEpochMillis INTEGER,
+            resultMessageId TEXT,
+            errorCode TEXT,
+            errorRetryable INTEGER,
+            errorSafeMessage TEXT,
+            errorUserAction TEXT,
+            PRIMARY KEY(id),
+            FOREIGN KEY(modelBindingId) REFERENCES model_bindings(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS study_plan_tasks (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            title TEXT NOT NULL,
+            detail TEXT,
+            state TEXT NOT NULL,
+            dueAtEpochMillis INTEGER,
+            completedAtEpochMillis INTEGER,
+            sourceSessionId TEXT,
+            sourceMessageId TEXT,
+            revision INTEGER NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS weekly_summaries (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            weekStartEpochMillis INTEGER NOT NULL,
+            weekEndEpochMillis INTEGER NOT NULL,
+            sourceRevision INTEGER NOT NULL,
+            generatorVersion TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            generatedAtEpochMillis INTEGER NOT NULL,
+            stale INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS token_usage_records (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            turnId TEXT NOT NULL,
+            attempt INTEGER NOT NULL,
+            modelBindingId TEXT,
+            providerUsageId TEXT,
+            inputTokens INTEGER NOT NULL,
+            outputTokens INTEGER NOT NULL,
+            cachedTokens INTEGER NOT NULL,
+            reasoningTokens INTEGER NOT NULL,
+            totalTokens INTEGER NOT NULL,
+            estimated INTEGER NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS widget_layout_preferences (
+            spaceId TEXT NOT NULL,
+            widgetId TEXT NOT NULL,
+            `order` INTEGER NOT NULL,
+            hidden INTEGER NOT NULL,
+            size TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(spaceId, widgetId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS search_documents (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            entityType TEXT NOT NULL,
+            entityId TEXT NOT NULL,
+            sessionId TEXT,
+            parentEntityId TEXT,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            normalizedText TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            rebuildRequired INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS sync_outbox (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            entityId TEXT NOT NULL,
+            entityType TEXT NOT NULL,
+            ownerId TEXT NOT NULL,
+            deviceId TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            idempotencyKey TEXT NOT NULL,
+            ownership TEXT NOT NULL,
+            operation TEXT NOT NULL,
+            payload TEXT,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            deletedAtEpochMillis INTEGER,
+            retryCount INTEGER NOT NULL,
+            nextAttemptAtEpochMillis INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            lastError TEXT,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS sync_cursors (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            entityType TEXT NOT NULL,
+            cursor TEXT,
+            revision INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            entityId TEXT NOT NULL,
+            entityType TEXT NOT NULL,
+            localRevision INTEGER NOT NULL,
+            remoteRevision INTEGER NOT NULL,
+            localPayload TEXT,
+            remotePayload TEXT,
+            state TEXT NOT NULL,
+            resolution TEXT,
+            createdAtEpochMillis INTEGER NOT NULL,
+            resolvedAtEpochMillis INTEGER,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS entity_tombstones (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            entityType TEXT NOT NULL,
+            entityId TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            deletedAtEpochMillis INTEGER NOT NULL,
+            idempotencyKey TEXT,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val hybridIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_provider_connections_spaceId ON provider_connections(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_provider_connections_protocol ON provider_connections(protocol)",
+        "CREATE INDEX IF NOT EXISTS index_model_bindings_spaceId ON model_bindings(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_model_bindings_connectionId ON model_bindings(connectionId)",
+        "CREATE INDEX IF NOT EXISTS index_model_bindings_availability ON model_bindings(availability)",
+        "CREATE INDEX IF NOT EXISTS index_model_bindings_spaceId_isDefault ON model_bindings(spaceId, isDefault)",
+        "CREATE INDEX IF NOT EXISTS index_context_snapshots_spaceId ON context_snapshots(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_context_snapshots_sessionId ON context_snapshots(sessionId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_context_snapshots_turnId_version ON context_snapshots(turnId, version)",
+        "CREATE INDEX IF NOT EXISTS index_turn_runs_spaceId ON turn_runs(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_turn_runs_sessionId ON turn_runs(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_turn_runs_state ON turn_runs(state)",
+        "CREATE INDEX IF NOT EXISTS index_turn_runs_modelBindingId ON turn_runs(modelBindingId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_turn_runs_turnId_attempt ON turn_runs(turnId, attempt)",
+        "CREATE INDEX IF NOT EXISTS index_turn_runs_sessionId_sequence ON turn_runs(sessionId, sequence)",
+        "CREATE INDEX IF NOT EXISTS index_study_plan_tasks_spaceId ON study_plan_tasks(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_study_plan_tasks_state ON study_plan_tasks(state)",
+        "CREATE INDEX IF NOT EXISTS index_study_plan_tasks_sourceSessionId ON study_plan_tasks(sourceSessionId)",
+        "CREATE INDEX IF NOT EXISTS index_study_plan_tasks_updatedAtEpochMillis ON study_plan_tasks(updatedAtEpochMillis)",
+        "CREATE INDEX IF NOT EXISTS index_weekly_summaries_spaceId ON weekly_summaries(spaceId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_weekly_summaries_spaceId_weekStartEpochMillis_sourceRevision_generatorVersion ON weekly_summaries(spaceId, weekStartEpochMillis, sourceRevision, generatorVersion)",
+        "CREATE INDEX IF NOT EXISTS index_token_usage_records_spaceId ON token_usage_records(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_token_usage_records_modelBindingId ON token_usage_records(modelBindingId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_token_usage_records_turnId_attempt ON token_usage_records(turnId, attempt)",
+        "CREATE INDEX IF NOT EXISTS index_token_usage_records_createdAtEpochMillis ON token_usage_records(createdAtEpochMillis)",
+        "CREATE INDEX IF NOT EXISTS index_widget_layout_preferences_spaceId_order ON widget_layout_preferences(spaceId, `order`)",
+        "CREATE INDEX IF NOT EXISTS index_search_documents_spaceId ON search_documents(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_search_documents_entityType ON search_documents(entityType)",
+        "CREATE INDEX IF NOT EXISTS index_search_documents_sessionId ON search_documents(sessionId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_search_documents_entityType_entityId ON search_documents(entityType, entityId)",
+        "CREATE INDEX IF NOT EXISTS index_sync_outbox_spaceId ON sync_outbox(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_sync_outbox_entityType ON sync_outbox(entityType)",
+        "CREATE INDEX IF NOT EXISTS index_sync_outbox_nextAttemptAtEpochMillis ON sync_outbox(nextAttemptAtEpochMillis)",
+        "CREATE INDEX IF NOT EXISTS index_sync_outbox_status ON sync_outbox(status)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_sync_outbox_idempotencyKey ON sync_outbox(idempotencyKey)",
+        "CREATE INDEX IF NOT EXISTS index_sync_cursors_spaceId ON sync_cursors(spaceId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_sync_cursors_spaceId_entityType ON sync_cursors(spaceId, entityType)",
+        "CREATE INDEX IF NOT EXISTS index_sync_conflicts_spaceId ON sync_conflicts(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_sync_conflicts_entityType ON sync_conflicts(entityType)",
+        "CREATE INDEX IF NOT EXISTS index_sync_conflicts_state ON sync_conflicts(state)",
+        "CREATE INDEX IF NOT EXISTS index_sync_conflicts_entityId ON sync_conflicts(entityId)",
+        "CREATE INDEX IF NOT EXISTS index_entity_tombstones_spaceId ON entity_tombstones(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_entity_tombstones_entityType ON entity_tombstones(entityType)",
+        "CREATE INDEX IF NOT EXISTS index_entity_tombstones_entityId ON entity_tombstones(entityId)",
+        "CREATE INDEX IF NOT EXISTS index_entity_tombstones_deletedAtEpochMillis ON entity_tombstones(deletedAtEpochMillis)"
+    )
+}
+
+object MigrationIds {
+    fun providerConnectionId(legacyProfileId: String): String = "connection-$legacyProfileId"
+
+    fun modelBindingId(legacyProfileId: String): String = legacyProfileId
 }

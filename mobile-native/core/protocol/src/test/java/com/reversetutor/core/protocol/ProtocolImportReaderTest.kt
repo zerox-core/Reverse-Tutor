@@ -33,6 +33,50 @@ class ProtocolImportReaderTest {
     }
 
     @Test
+    fun readsVersionOneFullBackupAfterVersionTwoBecomesCurrent() {
+        val result = ProtocolImportReader.read(
+            ProtocolFixtureLoader.read("valid/full-backup.json")
+        )
+
+        assertTrue(result.validation.errors.toString(), result.isValid)
+        assertEquals(1, result.document?.version)
+        assertEquals("profile-fixture-1", result.document?.llmProfiles?.single()?.id)
+    }
+
+    @Test
+    fun readsVersionTwoConnectionsAndBindingsWithoutSecretMaterial() {
+        val result = ProtocolImportReader.read(
+            """
+            {
+              "schema": "reverse_tutor_full_backup_v1",
+              "version": 2,
+              "type": "full_backup",
+              "created_at": "2026-07-11T00:00:00Z",
+              "sessions": [],
+              "provider_connections": [{
+                "id": "connection-1",
+                "name": "Provider",
+                "protocol": "OpenAiCompatible",
+                "secret_status": "excluded"
+              }],
+              "model_bindings": [{
+                "id": "binding-1",
+                "connection_id": "connection-1",
+                "model_id": "model-1",
+                "display_name": "Model"
+              }],
+              "graph": {}
+            }
+            """.trimIndent()
+        )
+
+        assertTrue(result.validation.errors.toString(), result.isValid)
+        assertEquals("connection-1", result.document?.providerConnections?.single()?.id)
+        assertEquals("binding-1", result.document?.modelBindings?.single()?.id)
+        assertTrue(result.document?.llmProfiles.orEmpty().isEmpty())
+    }
+
+    @Test
     fun invalidWholeFileProducesNoDocument() {
         val result = ProtocolImportReader.read(
             ProtocolFixtureLoader.read("invalid/full-backup-missing-version.json")

@@ -33,7 +33,10 @@ data class SpaceEntity(
     val sourceImportId: String? = null
 )
 
-@Entity(tableName = "sessions", indices = [Index("spaceId"), Index("updatedAtEpochMillis")])
+@Entity(
+    tableName = "sessions",
+    indices = [Index("spaceId"), Index("updatedAtEpochMillis"), Index("modelBindingId")]
+)
 data class SessionEntity(
     @PrimaryKey val id: String,
     val spaceId: String,
@@ -43,6 +46,7 @@ data class SessionEntity(
     val pinned: Boolean = false,
     val archived: Boolean = false,
     val llmProfileId: String? = null,
+    val modelBindingId: String? = llmProfileId,
     val settingsId: String? = null,
     val sourceImportId: String? = null
 )
@@ -93,12 +97,16 @@ data class LlmProfileEntity(
     val enabled: Boolean = true
 )
 
-@Entity(tableName = "session_settings", indices = [Index("spaceId"), Index("sessionId")])
+@Entity(
+    tableName = "session_settings",
+    indices = [Index("spaceId"), Index("sessionId"), Index("modelBindingId")]
+)
 data class SessionSettingsEntity(
     @PrimaryKey val id: String,
     val spaceId: String,
     val sessionId: String,
     val llmProfileId: String? = null,
+    val modelBindingId: String? = llmProfileId,
     val systemPrompt: String? = null
 )
 
@@ -199,8 +207,15 @@ data class BackgroundJobEntity(
     val status: String,
     val createdAtEpochMillis: Long,
     val sessionId: String? = null,
+    val startedAtEpochMillis: Long? = null,
     val completedAtEpochMillis: Long? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val userMessageId: String? = null,
+    val userText: String? = null,
+    val generationToken: String? = null,
+    val quoteExcerpt: String? = null,
+    val imageAttachmentsPayload: String? = null,
+    val contextEvidencePayload: String? = null
 )
 
 @Entity(tableName = "import_batches", indices = [Index("spaceId"), Index("status")])

@@ -4,10 +4,13 @@ import android.content.Context
 import androidx.room.Room
 import androidx.datastore.preferences.preferencesDataStore
 import com.reversetutor.core.data.graph.GraphRepository
+import com.reversetutor.core.data.background.BackgroundGenerationRepository
+import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.llm.AndroidKeystoreSecretStore
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.llm.LlmProfileRepository
 import com.reversetutor.core.data.llm.SecretStore
+import com.reversetutor.core.data.local.DatabaseSchema
 import com.reversetutor.core.data.local.ReverseTutorDatabase
 import com.reversetutor.core.data.migration.NativeExportRepository
 import com.reversetutor.core.data.migration.NativeImportRepository
@@ -16,7 +19,12 @@ import com.reversetutor.core.data.migration.RoomNativeImportStore
 import com.reversetutor.core.data.memory.MemoryRepository
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.preferences.AppPreferencesRepository
+import com.reversetutor.core.data.model.ModelConnectionRepositoryImpl
+import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
+import com.reversetutor.core.data.search.RoomGlobalSearchRepository
+import com.reversetutor.core.data.session.SessionDeletionRepository
 import com.reversetutor.core.data.session.SessionRepository
+import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.data.wipe.RoomLocalDataWipeStore
@@ -39,7 +47,9 @@ object DataModule {
                 context.applicationContext,
                 ReverseTutorDatabase::class.java,
                 databaseName
-            ).build().also { databaseInstance = it }
+            ).addMigrations(*DatabaseSchema.migrations)
+                .build()
+                .also { databaseInstance = it }
         }
 
     fun sessionRepository(context: Context): SessionRepository {
@@ -77,6 +87,36 @@ object DataModule {
             llmProfileRepository = llmProfileRepository(context),
             runtime = FakeLlmGenerationRuntime()
         )
+
+    fun backgroundGenerationRepository(context: Context): BackgroundGenerationRepository {
+        val appContext = context.applicationContext
+        val database = database(appContext)
+        return BackgroundGenerationRepository(
+            backgroundJobDao = database.backgroundJobDao(),
+            sessionDao = database.sessionDao(),
+            messageRepository = messageRepository(appContext),
+            llmProfileRepository = llmProfileRepository(appContext),
+            runtime = FakeLlmGenerationRuntime()
+        )
+    }
+
+    fun modelConnectionRepository(context: Context): ModelConnectionRepositoryImpl =
+        ModelConnectionRepositoryImpl(database(context.applicationContext))
+
+    fun conversationRunRepository(context: Context): ConversationRunRepositoryImpl =
+        ConversationRunRepositoryImpl(database(context.applicationContext))
+
+    fun learningRepository(context: Context): LearningRepositoryImpl =
+        LearningRepositoryImpl(database(context.applicationContext))
+
+    fun globalSearchRepository(context: Context): RoomGlobalSearchRepository =
+        RoomGlobalSearchRepository(database(context.applicationContext))
+
+    fun syncRepository(context: Context): RoomSyncRepository =
+        RoomSyncRepository(database(context.applicationContext))
+
+    fun sessionDeletionRepository(context: Context): SessionDeletionRepository =
+        SessionDeletionRepository(database(context.applicationContext))
 
     fun localDataWipeRepository(context: Context): LocalDataWipeRepository {
         val appContext = context.applicationContext

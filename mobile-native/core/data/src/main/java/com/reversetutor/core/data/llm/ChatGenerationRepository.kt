@@ -22,7 +22,8 @@ class ChatGenerationRepository(
     suspend fun generateReply(
         input: ChatGenerationInput,
         nowEpochMillis: Long,
-        isTokenCurrent: (LlmGenerationToken) -> Boolean
+        isTokenCurrent: (LlmGenerationToken) -> Boolean,
+        canPersistResult: suspend () -> Boolean = { true }
     ): ChatGenerationOutcome {
         if (!isTokenCurrent(input.token)) {
             return ChatGenerationOutcome.Stale
@@ -49,7 +50,7 @@ class ChatGenerationRepository(
         }
 
         val result = runtime.generate(request)
-        if (!isTokenCurrent(input.token)) {
+        if (!isTokenCurrent(input.token) || !canPersistResult()) {
             return ChatGenerationOutcome.Stale
         }
 

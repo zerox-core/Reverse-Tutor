@@ -207,6 +207,13 @@ interface BackgroundJobDao {
 
     @Query("SELECT * FROM background_jobs WHERE id = :id")
     suspend fun getById(id: String): BackgroundJobEntity?
+
+    @Query("SELECT * FROM background_jobs WHERE kind = 'Generation' AND status IN (:statuses) ORDER BY createdAtEpochMillis ASC")
+    suspend fun listGenerationByStatuses(statuses: List<String>): List<BackgroundJobEntity>
+
+    @Query("SELECT * FROM background_jobs WHERE kind = 'Generation' AND sessionId = :sessionId ORDER BY createdAtEpochMillis ASC")
+    suspend fun listGenerationBySession(sessionId: String): List<BackgroundJobEntity>
+
 }
 
 @Dao

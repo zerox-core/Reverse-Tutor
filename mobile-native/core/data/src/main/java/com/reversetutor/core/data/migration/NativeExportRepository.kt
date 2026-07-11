@@ -5,6 +5,8 @@ import com.reversetutor.core.data.local.entity.GraphEdgeEntity
 import com.reversetutor.core.data.local.entity.GraphNodeEntity
 import com.reversetutor.core.data.local.entity.LlmProfileEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
+import com.reversetutor.core.data.local.entity.ModelBindingEntity
+import com.reversetutor.core.data.local.entity.ProviderConnectionEntity
 import com.reversetutor.core.data.local.entity.SessionEntity
 import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.session.SessionRepository
@@ -16,6 +18,8 @@ import com.reversetutor.core.protocol.export.ExportGraphNodeRecord
 import com.reversetutor.core.protocol.export.ExportGraphSnapshotPayload
 import com.reversetutor.core.protocol.export.ExportLlmProfileRecord
 import com.reversetutor.core.protocol.export.ExportMessageRecord
+import com.reversetutor.core.protocol.export.ExportModelBindingRecord
+import com.reversetutor.core.protocol.export.ExportProviderConnectionRecord
 import com.reversetutor.core.protocol.export.ExportSecretStatus
 import com.reversetutor.core.protocol.export.ExportSessionRecord
 import com.reversetutor.core.protocol.export.ProtocolExportPayloadBuilder
@@ -79,13 +83,17 @@ class NativeExportRepository(
             sessions = sessions.map { it.toExportRecord(settingsBySessionId[it.id]) },
             messages = messages.map { it.toExportRecord(includeSessionId = true) },
             llmProfiles = store.listLlmProfiles(spaceId).map { it.toExportRecord() },
+            providerConnections = store.listProviderConnections(spaceId).map { it.toExportRecord() },
+            modelBindings = store.listModelBindings(spaceId).map { it.toExportRecord() },
             graph = graph
         )
         val payload = ProtocolExportPayloadBuilder.fullBackup(
             createdAt = createdAt,
             sessions = snapshot.sessions,
             llmProfiles = snapshot.llmProfiles,
-            graph = graph
+            graph = graph,
+            providerConnections = snapshot.providerConnections,
+            modelBindings = snapshot.modelBindings
         )
         return NativeExportResult.fromPayload(
             kind = NativeExportKind.FullBackup,
@@ -125,6 +133,8 @@ interface NativeExportStore {
     suspend fun listSessions(spaceId: String): List<SessionEntity>
     suspend fun listMessages(sessionId: String): List<MessageEntity>
     suspend fun listLlmProfiles(spaceId: String): List<LlmProfileEntity>
+    suspend fun listProviderConnections(spaceId: String): List<ProviderConnectionEntity> = emptyList()
+    suspend fun listModelBindings(spaceId: String): List<ModelBindingEntity> = emptyList()
     suspend fun listGraphNodes(spaceId: String): List<GraphNodeEntity>
     suspend fun listGraphEdges(spaceId: String): List<GraphEdgeEntity>
 }
@@ -147,6 +157,12 @@ class RoomNativeExportStore(
     override suspend fun listLlmProfiles(spaceId: String): List<LlmProfileEntity> =
         database.llmProfileDao().listBySpace(spaceId)
 
+    override suspend fun listProviderConnections(spaceId: String): List<ProviderConnectionEntity> =
+        database.modelConnectionDao().listConnections(spaceId)
+
+    override suspend fun listModelBindings(spaceId: String): List<ModelBindingEntity> =
+        database.modelConnectionDao().listBindings(spaceId)
+
     override suspend fun listGraphNodes(spaceId: String): List<GraphNodeEntity> =
         database.graphDao().listNodesBySpace(spaceId)
 
@@ -164,6 +180,8 @@ data class NativeExportSnapshot(
     val sessions: List<ExportSessionRecord> = emptyList(),
     val messages: List<ExportMessageRecord> = emptyList(),
     val llmProfiles: List<ExportLlmProfileRecord> = emptyList(),
+    val providerConnections: List<ExportProviderConnectionRecord> = emptyList(),
+    val modelBindings: List<ExportModelBindingRecord> = emptyList(),
     val graph: ExportGraphSnapshotPayload? = null
 )
 
@@ -226,7 +244,9 @@ private fun SessionEntity.toExportRecord(settings: SessionSettingsEntity?): Expo
         "pinned" to ExportFieldValue.BooleanValue(pinned),
         "archived" to ExportFieldValue.BooleanValue(archived)
     )
-    llmProfileId?.let { extras["llm_profile_id"] = ExportFieldValue.StringValue(it) }
+    (modelBindingId ?: llmProfileId)?.let {
+        extras["model_binding_id"] = ExportFieldValue.StringValue(it)
+    }
     settings?.systemPrompt?.takeIf { it.isNotBlank() }?.let {
         extras["system_prompt"] = ExportFieldValue.StringValue(it)
     }
@@ -267,6 +287,25 @@ private fun LlmProfileEntity.toExportRecord(): ExportLlmProfileRecord =
         secretStatus = if (secretRef.isNullOrBlank()) ExportSecretStatus.None else ExportSecretStatus.Excluded,
         secretRef = null,
         apiKey = null
+    )
+
+private fun ProviderConnectionEntity.toExportRecord(): ExportProviderConnectionRecord =
+    ExportProviderConnectionRecord(
+        id = id,
+        name = name,
+        protocol = protocol,
+        providerName = providerName,
+        baseUrl = baseUrl,
+        secretStatus = if (secretRef.isNullOrBlank()) ExportSecretStatus.None else ExportSecretStatus.Excluded
+    )
+
+private fun ModelBindingEntity.toExportRecord(): ExportModelBindingRecord =
+    ExportModelBindingRecord(
+        id = id,
+        connectionId = connectionId,
+        modelId = modelId,
+        displayName = displayName,
+        enabled = enabled
     )
 
 private fun GraphNodeEntity.toExportRecord(): ExportGraphNodeRecord =

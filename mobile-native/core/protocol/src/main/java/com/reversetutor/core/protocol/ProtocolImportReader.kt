@@ -15,13 +15,16 @@ data class ProtocolImportDocument(
     val sessions: List<ProtocolImportSessionRecord> = emptyList(),
     val messages: List<ProtocolImportMessageRecord> = emptyList(),
     val llmProfiles: List<ProtocolImportLlmProfileRecord> = emptyList(),
+    val providerConnections: List<ProtocolImportProviderConnectionRecord> = emptyList(),
+    val modelBindings: List<ProtocolImportModelBindingRecord> = emptyList(),
     val warnings: List<String> = emptyList()
 )
 
 data class ProtocolImportSessionRecord(
     val id: String,
     val title: String,
-    val systemPrompt: String? = null
+    val systemPrompt: String? = null,
+    val modelBindingId: String? = null
 )
 
 data class ProtocolImportMessageRecord(
@@ -37,6 +40,22 @@ data class ProtocolImportLlmProfileRecord(
     val provider: String,
     val model: String,
     val baseUrl: String? = null
+)
+
+data class ProtocolImportProviderConnectionRecord(
+    val id: String,
+    val name: String,
+    val protocol: String,
+    val providerName: String? = null,
+    val baseUrl: String? = null
+)
+
+data class ProtocolImportModelBindingRecord(
+    val id: String,
+    val connectionId: String,
+    val modelId: String,
+    val displayName: String? = null,
+    val enabled: Boolean = true
 )
 
 object ProtocolImportReader {
@@ -99,6 +118,14 @@ object ProtocolImportReader {
             ?.values
             ?.mapNotNull { (it as? JsonObject)?.toImportLlmProfile() }
             .orEmpty()
+        val connections = root.arrayField("provider_connections")
+            ?.values
+            ?.mapNotNull { (it as? JsonObject)?.toImportProviderConnection() }
+            .orEmpty()
+        val bindings = root.arrayField("model_bindings")
+            ?.values
+            ?.mapNotNull { (it as? JsonObject)?.toImportModelBinding() }
+            .orEmpty()
         val graphWarning = if (root.objectField("graph") != null) {
             listOf("Graph payload was detected; graph import is deferred to Phase 5.")
         } else {
@@ -111,6 +138,8 @@ object ProtocolImportReader {
             documentType = documentType,
             sessions = sessions,
             llmProfiles = profiles,
+            providerConnections = connections,
+            modelBindings = bindings,
             warnings = graphWarning
         )
     }
@@ -208,7 +237,8 @@ private fun JsonObject.toImportSession(): ProtocolImportSessionRecord? {
     return ProtocolImportSessionRecord(
         id = id,
         title = title,
-        systemPrompt = stringField("system_prompt") ?: stringField("systemPrompt")
+        systemPrompt = stringField("system_prompt") ?: stringField("systemPrompt"),
+        modelBindingId = stringField("model_binding_id") ?: stringField("llm_profile_id")
     )
 }
 
@@ -237,6 +267,34 @@ private fun JsonObject.toImportLlmProfile(): ProtocolImportLlmProfileRecord? {
         provider = provider,
         model = model,
         baseUrl = stringField("base_url") ?: stringField("baseUrl")
+    )
+}
+
+private fun JsonObject.toImportProviderConnection(): ProtocolImportProviderConnectionRecord? {
+    val id = stringField("id")?.trim().orEmpty()
+    val name = stringField("name")?.trim().orEmpty()
+    val protocol = stringField("protocol")?.trim().orEmpty()
+    if (id.isEmpty() || name.isEmpty() || protocol.isEmpty()) return null
+    return ProtocolImportProviderConnectionRecord(
+        id = id,
+        name = name,
+        protocol = protocol,
+        providerName = stringField("provider_name"),
+        baseUrl = stringField("base_url")
+    )
+}
+
+private fun JsonObject.toImportModelBinding(): ProtocolImportModelBindingRecord? {
+    val id = stringField("id")?.trim().orEmpty()
+    val connectionId = stringField("connection_id")?.trim().orEmpty()
+    val modelId = stringField("model_id")?.trim().orEmpty()
+    if (id.isEmpty() || connectionId.isEmpty() || modelId.isEmpty()) return null
+    return ProtocolImportModelBindingRecord(
+        id = id,
+        connectionId = connectionId,
+        modelId = modelId,
+        displayName = stringField("display_name"),
+        enabled = (fields["enabled"] as? JsonBoolean)?.value ?: true
     )
 }
 
