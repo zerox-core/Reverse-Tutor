@@ -24,6 +24,10 @@ Deliver a complete native frontend interaction system covering:
 ## Confirmed Product Decisions
 
 - Preserve the current visual theme.
+- Treat the current branch as a new architecture refactor. When old branch implementation contracts conflict with the new design, the new design takes precedence.
+- Preserve old versions as migration inputs and behavioral references, not as frozen source-level API or Room schema constraints.
+- Use a hybrid local-first architecture: Android owns local learning execution, while Python provides optional online enhancement, activities, synchronization, and release metadata.
+- Apply entity ownership: local learning data is device-owned, online activities are server-owned, and explicitly shared state uses versioned bidirectional synchronization.
 - Use the interaction-shell rebuild approach rather than incremental screen patching.
 - Horizontal order is weekly dashboard, session home, global graph, community.
 - Default page is session home.
@@ -51,3 +55,6 @@ Acceptance criteria, migration rules, error states, performance expectations, an
 
 `docs/superpowers/specs/2026-07-11-native-complete-interaction-frontend-design.md`
 
+Three-layer responsibilities, online synchronization ownership, cross-layer contracts, and sub-agent file boundaries are defined in:
+
+`docs/superpowers/specs/2026-07-11-native-three-layer-hybrid-architecture-design.md`
