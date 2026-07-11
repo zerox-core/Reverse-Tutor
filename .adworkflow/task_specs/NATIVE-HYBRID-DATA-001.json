@@ -1,0 +1,52 @@
+{
+  "task_id": "NATIVE-HYBRID-DATA-001",
+  "goal": "Implement Room v3, migration, versioned protocol, local/search/sync repositories, and transactional deletion against the frozen hybrid domain contracts.",
+  "non_goals": [
+    "Do not modify Compose or feature UI.",
+    "Do not modify Python services or provider runtime.",
+    "Do not change frozen shared contract signatures without controller approval.",
+    "Do not use destructive migration.",
+    "Do not revert unrelated user or worker changes."
+  ],
+  "acceptance_criteria": [
+    "Old LlmProfile rows migrate to one connection and one model binding without losing session selection.",
+    "Multiple active TurnRuns in one session remain valid.",
+    "Local syncable writes and Outbox records are transactional.",
+    "Session deletion writes a tombstone and removes session-owned records.",
+    "Secrets and sync internals are excluded from export."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": ["read", "edit", "test", "commit"],
+  "required_outputs": ["patch", "changed_file_summary", "worker_state", "verification_result"],
+  "module": ":core:data/:core:protocol",
+  "branch": "work/native-hybrid-data",
+  "dependencies": ["NATIVE-HYBRID-BACKEND-001-contract-checkpoint"],
+  "read_first": [
+    "AGENTS.md",
+    "docs/superpowers/specs/2026-07-11-native-three-layer-hybrid-architecture-design.md",
+    "docs/superpowers/plans/2026-07-11-native-three-layer-hybrid-implementation.md",
+    "mobile-native/core/model/src/main/java"
+  ],
+  "write_scope": [
+    "mobile-native/core/data",
+    "mobile-native/core/protocol",
+    "mobile-native/core/data/schemas"
+  ],
+  "do_not_touch": [
+    "mobile-native/app",
+    "mobile-native/feature",
+    "mobile-native/core/model",
+    "mobile-native/core/domain",
+    "mobile-native/core/llm",
+    "server.py",
+    "adapters/online",
+    "mobile",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run protocol and core:data JVM tests.",
+    "Compile Android migration tests and run them when a device is available.",
+    "Validate exported Room schema and protocol fixtures."
+  ]
+}
