@@ -6,9 +6,9 @@ import com.reversetutor.core.model.ModelCapabilityState
 import com.reversetutor.core.model.ProviderConnection
 
 interface ModelProviderGateway {
-    fun discover(connection: ProviderConnection): ModelDiscovery
+    suspend fun discover(connection: ProviderConnection): ModelDiscovery
 
-    fun check(
+    suspend fun check(
         connection: ProviderConnection,
         binding: ModelBinding
     ): ModelConnectionCheck
@@ -34,7 +34,7 @@ class ModelConnectionCoordinator(
     private val gateway: ModelProviderGateway,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
-    fun discoverModels(connectionId: String): ModelDiscoveryResult {
+    suspend fun discoverModels(connectionId: String): ModelDiscoveryResult {
         val connection = requireNotNull(repository.findConnection(connectionId)) {
             "ProviderConnection not found: $connectionId"
         }
@@ -60,7 +60,7 @@ class ModelConnectionCoordinator(
         return ModelDiscoveryResult(connection, bindings, discovery.capabilities)
     }
 
-    fun checkModel(bindingId: String): ModelBinding {
+    suspend fun checkModel(bindingId: String): ModelBinding {
         val binding = requireNotNull(repository.findBinding(bindingId)) {
             "ModelBinding not found: $bindingId"
         }

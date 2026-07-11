@@ -3,6 +3,7 @@ package com.reversetutor.core.domain
 import com.reversetutor.core.model.ContextSnapshot
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,7 +11,7 @@ import org.junit.Test
 
 class ConversationRunCoordinatorTest {
     @Test
-    fun independentRunsAreImmediatelyRunnable() {
+    fun independentRunsAreImmediatelyRunnable() = runBlocking {
         val repository = FakeConversationRunRepository()
         val coordinator = coordinator(repository)
 
@@ -25,7 +26,7 @@ class ConversationRunCoordinatorTest {
     }
 
     @Test
-    fun explicitDependentFollowUpWaitsUntilParentCompletes() {
+    fun explicitDependentFollowUpWaitsUntilParentCompletes() = runBlocking {
         val repository = FakeConversationRunRepository()
         val coordinator = coordinator(repository)
         val parent = coordinator.createRun(command("turn-parent", "message-parent")).run
@@ -52,7 +53,7 @@ class ConversationRunCoordinatorTest {
     }
 
     @Test
-    fun retryIncrementsAttemptAndRejectsOlderLateCompletion() {
+    fun retryIncrementsAttemptAndRejectsOlderLateCompletion() = runBlocking {
         val repository = FakeConversationRunRepository()
         val coordinator = coordinator(repository)
         val original = coordinator.createRun(command("turn-1", "message-1")).run
@@ -81,7 +82,7 @@ class ConversationRunCoordinatorTest {
     }
 
     @Test
-    fun deletedSessionRejectsCompletion() {
+    fun deletedSessionRejectsCompletion() = runBlocking {
         val repository = FakeConversationRunRepository()
         val coordinator = coordinator(repository)
         val run = coordinator.createRun(command("turn-1", "message-1")).run
@@ -125,32 +126,33 @@ private class FakeConversationRunRepository : ConversationRunRepository {
     val deletedSessions = mutableSetOf<String>()
     private val sequences = mutableMapOf<String, Long>()
 
-    override fun nextSequence(spaceId: String, sessionId: String): Long {
+    override suspend fun nextSequence(spaceId: String, sessionId: String): Long {
         val key = "$spaceId:$sessionId"
         val next = (sequences[key] ?: 0L) + 1L
         sequences[key] = next
         return next
     }
 
-    override fun saveRun(run: TurnRun): TurnRun {
+    override suspend fun saveRun(run: TurnRun): TurnRun {
         runs[run.id] = run
         return run
     }
 
-    override fun saveContextSnapshot(snapshot: ContextSnapshot): ContextSnapshot {
+    override suspend fun saveContextSnapshot(snapshot: ContextSnapshot): ContextSnapshot {
         snapshots[snapshot.id] = snapshot
         return snapshot
     }
 
-    override fun findRun(runId: String): TurnRun? = runs[runId]
+    override suspend fun findRun(runId: String): TurnRun? = runs[runId]
 
-    override fun findLatestRun(turnId: String): TurnRun? =
+    override suspend fun findLatestRun(turnId: String): TurnRun? =
         runs.values.filter { it.turnId == turnId }.maxByOrNull { it.attempt }
 
-    override fun findWaitingRuns(parentTurnId: String): List<TurnRun> =
+    override suspend fun findWaitingRuns(parentTurnId: String): List<TurnRun> =
         runs.values.filter {
             it.parentTurnId == parentTurnId && it.state == TurnRunState.Waiting
         }
 
-    override fun isSessionDeleted(sessionId: String): Boolean = sessionId in deletedSessions
+    override suspend fun isSessionDeleted(sessionId: String): Boolean =
+        sessionId in deletedSessions
 }

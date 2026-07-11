@@ -6,12 +6,13 @@ import com.reversetutor.core.model.ModelCapabilityState
 import com.reversetutor.core.model.ModelCapabilitySupport
 import com.reversetutor.core.model.ModelProtocol
 import com.reversetutor.core.model.ProviderConnection
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ModelConnectionCoordinatorTest {
     @Test
-    fun discoveryAndConnectionChecksRouteByProtocolWithoutVendorDtos() {
+    fun discoveryAndConnectionChecksRouteByProtocolWithoutVendorDtos() = runBlocking {
         val repository = FakeModelConnectionRepository()
         val gateway = FakeModelProviderGateway()
         val coordinator = ModelConnectionCoordinator(repository, gateway)
@@ -38,15 +39,15 @@ private class FakeModelConnectionRepository : ModelConnectionRepository {
     val connections = mutableMapOf<String, ProviderConnection>()
     val bindings = mutableMapOf<String, ModelBinding>()
 
-    override fun findConnection(connectionId: String): ProviderConnection? =
+    override suspend fun findConnection(connectionId: String): ProviderConnection? =
         connections[connectionId]
 
-    override fun findBinding(bindingId: String): ModelBinding? = bindings[bindingId]
+    override suspend fun findBinding(bindingId: String): ModelBinding? = bindings[bindingId]
 
-    override fun listBindings(connectionId: String): List<ModelBinding> =
+    override suspend fun listBindings(connectionId: String): List<ModelBinding> =
         bindings.values.filter { it.connectionId == connectionId }
 
-    override fun saveBinding(binding: ModelBinding): ModelBinding {
+    override suspend fun saveBinding(binding: ModelBinding): ModelBinding {
         bindings[binding.id] = binding
         return binding
     }
@@ -56,7 +57,7 @@ private class FakeModelProviderGateway : ModelProviderGateway {
     val discoveredProtocols = mutableListOf<ModelProtocol>()
     val checkedProtocols = mutableListOf<ModelProtocol>()
 
-    override fun discover(connection: ProviderConnection): ModelDiscovery {
+    override suspend fun discover(connection: ProviderConnection): ModelDiscovery {
         discoveredProtocols += connection.protocol
         return ModelDiscovery(
             modelIds = listOf("gemini-test"),
@@ -67,7 +68,7 @@ private class FakeModelProviderGateway : ModelProviderGateway {
         )
     }
 
-    override fun check(
+    override suspend fun check(
         connection: ProviderConnection,
         binding: ModelBinding
     ): ModelConnectionCheck {

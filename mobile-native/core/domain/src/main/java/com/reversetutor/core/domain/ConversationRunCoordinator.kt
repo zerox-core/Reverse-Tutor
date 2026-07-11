@@ -44,7 +44,7 @@ class ConversationRunCoordinator(
     private val idGenerator: () -> String = { UUID.randomUUID().toString() },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
-    fun createRun(command: CreateTurnRunCommand): RunDispatch {
+    suspend fun createRun(command: CreateTurnRunCommand): RunDispatch {
         val sequence = repository.nextSequence(command.spaceId, command.sessionId)
         val snapshot = ContextSnapshot(
             id = idGenerator(),
@@ -59,11 +59,7 @@ class ConversationRunCoordinator(
         )
         repository.saveContextSnapshot(snapshot)
 
-        val dependencyPending = command.parentTurnId
-            ?.let(repository::findLatestRun)
-            ?.isTerminal
-            ?.not()
-            ?: false
+        val dependencyPending = isDependencyPending(command.parentTurnId)
         val createdAt = nowEpochMillis()
         val state = if (dependencyPending) TurnRunState.Waiting else TurnRunState.Running
         val run = TurnRun(
@@ -90,7 +86,7 @@ class ConversationRunCoordinator(
         }
     }
 
-    fun retryRun(runId: String): TurnRun {
+    suspend fun retryRun(runId: String): TurnRun {
         val previous = requireNotNull(repository.findRun(runId)) {
             "TurnRun not found: $runId"
         }
@@ -104,11 +100,7 @@ class ConversationRunCoordinator(
                 completedAtEpochMillis = nowEpochMillis()
             )
         )
-        val dependencyPending = previous.parentTurnId
-            ?.let(repository::findLatestRun)
-            ?.isTerminal
-            ?.not()
-            ?: false
+        val dependencyPending = isDependencyPending(previous.parentTurnId)
         val now = nowEpochMillis()
         return repository.saveRun(
             previous.copy(
@@ -124,7 +116,7 @@ class ConversationRunCoordinator(
         )
     }
 
-    fun completeRun(
+    suspend fun completeRun(
         runId: String,
         attempt: Int,
         resultMessageId: String
@@ -161,5 +153,10 @@ class ConversationRunCoordinator(
             }
         }
         return RunCompletion.Accepted(completed, released)
+    }
+
+    private suspend fun isDependencyPending(parentTurnId: String?): Boolean {
+        if (parentTurnId == null) return false
+        return repository.findLatestRun(parentTurnId)?.isTerminal == false
     }
 }

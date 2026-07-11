@@ -3,7 +3,7 @@ package com.reversetutor.core.domain
 import com.reversetutor.core.model.SyncEnvelope
 
 interface SyncTransport {
-    fun push(envelope: SyncEnvelope): SyncPushResult
+    suspend fun push(envelope: SyncEnvelope): SyncPushResult
 }
 
 sealed interface SyncPushResult {
@@ -30,7 +30,7 @@ class SyncCoordinator(
     private val repository: SyncRepository,
     private val transport: SyncTransport
 ) {
-    fun pushPending(limit: Int = 100): SyncBatchResult {
+    suspend fun pushPending(limit: Int = 100): SyncBatchResult {
         val succeeded = mutableListOf<String>()
         val failed = mutableListOf<SyncItemFailure>()
         repository.pendingEnvelopes(limit).forEach { envelope ->
