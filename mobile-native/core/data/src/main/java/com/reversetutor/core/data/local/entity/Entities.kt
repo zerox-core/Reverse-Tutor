@@ -213,6 +213,7 @@ data class BackgroundJobEntity(
     val userMessageId: String? = null,
     val userText: String? = null,
     val generationToken: String? = null,
+    val modelBindingId: String? = null,
     val quoteExcerpt: String? = null,
     val imageAttachmentsPayload: String? = null,
     val contextEvidencePayload: String? = null
@@ -273,6 +274,7 @@ fun TutorSession.toEntity(): SessionEntity = SessionEntity(
     pinned = pinned,
     archived = archived,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     settingsId = settingsId,
     sourceImportId = sourceImportId
 )
@@ -286,6 +288,7 @@ fun SessionEntity.toDomain(): TutorSession = TutorSession(
     pinned = pinned,
     archived = archived,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     settingsId = settingsId,
     sourceImportId = sourceImportId
 )
@@ -379,6 +382,7 @@ fun SessionSettings.toEntity(): SessionSettingsEntity = SessionSettingsEntity(
     spaceId = spaceId,
     sessionId = sessionId,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     systemPrompt = systemPrompt
 )
 
@@ -387,6 +391,7 @@ fun SessionSettingsEntity.toDomain(): SessionSettings = SessionSettings(
     spaceId = spaceId,
     sessionId = sessionId,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     systemPrompt = systemPrompt
 )
 

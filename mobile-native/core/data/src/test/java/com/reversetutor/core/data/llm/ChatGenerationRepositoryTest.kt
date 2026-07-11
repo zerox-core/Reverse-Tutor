@@ -9,19 +9,129 @@ import com.reversetutor.core.data.local.entity.MessageAttachmentEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
 import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.data.model.ExecutionModelConfiguration
+import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationResult
+import com.reversetutor.core.llm.LlmGenerationRequest
+import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageRole
+import com.reversetutor.core.model.ModelBinding
+import com.reversetutor.core.model.ModelProtocol
+import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGenerationRepositoryTest {
+    @Test
+    fun requestedBindingBuildsExecutionProfileBeforeLegacyFallback() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val resolver = FixedExecutionModelResolver(
+            ExecutionModelConfiguration(
+                connection = ProviderConnection(
+                    id = "connection-1",
+                    spaceId = "space-1",
+                    name = "Anthropic",
+                    protocol = ModelProtocol.AnthropicCompatible,
+                    baseUrl = "https://anthropic.example/v1",
+                    secretRef = "secret-1"
+                ),
+                binding = ModelBinding(
+                    id = "binding-1",
+                    spaceId = "space-1",
+                    connectionId = "connection-1",
+                    modelId = "claude-test",
+                    displayName = "Claude"
+                )
+            )
+        )
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(
+                FakeMessageDao(),
+                FakeMessageAttachmentDao(),
+                FakeMessageQuoteDao()
+            ),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime,
+            modelConnectionRepository = resolver
+        )
+
+        val outcome = repository.generateReply(
+            input = input("token-binding").copy(modelBindingId = "binding-1"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        assertEquals(ChatGenerationOutcome.Generated("assistant-token-binding"), outcome)
+        assertEquals("binding-1", resolver.requestedBindingIds.single())
+        assertEquals("claude-test", runtime.requests.single().model)
+        assertEquals("https://anthropic.example/v1", runtime.requests.single().baseUrl)
+        assertEquals("secret-1", runtime.requests.single().secretRef)
+    }
+
+    @Test
+    fun legacyProfileFallbackOnlyRunsWhenNoNewConfigurationExists() = runBlocking {
+        val fallbackRuntime = RecordingGenerationRuntime()
+        val fallbackRepository = ChatGenerationRepository(
+            messageRepository = MessageRepository(
+                FakeMessageDao(),
+                FakeMessageAttachmentDao(),
+                FakeMessageQuoteDao()
+            ),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = fallbackRuntime,
+            modelConnectionRepository = FixedExecutionModelResolver(
+                configuration = null,
+                hasNewConfiguration = false
+            )
+        )
+        val blockedRuntime = RecordingGenerationRuntime()
+        val blockedRepository = ChatGenerationRepository(
+            messageRepository = MessageRepository(
+                FakeMessageDao(),
+                FakeMessageAttachmentDao(),
+                FakeMessageQuoteDao()
+            ),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = blockedRuntime,
+            modelConnectionRepository = FixedExecutionModelResolver(
+                configuration = null,
+                hasNewConfiguration = true
+            )
+        )
+
+        val fallback = fallbackRepository.generateReply(
+            input = input("token-legacy-fallback"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+        val blocked = blockedRepository.generateReply(
+            input = input("token-new-config-invalid"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        assertEquals(ChatGenerationOutcome.Generated("assistant-token-legacy-fallback"), fallback)
+        assertEquals("gpt-4o-mini", fallbackRuntime.requests.single().model)
+        assertEquals(ChatGenerationOutcome.NoModelConfigured, blocked)
+        assertTrue(blockedRuntime.requests.isEmpty())
+    }
+
     @Test
     fun generateReplyPersistsAssistantMessageForCurrentToken() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
@@ -412,4 +522,31 @@ private class ChatGenerationFakeSecretStore : SecretStore {
     override suspend fun put(ref: String, secret: String) = Unit
     override suspend fun get(ref: String): String? = null
     override suspend fun delete(ref: String) = Unit
+}
+
+private class FixedExecutionModelResolver(
+    private val configuration: ExecutionModelConfiguration?,
+    private val hasNewConfiguration: Boolean = true
+) : ExecutionModelResolver {
+    val requestedBindingIds = mutableListOf<String?>()
+
+    override suspend fun resolveForExecution(
+        sessionId: String,
+        requestedBindingId: String?
+    ): ExecutionModelConfiguration? {
+        requestedBindingIds += requestedBindingId
+        return configuration
+    }
+
+    override suspend fun hasNewConfigurationForSession(sessionId: String): Boolean =
+        hasNewConfiguration
+}
+
+private class RecordingGenerationRuntime : LlmGenerationRuntime {
+    val requests = mutableListOf<LlmGenerationRequest>()
+
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+        requests += request
+        return LlmGenerationResult.Success("Bound model reply")
+    }
 }

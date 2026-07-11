@@ -45,6 +45,19 @@ class ReverseTutorDatabaseMigration2To3Test {
                 )
                 """.trimIndent()
             )
+            execSQL(
+                """
+                INSERT INTO background_jobs (
+                    id, spaceId, kind, status, createdAtEpochMillis, sessionId,
+                    startedAtEpochMillis, completedAtEpochMillis, errorMessage,
+                    userMessageId, userText, generationToken, quoteExcerpt,
+                    imageAttachmentsPayload, contextEvidencePayload
+                ) VALUES (
+                    'job-1', 'space-1', 'Generation', 'Queued', 3, 'session-1',
+                    NULL, NULL, NULL, 'message-1', 'Explain', 'token-1', NULL, NULL, NULL
+                )
+                """.trimIndent()
+            )
             close()
         }
 
@@ -75,6 +88,12 @@ class ReverseTutorDatabaseMigration2To3Test {
         ).use { cursor ->
             assertTrue(cursor.moveToFirst())
             assertEquals("profile-1", cursor.getString(0))
+        }
+        database.query(
+            "SELECT modelBindingId FROM background_jobs WHERE id = 'job-1'"
+        ).use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertTrue(cursor.isNull(0))
         }
         database.close()
     }

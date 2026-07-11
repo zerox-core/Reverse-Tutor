@@ -9,6 +9,7 @@ data class TutorSession(
     val pinned: Boolean = false,
     val archived: Boolean = false,
     val llmProfileId: String? = null,
+    val modelBindingId: String? = llmProfileId,
     val settingsId: String? = null,
     val sourceImportId: String? = null
 )
@@ -54,5 +55,6 @@ data class SessionSettings(
     val spaceId: String,
     val sessionId: String,
     val llmProfileId: String? = null,
+    val modelBindingId: String? = llmProfileId,
     val systemPrompt: String? = null
 )

@@ -15,6 +15,8 @@ import com.reversetutor.core.data.local.entity.MessageEntity
 import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.local.entity.SessionEntity
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.data.model.ExecutionModelConfiguration
+import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmGenerationRequest
 import com.reversetutor.core.llm.LlmGenerationResult
@@ -22,12 +24,51 @@ import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageRole
+import com.reversetutor.core.model.ModelBinding
+import com.reversetutor.core.model.ModelProtocol
+import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackgroundGenerationRepositoryTest {
+    @Test
+    fun defaultSwitchAndProcessRecoveryKeepEnqueueModelSnapshot() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val sessionDao = FakeSessionDao()
+        val resolver = MutableExecutionModelResolver(defaultBindingId = "binding-a")
+        val runtime = CapturingRuntime()
+        val firstRepository = repository(
+            jobDao = jobDao,
+            sessionDao = sessionDao,
+            runtime = runtime,
+            modelConnectionRepository = resolver
+        )
+
+        val queued = firstRepository.enqueueGenerationJob(
+            input(token = "token-snapshot"),
+            nowEpochMillis = 10L,
+            jobId = "job-snapshot"
+        )
+        assertEquals("binding-a", queued.modelBindingId)
+
+        resolver.defaultBindingId = "binding-b"
+        val restoredRepository = repository(
+            jobDao = jobDao,
+            sessionDao = sessionDao,
+            runtime = runtime,
+            modelConnectionRepository = resolver
+        )
+        restoredRepository.recoverInterruptedGenerationJobs(nowEpochMillis = 20L)
+        val outcome = restoredRepository.runGenerationJob("job-snapshot", nowEpochMillis = 30L)
+
+        assertEquals(BackgroundGenerationOutcome.Completed("assistant-token-snapshot"), outcome)
+        assertEquals("binding-a", restoredRepository.getJob("job-snapshot")?.modelBindingId)
+        assertEquals("model-a", runtime.requests.single().model)
+        assertEquals("binding-a", resolver.requestedBindingIds.last())
+    }
+
     @Test
     fun enqueuePersistsQueuedJobBeforeExecution() = runBlocking {
         val jobDao = FakeBackgroundJobDao()
@@ -171,14 +212,16 @@ class BackgroundGenerationRepositoryTest {
             FakeMessageAttachmentDao(),
             FakeMessageQuoteDao()
         ),
-        runtime: LlmGenerationRuntime = StaticRuntime(LlmGenerationResult.Success("Mock generation ready"))
+        runtime: LlmGenerationRuntime = StaticRuntime(LlmGenerationResult.Success("Mock generation ready")),
+        modelConnectionRepository: ExecutionModelResolver? = null
     ): BackgroundGenerationRepository =
         BackgroundGenerationRepository(
             backgroundJobDao = jobDao,
             sessionDao = sessionDao,
             messageRepository = messageRepository,
             llmProfileRepository = LlmProfileRepository(FakeLlmProfileDao.withActiveProfile(), FakeSecretStore()),
-            runtime = runtime
+            runtime = runtime,
+            modelConnectionRepository = modelConnectionRepository
         )
 
     private fun input(token: String): BackgroundGenerationInput =
@@ -342,11 +385,59 @@ private class FakeSecretStore : SecretStore {
 private class StaticRuntime(
     private val result: LlmGenerationResult
 ) : LlmGenerationRuntime {
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult = result
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult = result
 }
 
 private class CallbackRuntime(
     private val block: () -> LlmGenerationResult
 ) : LlmGenerationRuntime {
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult = block()
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult = block()
+}
+
+private class CapturingRuntime : LlmGenerationRuntime {
+    val requests = mutableListOf<LlmGenerationRequest>()
+
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+        requests += request
+        return LlmGenerationResult.Success("Snapshot reply")
+    }
+}
+
+private class MutableExecutionModelResolver(
+    var defaultBindingId: String
+) : ExecutionModelResolver {
+    val requestedBindingIds = mutableListOf<String?>()
+
+    override suspend fun resolveForExecution(
+        sessionId: String,
+        requestedBindingId: String?
+    ): ExecutionModelConfiguration? {
+        requestedBindingIds += requestedBindingId
+        return configuration(requestedBindingId ?: defaultBindingId)
+    }
+
+    override suspend fun hasNewConfigurationForSession(sessionId: String): Boolean = true
+
+    private fun configuration(bindingId: String): ExecutionModelConfiguration {
+        val suffix = bindingId.substringAfterLast('-')
+        val connectionId = "connection-$suffix"
+        return ExecutionModelConfiguration(
+            connection = ProviderConnection(
+                id = connectionId,
+                spaceId = "default-space",
+                name = "Connection $suffix",
+                protocol = ModelProtocol.OpenAiCompatible,
+                baseUrl = "https://provider-$suffix.example/v1",
+                secretRef = "secret-$suffix"
+            ),
+            binding = ModelBinding(
+                id = bindingId,
+                spaceId = "default-space",
+                connectionId = connectionId,
+                modelId = "model-$suffix",
+                displayName = "Model $suffix",
+                isDefault = bindingId == defaultBindingId
+            )
+        )
+    }
 }

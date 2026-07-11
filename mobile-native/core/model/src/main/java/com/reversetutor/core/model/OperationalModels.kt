@@ -23,7 +23,8 @@ enum class BackgroundJobStatus {
     Running,
     Completed,
     Failed,
-    Cancelled
+    Cancelled,
+    Discarded
 }
 
 data class ImportBatch(

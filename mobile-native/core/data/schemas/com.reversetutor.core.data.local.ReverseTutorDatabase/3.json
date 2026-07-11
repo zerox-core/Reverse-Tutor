@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "4cce1589ec17d065fce2ef1608513cb2",
+    "identityHash": "a93554003e0c871444775727a181519c",
     "entities": [
       {
         "tableName": "spaces",
@@ -1115,7 +1115,7 @@
       },
       {
         "tableName": "background_jobs",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `spaceId` TEXT NOT NULL, `kind` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `sessionId` TEXT, `startedAtEpochMillis` INTEGER, `completedAtEpochMillis` INTEGER, `errorMessage` TEXT, `userMessageId` TEXT, `userText` TEXT, `generationToken` TEXT, `quoteExcerpt` TEXT, `imageAttachmentsPayload` TEXT, `contextEvidencePayload` TEXT, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `spaceId` TEXT NOT NULL, `kind` TEXT NOT NULL, `status` TEXT NOT NULL, `createdAtEpochMillis` INTEGER NOT NULL, `sessionId` TEXT, `startedAtEpochMillis` INTEGER, `completedAtEpochMillis` INTEGER, `errorMessage` TEXT, `userMessageId` TEXT, `userText` TEXT, `generationToken` TEXT, `modelBindingId` TEXT, `quoteExcerpt` TEXT, `imageAttachmentsPayload` TEXT, `contextEvidencePayload` TEXT, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -1186,6 +1186,12 @@
           {
             "fieldPath": "generationToken",
             "columnName": "generationToken",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "modelBindingId",
+            "columnName": "modelBindingId",
             "affinity": "TEXT",
             "notNull": false
           },
@@ -2935,7 +2941,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4cce1589ec17d065fce2ef1608513cb2')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a93554003e0c871444775727a181519c')"
     ]
   }
 }

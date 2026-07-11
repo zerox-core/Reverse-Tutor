@@ -8,9 +8,23 @@ import com.reversetutor.core.domain.ModelConnectionRepository
 import com.reversetutor.core.model.ModelBinding
 import com.reversetutor.core.model.ProviderConnection
 
+interface ExecutionModelResolver {
+    suspend fun resolveForExecution(
+        sessionId: String,
+        requestedBindingId: String? = null
+    ): ExecutionModelConfiguration?
+
+    suspend fun hasNewConfigurationForSession(sessionId: String): Boolean
+}
+
+data class ExecutionModelConfiguration(
+    val connection: ProviderConnection,
+    val binding: ModelBinding
+)
+
 class ModelConnectionRepositoryImpl(
     private val database: ReverseTutorDatabase
-) : ModelConnectionRepository {
+) : ModelConnectionRepository, ExecutionModelResolver {
     override suspend fun findConnection(connectionId: String): ProviderConnection? =
         database.modelConnectionDao().getConnection(connectionId)?.toDomain()
 
@@ -52,6 +66,37 @@ class ModelConnectionRepositoryImpl(
     suspend fun listBindingsBySpace(spaceId: String): List<ModelBinding> =
         database.modelConnectionDao().listBindings(spaceId).map { it.toDomain() }
 
+    override suspend fun resolveForExecution(
+        sessionId: String,
+        requestedBindingId: String?
+    ): ExecutionModelConfiguration? {
+        val session = database.sessionDao().getById(sessionId) ?: return null
+        val selectedBindingId = requestedBindingId.normalizedId()
+            ?: session.modelBindingId.normalizedId()
+        val binding = if (selectedBindingId != null) {
+            database.modelConnectionDao().getBinding(selectedBindingId)?.toDomain()
+        } else {
+            database.modelConnectionDao().listBindings(session.spaceId)
+                .asSequence()
+                .map { it.toDomain() }
+                .firstOrNull { it.isDefault && it.enabled }
+        } ?: return null
+        if (!binding.enabled || binding.spaceId != session.spaceId) return null
+
+        val connection = database.modelConnectionDao().getConnection(binding.connectionId)
+            ?.toDomain()
+            ?: return null
+        if (!connection.enabled || connection.spaceId != session.spaceId) return null
+        return ExecutionModelConfiguration(connection, binding)
+    }
+
+    override suspend fun hasNewConfigurationForSession(sessionId: String): Boolean {
+        val session = database.sessionDao().getById(sessionId) ?: return false
+        if (session.modelBindingId.normalizedId() != null) return true
+        return database.modelConnectionDao().listBindings(session.spaceId).isNotEmpty() ||
+            database.modelConnectionDao().listConnections(session.spaceId).isNotEmpty()
+    }
+
     suspend fun deleteConnectionIfUnused(id: String): Boolean =
         database.withTransaction {
             if (
@@ -64,3 +109,5 @@ class ModelConnectionRepositoryImpl(
             }
         }
 }
+
+private fun String?.normalizedId(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

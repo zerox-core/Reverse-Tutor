@@ -716,6 +716,95 @@ class ReverseTutorDatabaseDaoTest {
         assertEquals(run.id, database.turnRunDao().getById(run.id)?.id)
     }
 
+    @Test
+    fun executionModelResolutionUsesRequestedThenSessionThenDefaultAndRejectsDisabled() = runBlocking {
+        database.spaceDao().upsert(
+            SpaceEntity("space-resolution", "Resolution", "Default", 1L, 1L)
+        )
+        val connection = ProviderConnectionEntity(
+            id = "connection-resolution",
+            spaceId = "space-resolution",
+            name = "Connection",
+            protocol = "OpenAiCompatible",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L
+        )
+        database.modelConnectionDao().upsertConnection(connection)
+        listOf(
+            ModelBindingEntity(
+                id = "binding-default",
+                spaceId = "space-resolution",
+                connectionId = connection.id,
+                modelId = "model-default",
+                displayName = "Default",
+                isDefault = true,
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            ),
+            ModelBindingEntity(
+                id = "binding-session",
+                spaceId = "space-resolution",
+                connectionId = connection.id,
+                modelId = "model-session",
+                displayName = "Session",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 2L
+            ),
+            ModelBindingEntity(
+                id = "binding-requested",
+                spaceId = "space-resolution",
+                connectionId = connection.id,
+                modelId = "model-requested",
+                displayName = "Requested",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 3L
+            )
+        ).forEach { database.modelConnectionDao().upsertBinding(it) }
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-resolution",
+                spaceId = "space-resolution",
+                title = "Session",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L,
+                modelBindingId = "binding-session"
+            )
+        )
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-default",
+                spaceId = "space-resolution",
+                title = "Default session",
+                createdAtEpochMillis = 1L,
+                updatedAtEpochMillis = 1L
+            )
+        )
+        val repository = ModelConnectionRepositoryImpl(database)
+
+        assertEquals(
+            "binding-requested",
+            repository.resolveForExecution("session-resolution", "binding-requested")?.binding?.id
+        )
+        assertEquals(
+            "binding-session",
+            repository.resolveForExecution("session-resolution")?.binding?.id
+        )
+        assertEquals(
+            "binding-default",
+            repository.resolveForExecution("session-default")?.binding?.id
+        )
+
+        database.modelConnectionDao().upsertBinding(
+            requireNotNull(database.modelConnectionDao().getBinding("binding-requested"))
+                .copy(enabled = false)
+        )
+        assertNull(repository.resolveForExecution("session-resolution", "binding-requested"))
+        assertNull(repository.resolveForExecution("session-resolution", "binding-missing"))
+
+        database.modelConnectionDao().upsertConnection(connection.copy(enabled = false))
+        assertNull(repository.resolveForExecution("session-resolution"))
+    }
+
     private fun run(id: String, turnId: String, sequence: Long): TurnRun =
         TurnRun(
             id = id,

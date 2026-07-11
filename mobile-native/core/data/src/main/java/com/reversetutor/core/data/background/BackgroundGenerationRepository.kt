@@ -8,6 +8,7 @@ import com.reversetutor.core.data.local.dao.BackgroundJobDao
 import com.reversetutor.core.data.local.dao.SessionDao
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationRuntime
@@ -20,12 +21,14 @@ class BackgroundGenerationRepository(
     private val sessionDao: SessionDao,
     messageRepository: MessageRepository,
     llmProfileRepository: LlmProfileRepository,
-    runtime: LlmGenerationRuntime
+    runtime: LlmGenerationRuntime,
+    private val modelConnectionRepository: ExecutionModelResolver? = null
 ) {
     private val chatGenerationRepository = ChatGenerationRepository(
         messageRepository = messageRepository,
         llmProfileRepository = llmProfileRepository,
-        runtime = runtime
+        runtime = runtime,
+        modelConnectionRepository = modelConnectionRepository
     )
 
     suspend fun enqueueGenerationJob(
@@ -33,6 +36,7 @@ class BackgroundGenerationRepository(
         nowEpochMillis: Long,
         jobId: String = "generation-${input.userMessageId}-${input.token.value}"
     ): BackgroundGenerationJob {
+        val modelBindingId = snapshotModelBindingId(input)
         val job = BackgroundJobEntity(
             id = jobId,
             spaceId = input.spaceId,
@@ -43,6 +47,7 @@ class BackgroundGenerationRepository(
             userMessageId = input.userMessageId,
             userText = input.userText,
             generationToken = input.token.value,
+            modelBindingId = modelBindingId,
             quoteExcerpt = input.quoteExcerpt,
             imageAttachmentsPayload = input.imageAttachments.toAttachmentPayload(),
             contextEvidencePayload = input.contextEvidence.toEvidencePayload()
@@ -135,6 +140,7 @@ class BackgroundGenerationRepository(
                 userMessageId = job.userMessageId,
                 userText = job.userText,
                 token = job.token,
+                modelBindingId = job.modelBindingId,
                 capabilities = job.capabilities,
                 quoteExcerpt = job.quoteExcerpt,
                 imageAttachments = job.imageAttachments,
@@ -163,6 +169,17 @@ class BackgroundGenerationRepository(
             ChatGenerationOutcome.BlankPrompt -> fail(running, nowEpochMillis, "Blank prompt")
             ChatGenerationOutcome.Stale -> discard(running, nowEpochMillis, currentDiscardReason(job))
         }
+    }
+
+    private suspend fun snapshotModelBindingId(input: BackgroundGenerationInput): String? {
+        val requested = input.modelBindingId.normalizedId()
+        if (requested != null) return requested
+        val sessionBinding = sessionDao.getById(input.sessionId)?.modelBindingId.normalizedId()
+        if (sessionBinding != null) return sessionBinding
+        return modelConnectionRepository
+            ?.resolveForExecution(input.sessionId)
+            ?.binding
+            ?.id
     }
 
     private suspend fun isSessionAvailable(sessionId: String): Boolean {
@@ -226,6 +243,7 @@ class BackgroundGenerationRepository(
             userMessageId = messageId,
             userText = text,
             token = LlmGenerationToken(tokenValue),
+            modelBindingId = modelBindingId,
             status = runCatching { BackgroundJobStatus.valueOf(status) }
                 .getOrDefault(BackgroundJobStatus.Failed),
             createdAtEpochMillis = createdAtEpochMillis,
@@ -253,6 +271,7 @@ data class BackgroundGenerationInput(
     val userMessageId: String,
     val userText: String,
     val token: LlmGenerationToken,
+    val modelBindingId: String? = null,
     val capabilities: LlmCapabilities? = null,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
@@ -266,6 +285,7 @@ data class BackgroundGenerationJob(
     val userMessageId: String,
     val userText: String,
     val token: LlmGenerationToken,
+    val modelBindingId: String? = null,
     val status: BackgroundJobStatus,
     val createdAtEpochMillis: Long,
     val startedAtEpochMillis: Long? = null,
@@ -378,3 +398,5 @@ private fun String.decodePayloadField(): String =
             append('\\')
         }
     }
+
+private fun String?.normalizedId(): String? = this?.trim()?.takeIf { it.isNotEmpty() }

@@ -34,6 +34,7 @@ dependencies {
     api(project(":core:domain"))
     implementation(project(":core:protocol"))
     implementation(project(":core:llm"))
+    implementation(project(":core:remote"))
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("androidx.room:room-runtime:2.6.1")

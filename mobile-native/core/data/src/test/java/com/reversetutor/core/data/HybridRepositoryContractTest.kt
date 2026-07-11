@@ -3,14 +3,58 @@ package com.reversetutor.core.data
 import com.reversetutor.core.data.local.MigrationIds
 import com.reversetutor.core.data.local.entity.ModelBindingEntity
 import com.reversetutor.core.data.local.entity.ProviderConnectionEntity
+import com.reversetutor.core.data.local.entity.SessionEntity
+import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.local.entity.TurnRunEntity
 import com.reversetutor.core.data.local.entity.toDomain
+import com.reversetutor.core.data.local.entity.toEntity
+import com.reversetutor.core.model.SessionSettings
+import com.reversetutor.core.model.TutorSession
 import com.reversetutor.core.model.TurnRunState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class HybridRepositoryContractTest {
+    @Test
+    fun sessionMappingsPreserveExplicitAndLegacyCompatibleBindingIds() {
+        val explicit = TutorSession(
+            id = "session-explicit",
+            spaceId = "space-1",
+            title = "Explicit",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L,
+            llmProfileId = "profile-legacy",
+            modelBindingId = "binding-new"
+        )
+        val legacyEntity = SessionEntity(
+            id = "session-legacy",
+            spaceId = "space-1",
+            title = "Legacy",
+            createdAtEpochMillis = 1L,
+            updatedAtEpochMillis = 1L,
+            llmProfileId = "profile-legacy"
+        )
+        val settings = SessionSettings(
+            id = "settings-1",
+            spaceId = "space-1",
+            sessionId = "session-explicit",
+            llmProfileId = "profile-legacy",
+            modelBindingId = "binding-new"
+        )
+        val legacySettings = SessionSettingsEntity(
+            id = "settings-legacy",
+            spaceId = "space-1",
+            sessionId = "session-legacy",
+            llmProfileId = "profile-legacy"
+        )
+
+        assertEquals("binding-new", explicit.toEntity().modelBindingId)
+        assertEquals("profile-legacy", legacyEntity.toDomain().modelBindingId)
+        assertEquals("binding-new", settings.toEntity().modelBindingId)
+        assertEquals("profile-legacy", legacySettings.toDomain().modelBindingId)
+    }
+
     @Test
     fun legacyProfileMigrationKeepsBindingIdAndDerivesStableConnectionId() {
         assertEquals("profile-1", MigrationIds.modelBindingId("profile-1"))

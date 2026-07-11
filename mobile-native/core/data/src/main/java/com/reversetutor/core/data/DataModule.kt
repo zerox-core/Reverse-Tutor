@@ -85,7 +85,8 @@ object DataModule {
         ChatGenerationRepository(
             messageRepository = messageRepository(context),
             llmProfileRepository = llmProfileRepository(context),
-            runtime = FakeLlmGenerationRuntime()
+            runtime = FakeLlmGenerationRuntime(),
+            modelConnectionRepository = modelConnectionRepository(context)
         )
 
     fun backgroundGenerationRepository(context: Context): BackgroundGenerationRepository {
@@ -96,7 +97,8 @@ object DataModule {
             sessionDao = database.sessionDao(),
             messageRepository = messageRepository(appContext),
             llmProfileRepository = llmProfileRepository(appContext),
-            runtime = FakeLlmGenerationRuntime()
+            runtime = FakeLlmGenerationRuntime(),
+            modelConnectionRepository = modelConnectionRepository(appContext)
         )
     }
 

@@ -1,5 +1,7 @@
 package com.reversetutor.core.data.llm
 
+import com.reversetutor.core.data.model.ExecutionModelConfiguration
+import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
@@ -13,11 +15,15 @@ import com.reversetutor.core.llm.LlmProfileCapabilityResolver
 import com.reversetutor.core.model.Message
 import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageRole
+import com.reversetutor.core.model.LlmProfile
+import com.reversetutor.core.model.LlmProviderKind
+import com.reversetutor.core.model.ModelProtocol
 
 class ChatGenerationRepository(
     private val messageRepository: MessageRepository,
     private val llmProfileRepository: LlmProfileRepository,
-    private val runtime: LlmGenerationRuntime
+    private val runtime: LlmGenerationRuntime,
+    private val modelConnectionRepository: ExecutionModelResolver? = null
 ) {
     suspend fun generateReply(
         input: ChatGenerationInput,
@@ -29,8 +35,7 @@ class ChatGenerationRepository(
             return ChatGenerationOutcome.Stale
         }
 
-        val activeProfile = llmProfileRepository.listProfiles()
-            .firstOrNull { it.enabled }
+        val activeProfile = resolveExecutionProfile(input)
             ?: return ChatGenerationOutcome.NoModelConfigured
         val plan = LlmGenerationPlanner.plan(
             sessionId = input.sessionId,
@@ -83,6 +88,24 @@ class ChatGenerationRepository(
             }
         }
     }
+
+    private suspend fun resolveExecutionProfile(input: ChatGenerationInput): LlmProfile? {
+        val resolver = modelConnectionRepository ?: return activeLegacyProfile()
+        val resolved = resolver.resolveForExecution(
+            sessionId = input.sessionId,
+            requestedBindingId = input.modelBindingId
+        )
+        if (resolved != null) return resolved.toExecutionProfile()
+
+        val hasExplicitRequest = !input.modelBindingId.isNullOrBlank()
+        if (hasExplicitRequest || resolver.hasNewConfigurationForSession(input.sessionId)) {
+            return null
+        }
+        return activeLegacyProfile()
+    }
+
+    private suspend fun activeLegacyProfile(): LlmProfile? =
+        llmProfileRepository.listProfiles().firstOrNull { it.enabled }
 }
 
 data class ChatGenerationInput(
@@ -90,11 +113,32 @@ data class ChatGenerationInput(
     val userMessageId: String,
     val userText: String,
     val token: LlmGenerationToken,
+    val modelBindingId: String? = null,
     val capabilities: LlmCapabilities? = null,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList()
 )
+
+private fun ExecutionModelConfiguration.toExecutionProfile(): LlmProfile =
+    LlmProfile(
+        id = binding.id,
+        spaceId = binding.spaceId,
+        name = binding.displayName,
+        provider = connection.protocol.toLegacyProvider(),
+        model = binding.modelId,
+        secretRef = connection.secretRef,
+        createdAtEpochMillis = binding.createdAtEpochMillis,
+        updatedAtEpochMillis = maxOf(binding.updatedAtEpochMillis, connection.updatedAtEpochMillis),
+        baseUrl = connection.baseUrl,
+        enabled = binding.enabled && connection.enabled
+    )
+
+private fun ModelProtocol.toLegacyProvider(): LlmProviderKind = when (this) {
+    ModelProtocol.OpenAiCompatible -> LlmProviderKind.OpenAiCompatible
+    ModelProtocol.AnthropicCompatible -> LlmProviderKind.AnthropicCompatible
+    ModelProtocol.GeminiNative -> LlmProviderKind.Gemini
+}
 
 sealed interface ChatGenerationOutcome {
     data class Generated(val assistantMessageId: String) : ChatGenerationOutcome

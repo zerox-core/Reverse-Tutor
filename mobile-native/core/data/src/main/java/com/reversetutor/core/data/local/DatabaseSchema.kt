@@ -27,6 +27,7 @@ object DatabaseSchema {
             db.execSQL("ALTER TABLE session_settings ADD COLUMN modelBindingId TEXT")
             db.execSQL("UPDATE session_settings SET modelBindingId = llmProfileId WHERE llmProfileId IS NOT NULL")
             db.execSQL("CREATE INDEX IF NOT EXISTS index_session_settings_modelBindingId ON session_settings(modelBindingId)")
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN modelBindingId TEXT")
 
             createHybridTables(db)
             migrateLegacyProfiles(db)
