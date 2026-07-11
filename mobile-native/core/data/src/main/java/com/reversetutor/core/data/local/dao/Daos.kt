@@ -191,6 +191,20 @@ interface GraphDao {
     @Query("SELECT * FROM graph_nodes WHERE spaceId = :spaceId ORDER BY label ASC")
     suspend fun listNodesBySpace(spaceId: String): List<GraphNodeEntity>
 
+    @Query(
+        """
+        SELECT DISTINCT graph_nodes.*
+        FROM graph_nodes
+        INNER JOIN memory_items
+            ON memory_items.id = graph_nodes.sourceMemoryId
+        INNER JOIN messages
+            ON messages.id = memory_items.sourceMessageId
+        WHERE messages.sessionId = :sessionId
+        ORDER BY graph_nodes.label ASC
+        """
+    )
+    suspend fun listNodesBySession(sessionId: String): List<GraphNodeEntity>
+
     @Query("SELECT * FROM graph_edges WHERE spaceId = :spaceId ORDER BY createdAtEpochMillis ASC")
     suspend fun listEdgesBySpace(spaceId: String): List<GraphEdgeEntity>
 }

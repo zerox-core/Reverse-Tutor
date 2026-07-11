@@ -168,8 +168,11 @@ object DataModule {
             memoryDao = database(context.applicationContext).memoryDao()
         )
 
-    fun graphRepository(context: Context): GraphRepository =
-        GraphRepository(
-            graphDao = database(context.applicationContext).graphDao()
+    fun graphRepository(context: Context): GraphRepository {
+        val database = database(context.applicationContext)
+        return GraphRepository(
+            graphDao = database.graphDao(),
+            sessionDao = database.sessionDao()
         )
+    }
 }

@@ -10,6 +10,7 @@ import com.reversetutor.core.data.local.entity.GraphEdgeEntity
 import com.reversetutor.core.data.local.entity.GraphNodeEntity
 import com.reversetutor.core.data.local.entity.ImportBatchEntity
 import com.reversetutor.core.data.local.entity.LlmProfileEntity
+import com.reversetutor.core.data.local.entity.MemoryItemEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
 import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.local.entity.ModelBindingEntity
@@ -207,6 +208,94 @@ class ReverseTutorDatabaseDaoTest {
         )
         database.exportRecordDao().insert(exportRecord)
         assertEquals(exportRecord, database.exportRecordDao().getById("export-1"))
+    }
+
+    @Test
+    fun graphNodesCanBeQueriedThroughSessionProvenance() = runBlocking {
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-1",
+                spaceId = "space-1",
+                title = "Session 1",
+                createdAtEpochMillis = 100L,
+                updatedAtEpochMillis = 100L
+            )
+        )
+        database.sessionDao().upsert(
+            SessionEntity(
+                id = "session-2",
+                spaceId = "space-1",
+                title = "Session 2",
+                createdAtEpochMillis = 100L,
+                updatedAtEpochMillis = 100L
+            )
+        )
+        database.messageDao().insert(
+            MessageEntity(
+                id = "message-1",
+                spaceId = "space-1",
+                sessionId = "session-1",
+                role = "user",
+                text = "First",
+                createdAtEpochMillis = 100L
+            )
+        )
+        database.messageDao().insert(
+            MessageEntity(
+                id = "message-2",
+                spaceId = "space-1",
+                sessionId = "session-2",
+                role = "user",
+                text = "Second",
+                createdAtEpochMillis = 100L
+            )
+        )
+        database.memoryDao().insertMemoryItem(
+            MemoryItemEntity(
+                id = "memory-1",
+                spaceId = "space-1",
+                kind = "note",
+                title = "Memory 1",
+                body = "Body",
+                createdAtEpochMillis = 100L,
+                sourceMessageId = "message-1"
+            )
+        )
+        database.memoryDao().insertMemoryItem(
+            MemoryItemEntity(
+                id = "memory-2",
+                spaceId = "space-1",
+                kind = "note",
+                title = "Memory 2",
+                body = "Body",
+                createdAtEpochMillis = 100L,
+                sourceMessageId = "message-2"
+            )
+        )
+        val sessionNode = GraphNodeEntity(
+            id = "node-1",
+            spaceId = "space-1",
+            label = "Session 1 node",
+            kind = "Concept",
+            createdAtEpochMillis = 100L,
+            sourceMemoryId = "memory-1"
+        )
+        database.graphDao().insertNode(sessionNode)
+        database.graphDao().insertNode(
+            GraphNodeEntity(
+                id = "node-2",
+                spaceId = "space-1",
+                label = "Session 2 node",
+                kind = "Concept",
+                createdAtEpochMillis = 100L,
+                sourceMemoryId = "memory-2"
+            )
+        )
+
+        assertEquals(
+            listOf(sessionNode),
+            database.graphDao().listNodesBySession("session-1")
+        )
     }
 
     @Test
