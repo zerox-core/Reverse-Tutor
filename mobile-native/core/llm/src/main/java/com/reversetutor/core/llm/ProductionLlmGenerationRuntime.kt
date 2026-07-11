@@ -8,7 +8,7 @@ class CompositeLlmGenerationRuntime(
     private val anthropicCompatible: LlmGenerationRuntime,
     private val geminiNative: LlmGenerationRuntime
 ) : LlmGenerationRuntime {
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
         when (request.provider.toProviderProtocol()) {
             LlmProviderProtocol.OpenAiCompatible -> openAiCompatible.generate(request)
             LlmProviderProtocol.AnthropicCompatible -> anthropicCompatible.generate(request)
@@ -50,7 +50,7 @@ class ProductionLlmGenerationRuntime(
     private val secretResolver: LlmSecretResolver,
     private val timeoutMillis: Int = DefaultProviderTimeoutMillis
 ) : LlmGenerationRuntime {
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
         val secretRef = request.secretRef?.trim().orEmpty()
         if (secretRef.isEmpty()) return MissingCredential
 

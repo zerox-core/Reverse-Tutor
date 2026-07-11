@@ -132,7 +132,7 @@ sealed interface LlmGenerationResult {
 }
 
 interface LlmGenerationRuntime {
-    fun generate(request: LlmGenerationRequest): LlmGenerationResult
+    suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult
 }
 
 class FakeLlmGenerationRuntime(
@@ -142,7 +142,7 @@ class FakeLlmGenerationRuntime(
     var realProviderCallCount: Int = 0
         private set
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
         outcomes[request.token] ?: defaultResult
 }
 
@@ -175,7 +175,7 @@ class OpenAiCompatibleGenerationRuntime : LlmGenerationRuntime {
             )
         )
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
         LlmGenerationResult.Failure("Live OpenAI-compatible calls are disabled in preview")
 }
 
@@ -197,7 +197,7 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
             )
         )
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
         LlmGenerationResult.Failure("Live Anthropic-compatible calls are disabled in preview")
 }
 

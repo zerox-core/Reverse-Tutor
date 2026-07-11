@@ -3,6 +3,7 @@ package com.reversetutor.core.llm
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.LlmProviderKind
 import com.reversetutor.core.model.MessageAttachment
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -77,7 +78,7 @@ class LlmGenerationLifecycleTest {
     }
 
     @Test
-    fun fakeRuntimeAggregatesStreamingChunksAndNeverCallsRealProviders() {
+    fun fakeRuntimeAggregatesStreamingChunksAndNeverCallsRealProviders() = runBlocking {
         val request = LlmGenerationRequest(
             sessionId = "session-1",
             userMessageId = "user-1",
@@ -104,7 +105,7 @@ class LlmGenerationLifecycleTest {
     }
 
     @Test
-    fun fakeRuntimeReturnsFailureAndTimeoutOutcomesWithoutProviderCalls() {
+    fun fakeRuntimeReturnsFailureAndTimeoutOutcomesWithoutProviderCalls() = runBlocking {
         val failureToken = LlmGenerationToken("token-failure")
         val timeoutToken = LlmGenerationToken("token-timeout")
         val runtime = FakeLlmGenerationRuntime(

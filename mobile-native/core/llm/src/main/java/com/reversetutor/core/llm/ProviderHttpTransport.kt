@@ -21,9 +21,9 @@ sealed interface ProviderHttpResult {
 }
 
 fun interface ProviderHttpTransport {
-    fun execute(request: ProviderHttpRequest): ProviderHttpResult
+    suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult
 }
 
 fun interface LlmSecretResolver {
-    fun resolve(secretRef: String): String?
+    suspend fun resolve(secretRef: String): String?
 }

@@ -1,6 +1,7 @@
 package com.reversetutor.core.llm
 
 import com.reversetutor.core.model.LlmProviderKind
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -8,7 +9,7 @@ import org.junit.Test
 
 class ProductionLlmGenerationRuntimeTest {
     @Test
-    fun compositeRoutesAllSupportedProtocols() {
+    fun compositeRoutesAllSupportedProtocols() = runBlocking {
         val openAi = RecordingRuntime("openai")
         val anthropic = RecordingRuntime("anthropic")
         val gemini = RecordingRuntime("gemini")
@@ -24,7 +25,7 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
-    fun openAiRuntimeResolvesSecretAtExecutionAndParsesSse() {
+    fun openAiRuntimeResolvesSecretAtExecutionAndParsesSse() = runBlocking {
         val transport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(
                 statusCode = 200,
@@ -61,7 +62,7 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
-    fun openAiRuntimeParsesNonStreamingResponse() {
+    fun openAiRuntimeParsesNonStreamingResponse() = runBlocking {
         val transport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(
                 statusCode = 200,
@@ -80,7 +81,7 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
-    fun anthropicRuntimeBuildsHeadersAndParsesStreamingAndNonStreamingResponses() {
+    fun anthropicRuntimeBuildsHeadersAndParsesStreamingAndNonStreamingResponses() = runBlocking {
         val streamingTransport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(
                 statusCode = 200,
@@ -124,7 +125,7 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
-    fun geminiRuntimeUsesNativeEndpointAndParsesStreamingAndNonStreamingResponses() {
+    fun geminiRuntimeUsesNativeEndpointAndParsesStreamingAndNonStreamingResponses() = runBlocking {
         val streamingTransport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(
                 statusCode = 200,
@@ -171,7 +172,7 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
-    fun missingSecretFailsBeforeTransportExecution() {
+    fun missingSecretFailsBeforeTransportExecution() = runBlocking {
         val transport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(200, """{"choices":[]}""")
         )
@@ -196,7 +197,7 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
-    fun providerErrorsTimeoutsAndMalformedBodiesMapToSafeResults() {
+    fun providerErrorsTimeoutsAndMalformedBodiesMapToSafeResults() = runBlocking {
         val cases = listOf(
             ProviderHttpResult.Response(401, """{"error":"credential resolved-value rejected"}""") to
                 LlmGenerationResult.Failure("Provider rejected the credential.", retryable = false),
@@ -261,7 +262,7 @@ private class FakeProviderHttpTransport(
 ) : ProviderHttpTransport {
     val requests = mutableListOf<ProviderHttpRequest>()
 
-    override fun execute(request: ProviderHttpRequest): ProviderHttpResult {
+    override suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult {
         requests += request
         return result
     }
@@ -275,7 +276,7 @@ private class RecordingRuntime(
     var callCount: Int = 0
         private set
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
         callCount += 1
         return LlmGenerationResult.Success(text)
     }
