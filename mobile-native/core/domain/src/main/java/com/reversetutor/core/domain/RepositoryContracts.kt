@@ -9,20 +9,62 @@ import com.reversetutor.core.model.SyncCursor
 import com.reversetutor.core.model.SyncEnvelope
 import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TurnRun
+import com.reversetutor.core.model.TurnRunState
 import com.reversetutor.core.model.WeeklySummary
 
 interface SessionRepository {
     suspend fun sessionExists(sessionId: String): Boolean
+    suspend fun setModelBinding(sessionId: String, modelBindingId: String): Boolean
 }
 
 interface ConversationRunRepository {
-    suspend fun nextSequence(spaceId: String, sessionId: String): Long
-    suspend fun saveRun(run: TurnRun): TurnRun
-    suspend fun saveContextSnapshot(snapshot: ContextSnapshot): ContextSnapshot
+    suspend fun createRunWithSnapshot(command: PersistTurnRunCommand): TurnRun
     suspend fun findRun(runId: String): TurnRun?
     suspend fun findLatestRun(turnId: String): TurnRun?
-    suspend fun findWaitingRuns(parentTurnId: String): List<TurnRun>
     suspend fun isSessionDeleted(sessionId: String): Boolean
+    suspend fun retryLatestAttempt(command: PersistTurnRetryCommand): TurnRun?
+    suspend fun completeCurrentAttempt(command: PersistTurnCompletionCommand): PersistTurnCompletion
+}
+
+data class PersistTurnRunCommand(
+    val runId: String,
+    val snapshotId: String,
+    val spaceId: String,
+    val sessionId: String,
+    val turnId: String,
+    val userMessageId: String,
+    val modelBindingId: String,
+    val contextVersion: Long,
+    val contextMessageIds: List<String>,
+    val parentTurnId: String?,
+    val initialState: TurnRunState,
+    val createdAtEpochMillis: Long
+)
+
+data class PersistTurnRetryCommand(
+    val runId: String,
+    val replacementRunId: String,
+    val initialState: TurnRunState,
+    val createdAtEpochMillis: Long
+)
+
+data class PersistTurnCompletionCommand(
+    val runId: String,
+    val attempt: Int,
+    val resultMessageId: String,
+    val completedAtEpochMillis: Long
+)
+
+sealed interface PersistTurnCompletion {
+    data class Accepted(
+        val completedRun: TurnRun,
+        val releasedRuns: List<TurnRun>
+    ) : PersistTurnCompletion
+
+    data object NotFound : PersistTurnCompletion
+    data object StaleAttempt : PersistTurnCompletion
+    data object SessionDeleted : PersistTurnCompletion
+    data object AlreadyTerminal : PersistTurnCompletion
 }
 
 interface ModelConnectionRepository {
@@ -76,7 +118,7 @@ interface SyncRepository {
     suspend fun pendingEnvelopes(limit: Int = 100): List<SyncEnvelope>
     suspend fun markSucceeded(envelopeId: String, remoteRevision: Long)
     suspend fun markFailed(envelopeId: String, error: String, retryable: Boolean)
-    suspend fun readCursor(entityType: String): SyncCursor? = null
+    suspend fun readCursor(spaceId: String, entityType: String): SyncCursor? = null
     suspend fun saveCursor(cursor: SyncCursor): SyncCursor = cursor
 }
 

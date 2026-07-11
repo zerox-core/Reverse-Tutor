@@ -1,6 +1,5 @@
 package com.reversetutor.core.domain
 
-import com.reversetutor.core.model.ContextSnapshot
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
 import java.util.UUID
@@ -45,39 +44,25 @@ class ConversationRunCoordinator(
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
     suspend fun createRun(command: CreateTurnRunCommand): RunDispatch {
-        val sequence = repository.nextSequence(command.spaceId, command.sessionId)
-        val snapshot = ContextSnapshot(
-            id = idGenerator(),
-            spaceId = command.spaceId,
-            sessionId = command.sessionId,
-            turnId = command.turnId,
-            version = command.contextVersion,
-            messageIds = command.contextMessageIds.toList(),
-            parentTurnId = command.parentTurnId,
-            maxSequence = sequence,
-            createdAtEpochMillis = nowEpochMillis()
-        )
-        repository.saveContextSnapshot(snapshot)
-
         val dependencyPending = isDependencyPending(command.parentTurnId)
         val createdAt = nowEpochMillis()
         val state = if (dependencyPending) TurnRunState.Waiting else TurnRunState.Running
-        val run = TurnRun(
-            id = idGenerator(),
-            spaceId = command.spaceId,
-            turnId = command.turnId,
-            sessionId = command.sessionId,
-            userMessageId = command.userMessageId,
-            sequence = sequence,
-            contextVersion = command.contextVersion,
-            modelBindingId = command.modelBindingId,
-            parentTurnId = command.parentTurnId,
-            contextSnapshotId = snapshot.id,
-            state = state,
-            createdAtEpochMillis = createdAt,
-            startedAtEpochMillis = createdAt.takeIf { state == TurnRunState.Running }
+        val run = repository.createRunWithSnapshot(
+            PersistTurnRunCommand(
+                runId = idGenerator(),
+                snapshotId = idGenerator(),
+                spaceId = command.spaceId,
+                sessionId = command.sessionId,
+                turnId = command.turnId,
+                userMessageId = command.userMessageId,
+                modelBindingId = command.modelBindingId,
+                contextVersion = command.contextVersion,
+                contextMessageIds = command.contextMessageIds.toList(),
+                parentTurnId = command.parentTurnId,
+                initialState = state,
+                createdAtEpochMillis = createdAt
+            )
         )
-        repository.saveRun(run)
 
         return if (dependencyPending) {
             RunDispatch.WaitingForDependency(run, requireNotNull(command.parentTurnId))
@@ -90,30 +75,17 @@ class ConversationRunCoordinator(
         val previous = requireNotNull(repository.findRun(runId)) {
             "TurnRun not found: $runId"
         }
-        val latest = repository.findLatestRun(previous.turnId)
-        require(latest?.id == previous.id) {
-            "Only the latest attempt can be retried"
-        }
-        repository.saveRun(
-            previous.copy(
-                state = TurnRunState.Discarded,
-                completedAtEpochMillis = nowEpochMillis()
-            )
-        )
         val dependencyPending = isDependencyPending(previous.parentTurnId)
-        val now = nowEpochMillis()
-        return repository.saveRun(
-            previous.copy(
-                id = idGenerator(),
-                attempt = previous.attempt + 1,
-                state = if (dependencyPending) TurnRunState.Waiting else TurnRunState.Running,
-                createdAtEpochMillis = now,
-                startedAtEpochMillis = now.takeUnless { dependencyPending },
-                completedAtEpochMillis = null,
-                resultMessageId = null,
-                error = null
+        return requireNotNull(
+            repository.retryLatestAttempt(
+                PersistTurnRetryCommand(
+                    runId = runId,
+                    replacementRunId = idGenerator(),
+                    initialState = if (dependencyPending) TurnRunState.Waiting else TurnRunState.Running,
+                    createdAtEpochMillis = nowEpochMillis()
+                )
             )
-        )
+        ) { "Only the latest attempt can be retried" }
     }
 
     suspend fun completeRun(
@@ -121,38 +93,25 @@ class ConversationRunCoordinator(
         attempt: Int,
         resultMessageId: String
     ): RunCompletion {
-        val run = repository.findRun(runId) ?: return RunCompletion.NotFound
-        if (repository.isSessionDeleted(run.sessionId)) {
-            return RunCompletion.SessionDeleted
-        }
-        val latest = repository.findLatestRun(run.turnId)
-        if (latest?.id != run.id || latest.attempt != attempt || run.attempt != attempt) {
-            return RunCompletion.StaleAttempt
-        }
-        if (run.isTerminal) {
-            return RunCompletion.AlreadyTerminal
-        }
-
-        val completed = repository.saveRun(
-            run.copy(
-                state = TurnRunState.Completed,
-                completedAtEpochMillis = nowEpochMillis(),
-                resultMessageId = resultMessageId
-            )
-        )
-        val released = repository.findWaitingRuns(run.turnId).mapNotNull { waiting ->
-            if (repository.isSessionDeleted(waiting.sessionId)) {
-                null
-            } else {
-                repository.saveRun(
-                    waiting.copy(
-                        state = TurnRunState.Running,
-                        startedAtEpochMillis = nowEpochMillis()
-                    )
+        return when (
+            val persisted = repository.completeCurrentAttempt(
+                PersistTurnCompletionCommand(
+                    runId = runId,
+                    attempt = attempt,
+                    resultMessageId = resultMessageId,
+                    completedAtEpochMillis = nowEpochMillis()
                 )
-            }
+            )
+        ) {
+            is PersistTurnCompletion.Accepted -> RunCompletion.Accepted(
+                persisted.completedRun,
+                persisted.releasedRuns
+            )
+            PersistTurnCompletion.NotFound -> RunCompletion.NotFound
+            PersistTurnCompletion.StaleAttempt -> RunCompletion.StaleAttempt
+            PersistTurnCompletion.SessionDeleted -> RunCompletion.SessionDeleted
+            PersistTurnCompletion.AlreadyTerminal -> RunCompletion.AlreadyTerminal
         }
-        return RunCompletion.Accepted(completed, released)
     }
 
     private suspend fun isDependencyPending(parentTurnId: String?): Boolean {

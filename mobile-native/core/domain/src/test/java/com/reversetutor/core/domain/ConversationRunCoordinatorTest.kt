@@ -94,6 +94,20 @@ class ConversationRunCoordinatorTest {
         assertFalse(repository.findRun(run.id)?.isTerminal == true)
     }
 
+    @Test
+    fun duplicateCompletionIsAcceptedOnlyOnce() = runBlocking {
+        val repository = FakeConversationRunRepository()
+        val coordinator = coordinator(repository)
+        val run = coordinator.createRun(command("turn-1", "message-1")).run
+
+        val first = coordinator.completeRun(run.id, run.attempt, "assistant-1")
+        val duplicate = coordinator.completeRun(run.id, run.attempt, "assistant-duplicate")
+
+        assertTrue(first is RunCompletion.Accepted)
+        assertEquals(RunCompletion.AlreadyTerminal, duplicate)
+        assertEquals("assistant-1", repository.findRun(run.id)?.resultMessageId)
+    }
+
     private fun coordinator(repository: FakeConversationRunRepository): ConversationRunCoordinator {
         var id = 0
         var now = 100L
@@ -126,32 +140,104 @@ private class FakeConversationRunRepository : ConversationRunRepository {
     val deletedSessions = mutableSetOf<String>()
     private val sequences = mutableMapOf<String, Long>()
 
-    override suspend fun nextSequence(spaceId: String, sessionId: String): Long {
-        val key = "$spaceId:$sessionId"
-        val next = (sequences[key] ?: 0L) + 1L
-        sequences[key] = next
-        return next
-    }
+    override suspend fun createRunWithSnapshot(command: PersistTurnRunCommand): TurnRun =
+        synchronized(this) {
+            val key = "${command.spaceId}:${command.sessionId}"
+            val sequence = (sequences[key] ?: 0L) + 1L
+            sequences[key] = sequence
+            val snapshot = ContextSnapshot(
+                id = command.snapshotId,
+                spaceId = command.spaceId,
+                sessionId = command.sessionId,
+                turnId = command.turnId,
+                version = command.contextVersion,
+                messageIds = command.contextMessageIds,
+                parentTurnId = command.parentTurnId,
+                maxSequence = sequence,
+                createdAtEpochMillis = command.createdAtEpochMillis
+            )
+            val run = TurnRun(
+                id = command.runId,
+                spaceId = command.spaceId,
+                turnId = command.turnId,
+                sessionId = command.sessionId,
+                userMessageId = command.userMessageId,
+                sequence = sequence,
+                contextVersion = command.contextVersion,
+                modelBindingId = command.modelBindingId,
+                parentTurnId = command.parentTurnId,
+                contextSnapshotId = command.snapshotId,
+                state = command.initialState,
+                createdAtEpochMillis = command.createdAtEpochMillis,
+                startedAtEpochMillis = command.createdAtEpochMillis
+                    .takeIf { command.initialState == TurnRunState.Running }
+            )
+            snapshots[snapshot.id] = snapshot
+            runs[run.id] = run
+            run
+        }
 
-    override suspend fun saveRun(run: TurnRun): TurnRun {
-        runs[run.id] = run
-        return run
-    }
+    override suspend fun retryLatestAttempt(command: PersistTurnRetryCommand): TurnRun? =
+        synchronized(this) {
+            val previous = runs[command.runId] ?: return@synchronized null
+            val latest = runs.values
+                .filter { it.turnId == previous.turnId }
+                .maxByOrNull { it.attempt }
+            if (latest?.id != previous.id) return@synchronized null
+            runs[previous.id] = previous.copy(
+                state = TurnRunState.Discarded,
+                completedAtEpochMillis = command.createdAtEpochMillis
+            )
+            previous.copy(
+                id = command.replacementRunId,
+                attempt = previous.attempt + 1,
+                state = command.initialState,
+                createdAtEpochMillis = command.createdAtEpochMillis,
+                startedAtEpochMillis = command.createdAtEpochMillis
+                    .takeIf { command.initialState == TurnRunState.Running },
+                completedAtEpochMillis = null,
+                resultMessageId = null,
+                error = null
+            ).also { runs[it.id] = it }
+        }
 
-    override suspend fun saveContextSnapshot(snapshot: ContextSnapshot): ContextSnapshot {
-        snapshots[snapshot.id] = snapshot
-        return snapshot
+    override suspend fun completeCurrentAttempt(
+        command: PersistTurnCompletionCommand
+    ): PersistTurnCompletion = synchronized(this) {
+        val run = runs[command.runId] ?: return@synchronized PersistTurnCompletion.NotFound
+        if (run.sessionId in deletedSessions) {
+            return@synchronized PersistTurnCompletion.SessionDeleted
+        }
+        val latest = runs.values
+            .filter { it.turnId == run.turnId }
+            .maxByOrNull { it.attempt }
+        if (latest?.id != run.id || run.attempt != command.attempt) {
+            return@synchronized PersistTurnCompletion.StaleAttempt
+        }
+        if (run.isTerminal) {
+            return@synchronized PersistTurnCompletion.AlreadyTerminal
+        }
+        val completed = run.copy(
+            state = TurnRunState.Completed,
+            completedAtEpochMillis = command.completedAtEpochMillis,
+            resultMessageId = command.resultMessageId
+        )
+        runs[completed.id] = completed
+        val released = runs.values
+            .filter { it.parentTurnId == run.turnId && it.state == TurnRunState.Waiting }
+            .map { waiting ->
+                waiting.copy(
+                    state = TurnRunState.Running,
+                    startedAtEpochMillis = command.completedAtEpochMillis
+                ).also { runs[it.id] = it }
+            }
+        PersistTurnCompletion.Accepted(completed, released)
     }
 
     override suspend fun findRun(runId: String): TurnRun? = runs[runId]
 
     override suspend fun findLatestRun(turnId: String): TurnRun? =
         runs.values.filter { it.turnId == turnId }.maxByOrNull { it.attempt }
-
-    override suspend fun findWaitingRuns(parentTurnId: String): List<TurnRun> =
-        runs.values.filter {
-            it.parentTurnId == parentTurnId && it.state == TurnRunState.Waiting
-        }
 
     override suspend fun isSessionDeleted(sessionId: String): Boolean =
         sessionId in deletedSessions
