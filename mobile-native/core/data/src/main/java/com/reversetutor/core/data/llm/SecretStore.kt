@@ -11,6 +11,8 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 interface SecretStore {
     suspend fun put(ref: String, secret: String)
@@ -27,27 +29,17 @@ class AndroidKeystoreSecretStore(
         Context.MODE_PRIVATE
     )
 
-    override suspend fun put(ref: String, secret: String) {
-        val encoded = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            encryptWithKeystore(secret)
-        } else {
-            "legacy:${secret.toByteArray(Charsets.UTF_8).base64()}"
-        }
+    override suspend fun put(ref: String, secret: String) = withContext(Dispatchers.IO) {
+        val encoded = encryptWithKeystore(secret)
         preferences.edit().putString(secretKey(ref), encoded).apply()
     }
 
-    override suspend fun get(ref: String): String? {
-        val encoded = preferences.getString(secretKey(ref), null) ?: return null
-        return if (encoded.startsWith("legacy:")) {
-            String(encoded.removePrefix("legacy:").base64Decode(), Charsets.UTF_8)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            decryptWithKeystore(encoded)
-        } else {
-            null
-        }
+    override suspend fun get(ref: String): String? = withContext(Dispatchers.IO) {
+        val encoded = preferences.getString(secretKey(ref), null) ?: return@withContext null
+        decryptWithKeystore(encoded)
     }
 
-    override suspend fun delete(ref: String) {
+    override suspend fun delete(ref: String) = withContext(Dispatchers.IO) {
         preferences.edit().remove(secretKey(ref)).apply()
     }
 

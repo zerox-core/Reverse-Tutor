@@ -12,12 +12,19 @@ import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.migration.NativeExportRepository
 import com.reversetutor.core.data.migration.NativeImportRepository
 import com.reversetutor.core.data.model.ModelConnectionRepositoryImpl
+import com.reversetutor.core.data.online.OnlineActivityRepository
+import com.reversetutor.core.data.online.OnlineSyncTransport
+import com.reversetutor.core.data.online.OnlineUpdateRepository
 import com.reversetutor.core.data.preferences.AppPreferencesRepository
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.domain.ConversationRunCoordinator
+import com.reversetutor.core.domain.SyncCoordinator
+import com.reversetutor.core.remote.HttpOnlineApi
+import com.reversetutor.core.remote.OnlineAuthTokenProvider
+import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
 import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
 import com.reversetutor.feature.chat.ChatRunsViewModelFactory
 import com.reversetutor.feature.chat.HomePortViewModelFactory
@@ -37,6 +44,17 @@ data class HybridFrontendFactories(
     val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory
 )
 
+data class HybridOnlineConfiguration(
+    val baseUrl: String,
+    val authTokenProvider: OnlineAuthTokenProvider = OnlineAuthTokenProvider { null }
+)
+
+data class HybridOnlineServices(
+    val activityRepository: OnlineActivityRepository,
+    val syncCoordinator: SyncCoordinator,
+    val updateRepository: OnlineUpdateRepository
+)
+
 class HybridAppGraph private constructor(
     val appPreferencesRepository: AppPreferencesRepository,
     val sessionRepository: SessionRepository,
@@ -50,16 +68,36 @@ class HybridAppGraph private constructor(
     val localDataWipeRepository: LocalDataWipeRepository,
     val nativeImportRepository: NativeImportRepository,
     val nativeExportRepository: NativeExportRepository,
+    val online: HybridOnlineServices?,
     val frontend: HybridFrontendFactories
 ) {
     companion object {
-        fun create(context: Context): HybridAppGraph {
+        fun create(
+            context: Context,
+            onlineConfiguration: HybridOnlineConfiguration? = null
+        ): HybridAppGraph {
             val appContext = context.applicationContext
             val sessionRepository = DataModule.sessionRepository(appContext)
             val conversationRunRepository = DataModule.conversationRunRepository(appContext)
             val modelConnectionRepository = DataModule.modelConnectionRepository(appContext)
             val learningRepository = DataModule.learningRepository(appContext)
+            val syncRepository = DataModule.syncRepository(appContext)
             val runCoordinator = ConversationRunCoordinator(conversationRunRepository)
+            val onlineServices = onlineConfiguration?.let { configuration ->
+                val onlineApi = HttpOnlineApi(
+                    baseUrl = configuration.baseUrl,
+                    transport = UrlConnectionOnlineHttpTransport(),
+                    authTokenProvider = configuration.authTokenProvider
+                )
+                HybridOnlineServices(
+                    activityRepository = OnlineActivityRepository(onlineApi),
+                    syncCoordinator = SyncCoordinator(
+                        repository = syncRepository,
+                        transport = OnlineSyncTransport(onlineApi)
+                    ),
+                    updateRepository = OnlineUpdateRepository(onlineApi)
+                )
+            }
 
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
@@ -75,6 +113,7 @@ class HybridAppGraph private constructor(
                 localDataWipeRepository = DataModule.localDataWipeRepository(appContext),
                 nativeImportRepository = DataModule.nativeImportRepository(appContext),
                 nativeExportRepository = DataModule.nativeExportRepository(appContext),
+                online = onlineServices,
                 frontend = createFrontendFactories(
                     sessionRepository = sessionRepository,
                     conversationRunRepository = conversationRunRepository,

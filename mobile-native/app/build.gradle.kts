@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.reversetutor.preview"
-        minSdk = 22
+        minSdk = 23
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0-native-preview"
@@ -39,6 +39,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:data"))
     implementation(project(":core:llm"))
+    implementation(project(":core:remote"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:memory"))
     implementation(project(":feature:sources"))

@@ -28,7 +28,10 @@ import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.data.wipe.RoomLocalDataWipeStore
-import com.reversetutor.core.llm.FakeLlmGenerationRuntime
+import com.reversetutor.core.llm.CompositeLlmGenerationRuntime
+import com.reversetutor.core.llm.LlmGenerationRuntime
+import com.reversetutor.core.llm.LlmSecretResolver
+import com.reversetutor.core.llm.UrlConnectionProviderHttpTransport
 
 private val Context.appPreferencesDataStore by preferencesDataStore(
     name = "reverse_tutor_app_preferences"
@@ -81,15 +84,21 @@ object DataModule {
         )
     }
 
-    fun chatGenerationRepository(context: Context): ChatGenerationRepository =
+    fun chatGenerationRepository(
+        context: Context,
+        runtime: LlmGenerationRuntime? = null
+    ): ChatGenerationRepository =
         ChatGenerationRepository(
             messageRepository = messageRepository(context),
             llmProfileRepository = llmProfileRepository(context),
-            runtime = FakeLlmGenerationRuntime(),
+            runtime = runtime ?: productionGenerationRuntime(context),
             modelConnectionRepository = modelConnectionRepository(context)
         )
 
-    fun backgroundGenerationRepository(context: Context): BackgroundGenerationRepository {
+    fun backgroundGenerationRepository(
+        context: Context,
+        runtime: LlmGenerationRuntime? = null
+    ): BackgroundGenerationRepository {
         val appContext = context.applicationContext
         val database = database(appContext)
         return BackgroundGenerationRepository(
@@ -97,8 +106,16 @@ object DataModule {
             sessionDao = database.sessionDao(),
             messageRepository = messageRepository(appContext),
             llmProfileRepository = llmProfileRepository(appContext),
-            runtime = FakeLlmGenerationRuntime(),
+            runtime = runtime ?: productionGenerationRuntime(appContext),
             modelConnectionRepository = modelConnectionRepository(appContext)
+        )
+    }
+
+    private fun productionGenerationRuntime(context: Context): LlmGenerationRuntime {
+        val secretStore = secretStore(context.applicationContext)
+        return CompositeLlmGenerationRuntime.production(
+            transport = UrlConnectionProviderHttpTransport(),
+            secretResolver = LlmSecretResolver(secretStore::get)
         )
     }
 

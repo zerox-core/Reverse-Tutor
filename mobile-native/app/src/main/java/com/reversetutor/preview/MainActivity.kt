@@ -9,53 +9,21 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.preferences.AppPreferences
 import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
+import com.reversetutor.preview.wiring.HybridAppGraph
 
 class MainActivity : ComponentActivity() {
     private var receivedImportPayload by mutableStateOf<ReceivedImportPayload?>(null)
 
-    private val appPreferencesRepository by lazy {
-        DataModule.appPreferencesRepository(this)
-    }
-    private val sessionRepository by lazy {
-        DataModule.sessionRepository(this)
-    }
-    private val messageRepository by lazy {
-        DataModule.messageRepository(this)
-    }
-    private val llmProfileRepository by lazy {
-        DataModule.llmProfileRepository(this)
-    }
-    private val chatGenerationRepository by lazy {
-        DataModule.chatGenerationRepository(this)
-    }
-    private val sourceRepository by lazy {
-        DataModule.sourceRepository(this)
-    }
-    private val memoryRepository by lazy {
-        DataModule.memoryRepository(this)
-    }
-    private val graphRepository by lazy {
-        DataModule.graphRepository(this)
-    }
-    private val localDataWipeRepository by lazy {
-        DataModule.localDataWipeRepository(this)
-    }
-    private val nativeImportRepository by lazy {
-        DataModule.nativeImportRepository(this)
-    }
-    private val nativeExportRepository by lazy {
-        DataModule.nativeExportRepository(this)
-    }
+    private val appGraph by lazy { HybridAppGraph.create(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         receivedImportPayload = readImportPayload(intent)
         setContent {
-            val appPreferences by appPreferencesRepository.preferences.collectAsState(
+            val appPreferences by appGraph.appPreferencesRepository.preferences.collectAsState(
                 initial = AppPreferences.defaults
             )
             val receivedImport = receivedImportPayload
@@ -63,16 +31,17 @@ class MainActivity : ComponentActivity() {
             ReverseTutorTheme {
                 AppShell(
                     appPreferences = appPreferences,
-                    sessionRepository = sessionRepository,
-                    messageRepository = messageRepository,
-                    llmProfileRepository = llmProfileRepository,
-                    chatGenerationRepository = chatGenerationRepository,
-                    sourceRepository = sourceRepository,
-                    memoryRepository = memoryRepository,
-                    graphRepository = graphRepository,
-                    localDataWipeRepository = localDataWipeRepository,
-                    nativeImportRepository = nativeImportRepository,
-                    nativeExportRepository = nativeExportRepository,
+                    sessionRepository = appGraph.sessionRepository,
+                    messageRepository = appGraph.messageRepository,
+                    llmProfileRepository = appGraph.llmProfileRepository,
+                    chatGenerationRepository = appGraph.chatGenerationRepository,
+                    backgroundGenerationRepository = appGraph.backgroundGenerationRepository,
+                    sourceRepository = appGraph.sourceRepository,
+                    memoryRepository = appGraph.memoryRepository,
+                    graphRepository = appGraph.graphRepository,
+                    localDataWipeRepository = appGraph.localDataWipeRepository,
+                    nativeImportRepository = appGraph.nativeImportRepository,
+                    nativeExportRepository = appGraph.nativeExportRepository,
                     initialImportText = receivedImport?.text,
                     initialImportFileName = receivedImport?.fileName,
                     onExitRequested = ::finish

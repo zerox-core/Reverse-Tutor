@@ -1,0 +1,24 @@
+{
+  "task_id": "NATIVE-HYBRID-PROD-001",
+  "status": "verified",
+  "done": [
+    "Added production OpenAI-compatible, Anthropic-compatible, and Gemini-native runtimes behind an injected suspend HTTP transport.",
+    "Added suspend Android online API transport and activity, sync, and update repository adapters.",
+    "Replaced production fake generation wiring with Android Keystore-backed provider execution while retaining injectable test runtimes.",
+    "Wired application repositories through HybridAppGraph and kept online services optional.",
+    "Persisted modelBindingId on queued background jobs so retries and process recovery use the enqueue-time model.",
+    "Excluded encrypted provider secret preferences from Android backup and device transfer."
+  ],
+  "commits": [
+    "8b30420 feat: add production provider runtimes",
+    "516cc93 feat: wire hybrid frontend application graph",
+    "c46cfa4 feat: add suspend online transport adapters",
+    "f4c4e5e refactor: make provider runtime suspendable",
+    "c45edcd feat: snapshot generation model bindings"
+  ],
+  "current_problem": null,
+  "remaining_risks": [
+    "The branch HEAD predates a still-uncommitted native Figma UI baseline. A clean worktree at HEAD does not compile until those user-owned UI changes are committed or rebased as a separate task.",
+    "Automated verification used fake provider transports and local API tests; no real provider credential or external provider call was used."
+  ]
+}

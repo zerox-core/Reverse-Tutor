@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude
+        domain="sharedpref"
+        path="reverse_tutor_llm_profile_secrets.xml" />
+</full-backup-content>

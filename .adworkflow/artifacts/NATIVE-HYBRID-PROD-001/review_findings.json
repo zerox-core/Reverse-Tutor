@@ -1,0 +1,18 @@
+{
+  "task_id": "NATIVE-HYBRID-PROD-001",
+  "status": "approved_with_residual_risk",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    "Commit the verified native Figma UI baseline separately so future clean worktrees build from branch HEAD without relying on the current dirty workspace.",
+    "Add loopback-server tests for the concrete HttpURLConnection transports if transport-level redirect, timeout, and streaming behavior needs stronger coverage."
+  ],
+  "review_basis": [
+    "Production integration plan",
+    "staged and working-tree diffs",
+    "331 native JVM tests",
+    "11 module lint reports",
+    "debug APK assembly",
+    "429 Python regression tests",
+    "static layer and secret-boundary checks"
+  ]
+}

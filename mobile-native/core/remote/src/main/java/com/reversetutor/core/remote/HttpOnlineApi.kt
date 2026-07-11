@@ -23,10 +23,10 @@ import kotlinx.serialization.json.put
 class HttpOnlineApi(
     baseUrl: String,
     private val transport: OnlineHttpTransport,
-    private val authTokenProvider: OnlineAuthTokenProvider = OnlineAuthTokenProvider { null },
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val authTokenProvider: OnlineAuthTokenProvider = OnlineAuthTokenProvider { null }
 ) : OnlineApi {
     private val baseUrl = baseUrl.trim().trimEnd('/')
+    private val json: Json = Json { ignoreUnknownKeys = true }
 
     init {
         require(this.baseUrl.startsWith("http://") || this.baseUrl.startsWith("https://")) {
