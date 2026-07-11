@@ -6,9 +6,7 @@ import com.reversetutor.core.model.ModelProtocol
 import com.reversetutor.core.model.ProviderConnection
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,30 +58,6 @@ interface ModelConnectionsPort {
     suspend fun selectSessionModel(sessionId: String, modelBindingId: String)
 }
 
-class FakeModelConnectionsPort(
-    connections: List<ProviderConnection> = emptyList(),
-    bindings: List<ModelBinding> = emptyList()
-) : ModelConnectionsPort {
-    var connections: List<ProviderConnection> = connections
-    var bindings: List<ModelBinding> = bindings
-    var loadError: Throwable? = null
-    var modelSwitchError: Throwable? = null
-    val sessionModelChanges = mutableListOf<Pair<String, String>>()
-
-    override suspend fun loadSnapshot(): ModelConnectionsSnapshot {
-        loadError?.let { throw it }
-        return ModelConnectionsSnapshot(
-            connections = connections.toList(),
-            bindings = bindings.toList()
-        )
-    }
-
-    override suspend fun selectSessionModel(sessionId: String, modelBindingId: String) {
-        modelSwitchError?.let { throw it }
-        sessionModelChanges += sessionId to modelBindingId
-    }
-}
-
 fun interface ModelConnectionsViewModelFactory {
     fun create(
         sessionId: String?,
@@ -112,7 +86,7 @@ class ModelConnectionsViewModel(
     private val sessionId: String?,
     initialSessionModelBindingId: String?,
     private val port: ModelConnectionsPort,
-    private val scope: CoroutineScope = defaultModelConnectionsScope()
+    private val scope: CoroutineScope
 ) {
     private val mutableUiState = MutableStateFlow(
         ModelConnectionsUiState(
@@ -228,9 +202,6 @@ private fun ModelConnectionsSnapshot.toUiState(
         sessionModelBindingId = sessionModelBindingId,
         isLoading = isLoading
     )
-
-private fun defaultModelConnectionsScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 private fun Throwable.toModelConnectionsErrorMessage(): String =
     message?.takeIf { it.isNotBlank() } ?: "Unable to load model connections"

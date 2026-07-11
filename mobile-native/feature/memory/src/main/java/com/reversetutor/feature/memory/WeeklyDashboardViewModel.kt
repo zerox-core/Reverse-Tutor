@@ -4,9 +4,7 @@ import com.reversetutor.core.model.StudyPlanTask
 import com.reversetutor.core.model.WeeklySummary
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,20 +33,6 @@ interface WeeklyDashboardPort {
     suspend fun loadLocalSnapshot(): WeeklyDashboardSnapshot
 }
 
-class FakeWeeklyDashboardPort(
-    summary: WeeklySummary? = null,
-    tasks: List<StudyPlanTask> = emptyList()
-) : WeeklyDashboardPort {
-    var summary: WeeklySummary? = summary
-    var tasks: List<StudyPlanTask> = tasks
-    var loadError: Throwable? = null
-
-    override suspend fun loadLocalSnapshot(): WeeklyDashboardSnapshot {
-        loadError?.let { throw it }
-        return WeeklyDashboardSnapshot(summary = summary, tasks = tasks.toList())
-    }
-}
-
 fun interface WeeklyDashboardViewModelFactory {
     fun create(scope: CoroutineScope): WeeklyDashboardViewModel
 }
@@ -68,7 +52,7 @@ class WeeklyDashboardPortViewModelFactory(
 class WeeklyDashboardViewModel(
     private val port: WeeklyDashboardPort,
     initialOnline: Boolean = true,
-    private val scope: CoroutineScope = defaultWeeklyDashboardScope()
+    private val scope: CoroutineScope
 ) {
     private val mutableUiState = MutableStateFlow(
         WeeklyDashboardUiState(isOnline = initialOnline)
@@ -116,9 +100,6 @@ class WeeklyDashboardViewModel(
         }
     }
 }
-
-private fun defaultWeeklyDashboardScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 private fun Throwable.toWeeklyDashboardErrorMessage(): String =
     message?.takeIf { it.isNotBlank() } ?: "Unable to load the weekly dashboard"

@@ -3,9 +3,7 @@ package com.reversetutor.feature.chat
 import com.reversetutor.core.model.TutorSession
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,18 +28,6 @@ interface HomePort {
     suspend fun loadLocalSessions(): List<TutorSession>
 }
 
-class FakeHomePort(
-    localSessions: List<TutorSession> = emptyList()
-) : HomePort {
-    var localSessions: List<TutorSession> = localSessions
-    var loadError: Throwable? = null
-
-    override suspend fun loadLocalSessions(): List<TutorSession> {
-        loadError?.let { throw it }
-        return localSessions.toList()
-    }
-}
-
 fun interface HomeViewModelFactory {
     fun create(scope: CoroutineScope): HomeViewModel
 }
@@ -57,7 +43,7 @@ class HomePortViewModelFactory(
 class HomeViewModel(
     private val port: HomePort,
     initialOnline: Boolean = true,
-    private val scope: CoroutineScope = defaultHomeScope()
+    private val scope: CoroutineScope
 ) {
     private val mutableUiState = MutableStateFlow(
         HomeUiState(isOnline = initialOnline)
@@ -107,9 +93,6 @@ class HomeViewModel(
         }
     }
 }
-
-private fun defaultHomeScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 private fun Throwable.toHomeErrorMessage(): String =
     message?.takeIf { it.isNotBlank() } ?: "Unable to load local sessions"
