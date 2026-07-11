@@ -22,6 +22,7 @@ import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
+import com.reversetutor.core.data.learning.WidgetLayoutRepositoryImpl
 import com.reversetutor.core.data.model.ModelConnectionRepositoryImpl
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
 import com.reversetutor.core.data.search.RoomGlobalSearchRepository
@@ -52,6 +53,8 @@ import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
 import com.reversetutor.core.model.WeeklySummary
+import com.reversetutor.core.model.WidgetLayoutPreference
+import com.reversetutor.core.model.WidgetSize
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -296,6 +299,67 @@ class ReverseTutorDatabaseDaoTest {
             listOf(sessionNode),
             database.graphDao().listNodesBySession("session-1")
         )
+    }
+
+    @Test
+    fun widgetLayoutRepositoryReplacesCompleteLocalLayoutTransactionally() = runBlocking {
+        val repository = WidgetLayoutRepositoryImpl(database)
+        val initial = listOf(
+            WidgetLayoutPreference(
+                spaceId = "space-1",
+                widgetId = "summary",
+                order = 1,
+                hidden = true,
+                size = WidgetSize.FullWidth,
+                updatedAtEpochMillis = 101L
+            ),
+            WidgetLayoutPreference(
+                spaceId = "space-1",
+                widgetId = "progress",
+                order = 0,
+                hidden = false,
+                size = WidgetSize.Compact,
+                updatedAtEpochMillis = 100L
+            )
+        )
+
+        repository.saveLayout("space-1", initial)
+
+        assertEquals(
+            listOf("progress", "summary"),
+            repository.load("space-1").map { it.widgetId }
+        )
+        assertEquals(true, repository.load("space-1").last().hidden)
+        assertEquals(WidgetSize.FullWidth, repository.load("space-1").last().size)
+        assertTrue(database.syncDao().listReadyOutbox(Long.MAX_VALUE, 100).isEmpty())
+
+        val replacement = listOf(initial.first().copy(order = 0))
+        repository.saveLayout("space-1", replacement)
+        assertEquals(replacement, repository.load("space-1"))
+
+        var invalidRejected = false
+        try {
+            repository.saveLayout(
+                "space-1",
+                listOf(
+                    replacement.single(),
+                    replacement.single().copy(widgetId = "duplicate-order")
+                )
+            )
+        } catch (_: IllegalArgumentException) {
+            invalidRejected = true
+        }
+        assertTrue(invalidRejected)
+        assertEquals(replacement, repository.load("space-1"))
+        assertTrue(database.syncDao().listReadyOutbox(Long.MAX_VALUE, 100).isEmpty())
+
+        repository.saveLayout("space-1", emptyList())
+        assertTrue(repository.load("space-1").isEmpty())
+
+        repository.saveLayout("space-1", replacement)
+        repository.reset("space-1")
+        assertTrue(repository.load("space-1").isEmpty())
+        assertTrue(database.syncDao().listReadyOutbox(Long.MAX_VALUE, 100).isEmpty())
     }
 
     @Test

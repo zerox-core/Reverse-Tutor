@@ -6,6 +6,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
+import com.reversetutor.core.data.learning.WidgetLayoutRepositoryImpl
 import com.reversetutor.core.data.llm.AndroidKeystoreSecretStore
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.llm.LlmProfileRepository
@@ -127,6 +128,9 @@ object DataModule {
 
     fun learningRepository(context: Context): LearningRepositoryImpl =
         LearningRepositoryImpl(database(context.applicationContext))
+
+    fun widgetLayoutRepository(context: Context): WidgetLayoutRepositoryImpl =
+        WidgetLayoutRepositoryImpl(database(context.applicationContext))
 
     fun globalSearchRepository(context: Context): RoomGlobalSearchRepository =
         RoomGlobalSearchRepository(database(context.applicationContext))

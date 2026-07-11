@@ -11,6 +11,7 @@ import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
 import com.reversetutor.core.model.WeeklySummary
+import com.reversetutor.core.model.WidgetLayoutPreference
 
 interface SessionRepository {
     suspend fun sessionExists(sessionId: String): Boolean
@@ -92,6 +93,12 @@ interface LearningInsightRepository {
 
 interface TokenUsageRepository {
     suspend fun saveUsage(record: TokenUsageRecord): TokenUsageRecord
+}
+
+interface WidgetLayoutRepository {
+    suspend fun load(spaceId: String): List<WidgetLayoutPreference>
+    suspend fun saveLayout(spaceId: String, preferences: List<WidgetLayoutPreference>)
+    suspend fun reset(spaceId: String)
 }
 
 interface GlobalSearchRepository {

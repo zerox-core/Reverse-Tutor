@@ -105,6 +105,9 @@ interface LearningDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertWidgetPreference(preference: WidgetLayoutPreferenceEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertWidgetPreferences(preferences: List<WidgetLayoutPreferenceEntity>)
+
     @Query("SELECT * FROM study_plan_tasks WHERE spaceId = :spaceId ORDER BY updatedAtEpochMillis DESC")
     suspend fun listPlanTasks(spaceId: String): List<StudyPlanTaskEntity>
 
@@ -133,6 +136,9 @@ interface LearningDao {
 
     @Query("SELECT * FROM widget_layout_preferences WHERE spaceId = :spaceId ORDER BY `order` ASC")
     suspend fun listWidgetPreferences(spaceId: String): List<WidgetLayoutPreferenceEntity>
+
+    @Query("DELETE FROM widget_layout_preferences WHERE spaceId = :spaceId")
+    suspend fun deleteWidgetPreferences(spaceId: String): Int
 
     @Query("DELETE FROM study_plan_tasks WHERE sourceSessionId = :sessionId")
     suspend fun deletePlanTasksBySession(sessionId: String): Int

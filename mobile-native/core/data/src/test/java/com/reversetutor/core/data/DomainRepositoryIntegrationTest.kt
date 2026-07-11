@@ -1,6 +1,7 @@
 package com.reversetutor.core.data
 
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
+import com.reversetutor.core.data.learning.WidgetLayoutRepositoryImpl
 import com.reversetutor.core.data.model.ModelConnectionRepositoryImpl
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
 import com.reversetutor.core.data.search.RoomGlobalSearchRepository
@@ -13,6 +14,7 @@ import com.reversetutor.core.domain.ModelConnectionRepository
 import com.reversetutor.core.domain.StudyPlanRepository
 import com.reversetutor.core.domain.SyncRepository
 import com.reversetutor.core.domain.TokenUsageRepository
+import com.reversetutor.core.domain.WidgetLayoutRepository
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,6 +27,7 @@ class DomainRepositoryIntegrationTest {
         assertAssignable<StudyPlanRepository, LearningRepositoryImpl>()
         assertAssignable<LearningInsightRepository, LearningRepositoryImpl>()
         assertAssignable<TokenUsageRepository, LearningRepositoryImpl>()
+        assertAssignable<WidgetLayoutRepository, WidgetLayoutRepositoryImpl>()
         assertAssignable<GlobalSearchRepository, RoomGlobalSearchRepository>()
         assertAssignable<SyncRepository, RoomSyncRepository>()
     }
