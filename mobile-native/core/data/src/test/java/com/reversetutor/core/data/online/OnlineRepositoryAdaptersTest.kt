@@ -60,10 +60,10 @@ class OnlineRepositoryAdaptersTest {
     }
 
     @Test
-    fun syncRejectsLocalOnlyEntityBeforeCallingApi() = runBlocking {
+    fun syncRejectsWidgetLayoutBeforeCallingApi() = runBlocking {
         val api = FakeOnlineApi()
 
-        val result = OnlineSyncTransport(api).push(envelope(entityType = "chat_message"))
+        val result = OnlineSyncTransport(api).push(envelope(entityType = "widget_layout"))
 
         assertEquals(
             SyncPushResult.Rejected("entity_type_not_syncable", retryable = false),

@@ -63,6 +63,7 @@ class ConversationRunCoordinatorTest {
         assertEquals(original.turnId, retry.turnId)
         assertEquals(1, retry.attempt)
         assertEquals(original.modelBindingId, retry.modelBindingId)
+        assertEquals(original.contextVersion, retry.contextVersion)
         assertEquals(original.contextSnapshotId, retry.contextSnapshotId)
 
         val late = coordinator.completeRun(
