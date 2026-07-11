@@ -18,6 +18,7 @@ data class LlmGenerationRequest(
     val capabilities: LlmCapabilities,
     val token: LlmGenerationToken,
     val secretRef: String? = null,
+    val streaming: Boolean = true,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList()
@@ -147,7 +148,8 @@ class FakeLlmGenerationRuntime(
 
 enum class LlmProviderProtocol {
     OpenAiCompatible,
-    AnthropicCompatible
+    AnthropicCompatible,
+    GeminiNative
 }
 
 data class LlmProviderPayload(
@@ -169,7 +171,7 @@ class OpenAiCompatibleGenerationRuntime : LlmGenerationRuntime {
                 "messages" to listOf(
                     mapOf("role" to "user", "content" to request.openAiUserContent())
                 ),
-                "stream" to true
+                "stream" to request.streaming
             )
         )
 
@@ -187,10 +189,11 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
             endpoint = request.baseUrl.orEmpty().trimEnd('/') + "/messages",
             body = mapOf(
                 "model" to request.model,
+                "max_tokens" to 2048,
                 "messages" to listOf(
                     mapOf("role" to "user", "content" to request.anthropicUserContent())
                 ),
-                "stream" to true
+                "stream" to request.streaming
             )
         )
 
