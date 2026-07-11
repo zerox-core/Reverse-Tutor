@@ -45,3 +45,16 @@ enum class ModelAvailability {
     RateLimited,
     ProviderUnavailable
 }
+
+data class ModelCapabilityState(
+    val text: ModelCapabilitySupport = ModelCapabilitySupport.Unknown,
+    val image: ModelCapabilitySupport = ModelCapabilitySupport.Unknown,
+    val streaming: ModelCapabilitySupport = ModelCapabilitySupport.Unknown,
+    val tools: ModelCapabilitySupport = ModelCapabilitySupport.Unknown
+)
+
+enum class ModelCapabilitySupport {
+    Supported,
+    Unsupported,
+    Unknown
+}

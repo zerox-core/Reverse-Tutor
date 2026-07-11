@@ -140,4 +140,64 @@ class HybridArchitectureModelsTest {
         assertEquals(DomainErrorCode.ProviderUnavailable, error.code)
         assertEquals(DomainUserAction.Retry, error.userAction)
     }
+
+    @Test
+    fun modelCapabilitiesUseProviderIndependentThreeStateValues() {
+        val capabilities = ModelCapabilityState(
+            text = ModelCapabilitySupport.Supported,
+            image = ModelCapabilitySupport.Unsupported,
+            streaming = ModelCapabilitySupport.Supported
+        )
+
+        assertEquals(ModelCapabilitySupport.Supported, capabilities.text)
+        assertEquals(ModelCapabilitySupport.Unsupported, capabilities.image)
+        assertEquals(ModelCapabilitySupport.Supported, capabilities.streaming)
+        assertEquals(ModelCapabilitySupport.Unknown, capabilities.tools)
+    }
+
+    @Test
+    fun widgetLayoutPreferenceContainsOnlyStableLayoutValues() {
+        val preference = WidgetLayoutPreference(
+            spaceId = "space-1",
+            widgetId = "weekly-summary",
+            order = 2,
+            hidden = true,
+            size = WidgetSize.FullWidth,
+            updatedAtEpochMillis = 500L
+        )
+
+        assertEquals("space-1", preference.spaceId)
+        assertEquals("weekly-summary", preference.widgetId)
+        assertEquals(2, preference.order)
+        assertTrue(preference.hidden)
+        assertEquals(WidgetSize.FullWidth, preference.size)
+        assertEquals(500L, preference.updatedAtEpochMillis)
+    }
+
+    @Test
+    fun searchTargetExpressesEntityAndOptionalNavigationLocation() {
+        val target = SearchTarget(
+            type = SearchTargetType.Message,
+            entityId = "message-1",
+            parentEntityId = "turn-1",
+            sessionId = "session-1"
+        )
+
+        assertEquals(SearchTargetType.Message, target.type)
+        assertEquals("message-1", target.entityId)
+        assertEquals("turn-1", target.parentEntityId)
+        assertEquals("session-1", target.sessionId)
+        assertNull(target.spaceId)
+        assertEquals(
+            setOf(
+                SearchTargetType.Session,
+                SearchTargetType.Message,
+                SearchTargetType.Source,
+                SearchTargetType.Memory,
+                SearchTargetType.GraphNode,
+                SearchTargetType.StudyPlan
+            ),
+            SearchTargetType.entries.toSet()
+        )
+    }
 }
