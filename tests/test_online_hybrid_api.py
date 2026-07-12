@@ -91,6 +91,7 @@ async def test_sync_push_isolates_invalid_or_failed_items(client):
             "cursor": None,
             "items": [
                 {
+                    "envelopeId": "env-ok",
                     "entityId": "plan-1",
                     "entityType": "study_plan",
                     "revision": 1,
@@ -98,6 +99,7 @@ async def test_sync_push_isolates_invalid_or_failed_items(client):
                     "payload": {"completed": True},
                 },
                 {
+                    "envelopeId": "env-rejected",
                     "entityId": "message-1",
                     "entityType": "chat_message",
                     "revision": 1,
@@ -110,8 +112,21 @@ async def test_sync_push_isolates_invalid_or_failed_items(client):
 
     assert response.status_code == 200
     body = response.json()
-    assert [item["status"] for item in body["items"]] == ["accepted", "rejected"]
-    assert body["items"][1]["errorCode"] == "entity_type_not_syncable"
+    assert body["items"][0] == {
+        "envelopeId": "env-ok",
+        "entityId": "plan-1",
+        "accepted": True,
+        "remoteRevision": 2,
+        "retryable": False,
+    }
+    assert body["items"][1] == {
+        "envelopeId": "env-rejected",
+        "entityId": "message-1",
+        "accepted": False,
+        "errorCode": "entity_type_not_syncable",
+        "retryable": False,
+    }
+    assert all("status" not in item for item in body["items"])
 
 
 async def test_sync_push_isolates_unexpected_item_failure(client, monkeypatch):
@@ -130,12 +145,14 @@ async def test_sync_push_isolates_unexpected_item_failure(client, monkeypatch):
             "deviceId": "device-1",
             "items": [
                 {
+                    "envelopeId": "env-fail",
                     "entityId": "plan-fail",
                     "entityType": "study_plan",
                     "revision": 1,
                     "idempotencyKey": "sync-fail",
                 },
                 {
+                    "envelopeId": "env-ok",
                     "entityId": "plan-ok",
                     "entityType": "study_plan",
                     "revision": 1,
@@ -146,11 +163,14 @@ async def test_sync_push_isolates_unexpected_item_failure(client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert [item["status"] for item in response.json()["items"]] == [
-        "failed",
-        "accepted",
-    ]
-    assert response.json()["items"][0]["retryable"] is True
+    assert response.json()["items"][0] == {
+        "envelopeId": "env-fail",
+        "entityId": "plan-fail",
+        "accepted": False,
+        "errorCode": "temporary_sync_failure",
+        "retryable": True,
+    }
+    assert response.json()["items"][1]["accepted"] is True
 
 
 async def test_sync_push_reuses_idempotent_result_and_pull_returns_cursor(client):
@@ -159,6 +179,7 @@ async def test_sync_push_reuses_idempotent_result_and_pull_returns_cursor(client
         "deviceId": "device-1",
         "items": [
             {
+                "envelopeId": "env-sync-1",
                 "entityId": "plan-1",
                 "entityType": "study_plan",
                 "revision": 1,

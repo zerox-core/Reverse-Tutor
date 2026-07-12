@@ -30,6 +30,7 @@ class ActivityProgressRequest(OnlineWriteIdentity):
 
 
 class SyncItem(CamelModel):
+    envelope_id: str = Field(min_length=1)
     entity_id: str = Field(min_length=1)
     entity_type: str = Field(min_length=1)
     revision: int = Field(ge=0)

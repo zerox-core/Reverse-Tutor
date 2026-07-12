@@ -125,8 +125,9 @@ class OnlineHybridService:
                 results.append(self._push_sync_item(request, item))
             except Exception:
                 results.append({
+                    "envelopeId": item.envelope_id,
                     "entityId": item.entity_id,
-                    "status": "failed",
+                    "accepted": False,
                     "errorCode": "temporary_sync_failure",
                     "retryable": True,
                 })
@@ -143,8 +144,9 @@ class OnlineHybridService:
         with self._lock:
             if item.entity_type not in SYNCABLE_ENTITY_TYPES:
                 return {
+                    "envelopeId": item.envelope_id,
                     "entityId": item.entity_id,
-                    "status": "rejected",
+                    "accepted": False,
                     "errorCode": "entity_type_not_syncable",
                     "retryable": False,
                 }
@@ -164,8 +166,9 @@ class OnlineHybridService:
             }
             self._sync_records.append(record)
             result = {
+                "envelopeId": item.envelope_id,
                 "entityId": item.entity_id,
-                "status": "accepted",
+                "accepted": True,
                 "remoteRevision": remote_revision,
                 "retryable": False,
             }
