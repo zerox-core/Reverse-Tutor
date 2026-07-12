@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 3
+    const val version = 4
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -34,7 +34,14 @@ object DatabaseSchema {
         }
     }
 
-    val migrations: Array<Migration> = arrayOf(migration1To2, migration2To3)
+    val migration3To4: Migration = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            worldTreeTableSql.forEach(db::execSQL)
+            worldTreeIndexSql.forEach(db::execSQL)
+        }
+    }
+
+    val migrations: Array<Migration> = arrayOf(migration1To2, migration2To3, migration3To4)
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
         hybridTableSql.forEach(db::execSQL)
@@ -350,6 +357,60 @@ object DatabaseSchema {
         "CREATE INDEX IF NOT EXISTS index_entity_tombstones_entityType ON entity_tombstones(entityType)",
         "CREATE INDEX IF NOT EXISTS index_entity_tombstones_entityId ON entity_tombstones(entityId)",
         "CREATE INDEX IF NOT EXISTS index_entity_tombstones_deletedAtEpochMillis ON entity_tombstones(deletedAtEpochMillis)"
+    )
+
+    private val worldTreeTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS world_tree_drafts (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            sessionId TEXT,
+            templateId TEXT,
+            title TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            schemaVersion INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id),
+            FOREIGN KEY(spaceId) REFERENCES spaces(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+            FOREIGN KEY(sessionId) REFERENCES sessions(id) ON UPDATE NO ACTION ON DELETE SET NULL
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS world_tree_sections (
+            id TEXT NOT NULL,
+            draftId TEXT NOT NULL,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            orderIndex INTEGER NOT NULL,
+            payloadJson TEXT NOT NULL,
+            required INTEGER NOT NULL,
+            completed INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id),
+            FOREIGN KEY(draftId) REFERENCES world_tree_drafts(id) ON UPDATE NO ACTION ON DELETE CASCADE
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS world_tree_source_cross_ref (
+            draftId TEXT NOT NULL,
+            sourceId TEXT NOT NULL,
+            orderIndex INTEGER NOT NULL,
+            PRIMARY KEY(draftId, sourceId),
+            FOREIGN KEY(draftId) REFERENCES world_tree_drafts(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+            FOREIGN KEY(sourceId) REFERENCES sources(id) ON UPDATE NO ACTION ON DELETE RESTRICT
+        )
+        """.trimIndent()
+    )
+
+    private val worldTreeIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_world_tree_drafts_spaceId ON world_tree_drafts(spaceId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_world_tree_drafts_sessionId ON world_tree_drafts(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_world_tree_sections_draftId ON world_tree_sections(draftId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_world_tree_sections_draftId_orderIndex ON world_tree_sections(draftId, orderIndex)",
+        "CREATE INDEX IF NOT EXISTS index_world_tree_source_cross_ref_sourceId ON world_tree_source_cross_ref(sourceId)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS index_world_tree_source_cross_ref_draftId_orderIndex ON world_tree_source_cross_ref(draftId, orderIndex)"
     )
 }
 

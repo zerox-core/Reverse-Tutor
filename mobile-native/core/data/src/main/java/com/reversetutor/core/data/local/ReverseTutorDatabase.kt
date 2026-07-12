@@ -20,6 +20,7 @@ import com.reversetutor.core.data.local.dao.SourceDao
 import com.reversetutor.core.data.local.dao.SpaceDao
 import com.reversetutor.core.data.local.dao.SyncDao
 import com.reversetutor.core.data.local.dao.TurnRunDao
+import com.reversetutor.core.data.local.dao.WorldTreeDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
 import com.reversetutor.core.data.local.entity.ErrorLogEntity
@@ -51,6 +52,9 @@ import com.reversetutor.core.data.local.entity.TokenUsageRecordEntity
 import com.reversetutor.core.data.local.entity.TurnRunEntity
 import com.reversetutor.core.data.local.entity.WeeklySummaryEntity
 import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
+import com.reversetutor.core.data.local.entity.WorldTreeDraftEntity
+import com.reversetutor.core.data.local.entity.WorldTreeSectionEntity
+import com.reversetutor.core.data.local.entity.WorldTreeSourceCrossRef
 
 @Database(
     entities = [
@@ -84,7 +88,10 @@ import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
         SyncOutboxEntity::class,
         SyncCursorEntity::class,
         SyncConflictEntity::class,
-        EntityTombstoneEntity::class
+        EntityTombstoneEntity::class,
+        WorldTreeDraftEntity::class,
+        WorldTreeSectionEntity::class,
+        WorldTreeSourceCrossRef::class
     ],
     version = DatabaseSchema.version,
     exportSchema = DatabaseSchema.exportSchema
@@ -108,4 +115,5 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun learningDao(): LearningDao
     abstract fun searchDocumentDao(): SearchDocumentDao
     abstract fun syncDao(): SyncDao
+    abstract fun worldTreeDao(): WorldTreeDao
 }

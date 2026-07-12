@@ -19,22 +19,26 @@ import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
+import com.reversetutor.core.data.local.entity.WorldTreeDraftEntity
+import com.reversetutor.core.data.local.entity.WorldTreeSectionEntity
+import com.reversetutor.core.data.local.entity.WorldTreeSourceCrossRef
 import com.reversetutor.core.data.local.entity.toDomain
 import com.reversetutor.core.data.local.entity.toEntity
 import com.reversetutor.core.model.Space
 import com.reversetutor.core.model.SpaceKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SchemaPolicyTest {
     @Test
-    fun databaseSchemaExportsVersionThreeWithCompleteMigrationChain() {
-        assertEquals(3, DatabaseSchema.version)
+    fun databaseSchemaExportsVersionFourWithCompleteMigrationChain() {
+        assertEquals(4, DatabaseSchema.version)
         assertTrue(DatabaseSchema.exportSchema)
-        assertEquals(2, DatabaseSchema.migrations.size)
-        assertEquals(listOf(1, 2), DatabaseSchema.migrations.map { it.startVersion })
-        assertEquals(listOf(2, 3), DatabaseSchema.migrations.map { it.endVersion })
+        assertEquals(3, DatabaseSchema.migrations.size)
+        assertEquals(listOf(1, 2, 3), DatabaseSchema.migrations.map { it.startVersion })
+        assertEquals(listOf(2, 3, 4), DatabaseSchema.migrations.map { it.endVersion })
     }
 
     @Test
@@ -56,7 +60,8 @@ class SchemaPolicyTest {
             SourceChunkEntity::class.java,
             BackgroundJobEntity::class.java,
             ImportBatchEntity::class.java,
-            ExportRecordEntity::class.java
+            ExportRecordEntity::class.java,
+            WorldTreeDraftEntity::class.java
         )
 
         entityTypes.forEach { entityType ->
@@ -65,6 +70,16 @@ class SchemaPolicyTest {
                 entityType.declaredFields.any { it.name == "spaceId" }
             )
         }
+    }
+
+    @Test
+    fun worldTreeChildrenDeriveSpaceOwnershipFromDraft() {
+        assertFalse(
+            WorldTreeSectionEntity::class.java.declaredFields.any { it.name == "spaceId" }
+        )
+        assertFalse(
+            WorldTreeSourceCrossRef::class.java.declaredFields.any { it.name == "spaceId" }
+        )
     }
 
     @Test
