@@ -32,8 +32,8 @@ interface WorldTreeDao {
     @Query("SELECT sourceId FROM world_tree_source_cross_ref WHERE draftId = :draftId ORDER BY orderIndex")
     suspend fun listSourceIds(draftId: String): List<String>
 
-    @Query("SELECT COUNT(*) FROM sources WHERE id IN (:sourceIds)")
-    suspend fun countSources(sourceIds: List<String>): Int
+    @Query("SELECT COUNT(*) FROM sources WHERE spaceId = :spaceId AND id IN (:sourceIds)")
+    suspend fun countSourcesInSpace(spaceId: String, sourceIds: List<String>): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertDraft(draft: WorldTreeDraftEntity)

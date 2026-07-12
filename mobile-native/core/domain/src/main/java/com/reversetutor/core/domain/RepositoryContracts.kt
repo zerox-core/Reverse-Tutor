@@ -12,6 +12,10 @@ import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
 import com.reversetutor.core.model.WeeklySummary
 import com.reversetutor.core.model.WidgetLayoutPreference
+import com.reversetutor.core.model.CreateWorldTreeDraftCommand
+import com.reversetutor.core.model.WorldTreeDraft
+import com.reversetutor.core.model.WorldTreeSection
+import kotlinx.coroutines.flow.Flow
 
 interface SessionRepository {
     suspend fun sessionExists(sessionId: String): Boolean
@@ -99,6 +103,39 @@ interface WidgetLayoutRepository {
     suspend fun load(spaceId: String): List<WidgetLayoutPreference>
     suspend fun saveLayout(spaceId: String, preferences: List<WidgetLayoutPreference>)
     suspend fun reset(spaceId: String)
+}
+
+interface WorldTreeRepository {
+    fun observeDraft(draftId: String): Flow<WorldTreeDraft?>
+    suspend fun getDraft(draftId: String): WorldTreeDraft?
+    suspend fun createDraft(command: CreateWorldTreeDraftCommand): WorldTreeDraft
+    suspend fun updateTitle(draftId: String, title: String, nowEpochMillis: Long): WorldTreeDraft
+    suspend fun upsertSection(
+        draftId: String,
+        section: WorldTreeSection,
+        nowEpochMillis: Long
+    ): WorldTreeDraft
+    suspend fun reorderSections(
+        draftId: String,
+        sectionIds: List<String>,
+        nowEpochMillis: Long
+    ): WorldTreeDraft
+    suspend fun removeCustomSection(
+        draftId: String,
+        sectionId: String,
+        nowEpochMillis: Long
+    ): WorldTreeDraft
+    suspend fun replaceSourceLinks(
+        draftId: String,
+        sourceIds: List<String>,
+        nowEpochMillis: Long
+    ): WorldTreeDraft
+    suspend fun attachToSession(
+        draftId: String,
+        sessionId: String,
+        nowEpochMillis: Long
+    ): WorldTreeDraft
+    suspend fun archive(draftId: String, nowEpochMillis: Long)
 }
 
 interface GlobalSearchRepository {

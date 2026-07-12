@@ -29,6 +29,7 @@ import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.data.wipe.RoomLocalDataWipeStore
+import com.reversetutor.core.data.worldtree.RoomWorldTreeRepository
 import com.reversetutor.core.llm.CompositeLlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmSecretResolver
@@ -179,4 +180,7 @@ object DataModule {
             sessionDao = database.sessionDao()
         )
     }
+
+    fun worldTreeRepository(context: Context): RoomWorldTreeRepository =
+        RoomWorldTreeRepository(database(context.applicationContext))
 }
