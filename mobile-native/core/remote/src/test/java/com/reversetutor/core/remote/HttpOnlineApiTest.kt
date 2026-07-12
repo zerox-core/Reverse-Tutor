@@ -74,7 +74,7 @@ class HttpOnlineApiTest {
         val transport = FakeTransport(
             OnlineHttpResponse(
                 200,
-                """{"cursor":"7","items":[{"entityId":"plan-1","status":"accepted","remoteRevision":8,"retryable":false}]}"""
+                """{"cursor":"7","items":[{"envelopeId":"envelope-1","entityId":"plan-1","accepted":true,"remoteRevision":8,"errorCode":null,"retryable":false}]}"""
             )
         )
         val api = HttpOnlineApi("https://online.example", transport)
@@ -104,6 +104,23 @@ class HttpOnlineApiTest {
         val body = transport.requests.single().body.orEmpty()
         assertTrue(body.contains(""""entityType":"study_plan""""))
         assertTrue(body.contains(""""payload":{"completed":true}"""))
+    }
+
+    @Test
+    fun syncPushRejectsLegacyStatusResponse() = runBlocking {
+        val transport = FakeTransport(
+            OnlineHttpResponse(
+                200,
+                """{"cursor":"7","items":[{"entityId":"plan-1","status":"accepted","remoteRevision":8,"retryable":false}]}"""
+            )
+        )
+        val api = HttpOnlineApi("https://online.example", transport)
+
+        val result = api.pushSync(
+            SyncPushRequest("user-1", "device-1", listOf(envelope()))
+        )
+
+        assertEquals(OnlineResult.Failure("protocol_error", false), result)
     }
 
     @Test

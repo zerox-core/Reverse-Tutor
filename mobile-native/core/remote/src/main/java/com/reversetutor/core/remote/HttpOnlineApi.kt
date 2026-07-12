@@ -94,20 +94,15 @@ class HttpOnlineApi(
             return OnlineResult.Failure("protocol_error", retryable = false)
         }
         return post("/api/v1/sync/push", body) { response ->
-            val envelopesByEntity = syncableItems.groupBy { it.entityId }
-                .mapValues { (_, envelopes) -> ArrayDeque(envelopes) }
             val items = response.requiredArray("items").map { itemValue ->
                 val item = itemValue.jsonObject
-                val entityId = item.requiredString("entityId")
-                val envelope = envelopesByEntity[entityId]?.removeFirstOrNull()
-                val status = item.requiredString("status")
                 SyncPushItemResult(
-                    envelopeId = envelope?.id ?: entityId,
-                    entityId = entityId,
-                    accepted = status == "accepted",
+                    envelopeId = item.requiredString("envelopeId"),
+                    entityId = item.requiredString("entityId"),
+                    accepted = item.requiredBoolean("accepted"),
                     remoteRevision = item.optionalLong("remoteRevision"),
                     errorCode = item.optionalString("errorCode"),
-                    retryable = item.optionalBoolean("retryable") ?: false
+                    retryable = item.requiredBoolean("retryable")
                 )
             } + rejected
             SyncPushResponse(
@@ -316,6 +311,9 @@ private fun JsonObject.optionalLong(name: String): Long? =
 
 private fun JsonObject.optionalBoolean(name: String): Boolean? =
     get(name)?.takeUnless { it is JsonNull }?.jsonPrimitive?.booleanOrNull
+
+private fun JsonObject.requiredBoolean(name: String): Boolean =
+    getValue(name).jsonPrimitive.booleanOrNull ?: error("Expected boolean: $name")
 
 private fun JsonObject.requiredArray(name: String): JsonArray =
     getValue(name) as? JsonArray ?: error("Expected array: $name")
