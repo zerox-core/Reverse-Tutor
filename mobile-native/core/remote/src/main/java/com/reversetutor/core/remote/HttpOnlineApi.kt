@@ -249,6 +249,7 @@ private fun SyncPushRequest.toJson(json: Json): JsonObject = buildJsonObject {
     put("items", buildJsonArray {
         items.forEach { envelope ->
             add(buildJsonObject {
+                put("envelopeId", envelope.id)
                 put("entityId", envelope.entityId)
                 put("entityType", envelope.entityType)
                 put("revision", envelope.revision)

@@ -102,6 +102,7 @@ class HttpOnlineApiTest {
             result
         )
         val body = transport.requests.single().body.orEmpty()
+        assertTrue(body.contains(""""envelopeId":"envelope-1""""))
         assertTrue(body.contains(""""entityType":"study_plan""""))
         assertTrue(body.contains(""""payload":{"completed":true}"""))
     }
