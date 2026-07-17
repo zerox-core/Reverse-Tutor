@@ -82,36 +82,39 @@ The first public native replacement release must cover:
 
 ## Source Type Status Matrix
 
-To be filled during ARCH/source module design.
+Updated for `NATIVE-P5-008` Phase 5 preview validation. This records current native preview behavior only; it does not close Phase 6 source parity.
 
-| Source Type | Current Legacy Support | Native Target | Phase-One Status |
-|---|---|---|---|
-| Existing export JSON | Full backup/session/graph/preset import-export | Native import/export protocol | Required |
-| PDF | Import as source | Local if feasible, otherwise parser-status fallback | TBD |
-| DOCX | Import as source | Local if feasible, otherwise parser-status fallback | TBD |
-| TXT | Import as source | Local text extraction | Required |
-| Markdown | Import as source | Local text extraction | Required |
-| HTML | Import as source | Local text extraction/sanitization | TBD |
-| PPTX | Import as source | Local if feasible, otherwise parser-status fallback | TBD |
-| EPUB | Import as source | Local if feasible, otherwise parser-status fallback | TBD |
-| Images | Image source and chat attachment | Native image storage and model-capability handling | Required for attachment; source analysis TBD |
+| Source Type | Current Legacy Support | Native Target | Phase 5 Native Preview Status | Replacement Risk |
+|---|---|---|---|---|
+| Existing export JSON | Full backup/session/graph/preset import-export | Native import/export protocol | Handled by Phase 4 import/export flows; Source Library keeps JSON exports as `queued_for_future_api` reference material rather than parsing them as sources. | Keep import/export parity in LEG-031/LEG-032 Phase 6 validation. |
+| PDF | Import as source | Local if feasible, otherwise parser-status fallback | `queued_for_future_api`; file remains visible and recoverable, with no local text chunks yet. | P0 source parity remains blocked until complex parser/device matrix is complete. |
+| DOCX | Import as source | Local if feasible, otherwise parser-status fallback | `queued_for_future_api`; file remains visible and recoverable, with no local text chunks yet. | P0 source parity remains blocked until complex parser/device matrix is complete. |
+| TXT | Import as source | Local text extraction | `supported_local`; local chunks/snippets and reprocess path are available. | Needs Phase 6 citation/highlight parity. |
+| Markdown | Import as source | Local text extraction | `supported_local`; lightweight Markdown syntax is stripped into local chunks/snippets. | Needs Phase 6 citation/highlight parity. |
+| HTML | Import as source | Local text extraction/sanitization | `partial_local`; script/style/comment markup is stripped and warnings are shown. | Needs richer parser validation before replacement. |
+| PPTX | Import as source | Local if feasible, otherwise parser-status fallback | `queued_for_future_api`; file remains visible and recoverable, with no local text chunks yet. | P0 source parity remains blocked until complex parser/device matrix is complete. |
+| EPUB | Import as source | Local if feasible, otherwise parser-status fallback | `queued_for_future_api`; file remains visible and recoverable, with no local text chunks yet. | P0 source parity remains blocked until complex parser/device matrix is complete. |
+| Images | Image source and chat attachment | Native image storage and model-capability handling | Source Library stores image records as `queued_for_future_api`; chat attachments persist URI/mime/name/sourceId and generation is gated by vision capability. | Real multimodal provider execution and dedicated image-picker device smoke remain pending. |
 
 ## Graph Parity Checklist
 
-The replacement release should not be approved until this list is completed or explicitly waived.
+Updated for `NATIVE-P5-008` Phase 5 preview validation. The replacement release should not be approved until this list is completed or explicitly waived.
 
-- Pan graph canvas
-- Zoom graph canvas
-- Select node
-- Deselect node
-- Bottom-sheet node detail
-- Expand/collapse detail where applicable
-- Related chat/source jump
-- Semantic fragment/card review
-- Node edit/save where currently available
-- Global graph read-only browsing
-- Per-session graph browsing
-- Empty, loading, large graph, and invalid graph states
+| Capability | Phase 5 Native Preview Status | Evidence | Replacement Risk |
+|---|---|---|---|
+| Pan graph canvas | Implemented in native Compose Canvas transform gestures. | `KnowledgeGraphPanel.NativeGraphCanvas`; `Phase5GraphDeviceTest`; `KnowledgeGraphUiStateTest`. | Needs broader Phase 6 gesture/device matrix. |
+| Zoom graph canvas | Implemented in native Compose Canvas transform gestures. | `KnowledgeGraphPanel.NativeGraphCanvas`; `Phase5GraphDeviceTest`; `KnowledgeGraphUiStateTest`. | Needs broader Phase 6 gesture/device matrix. |
+| Reset/fit graph view | Basic `Reset view` control is present. | `Phase5GraphDeviceTest` checks control visibility. | Fit-to-selection and clustering controls remain follow-up. |
+| Select node | Implemented by canvas tap and non-canvas node list chips. | `KnowledgeGraphUiState.hitTest`; `Phase5GraphDeviceTest`. | Exact large-graph selection QA remains Phase 6. |
+| Deselect node | Implemented through clear/close detail and chip reselect behavior. | `KnowledgeGraphPanel.GraphNodeDetail`; `KnowledgeGraphUiState.withSelection`. | Needs final interaction QA. |
+| Bottom-sheet node detail | Implemented as native inline detail panel, not a modal bottom sheet. | `KnowledgeGraphPanel.GraphNodeDetail`; `Phase5GraphDeviceTest`. | Sheet-vs-inline parity decision remains open before replacement. |
+| Expand/collapse detail where applicable | Not implemented as a separate expand/collapse state. | Current detail panel always renders available details. | Requires Phase 6 parity decision or waiver. |
+| Related chat/source jump | Implemented as route handoff labels and navigation targets. | `ContextHubRoute` graph evidence callbacks; `ChatRoute`/`SourcesRoute` evidence target labels; `Phase5GraphDeviceTest`. | Exact target row highlighting and clickable citation parity remain open. |
+| Semantic fragment/card review | Partial: memory-backed review cards and NeedsReview actions exist. | `GraphLayoutNode.reviewCards`; `Phase5GraphDeviceTest`. | Full legacy semantic deck/review parity remains open. |
+| Node edit/save where currently available | Implemented for session graph node labels and review status actions. | `GraphRepository.updateNode`; `KnowledgeGraphPanel.GraphNodeDetail`; `Phase5GraphDeviceTest`. | Schema richness and broader edit parity remain Phase 6 work. |
+| Global graph read-only browsing | Implemented as a native global graph route with read-only review. | `GlobalGraphRoute`; `Phase5GraphDeviceTest`. | True global insights/aggregation remain open. |
+| Per-session graph browsing | Implemented as session route display using current graph snapshot. | `ContextHubRoute`; `Phase5GraphDeviceTest`. | True session-scoped graph projection remains open. |
+| Empty, loading, large graph, and invalid graph states | Implemented in `KnowledgeGraphUiState`; UI explains native interaction and node-list fallback. | `KnowledgeGraphUiStateTest`; Context Hub state tests. | Needs screenshot/device matrix for large/invalid states. |
 
 ## Device Validation Matrix
 

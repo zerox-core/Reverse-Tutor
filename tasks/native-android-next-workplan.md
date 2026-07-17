@@ -7,7 +7,7 @@ Current baseline: Phase 4 import/export/prompt foundations are implemented, `NAT
 ## Current Gate Snapshot
 
 - Coverage registry rows: `LEG-001` through `LEG-044`.
-- Current status summary: `verified=4`, `in_progress=37`, `not_started=3`.
+- Current status summary: `verified=4`, `in_progress=38`, `not_started=2`.
 - Current P0 replacement blockers: `28`.
 - Replacement readiness: not achieved.
 - PWA exit decision: not eligible until Phase 6 evidence and explicit user approval.

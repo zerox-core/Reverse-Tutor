@@ -1054,10 +1054,12 @@
     border: 0 !important;
   }
   .insights-graph-page {
+    flex: 1;
     height: 100%;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    width: 100%;
     padding: 0;
   }
   .insights-graph-canvas,
@@ -1065,7 +1067,14 @@
     flex: 1;
     min-height: 0;
     height: 100%;
+    display: flex;
+    flex-direction: column;
     padding: 0 !important;
+  }
+  .insights-graph-canvas > .knowledge-graph,
+  .context-graph-body > .knowledge-graph {
+    flex: 1;
+    width: 100%;
   }
   .insight-kb-strip {
     display: grid;
@@ -2109,7 +2118,7 @@
   </section>
 
   <!-- 洞察 view -->
-  <section data-view="insights" class="view flex-1 min-h-0 hidden">
+  <section data-view="insights" class="view flex-1 min-h-0 flex flex-col hidden">
     <div class="insights-graph-page">
       <div id="insights-summary" class="hidden"></div>
       <div id="insights-mastery" class="insights-graph-canvas"></div>
@@ -2278,7 +2287,7 @@
       <div class="text-[10px] text-neutral-600 text-center pt-2">
         <div class="text-neutral-500">欢迎入qq群反馈给我更新动力</div>
         <div class="text-neutral-400 font-mono text-[11px] mt-1">QQ群：897804938</div>
-        <div class="mt-3">Reverse Tutor v0.19.6 · 移动 PWA</div>
+        <div class="mt-3">Reverse Tutor v0.19.6-graph-cards-test · 移动 PWA</div>
         <div>所有数据保存在本机浏览器（IndexedDB）</div>
       </div>
     </div>
@@ -2680,8 +2689,8 @@ function refreshIcons() {
   });
 }
 
-const APP_VERSION_CODE = 45;
-const APP_VERSION_NAME = '0.19.6';
+const APP_VERSION_CODE = 49;
+const APP_VERSION_NAME = '0.19.6-graph-cards-test';
 const DEFAULT_UPDATE_FEED_URL = 'https://dl.zeroxcore.tech/reverse-tutor/latest.json';
 const GITHUB_UPDATE_FEED_URL = 'https://raw.githubusercontent.com/zhuxice-ctrl/Reverse-Tutor/main/static/app/latest.json';
 const GITHUB_LATEST_RELEASE_URL = 'https://api.github.com/repos/zhuxice-ctrl/Reverse-Tutor/releases/latest';
@@ -3392,22 +3401,16 @@ function normalizeUpdateInfo(raw) {
 }
 
 function isNewerUpdate(info) {
+  const currentIsPrerelease = /[-](test|alpha|beta|rc|dev)/i.test(APP_VERSION_NAME);
+  const remoteIsPrerelease = /[-](test|alpha|beta|rc|dev)/i.test(info.versionName || '');
   if (info.versionCode && info.versionCode > APP_VERSION_CODE) return true;
-  // 相同 versionCode：正式版优先于预发布版
   if (info.versionCode && info.versionCode === APP_VERSION_CODE) {
-    const currentIsPrerelease = /[-](test|alpha|beta|rc|dev)/i.test(APP_VERSION_NAME);
-    const remoteIsPrerelease = /[-](test|alpha|beta|rc|dev)/i.test(info.versionName || '');
     if (currentIsPrerelease && !remoteIsPrerelease) return true;
   }
   if (!info.versionCode && info.versionName) {
     const cmp = compareVersionName(info.versionName, APP_VERSION_NAME);
     if (cmp > 0) return true;
-    // 同版本号：正式版优先于测试版
-    if (cmp === 0) {
-      const currentIsPrerelease = /[-](test|alpha|beta|rc|dev)/i.test(APP_VERSION_NAME);
-      const remoteIsPrerelease = /[-](test|alpha|beta|rc|dev)/i.test(info.versionName || '');
-      if (currentIsPrerelease && !remoteIsPrerelease) return true;
-    }
+    if (cmp === 0) return false;
   }
   return false;
 }
@@ -4290,6 +4293,34 @@ const LLM = (() => {
     const triggers = ['重点','想搞','想学','想多练','尤其','目标','要考','希望多','希望少','不要','别给'];
     return triggers.some(k => t.includes(k)) ? [t.slice(0,80)] : [];
   }
+  function decodeMockTopicText(t) {
+    let s = String(t || '').trim();
+    if (/%[0-9A-F]{2}/i.test(s)) {
+      try { s = decodeURIComponent(s); } catch (_) {}
+    }
+    return s.replace(/\s+/g, ' ').trim();
+  }
+  function inferMockKnowledgePoint(lastUser, messages, fallbackIndex=0) {
+    const decoded = decodeMockTopicText(lastUser);
+    const compact = decoded.replace(/\s+/g, '');
+    const knownMockTopics = ['Python list comprehension', 'list comprehension'];
+    const lower = decoded.toLowerCase();
+    for (const topic of knownMockTopics) {
+      if (lower.includes(topic.toLowerCase())) return topic;
+    }
+    const techTopic = decoded.match(/列表推导式|Python|JavaScript|TypeScript|React|Vue|SQL|HTML|CSS|bug|报错|语法|函数|循环|变量/i);
+    if (techTopic) return techTopic[0].trim();
+    const topicPatterns = [
+      /(?:什么是|是啥|教你什么是|我要教你|我来教你|接下来我要教你|接下来教你|给你讲|讲一下|解释|explain)\s*([A-Za-z0-9\u4e00-\u9fa5·+# _-]{2,48})/i,
+      /(?:学|学习|了解)\s*([A-Za-z0-9\u4e00-\u9fa5·+# _-]{2,48})/i,
+    ];
+    for (const re of topicPatterns) {
+      const m = decoded.match(re) || compact.match(re);
+      const topic = String(m?.[1] || '').replace(/[。！？!?，,；;：:]+$/g, '').trim();
+      if (topic) return topic.slice(0, 48);
+    }
+    return KP_SEQ[fallbackIndex] || KP_SEQ[0];
+  }
   function pack(action_type, kp, emotion, correctness, depth, reqs, note='mock') {
     const pool = LINES[action_type] || LINES.ask;
     const reply = pool[Math.floor(Math.random()*pool.length)].replace('{kp}', kp);
@@ -4331,7 +4362,7 @@ const LLM = (() => {
       }
     }
     const kp_idx = Math.min(n_next + (intent==='next' ? 1 : 0), KP_SEQ.length - 1);
-    const kp = KP_SEQ[kp_idx];
+    const kp = inferMockKnowledgePoint(last_user, messages, kp_idx);
     let correctness, depth;
     if (['probe','next','emote'].includes(intent)) { correctness = Math.min(0.85, 0.35 + 0.1*userMsgs.length); depth = 0.6; }
     else if (intent === 'persuade') { correctness = 0.1; depth = 0.1; }
@@ -5524,6 +5555,11 @@ const ENGINE = (() => {
       : `你是 "反转家教 AI" 中的"学生 AI"角色。你的核心使命：稳定扮演用户设定的人格，围绕目标推进关系、协作或陪伴；必要时可以请用户帮忙，但不要把普通目标都改造成学习任务。`;
     let s = `${coreMission}
 
+# 老师/学生角色铁律
+- 用户始终是老师，你始终是学生 AI。
+- 如果用户说“我要教你/给你讲/接下来教你”某个主题，这是老师安排接下来要教你的内容，不是角色倒置。
+- 遇到老师要教你的表达，先接受安排并围绕该主题请老师开讲或提一个学生式问题；不能反问“怎么变成你教我了”，不能质疑老师为什么要教你。
+
 # 你的人设
 - 角色: ${p.role||''}
 - 目标: ${p.goal||''}
@@ -5634,6 +5670,7 @@ ${format_actions()}
       : '按用户问题自然展开：轻聊天通常 2 到 5 句、约 120 到 300 个中文字符；解释、列举、复盘或用户让你“说说/展开/什么意思”时要给足信息；只有纯寒暄或用户明确要短答时才 1 句。';
     return `# Post-History Instructions
 - 只写学生 AI 的下一次回复，不写用户/老师的台词，不替用户行动、感受或决定。
+- 用户始终是老师，你始终是学生 AI；用户说“我要教你/给你讲/接下来教你”是在安排要教你的内容，先接受并请老师讲，不能反问“怎么变成你教我了”。
 - 尊重用户自主权：用户说不会、拒绝、索要不现实内容或偏离目标时，先承接情绪，再用角色关系把话题推回一个现实可回应的小目标。
 - 当前 mode: ${mode}。${mode === 'goal_support' ? '不要把非学习目标强行改成教学/知识点讲解；围绕人格、关系和目标自然推进。' : '可以请教、追问或复述，但每次只推进一个具体知识点。'}
 - 如果用户主动偏离主线，先判断关联性：无关时先解决当前问题，弱相关时先回答再自然桥接回目标，强相关时继续推进主线。不要硬拽用户回“中点”。
@@ -6106,12 +6143,81 @@ ${format_actions()}
 
   async function maybe_extract_kg_from_turn(session, sid, userInput, evaluation, action, episodeId) {
     try {
-      if (inferConversationMode(session) !== 'learning') return [];
       const gate = should_extract(session?.settings || {}, userInput || '', evaluation || {}, action || {});
       if (!gate.allowed) return [];
       return await extract_from_turn(sid, { evaluation, action, episodeId });
     } catch (e) {
       console.warn('kg extraction failed', e);
+      return [];
+    }
+  }
+
+  const KG_MASTERY_BACKFILL_PREFIX = 'kg_mastery_backfill_v1:';
+  async function backfill_kg_from_mastery(sid) {
+    if (!sid) return [];
+    const markerKey = `${KG_MASTERY_BACKFILL_PREFIX}${sid}`;
+    if (await DB.kvGet(markerKey)) return [];
+    try {
+      const masteries = (await DB.bySid('mastery', sid))
+        .filter(m => isLogicalGraphKp(m.kp || m.knowledge_point));
+      const existingMasteryKps = new Set(masteries.map(m => String(m.kp || m.knowledge_point || '').trim()));
+      const records = new Map();
+      for (const row of masteries) {
+        const kp = String(row.kp || row.knowledge_point || '').trim();
+        if (kp) records.set(kp, { kp, row, source: 'mastery', episodeId: null });
+      }
+      const messages = await DB.bySid('messages', sid);
+      for (const m of messages) {
+        const kp = String((m.meta || {}).action?.knowledge_point || '').trim();
+        if (!isLogicalGraphKp(kp)) continue;
+        const existing = records.get(kp);
+        if (existing) {
+          if (!existing.episodeId && m.id) existing.episodeId = m.id;
+          continue;
+        }
+        const evaluation = (m.meta || {}).evaluation || {};
+        if (!existingMasteryKps.has(kp)) {
+          await upsert_mastery(sid, kp, +evaluation.correctness || 0, +evaluation.depth || 0,
+            evaluation.evidence_for_mastery?.type || 'none',
+            evaluation.evidence_for_mastery?.status || 'none');
+        }
+        records.set(kp, {
+          kp,
+          row: { level: 0, attempts: 0 },
+          source: 'message_action',
+          episodeId: m.id || null,
+        });
+      }
+      if (!records.size) return [];
+      const ops = [];
+      let userNode = await find_kg_node(sid, 'person', '用户');
+      for (const { kp, row, source, episodeId } of records.values()) {
+        if (!userNode) {
+          userNode = await upsert_kg_node(sid, 'person', '用户', {
+            properties: { backfilled_from: source },
+            episodeId,
+          });
+        }
+        const concept = await upsert_kg_node(sid, KIND_CONCEPT, kp, {
+          properties: {
+            backfilled_from: source,
+            mastery_level: Number(row.level || 0),
+            attempts: Number(row.attempts || 0),
+          },
+          episodeId,
+        });
+        if (!userNode || !concept) continue;
+        await upsert_kg_edge(sid, userNode.id, concept.id, REL_LEARNING, {
+          weight: Math.max(0.2, Number(row.level || 0)),
+          properties: { backfilled_from: source },
+          episodeId,
+        });
+        ops.push({ op: 'backfill_mastery', kp, source });
+      }
+      await DB.kvSet(markerKey, { at: Date.now(), count: ops.length });
+      return ops;
+    } catch (e) {
+      console.warn('kg mastery backfill failed', e);
       return [];
     }
   }
@@ -6277,7 +6383,6 @@ ${format_actions()}
 
   async function buildKgContextTextForPrompt(sid, session, currentKp) {
     try {
-      if (inferConversationMode(session) !== 'learning') return '';
       const ctx = await retrieve_kg_context(sid, String(currentKp || '').slice(0, 50));
       return format_for_prompt(ctx);
     } catch (e) {
@@ -6686,6 +6791,8 @@ function supportsBackgroundChat(cfg) {
     if (pureGreetingPattern.test(compact)) return turnRouteDecision(TURN_ROUTE_CHAT_LIGHT, 'pure_greeting');
     const studyControlPattern = /^(继续|下一步|下一题|再来|再讲|接着|继续学|继续讲|往下|开始吧|来一题|出题|考我|复习)$/i;
     if (studyControlPattern.test(compact)) return turnRouteDecision(TURN_ROUTE_STUDY_FULL, 'study_control');
+    const teacherTeachingPattern = /(我要教你|我来教你|我想教你|接下来我要教你|接下来教你|给你讲|教你什么是|教你怎么|教你如何|带你学)/i;
+    if (teacherTeachingPattern.test(compact)) return turnRouteDecision(TURN_ROUTE_STUDY_FULL, 'teacher_teaching_action');
     const metaExperiencePattern = /(说话.*慢|输出.*慢|回复.*慢|生成.*慢|太慢|慢死|卡顿|延迟|等.*久|速度|反应.*慢|加载.*慢|slow|lag|delay)/i;
     if (compact.length <= 48 && metaExperiencePattern.test(compact)) return turnRouteDecision(TURN_ROUTE_CHAT_LIGHT, 'meta_experience');
     const ambiguousShortWhyPattern = /^(为什么啊?|为啥啊?|咋了|怎么了|why)[。！？!?~～,.，\s]*$/i;
@@ -6729,6 +6836,7 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
 
 # 轻量聊天规则
 - 仍然按人设、关系和最近上下文自然回复，不要套固定模板。
+- 用户始终是老师，你始终是学生 AI；用户说“我要教你/给你讲/接下来教你”是在安排要教你的内容，先接受并请老师讲，不能反问“怎么变成你教我了”。
 - 不要强行教学。
 - 不要突然讲知识点。
 - 不要做掌握度判断。
@@ -7282,7 +7390,7 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
     ]);
   }
 
-  return { create_session, delete_session, run_opening_turn, run_turn, run_proactive_turn, maybe_summarize, import_native_background_turns, queue_pending_user_message, normalizeStrategySettings, formatStrategySettings, buildStructuredProfileSummary, buildRuntimeProfileHint, PROFILE_TAG_CATEGORIES, ACTION_TYPES };
+  return { create_session, delete_session, run_opening_turn, run_turn, run_proactive_turn, maybe_summarize, import_native_background_turns, queue_pending_user_message, backfill_kg_from_mastery, normalizeStrategySettings, formatStrategySettings, buildStructuredProfileSummary, buildRuntimeProfileHint, PROFILE_TAG_CATEGORIES, ACTION_TYPES };
 })();
 </script>
 
@@ -7736,14 +7844,22 @@ function keepChatTailVisible(delay=40, opts={}) {
   }, delay);
 }
 
+function clearKeyboardLayoutState(opts={}) {
+  if (opts.blur && editableHasKeyboard(document.activeElement)) {
+    try { document.activeElement.blur(); } catch (_) {}
+  }
+  syncKeyboardLayout.focusedAt = 0;
+  document.body.classList.remove('keyboard-open');
+  document.documentElement.style.setProperty('--keyboard-bottom', '0px');
+}
+
 function syncKeyboardLayout() {
   if (chatInputComposing) return;
   const vv = window.visualViewport;
   const focused = editableHasKeyboard(document.activeElement);
   if (!focused) {
     viewportBaselineHeight = Math.max(viewportBaselineHeight, window.innerHeight || 0);
-    document.body.classList.remove('keyboard-open');
-    document.documentElement.style.setProperty('--keyboard-bottom', '0px');
+    clearKeyboardLayoutState();
     return;
   }
   const now = Date.now();
@@ -8407,6 +8523,7 @@ async function showSessionHome() {
   state.chatScreen = 'list';
   state.contextEditingNoteId = null;
   state.sessionSearchFocused = false;
+  clearKeyboardLayoutState({ blur: true });
   switchTab('chat');
   await refreshHeader();
   await renderChat();
@@ -8414,6 +8531,7 @@ async function showSessionHome() {
 
 function switchTab(name) {
   state.currentTab = name;
+  if (name !== 'chat' || state.chatScreen !== 'thread') clearKeyboardLayoutState({ blur: true });
   syncGraphBrowseReadOnlyUi();
   $$('[data-view]').forEach(v => v.classList.toggle('hidden', v.dataset.view !== name));
   $$('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
@@ -11085,7 +11203,7 @@ async function renderContextGraph(renderId=state.contextRenderSeq) {
   ]);
   if (!isActiveContextRender(renderId, 'graph')) return;
   const ai = msgs.filter(m => m.role === 'assistant');
-  if (!masteries.length && !anchors.length) {
+  if (!masteries.length && !anchors.length && !ai.length) {
     setActiveGraphDataset([], []);
     ForceGraph.destroy();
     body.innerHTML = '<div class="text-xs text-neutral-500 text-center py-10 leading-relaxed">当前窗口还没有图谱节点。聊天、锚点和随笔都会按正常逻辑沉淀到这里。</div>';
@@ -11094,6 +11212,12 @@ async function renderContextGraph(renderId=state.contextRenderSeq) {
   body.innerHTML = `
     <div id="context-knowledge-graph" class="knowledge-graph knowledge-graph-fullscreen"><div class="graph-hint">拖拽平移 · 双指缩放 · 点击节点回顾来源</div></div>`;
   const { nodes, links } = buildGraphData(masteries, ai, anchors);
+  if (!nodes.length) {
+    setActiveGraphDataset([], []);
+    ForceGraph.destroy();
+    body.innerHTML = '<div class="text-xs text-neutral-500 text-center py-10 leading-relaxed">当前窗口还没有可回看的图谱节点。继续聊几句后会出现在这里。</div>';
+    return;
+  }
   nodes.forEach(n => { n.sid = state.sid; });
   setActiveGraphDataset(nodes, links);
   ForceGraph.init($('#context-knowledge-graph'), node => {
@@ -11808,6 +11932,68 @@ function buildKpMemoryDigests(ai, byKp) {
   return digests.slice(-30);
 }
 
+function buildChatFragmentLabel(msg, index=0) {
+  const action = msg?.meta?.action || {};
+  const kp = String(action.knowledge_point || '').trim();
+  if (isLogicalGraphKp(kp)) return graphTrim(kp, 24);
+  const content = String(msg?.content || '').replace(/\s+/g, ' ').trim();
+  const sentence = (content.match(/^[^。！？!?]{4,32}/) || [])[0] || content;
+  return graphTrim(sentence || `对话片段 ${index + 1}`, 24);
+}
+
+function buildChatFragmentGraphNodes(ai, limit=4) {
+  const processTypes = new Set(['process', 'thinking', 'pending', 'system']);
+  const rows = (ai || [])
+    .filter(msg => {
+      const content = String(msg?.content || '').replace(/\s+/g, ' ').trim();
+      if (!content) return false;
+      const action = msg?.meta?.action || {};
+      const type = String(action.type || '').toLowerCase();
+      if (processTypes.has(type)) return false;
+      return true;
+    })
+    .slice(-limit);
+  if (!rows.length) return { nodes: [], links: [] };
+  const title = rows[rows.length - 1]?.sessionTitle || '当前会话';
+  const root = {
+    key:'chat-session-root',
+    nodeType:'chat_session',
+    kp:title,
+    label:title,
+    summary:`最近 ${rows.length} 条对话片段`,
+    chatMessageIds:rows.map(msg => msg.id).filter(Boolean),
+  };
+  const nodes = [root];
+  const links = [];
+  let prev = null;
+  rows.forEach((msg, i) => {
+    const label = buildChatFragmentLabel(msg, i);
+    const fragment = {
+      key:`chat-fragment-${msg.id || i}`,
+      nodeType:'chat_fragment',
+      kp:label,
+      label,
+      content:graphTrim(msg.content || '', 360),
+      summary:graphTrim(msg.content || '', 180),
+      messageId:msg.id || null,
+      chatMessageIds:[msg.id].filter(Boolean),
+      meta: {
+        ...(msg.meta || {}),
+        action: {
+          type:'chat_fragment',
+          knowledge_point:label,
+          ...((msg.meta || {}).action || {}),
+        },
+      },
+    };
+    nodes.push(fragment);
+    links.push({ a:root, b:fragment, weight:1.1, kind:'conversation' });
+    if (prev) links.push({ a:prev, b:fragment, weight:.8, kind:'sequence' });
+    prev = fragment;
+  });
+  return { nodes, links };
+}
+
 function cleanOutlineTitle(raw) {
   return String(raw || '')
     .replace(/\s+/g, ' ')
@@ -11975,9 +12161,11 @@ const ForceGraph = (() => {
   let cvs, ctx, box;
   let nodes = [], links = [], particles = [];
   let cam = { x:0, y:0, s:1, vx:0, vy:0 };
-  let sel = null, anim = null, settled = false, iter = 0;
-  const REPUL = 1200, ATTR = 0.0018, GRAV = 0.0008, DAMP = 0.92, MAX_IT = 400, ALPHA_MIN = 0.04, COL_PAD = 6;
-  const GRAPH_MIN_W = 280, GRAPH_MIN_H = 300, TOUCH_PAN_SPEED = 0.55, WHEEL_ZOOM_STEP = 0.06;
+  let sel = null, anim = null, settled = false, iter = 0, graphDpr = 1, renderPending = false;
+  const REPUL = 1200, LINK_ATTR = 0.0036, GRAV = 0.0008, DAMP = 0.90, MAX_IT = 300, ALPHA_MIN = 0.04, COL_PAD = 6;
+  const GRAPH_MIN_W = 280, GRAPH_MIN_H = 300, GRAPH_MAX_DPR = 1.5, TOUCH_PAN_SPEED = 0.55, WHEEL_ZOOM_STEP = 0.06;
+  const GRAPH_TOUCH_HIT_RADIUS = 30, GRAPH_MOUSE_HIT_RADIUS = 16, GRAPH_TOUCH_MOVE_TOLERANCE = 18, GRAPH_MOUSE_MOVE_TOLERANCE = 6;
+  const GRAPH_TOUCH_TAP_MS = 480, GRAPH_MOUSE_TAP_MS = 320;
   let ts = { down:false, pinch:false, sx:0, sy:0, lx:0, ly:0, moved:false, t0:0, dn:null, sd:0, ss:1 };
   let _onSelect = null;
   let _thm = {};
@@ -11989,8 +12177,16 @@ const ForceGraph = (() => {
       text:g('--text'), muted:g('--muted'), accent:g('--accent'), warn:g('--warn'), chatBg:g('--chat-bg') };
   }
 
+  function isMobileGraphViewport() {
+    return Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 720;
+  }
+
+  function mobileGraphDprCap() {
+    return isMobileGraphViewport() ? 1.15 : GRAPH_MAX_DPR;
+  }
+
   function init(container, onSelect) {
-    if (box === container && cvs) { resize(); readTheme(); return; }
+    if (box === container && cvs) { resize(); readTheme(); requestGraphRender(); return; }
     destroy();
     box = container;
     _onSelect = onSelect || null;
@@ -12007,21 +12203,22 @@ const ForceGraph = (() => {
     cvs.addEventListener('mousemove', onMM);
     cvs.addEventListener('mouseup', onMU);
     cvs.addEventListener('wheel', onWh, {passive:false});
-    window.addEventListener('resize', () => { resize(); render(); });
+    window.addEventListener('resize', () => { resize(); requestGraphRender(); });
   }
 
   function resize() {
     if (!cvs || !box) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(mobileGraphDprCap(), window.devicePixelRatio || 1);
     const r = box.getBoundingClientRect();
     const w = Math.max(GRAPH_MIN_W, r.width || box.clientWidth || 0);
     const h = Math.max(GRAPH_MIN_H, r.height || box.clientHeight || 0);
+    graphDpr = dpr;
     cvs.width = w * dpr; cvs.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function W() { return cvs.width / (window.devicePixelRatio||1); }
-  function H() { return cvs.height / (window.devicePixelRatio||1); }
+  function W() { return cvs.width / (graphDpr || 1); }
+  function H() { return cvs.height / (graphDpr || 1); }
 
   function setData(nd, lk) {
     const cx = W()/2, cy = H()/2;
@@ -12029,6 +12226,7 @@ const ForceGraph = (() => {
       const a = (Math.PI*2*i/Math.max(nd.length,1)) - Math.PI/2;
       const r = n.nodeType==='kp' ? Math.min(W(),H())*.22
         : n.nodeType==='source' ? Math.min(W(),H())*.16
+        : n.nodeType==='chat_session' ? Math.min(W(),H())*.14
         : n.nodeType==='section' ? Math.min(W(),H())*.27
         : n.nodeType==='diagnostic' ? Math.min(W(),H())*.24
         : n.nodeType==='latent' ? Math.min(W(),H())*.34
@@ -12036,9 +12234,11 @@ const ForceGraph = (() => {
         : Math.min(W(),H())*.42;
       const radius = n.nodeType==='kp' ? Math.max(13,13+(n.level||0)*16)
         : n.nodeType==='source' ? 16
+        : n.nodeType==='chat_session' ? 13
         : n.nodeType==='section' ? 12
         : n.nodeType==='diagnostic' ? 11
         : n.nodeType==='latent' ? 10
+        : n.nodeType==='chat_fragment' ? 8
         : n.nodeType==='insight' ? 9
         : (n.nodeType==='support'?7:5);
       return { ...n, x: cx+Math.cos(a)*r+(Math.random()-.5)*30,
@@ -12051,13 +12251,27 @@ const ForceGraph = (() => {
       target: nodes.find(n=>n.key===l.b.key),
       weight: l.weight||1, kind: l.kind||'memory'
     })).filter(l=>l.source&&l.target);
-    particles = links.filter(l => !['foundation','outline'].includes(l.kind)).slice(0,60).map(l => ({ link:l, t:Math.random(), sp:.002+Math.random()*.003 }));
+    if (box) {
+      box.dataset.graphNodeCount = String(nodes.length);
+      box.dataset.graphLinkCount = String(links.length);
+    }
+    particles = links.filter(l => !['foundation','outline'].includes(l.kind)).slice(0, isMobileGraphViewport() ? 18 : 60).map(l => ({ link:l, t:Math.random(), sp:.002+Math.random()*.003 }));
     sel = null; settled = false; iter = 0;
     cam = { x:0, y:0, s:1, vx:0, vy:0 };
     startAnim();
   }
 
-  function wake() { settled=false; iter=Math.min(iter, MAX_IT>>1); }
+  function hasCameraInertia() { return Math.abs(cam.vx)>.05 || Math.abs(cam.vy)>.05; }
+  function wake() { settled=false; iter=Math.min(iter, MAX_IT>>1); startAnim(); }
+
+  function requestGraphRender() {
+    if (renderPending) return;
+    renderPending = true;
+    requestAnimationFrame(() => {
+      renderPending = false;
+      if (cvs) render();
+    });
+  }
 
   function tick() {
     iter++;
@@ -12077,7 +12291,7 @@ const ForceGraph = (() => {
       const dx=l.target.x-l.source.x, dy=l.target.y-l.source.y;
       const d=Math.max(1,Math.sqrt(dx*dx+dy*dy));
       const ideal = l.kind==='sequence'?110:(l.kind==='foundation'?86:(l.kind==='outline'?70:55));
-      const f=(d-ideal)*ATTR*alpha*l.weight;
+      const f=(d-ideal)*LINK_ATTR*alpha*l.weight;
       const fx=(dx/d)*f, fy=(dy/d)*f;
       l.source.vx+=fx; l.source.vy+=fy; l.target.vx-=fx; l.target.vy-=fy;
     }
@@ -12090,10 +12304,20 @@ const ForceGraph = (() => {
       n.vx*=DAMP; n.vy*=DAMP; n.x+=n.vx; n.y+=n.vy;
       mv=Math.max(mv,Math.abs(n.vx),Math.abs(n.vy));
     }
-    if (iter>60 && mv<.01) settled=true;
+    if (iter>60 && mv<.01 && !hasCameraInertia()) settled=true;
     // camera pan inertia
-    if (Math.abs(cam.vx)>.05||Math.abs(cam.vy)>.05) { cam.x+=cam.vx; cam.y+=cam.vy; cam.vx*=.92; cam.vy*=.92; }
+    if (hasCameraInertia()) { cam.x+=cam.vx; cam.y+=cam.vy; cam.vx*=.92; cam.vy*=.92; }
     else { cam.vx=0; cam.vy=0; }
+  }
+
+  function linkStrokeStyle(l, dim) {
+    if (l.kind==='outline') { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(120,160,132,.12)' : 'rgba(120,160,132,.58)'; ctx.lineWidth=1.8; }
+    else if (l.kind==='diagnostic') { ctx.setLineDash([5,5]); ctx.strokeStyle = dim ? 'rgba(217,111,103,.12)' : 'rgba(217,111,103,.62)'; ctx.lineWidth=1.6; }
+    else if (l.kind==='foundation') { ctx.setLineDash([2,6]); ctx.strokeStyle = dim ? 'rgba(120,160,132,.12)' : 'rgba(120,160,132,.46)'; ctx.lineWidth=1.35; }
+    else if (l.kind==='related') { ctx.setLineDash([4,4]); ctx.strokeStyle = dim ? 'rgba(79,154,200,.12)' : 'rgba(79,154,200,.58)'; ctx.lineWidth=1.45; }
+    else if (l.kind==='sequence') { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(95,104,93,.16)' : 'rgba(224,124,47,.58)'; ctx.lineWidth=1.8; }
+    else if (l.kind==='conversation') { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(95,104,93,.14)' : 'rgba(217,111,103,.54)'; ctx.lineWidth=1.45; }
+    else { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(95,104,93,.16)' : 'rgba(95,104,93,.46)'; ctx.lineWidth=1.15; }
   }
 
   function render() {
@@ -12105,12 +12329,7 @@ const ForceGraph = (() => {
     for (const l of links) {
       const dim = sel && l.source!==sel && l.target!==sel;
       ctx.beginPath(); ctx.moveTo(l.source.x,l.source.y); ctx.lineTo(l.target.x,l.target.y);
-      if (l.kind==='outline') { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(120,160,132,.08)' : 'rgba(120,160,132,.38)'; ctx.lineWidth=1.4; }
-      else if (l.kind==='diagnostic') { ctx.setLineDash([5,5]); ctx.strokeStyle = dim ? 'rgba(217,111,103,.08)' : 'rgba(217,111,103,.42)'; ctx.lineWidth=1.2; }
-      else if (l.kind==='foundation') { ctx.setLineDash([2,6]); ctx.strokeStyle = dim ? 'rgba(120,160,132,.07)' : 'rgba(120,160,132,.24)'; ctx.lineWidth=1; }
-      else if (l.kind==='related') { ctx.setLineDash([4,4]); ctx.strokeStyle = dim ? 'rgba(79,154,200,.08)' : 'rgba(79,154,200,.42)'; ctx.lineWidth=1.1; }
-      else if (l.kind==='sequence') { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(95,104,93,.1)' : `rgba(${kpC},.35)`; ctx.lineWidth=1.4; }
-      else { ctx.setLineDash([]); ctx.strokeStyle = dim ? 'rgba(95,104,93,.1)' : 'rgba(95,104,93,.28)'; ctx.lineWidth=.7; }
+      linkStrokeStyle(l, dim);
       ctx.stroke(); ctx.setLineDash([]);
     }
     // particles
@@ -12155,7 +12374,7 @@ const ForceGraph = (() => {
         ctx.strokeStyle='rgba(235,230,220,.24)'; ctx.lineWidth=.8; ctx.stroke();
       }
       // label
-      if ((n.nodeType==='kp' || n.nodeType==='source' || n.nodeType==='section' || n.nodeType==='diagnostic' || n.nodeType==='latent' || n.nodeType==='note' || n.nodeType==='insight') && !dim) {
+      if ((n.nodeType==='kp' || n.nodeType==='source' || n.nodeType==='chat_session' || n.nodeType==='chat_fragment' || n.nodeType==='section' || n.nodeType==='diagnostic' || n.nodeType==='latent' || n.nodeType==='note' || n.nodeType==='insight') && !dim) {
         const fs=Math.max(9,n.radius*.6);
         ctx.font=`${isSel?'bold ':''}${fs}px -apple-system,sans-serif`;
         ctx.fillStyle=n.nodeType==='latent'?'rgba(235,230,220,.48)':(n.nodeType==='diagnostic'?'rgba(244,181,174,.86)':'rgba(235,230,220,.88)');
@@ -12168,27 +12387,28 @@ const ForceGraph = (() => {
     ctx.restore();
   }
 
-  function startAnim() { if (anim) return; const loop=()=>{ tick(); render(); anim=requestAnimationFrame(loop); }; anim=requestAnimationFrame(loop); }
+  function startAnim() { if (anim) return; const loop=()=>{ tick(); if (settled && !hasCameraInertia()) { render(); stopAnim(); return; } render(); anim=requestAnimationFrame(loop); }; anim=requestAnimationFrame(loop); }
   function stopAnim() { if(anim){cancelAnimationFrame(anim);anim=null;} }
 
-  function hit(sx,sy) {
+  function hit(sx,sy, opts={}) {
     const gx=(sx-cam.x)/cam.s, gy=(sy-cam.y)/cam.s;
+    const minHit = opts.touch ? GRAPH_TOUCH_HIT_RADIUS : GRAPH_MOUSE_HIT_RADIUS;
     for (let i=nodes.length-1;i>=0;i--) {
-      const n=nodes[i], dx=gx-n.x, dy=gy-n.y, tr=Math.max(n.radius,16);
+      const n=nodes[i], dx=gx-n.x, dy=gy-n.y, tr=Math.max(n.radius,minHit);
       if (dx*dx+dy*dy<=tr*tr) return n;
     }
     return null;
   }
-  function pos(e) { const r=cvs.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left,y:t.clientY-r.top}; }
+  function pos(e) { const r=cvs.getBoundingClientRect(); const t=(e.touches&&e.touches[0])||(e.changedTouches&&e.changedTouches[0])||e; return {x:t.clientX-r.left,y:t.clientY-r.top}; }
   function tdist(e) { const dx=e.touches[1].clientX-e.touches[0].clientX, dy=e.touches[1].clientY-e.touches[0].clientY; return Math.sqrt(dx*dx+dy*dy); }
 
-  function onTS(e) { e.preventDefault(); if(e.touches.length===2){ts.pinch=true;ts.sd=tdist(e);ts.ss=cam.s;return;} const p=pos(e); const n=hit(p.x,p.y); ts.down=true;ts.sx=p.x;ts.sy=p.y;ts.lx=p.x;ts.ly=p.y;ts.moved=false;ts.t0=Date.now();ts.dn=n||null; }
-  function onTM(e) { e.preventDefault(); if(ts.pinch&&e.touches.length===2){ const d=tdist(e); const raw=ts.ss*(d/ts.sd); const ns=Math.max(.45,Math.min(3.2,ts.ss+(raw-ts.ss)*0.65)); const r=cvs.getBoundingClientRect(); const cx2=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left; const cy2=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top; const rt=ns/cam.s; cam.x=cx2-(cx2-cam.x)*rt; cam.y=cy2-(cy2-cam.y)*rt; cam.s=ns; render(); return; } if(!ts.down)return; const p=pos(e); const dx=(p.x-ts.lx)*TOUCH_PAN_SPEED,dy=(p.y-ts.ly)*TOUCH_PAN_SPEED; if(Math.abs(p.x-ts.sx)>8||Math.abs(p.y-ts.sy)>8) ts.moved=true; if(ts.dn&&ts.moved){const vx=dx/cam.s,vy=dy/cam.s;ts.dn.x+=vx;ts.dn.y+=vy;ts.dn.vx=vx*2;ts.dn.vy=vy*2;render();}else if(!ts.dn){cam.vx=dx*.45;cam.vy=dy*.45;cam.x+=dx;cam.y+=dy;render();} ts.lx=p.x;ts.ly=p.y; }
-  function onTE(e) { if(ts.pinch){ts.pinch=false;return;} const tap=!ts.moved&&(Date.now()-ts.t0<300); if(tap&&ts.dn){sel=ts.dn;render();if(_onSelect)_onSelect(ts.dn);}else if(tap){sel=null;cam.vx=0;cam.vy=0;render();if(_onSelect)_onSelect(null);} if(ts.dn)wake(); ts.down=false;ts.dn=null; }
+  function onTS(e) { e.preventDefault(); if(e.touches.length===2){ts.pinch=true;ts.sd=tdist(e);ts.ss=cam.s;return;} const p=pos(e); const n=hit(p.x,p.y,{ touch:true }); ts.down=true;ts.sx=p.x;ts.sy=p.y;ts.lx=p.x;ts.ly=p.y;ts.moved=false;ts.t0=Date.now();ts.dn=n||null; }
+  function onTM(e) { e.preventDefault(); if(ts.pinch&&e.touches.length===2){ const d=tdist(e); const raw=ts.ss*(d/ts.sd); const ns=Math.max(.45,Math.min(3.2,ts.ss+(raw-ts.ss)*0.65)); const r=cvs.getBoundingClientRect(); const cx2=(e.touches[0].clientX+e.touches[1].clientX)/2-r.left; const cy2=(e.touches[0].clientY+e.touches[1].clientY)/2-r.top; const rt=ns/cam.s; cam.x=cx2-(cx2-cam.x)*rt; cam.y=cy2-(cy2-cam.y)*rt; cam.s=ns; requestGraphRender(); return; } if(!ts.down)return; const p=pos(e); const dx=(p.x-ts.lx)*TOUCH_PAN_SPEED,dy=(p.y-ts.ly)*TOUCH_PAN_SPEED; if(Math.abs(p.x-ts.sx)>GRAPH_TOUCH_MOVE_TOLERANCE||Math.abs(p.y-ts.sy)>GRAPH_TOUCH_MOVE_TOLERANCE) ts.moved=true; if(ts.dn&&ts.moved){const vx=dx/cam.s,vy=dy/cam.s;ts.dn.x+=vx;ts.dn.y+=vy;ts.dn.vx=vx*2;ts.dn.vy=vy*2;wake();requestGraphRender();}else if(!ts.dn){cam.vx=dx*.45;cam.vy=dy*.45;cam.x+=dx;cam.y+=dy;wake();requestGraphRender();} ts.lx=p.x;ts.ly=p.y; }
+  function onTE(e) { if(ts.pinch){ts.pinch=false;requestGraphRender();return;} const p=pos(e); const tap=!ts.moved&&(Date.now()-ts.t0<GRAPH_TOUCH_TAP_MS); if(tap){const n = ts.dn || hit(p.x, p.y, { touch:true }); if(n){sel=n;requestGraphRender();if(_onSelect)_onSelect(n);}else{sel=null;cam.vx=0;cam.vy=0;requestGraphRender();if(_onSelect)_onSelect(null);}} if(ts.dn)wake(); ts.down=false;ts.dn=null; }
   function onMD(e) { const p={x:e.offsetX,y:e.offsetY}; const n=hit(p.x,p.y); ts.down=true;ts.sx=p.x;ts.sy=p.y;ts.lx=p.x;ts.ly=p.y;ts.moved=false;ts.t0=Date.now();ts.dn=n||null; }
-  function onMM(e) { if(!ts.down)return; const p={x:e.offsetX,y:e.offsetY}; const dx=(p.x-ts.lx)*TOUCH_PAN_SPEED,dy=(p.y-ts.ly)*TOUCH_PAN_SPEED; if(Math.abs(p.x-ts.sx)>6||Math.abs(p.y-ts.sy)>6)ts.moved=true; if(ts.dn&&ts.moved){const vx=dx/cam.s,vy=dy/cam.s;ts.dn.x+=vx;ts.dn.y+=vy;ts.dn.vx=vx*2;ts.dn.vy=vy*2;render();}else if(!ts.dn){cam.vx=dx*.45;cam.vy=dy*.45;cam.x+=dx;cam.y+=dy;render();} ts.lx=p.x;ts.ly=p.y; }
-  function onMU(e) { const tap=!ts.moved&&(Date.now()-ts.t0<300); if(tap&&ts.dn){sel=ts.dn;render();if(_onSelect)_onSelect(ts.dn);}else if(tap){sel=null;cam.vx=0;cam.vy=0;render();if(_onSelect)_onSelect(null);} if(ts.dn)wake(); ts.down=false;ts.dn=null; }
-  function onWh(e) { e.preventDefault(); const f=e.deltaY>0 ? 1-WHEEL_ZOOM_STEP : 1+WHEEL_ZOOM_STEP; const ns=Math.max(.45,Math.min(3.2,cam.s*f)); const rt=ns/cam.s; cam.x=e.offsetX-(e.offsetX-cam.x)*rt; cam.y=e.offsetY-(e.offsetY-cam.y)*rt; cam.s=ns; render(); }
+  function onMM(e) { if(!ts.down)return; const p={x:e.offsetX,y:e.offsetY}; const dx=(p.x-ts.lx)*TOUCH_PAN_SPEED,dy=(p.y-ts.ly)*TOUCH_PAN_SPEED; if(Math.abs(p.x-ts.sx)>GRAPH_MOUSE_MOVE_TOLERANCE||Math.abs(p.y-ts.sy)>GRAPH_MOUSE_MOVE_TOLERANCE)ts.moved=true; if(ts.dn&&ts.moved){const vx=dx/cam.s,vy=dy/cam.s;ts.dn.x+=vx;ts.dn.y+=vy;ts.dn.vx=vx*2;ts.dn.vy=vy*2;wake();requestGraphRender();}else if(!ts.dn){cam.vx=dx*.45;cam.vy=dy*.45;cam.x+=dx;cam.y+=dy;wake();requestGraphRender();} ts.lx=p.x;ts.ly=p.y; }
+  function onMU(e) { const tap=!ts.moved&&(Date.now()-ts.t0<GRAPH_MOUSE_TAP_MS); if(tap&&ts.dn){sel=ts.dn;requestGraphRender();if(_onSelect)_onSelect(ts.dn);}else if(tap){sel=null;cam.vx=0;cam.vy=0;requestGraphRender();if(_onSelect)_onSelect(null);} if(ts.dn)wake(); ts.down=false;ts.dn=null; }
+  function onWh(e) { e.preventDefault(); const f=e.deltaY>0 ? 1-WHEEL_ZOOM_STEP : 1+WHEEL_ZOOM_STEP; const ns=Math.max(.45,Math.min(3.2,cam.s*f)); const rt=ns/cam.s; cam.x=e.offsetX-(e.offsetX-cam.x)*rt; cam.y=e.offsetY-(e.offsetY-cam.y)*rt; cam.s=ns; requestGraphRender(); }
 
   function destroy() { stopAnim(); if(cvs){cvs.remove();cvs=null;} nodes=[];links=[];particles=[];sel=null;box=null; }
 
@@ -12342,6 +12562,11 @@ function buildGraphData(masteries, ai, anchors=[]) {
       links.push({a:src, b:tgt, weight:1.5, kind:'related'});
     }
   }
+  if (!nodes.length) {
+    const fallback = buildChatFragmentGraphNodes(ai);
+    nodes.push(...fallback.nodes);
+    links.push(...fallback.links);
+  }
   return {nodes,links};
 }
 
@@ -12372,6 +12597,8 @@ function graphNodeTypeLabel(node) {
   if (type === 'latent') return '候选知识点';
   if (type === 'note') return '随笔';
   if (type === 'insight') return '学习整理';
+  if (type === 'chat_session') return '当前会话';
+  if (type === 'chat_fragment') return '对话片段';
   return '对话片段';
 }
 
@@ -12383,6 +12610,7 @@ function graphLinkKindLabel(kind) {
   if (kind === 'sequence') return '学习顺序';
   if (kind === 'related') return '相关概念';
   if (kind === 'note') return '随笔关联';
+  if (kind === 'conversation') return '对话片段';
   return kind || '双向链接';
 }
 
@@ -13091,8 +13319,32 @@ async function showGraphSheet(node) {
       pairs.push({ user: prev, ai: m, ev: m.meta?.evaluation||{}, act: m.meta?.action||{} });
     }
   }
+  const graphMessageIds = new Set([
+    ...(node.chatMessageIds || []),
+    ...(node.chat_message_ids || []),
+    node.messageId,
+  ].filter(Boolean).map(x => String(x)));
+  if (!pairs.length && graphMessageIds.size) {
+    for (let i=0;i<allMsgs.length;i++) {
+      const m = allMsgs[i];
+      if (m.role !== 'assistant' || !graphMessageIds.has(String(m.id))) continue;
+      const prev = i>0 && allMsgs[i-1].role==='user' ? allMsgs[i-1] : null;
+      pairs.push({ user: prev, ai: m, ev: m.meta?.evaluation||{}, act: m.meta?.action||{} });
+    }
+  }
 
   const digest = buildKpConversationDigest(pairs, kpName);
+  const summaryBullets = graphUniqueClean([
+    digest?.status,
+    ...(digest?.evidence || []),
+    node?.summary,
+    node?.content,
+    node?.preview,
+  ], 8);
+  const exampleBullets = graphUniqueClean([
+    ...(digest?.nextSteps || []),
+    ...(node?.memoryExpansion?.teacher_questions || []),
+  ], 6);
 
   let html='';
   if (node.nodeType==='kp') {
@@ -13361,6 +13613,7 @@ async function renderInsights() {
   }
   const allNodes = [], allLinks = [], allAi = [], allMasteries = [], allAnchors = [];
   for (const session of sessions) {
+    await ENGINE.backfill_kg_from_mastery(session.id);
     const sid = session.id;
     const msgs = (await DB.bySid('messages', sid)).sort((a,b)=>a.id-b.id);
     const masteries = (await DB.bySid('mastery', sid)).sort((a,b)=>b.level-a.level);
@@ -13369,7 +13622,7 @@ async function renderInsights() {
     allAi.push(...ai.map(m => ({ ...m, sid, sessionTitle: session.title })));
     allMasteries.push(...masteries.map(m => ({ ...m, sid, sessionTitle: session.title })));
     allAnchors.push(...anchors.map(a => ({ ...a, sid, sessionTitle: session.title })));
-    if (!masteries.length && !anchors.length) continue;
+    if (!masteries.length && !anchors.length && !ai.length) continue;
     const { nodes, links } = buildGraphData(masteries, ai, anchors);
     nodes.forEach(n => {
       n.sid = sid;
