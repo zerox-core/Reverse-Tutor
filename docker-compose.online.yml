@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${ONLINE_POSTGRES_DB:-reverse_tutor_online}
+      POSTGRES_USER: ${ONLINE_POSTGRES_USER:-reverse_tutor}
+      POSTGRES_PASSWORD: ${ONLINE_POSTGRES_PASSWORD:-reverse_tutor_dev}
+    ports:
+      - "${ONLINE_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    volumes:
+      - online-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  online-postgres-data:
