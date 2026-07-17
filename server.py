@@ -14,17 +14,22 @@ REST API：
 from __future__ import annotations
 
 import json
+import os
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.exception_handlers import http_exception_handler, request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DbSession
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 import db
 import engine
@@ -32,11 +37,106 @@ import llm
 import vision
 from adapters import dispatch_webhook
 from adapters.online import router as online_router
+from adapters.online.auth_routes import reset_auth_service, set_auth_service
+from adapters.online.dependencies import build_postgres_auth_service
+from adapters.online.errors import OnlineApiError, error_response
+from adapters.online.request_context import request_id_from_header, request_id_var
+from online_db.settings import OnlineDatabaseSettings
+
+def configure_online_auth_from_env() -> bool:
+    database_url = os.getenv("ONLINE_DATABASE_URL", "").strip()
+    if database_url:
+        # Production online writes are fail-closed: the configured database
+        # must be migrated to the single Alembic head before serving traffic.
+        settings = OnlineDatabaseSettings.from_env()
+        set_auth_service(build_postgres_auth_service(settings.database_url))
+        return True
+    if os.getenv("ONLINE_AUTH_ALLOW_IN_MEMORY", "") == "1":
+        reset_auth_service()
+        return False
+    raise RuntimeError(
+        "ONLINE_DATABASE_URL is required unless ONLINE_AUTH_ALLOW_IN_MEMORY=1"
+    )
+
+
+@asynccontextmanager
+async def app_lifespan(_app: FastAPI):
+    configure_online_auth_from_env()
+    db.init_db()
+    # 首次启动 seed 内置 persona 模板
+    with db.SessionLocal() as session:
+        db.seed_builtin_templates(session)
+        db.purge_expired_images(session, datetime.utcnow())
+        session.commit()
+    try:
+        yield
+    finally:
+        reset_auth_service()
+
 
 # --- App ---------------------------------------------------------------------
 
-app = FastAPI(title="Reverse Tutor", version="0.1.0")
+app = FastAPI(title="Reverse Tutor", version="0.1.0", lifespan=app_lifespan)
 app.include_router(online_router)
+
+
+@app.middleware("http")
+async def online_request_context(request: Request, call_next):
+    if not request.url.path.startswith("/api/v1"):
+        return await call_next(request)
+
+    request_id = request_id_from_header(request.headers.get("X-Request-Id"))
+    context_token = request_id_var.set(request_id)
+    try:
+        try:
+            response = await call_next(request)
+        except Exception:
+            response = error_response(500, "server_error", "Internal server error")
+        response.headers["X-Request-Id"] = request_id
+        return response
+    finally:
+        request_id_var.reset(context_token)
+
+
+@app.exception_handler(OnlineApiError)
+async def online_api_error_handler(_request: Request, exc: OnlineApiError):
+    return error_response(
+        exc.status_code,
+        exc.code,
+        exc.message,
+        retryable=exc.retryable,
+        user_action=exc.user_action,
+        details=exc.details,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def online_validation_error_handler(request: Request, exc: RequestValidationError):
+    if not request.url.path.startswith("/api/v1"):
+        return await request_validation_exception_handler(request, exc)
+    fields = [
+        {"location": list(error["loc"]), "type": error["type"], "message": error["msg"]}
+        for error in exc.errors()
+    ]
+    return error_response(
+        422,
+        "invalid_request",
+        "Request validation failed",
+        details={"fields": fields},
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def online_http_error_handler(request: Request, exc: StarletteHTTPException):
+    if not request.url.path.startswith("/api/v1"):
+        return await http_exception_handler(request, exc)
+    code, message = {
+        401: ("unauthorized", "Authentication is required"),
+        403: ("forbidden", "Request is forbidden"),
+        404: ("not_found", "Resource not found"),
+        405: ("method_not_allowed", "Method not allowed"),
+    }.get(exc.status_code, ("http_error", "Request failed"))
+    return error_response(exc.status_code, code, message)
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,16 +149,6 @@ ENV_FILE = Path(__file__).parent / ".env"
 IMAGE_DATA_DIR = Path(__file__).parent / "data" / "images"
 IMAGE_MIME_EXT = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    db.init_db()
-    # 首次启动 seed 内置 persona 模板
-    with db.SessionLocal() as s:
-        db.seed_builtin_templates(s)
-        db.purge_expired_images(s, datetime.utcnow())
-        s.commit()
 
 
 def get_db() -> DbSession:

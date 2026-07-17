@@ -1,0 +1,991 @@
+openapi: 3.1.0
+info:
+  title: Reverse Tutor Mobile Online API
+  version: 1.0.0-draft
+  description: Canonical contract for mobile-native and the FastAPI online service.
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production placeholder
+  - url: http://127.0.0.1:8000/api/v1
+    description: Local development
+tags:
+  - name: Auth
+  - name: Content
+  - name: Activities
+  - name: Sync
+  - name: Insights
+  - name: Releases
+paths:
+  /auth/anonymous:
+    post:
+      tags: [Auth]
+      operationId: bootstrapAnonymous
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnonymousBootstrapRequest'
+      responses:
+        '201':
+          description: Anonymous account and device session created or restored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshAuth
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Rotated access and refresh tokens.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getAuthMe
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Identity derived from the Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthMeResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/sessions:
+    get:
+      tags: [Auth]
+      operationId: listAuthSessions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sessions belonging to the authenticated account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSessionPage'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /auth/sessions/{sessionId}:
+    delete:
+      tags: [Auth]
+      operationId: revokeAuthSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Session revoked or already inactive.
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /content/feed:
+    get:
+      tags: [Content]
+      operationId: getContentFeed
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+        - name: cursor
+          in: query
+          schema:
+            type: [string, 'null']
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: types
+          in: query
+          description: Comma-separated content types.
+          schema:
+            type: string
+            example: public_interest,announcement
+      responses:
+        '200':
+          description: Lightweight content feed.
+          headers:
+            ETag:
+              schema:
+                type: string
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentFeedResponse'
+        '304':
+          description: Feed has not changed.
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /content/{slug}:
+    get:
+      tags: [Content]
+      operationId: getContentDetail
+      security: []
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Published content detail.
+          headers:
+            ETag:
+              schema:
+                type: string
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '410':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /activities:
+    get:
+      tags: [Activities]
+      operationId: listActivities
+      security: []
+      parameters:
+        - name: cursor
+          in: query
+          schema:
+            type: [string, 'null']
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Active and recently closed activities.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityListResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /activities/{activityId}:
+    get:
+      tags: [Activities]
+      operationId: getActivity
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+      responses:
+        '200':
+          description: Activity definition.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Activity'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /activities/{activityId}/join:
+    post:
+      tags: [Activities]
+      operationId: joinActivity
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineWriteIdentity'
+      responses:
+        '200':
+          description: Existing or newly created participation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityParticipation'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /activities/{activityId}/progress:
+    post:
+      tags: [Activities]
+      operationId: updateActivityProgress
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityProgressRequest'
+      responses:
+        '200':
+          description: Updated participation. Progress is monotonic unless the activity says otherwise.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityParticipation'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /activities/{activityId}/participation:
+    delete:
+      tags: [Activities]
+      operationId: leaveActivity
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnlineWriteIdentity'
+      responses:
+        '200':
+          description: Participation is no longer active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityParticipation'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /activities/{activityId}/leaderboard:
+    get:
+      tags: [Activities]
+      operationId: getActivityLeaderboard
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+        - name: cursor
+          in: query
+          schema:
+            type: [string, 'null']
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        '200':
+          description: Ranked public activity progress.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /sync/push:
+    post:
+      tags: [Sync]
+      operationId: pushSync
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPushRequest'
+      responses:
+        '200':
+          description: Per-envelope results. One rejected item does not fail the batch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPushResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /sync/pull:
+    post:
+      tags: [Sync]
+      operationId: pullSync
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPullRequest'
+      responses:
+        '200':
+          description: Shared entities after the supplied cursor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncPullResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /insights/weekly:
+    post:
+      tags: [Insights]
+      operationId: generateWeeklyInsight
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeeklyInsightRequest'
+      responses:
+        '200':
+          description: Optional online enhancement based on aggregated statistics only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyInsight'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /app/releases/latest:
+    get:
+      tags: [Releases]
+      operationId: getLatestRelease
+      security: []
+      responses:
+        '200':
+          description: Latest release metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineRelease'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+        maxLength: 128
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      schema:
+        type: string
+    ActivityId:
+      name: activityId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  headers:
+    RequestId:
+      schema:
+        type: string
+  responses:
+    ErrorResponse:
+      description: Standard error response.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable, userAction, requestId]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+        userAction:
+          type: string
+          enum: [none, retry, check_connection, sign_in, reauthenticate, bootstrap_anonymous, resolve_conflict, update_app]
+        requestId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+          default: {}
+    AnonymousBootstrapRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceId, idempotencyKey]
+      properties:
+        deviceId:
+          type: string
+          minLength: 16
+          maxLength: 128
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 128
+        appVersionCode:
+          type: [integer, 'null']
+          format: int64
+          minimum: 1
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      required: [refreshToken, idempotencyKey]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 32
+          maxLength: 4096
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 128
+    AuthTokenResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - accountId
+        - deviceId
+        - sessionId
+        - tokenType
+        - accessToken
+        - accessTokenExpiresAtEpochMillis
+        - refreshToken
+        - refreshTokenExpiresAtEpochMillis
+      properties:
+        accountId: {type: string, format: uuid}
+        deviceId: {type: string}
+        sessionId: {type: string, format: uuid}
+        tokenType: {type: string, const: Bearer}
+        accessToken: {type: string}
+        accessTokenExpiresAtEpochMillis: {type: integer, format: int64}
+        refreshToken: {type: string}
+        refreshTokenExpiresAtEpochMillis: {type: integer, format: int64}
+    AuthMeResponse:
+      type: object
+      additionalProperties: false
+      required: [accountId, deviceId, sessionId, accountType, sessionExpiresAtEpochMillis]
+      properties:
+        accountId: {type: string, format: uuid}
+        deviceId: {type: string}
+        sessionId: {type: string, format: uuid}
+        accountType: {type: string, const: anonymous}
+        sessionExpiresAtEpochMillis: {type: integer, format: int64}
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [sessionId, deviceId, status, createdAtEpochMillis, expiresAtEpochMillis, current]
+      properties:
+        sessionId: {type: string, format: uuid}
+        deviceId: {type: string}
+        status: {type: string, enum: [active, revoked, expired]}
+        createdAtEpochMillis: {type: integer, format: int64}
+        expiresAtEpochMillis: {type: integer, format: int64}
+        current: {type: boolean}
+    AuthSessionPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthSession'
+    OnlineWriteIdentity:
+      type: object
+      additionalProperties: false
+      required: [deviceId, revision, idempotencyKey]
+      properties:
+        deviceId:
+          type: string
+          minLength: 1
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        idempotencyKey:
+          type: string
+          minLength: 1
+          maxLength: 128
+    IllustrationConfig:
+      type: object
+      additionalProperties: true
+      properties:
+        dialogues:
+          type: array
+          maxItems: 6
+          items:
+            type: string
+            maxLength: 120
+        palette:
+          type: string
+          maxLength: 40
+    AssetRef:
+      type: object
+      additionalProperties: false
+      required: [url, mimeType, width, height]
+      properties:
+        url:
+          type: string
+          format: uri
+        mimeType:
+          type: string
+        width:
+          type: integer
+          minimum: 1
+        height:
+          type: integer
+          minimum: 1
+        bytes:
+          type: [integer, 'null']
+          minimum: 0
+        sha256:
+          type: [string, 'null']
+    ContentFeedItem:
+      type: object
+      additionalProperties: true
+      required:
+        - id
+        - slug
+        - type
+        - title
+        - summary
+        - illustrationTemplate
+        - illustrationConfig
+        - publishedAtEpochMillis
+        - contentVersion
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+          enum: [public_interest, announcement]
+        title:
+          type: string
+          maxLength: 80
+        summary:
+          type: string
+          maxLength: 180
+        illustrationTemplate:
+          type: string
+        illustrationConfig:
+          $ref: '#/components/schemas/IllustrationConfig'
+        cover:
+          oneOf:
+            - $ref: '#/components/schemas/AssetRef'
+            - type: 'null'
+        publisherName:
+          type: [string, 'null']
+        publishedAtEpochMillis:
+          type: integer
+          format: int64
+        contentVersion:
+          type: integer
+          minimum: 1
+    ContentFeedResponse:
+      type: object
+      additionalProperties: false
+      required: [version, updatedAtEpochMillis, items, nextCursor]
+      properties:
+        version:
+          type: integer
+          minimum: 0
+        updatedAtEpochMillis:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentFeedItem'
+        nextCursor:
+          type: [string, 'null']
+    ContentDetail:
+      allOf:
+        - $ref: '#/components/schemas/ContentFeedItem'
+        - type: object
+          required: [bodyMarkdown, bodyAssets]
+          properties:
+            bodyMarkdown:
+              type: string
+              maxLength: 100000
+            bodyAssets:
+              type: array
+              maxItems: 5
+              items:
+                $ref: '#/components/schemas/AssetRef'
+    Activity:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - description
+        - revision
+        - startsAtEpochMillis
+        - endsAtEpochMillis
+        - requiresOnlineConfirmation
+        - allowsDeferredProgress
+        - state
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        startsAtEpochMillis:
+          type: integer
+          format: int64
+        endsAtEpochMillis:
+          type: integer
+          format: int64
+        requiresOnlineConfirmation:
+          type: boolean
+        allowsDeferredProgress:
+          type: boolean
+        state:
+          type: string
+          enum: [scheduled, active, closed, offline]
+        sessionTemplateId:
+          type: [string, 'null']
+    ActivityListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, updatedAtEpochMillis]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Activity'
+        nextCursor:
+          type: [string, 'null']
+        updatedAtEpochMillis:
+          type: integer
+          format: int64
+    ActivityProgressRequest:
+      allOf:
+        - $ref: '#/components/schemas/OnlineWriteIdentity'
+        - type: object
+          required: [progress]
+          properties:
+            progress:
+              type: integer
+              format: int64
+              minimum: 0
+    ActivityParticipation:
+      type: object
+      additionalProperties: false
+      required: [activityId, userId, joined, progress, revision, state, idempotencyKey]
+      properties:
+        activityId:
+          type: string
+        userId:
+          type: string
+        joined:
+          type: boolean
+        progress:
+          type: integer
+          format: int64
+          minimum: 0
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        state:
+          type: string
+          enum: [joined, pending_sync, completed, left]
+        idempotencyKey:
+          type: string
+    LeaderboardItem:
+      type: object
+      additionalProperties: false
+      required: [rank, displayName, progress]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        displayName:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+          format: uri
+        progress:
+          type: integer
+          format: int64
+          minimum: 0
+        isCurrentUser:
+          type: boolean
+          default: false
+    LeaderboardResponse:
+      type: object
+      additionalProperties: false
+      required: [items, nextCursor, updatedAtEpochMillis]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LeaderboardItem'
+        nextCursor:
+          type: [string, 'null']
+        updatedAtEpochMillis:
+          type: integer
+          format: int64
+    SyncItem:
+      type: object
+      additionalProperties: true
+      required:
+        - envelopeId
+        - spaceId
+        - entityId
+        - entityType
+        - revision
+        - idempotencyKey
+        - operation
+        - payload
+        - updatedAtEpochMillis
+      properties:
+        envelopeId:
+          type: string
+        spaceId:
+          type: string
+        entityId:
+          type: string
+        entityType:
+          type: string
+          enum: [activity_progress, study_plan, sync_summary, user_setting]
+        revision:
+          type: integer
+          format: int64
+          minimum: 0
+        idempotencyKey:
+          type: string
+        operation:
+          type: string
+          enum: [upsert, delete]
+        payload:
+          type: object
+          additionalProperties: true
+        updatedAtEpochMillis:
+          type: integer
+          format: int64
+        deletedAtEpochMillis:
+          type: [integer, 'null']
+          format: int64
+    SyncPushRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceId, spaceId, cursor, items]
+      properties:
+        deviceId:
+          type: string
+        spaceId:
+          type: string
+        cursor:
+          type: [string, 'null']
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/SyncItem'
+    SyncPushItemResult:
+      type: object
+      additionalProperties: false
+      required: [envelopeId, entityId, accepted, retryable]
+      properties:
+        envelopeId:
+          type: string
+        entityId:
+          type: string
+        accepted:
+          type: boolean
+        remoteRevision:
+          type: [integer, 'null']
+          format: int64
+        errorCode:
+          type: [string, 'null']
+        retryable:
+          type: boolean
+    SyncPushResponse:
+      type: object
+      additionalProperties: false
+      required: [cursor, items]
+      properties:
+        cursor:
+          type: [string, 'null']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncPushItemResult'
+    SyncPullRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceId, spaceId, cursor]
+      properties:
+        deviceId:
+          type: string
+        spaceId:
+          type: string
+        cursor:
+          type: [string, 'null']
+        entityTypes:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [activity_progress, study_plan, sync_summary, user_setting]
+    SyncRemoteItem:
+      allOf:
+        - $ref: '#/components/schemas/SyncItem'
+        - type: object
+          required: [ownerId, deviceId]
+          properties:
+            ownerId:
+              type: string
+            deviceId:
+              type: string
+    SyncPullResponse:
+      type: object
+      additionalProperties: false
+      required: [cursor, items]
+      properties:
+        cursor:
+          type: [string, 'null']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncRemoteItem'
+    WeeklyInsightRequest:
+      type: object
+      additionalProperties: false
+      required: [deviceId, spaceId, weekStartEpochMillis, sourceRevision, statistics]
+      properties:
+        deviceId:
+          type: string
+        spaceId:
+          type: string
+        weekStartEpochMillis:
+          type: integer
+          format: int64
+        sourceRevision:
+          type: integer
+          format: int64
+          minimum: 0
+        statistics:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+            minimum: 0
+    WeeklyInsight:
+      type: object
+      additionalProperties: false
+      required: [spaceId, weekStartEpochMillis, sourceRevision, generatorVersion, summary]
+      properties:
+        spaceId:
+          type: string
+        weekStartEpochMillis:
+          type: integer
+          format: int64
+        sourceRevision:
+          type: integer
+          format: int64
+        generatorVersion:
+          type: string
+        summary:
+          type: string
+          maxLength: 4000
+    OnlineRelease:
+      type: object
+      additionalProperties: false
+      required: [versionName, versionCode, minimumSupportedVersionCode]
+      properties:
+        versionName:
+          type: string
+        versionCode:
+          type: integer
+          format: int64
+          minimum: 1
+        minimumSupportedVersionCode:
+          type: integer
+          format: int64
+          minimum: 1
+        downloadUrl:
+          type: [string, 'null']
+          format: uri
+        sha256:
+          type: [string, 'null']
+          pattern: '^[A-Fa-f0-9]{64}$'
+security:
+  - bearerAuth: []

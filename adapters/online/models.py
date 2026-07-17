@@ -19,7 +19,8 @@ class CamelModel(BaseModel):
 
 
 class OnlineWriteIdentity(CamelModel):
-    user_id: str = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
     device_id: str = Field(min_length=1)
     revision: int = Field(ge=0)
     idempotency_key: str = Field(min_length=1)
@@ -40,20 +41,23 @@ class SyncItem(CamelModel):
 
 
 class SyncPushRequest(CamelModel):
-    user_id: str = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
     device_id: str = Field(min_length=1)
     cursor: str | None = None
     items: list[SyncItem] = Field(default_factory=list, max_length=100)
 
 
 class SyncPullRequest(CamelModel):
-    user_id: str = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
     device_id: str = Field(min_length=1)
     cursor: str | None = None
 
 
 class WeeklyInsightRequest(CamelModel):
-    user_id: str = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
     device_id: str = Field(min_length=1)
     space_id: str = Field(min_length=1)
     week_start_epoch_millis: int = Field(ge=0)

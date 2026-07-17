@@ -4,34 +4,58 @@ import httpx
 import pytest
 
 import server
+from adapters.online.auth_routes import reset_auth_service
 from adapters.online.service import online_service
 
 
 @pytest.fixture
 async def client():
+    reset_auth_service()
     online_service.reset()
     transport = httpx.ASGITransport(app=server.app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
 
 
+async def authenticated(client, suffix: str = "one") -> tuple[dict, dict[str, str]]:
+    response = await client.post(
+        "/api/v1/auth/anonymous",
+        json={
+            "deviceId": f"device-{suffix}-0123456789",
+            "idempotencyKey": f"bootstrap-{suffix}",
+        },
+    )
+    assert response.status_code == 201
+    issued = response.json()
+    return issued, {"Authorization": f"Bearer {issued['accessToken']}"}
+
+
 async def test_activities_list_detail_and_join_are_idempotent(client):
+    issued, headers = await authenticated(client)
     listed = await client.get("/api/v1/activities")
     assert listed.status_code == 200
     activity = listed.json()["items"][0]
+    assert listed.json()["nextCursor"] is None
+    assert isinstance(listed.json()["updatedAtEpochMillis"], int)
+    assert activity["allowsDeferredProgress"] is True
+    assert activity["state"] == "active"
+    assert activity["sessionTemplateId"]
 
     detail = await client.get(f"/api/v1/activities/{activity['id']}")
     assert detail.status_code == 200
     assert detail.json()["revision"] == activity["revision"]
 
     payload = {
-        "userId": "user-1",
-        "deviceId": "device-1",
+        "deviceId": issued["deviceId"],
         "revision": activity["revision"],
         "idempotencyKey": "join-1",
     }
-    first = await client.post(f"/api/v1/activities/{activity['id']}/join", json=payload)
-    second = await client.post(f"/api/v1/activities/{activity['id']}/join", json=payload)
+    first = await client.post(
+        f"/api/v1/activities/{activity['id']}/join", json=payload, headers=headers
+    )
+    second = await client.post(
+        f"/api/v1/activities/{activity['id']}/join", json=payload, headers=headers
+    )
 
     assert first.status_code == 200
     assert second.status_code == 200
@@ -40,42 +64,58 @@ async def test_activities_list_detail_and_join_are_idempotent(client):
 
 
 async def test_activity_idempotency_is_scoped_to_user_and_leaderboard_is_readable(client):
-    base = {
-        "deviceId": "device-1",
-        "revision": 1,
-        "idempotencyKey": "same-client-key",
-        "progress": 2,
-    }
+    first_identity, first_headers = await authenticated(client, "one")
+    second_identity, second_headers = await authenticated(client, "two")
     first = await client.post(
         "/api/v1/activities/focus-week/progress",
-        json={**base, "userId": "user-1"},
+        headers=first_headers,
+        json={
+            "deviceId": first_identity["deviceId"],
+            "revision": 1,
+            "idempotencyKey": "same-client-key",
+            "progress": 2,
+        },
     )
     second = await client.post(
         "/api/v1/activities/focus-week/progress",
-        json={**base, "userId": "user-2"},
+        headers=second_headers,
+        json={
+            "deviceId": second_identity["deviceId"],
+            "revision": 1,
+            "idempotencyKey": "same-client-key",
+            "progress": 2,
+        },
     )
     leaderboard = await client.get("/api/v1/activities/focus-week/leaderboard")
 
     assert first.status_code == 200
     assert second.status_code == 200
     assert online_service.activity_write_count == 2
-    assert [row["userId"] for row in leaderboard.json()["items"]] == [
-        "user-1",
-        "user-2",
-    ]
+    assert [row["userId"] for row in leaderboard.json()["items"]] == sorted(
+        [first_identity["accountId"], second_identity["accountId"]]
+    )
+    assert leaderboard.json()["items"][0]["rank"] == 1
+    assert leaderboard.json()["items"][0]["displayName"]
+    assert "isCurrentUser" in leaderboard.json()["items"][0]
+    assert leaderboard.json()["nextCursor"] is None
+    assert isinstance(leaderboard.json()["updatedAtEpochMillis"], int)
 
 
 async def test_activity_progress_write_is_idempotent(client):
+    issued, headers = await authenticated(client)
     payload = {
-        "userId": "user-1",
-        "deviceId": "device-1",
+        "deviceId": issued["deviceId"],
         "revision": 1,
         "idempotencyKey": "progress-1",
         "progress": 3,
     }
 
-    first = await client.post("/api/v1/activities/focus-week/progress", json=payload)
-    second = await client.post("/api/v1/activities/focus-week/progress", json=payload)
+    first = await client.post(
+        "/api/v1/activities/focus-week/progress", json=payload, headers=headers
+    )
+    second = await client.post(
+        "/api/v1/activities/focus-week/progress", json=payload, headers=headers
+    )
 
     assert first.status_code == 200
     assert first.json() == second.json()
@@ -83,11 +123,12 @@ async def test_activity_progress_write_is_idempotent(client):
 
 
 async def test_sync_push_isolates_invalid_or_failed_items(client):
+    issued, headers = await authenticated(client)
     response = await client.post(
         "/api/v1/sync/push",
+        headers=headers,
         json={
-            "userId": "user-1",
-            "deviceId": "device-1",
+            "deviceId": issued["deviceId"],
             "cursor": None,
             "items": [
                 {
@@ -130,19 +171,20 @@ async def test_sync_push_isolates_invalid_or_failed_items(client):
 
 
 async def test_sync_push_isolates_unexpected_item_failure(client, monkeypatch):
+    issued, headers = await authenticated(client)
     original = online_service._push_sync_item
 
-    def fail_one(request, item):
+    def fail_one(account_id, request, item):
         if item.entity_id == "plan-fail":
             raise RuntimeError("temporary storage error")
-        return original(request, item)
+        return original(account_id, request, item)
 
     monkeypatch.setattr(online_service, "_push_sync_item", fail_one)
     response = await client.post(
         "/api/v1/sync/push",
+        headers=headers,
         json={
-            "userId": "user-1",
-            "deviceId": "device-1",
+            "deviceId": issued["deviceId"],
             "items": [
                 {
                     "envelopeId": "env-fail",
@@ -174,9 +216,9 @@ async def test_sync_push_isolates_unexpected_item_failure(client, monkeypatch):
 
 
 async def test_sync_push_reuses_idempotent_result_and_pull_returns_cursor(client):
+    issued, headers = await authenticated(client)
     request = {
-        "userId": "user-1",
-        "deviceId": "device-1",
+        "deviceId": issued["deviceId"],
         "items": [
             {
                 "envelopeId": "env-sync-1",
@@ -189,11 +231,12 @@ async def test_sync_push_reuses_idempotent_result_and_pull_returns_cursor(client
         ],
     }
 
-    first = await client.post("/api/v1/sync/push", json=request)
-    second = await client.post("/api/v1/sync/push", json=request)
+    first = await client.post("/api/v1/sync/push", json=request, headers=headers)
+    second = await client.post("/api/v1/sync/push", json=request, headers=headers)
     pulled = await client.post(
         "/api/v1/sync/pull",
-        json={"userId": "user-1", "deviceId": "device-2", "cursor": None},
+        headers=headers,
+        json={"deviceId": issued["deviceId"], "cursor": None},
     )
 
     assert first.json() == second.json()
@@ -204,11 +247,12 @@ async def test_sync_push_reuses_idempotent_result_and_pull_returns_cursor(client
 
 
 async def test_weekly_insight_and_latest_release_are_available_without_learning_body(client):
+    issued, headers = await authenticated(client)
     insight = await client.post(
         "/api/v1/insights/weekly",
+        headers=headers,
         json={
-            "userId": "user-1",
-            "deviceId": "device-1",
+            "deviceId": issued["deviceId"],
             "spaceId": "space-1",
             "weekStartEpochMillis": 1000,
             "sourceRevision": 4,
