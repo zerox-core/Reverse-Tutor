@@ -23,7 +23,7 @@ class OnlineWriteIdentity(CamelModel):
 
     device_id: str = Field(min_length=1)
     revision: int = Field(ge=0)
-    idempotency_key: str = Field(min_length=1)
+    idempotency_key: str = Field(min_length=1, max_length=128)
 
 
 class ActivityProgressRequest(OnlineWriteIdentity):

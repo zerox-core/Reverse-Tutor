@@ -91,12 +91,15 @@ async def test_activity_idempotency_is_scoped_to_user_and_leaderboard_is_readabl
     assert first.status_code == 200
     assert second.status_code == 200
     assert online_service.activity_write_count == 2
-    assert [row["userId"] for row in leaderboard.json()["items"]] == sorted(
-        [first_identity["accountId"], second_identity["accountId"]]
-    )
-    assert leaderboard.json()["items"][0]["rank"] == 1
-    assert leaderboard.json()["items"][0]["displayName"]
-    assert "isCurrentUser" in leaderboard.json()["items"][0]
+    assert len(leaderboard.json()["items"]) == 2
+    assert [row["rank"] for row in leaderboard.json()["items"]] == [1, 2]
+    assert set(leaderboard.json()["items"][0]) == {
+        "rank",
+        "displayName",
+        "avatarUrl",
+        "progress",
+        "isCurrentUser",
+    }
     assert leaderboard.json()["nextCursor"] is None
     assert isinstance(leaderboard.json()["updatedAtEpochMillis"], int)
 

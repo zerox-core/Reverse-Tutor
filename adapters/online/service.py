@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import os
-import time
 from copy import deepcopy
+from datetime import datetime
 from threading import RLock
-from typing import Any
+from typing import Any, Callable
 
+from .content_activity_memory import MemoryContentActivityPort
+from .content_activity_ports import ActivityPort, PublicContentPort
+from .content_activity_service import ContentActivityService
 from .models import (
     ActivityProgressRequest,
     OnlineWriteIdentity,
@@ -25,157 +28,127 @@ SYNCABLE_ENTITY_TYPES = {
 
 
 class OnlineHybridService:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        content_port: PublicContentPort | None = None,
+        activity_port: ActivityPort | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._lock = RLock()
+        self._clock = clock
+        self._default_content_activity_port = MemoryContentActivityPort()
+        self._content_port = content_port or self._default_content_activity_port
+        self._activity_port = activity_port or self._default_content_activity_port
+        self._content_activity = ContentActivityService(
+            self._content_port,
+            self._activity_port,
+            self._clock,
+        )
         self.reset()
 
     def reset(self) -> None:
         with self._lock:
-            self.activities = {
-                "focus-week": {
-                    "id": "focus-week",
-                    "title": "Focus Week",
-                    "description": "Complete focused local study sessions this week.",
-                    "revision": 1,
-                    "startsAtEpochMillis": 0,
-                    "endsAtEpochMillis": 4_102_444_800_000,
-                    "requiresOnlineConfirmation": False,
-                    "allowsDeferredProgress": True,
-                    "state": "active",
-                    "sessionTemplateId": "focus-week-v1",
-                }
-            }
-            self._updated_at_epoch_millis = int(time.time() * 1000)
-            self._activity_results: dict[tuple[str, str, str], dict[str, Any]] = {}
-            self._activity_progress: dict[tuple[str, str], dict[str, Any]] = {}
+            self._default_content_activity_port.reset()
             self._sync_results: dict[tuple[str, str], dict[str, Any]] = {}
             self._sync_records: list[dict[str, Any]] = []
-            self.activity_write_count = 0
             self.sync_write_count = 0
 
-    def list_activities(self) -> dict[str, Any]:
-        with self._lock:
-            return {
-                "items": deepcopy(list(self.activities.values())),
-                "nextCursor": None,
-                "updatedAtEpochMillis": self._updated_at_epoch_millis,
-            }
+    @property
+    def activity_write_count(self) -> int:
+        return int(getattr(self._activity_port, "write_count", 0))
 
-    def get_activity(self, activity_id: str) -> dict[str, Any] | None:
+    def set_content_activity_ports(
+        self,
+        *,
+        content_port: PublicContentPort | None = None,
+        activity_port: ActivityPort | None = None,
+    ) -> None:
         with self._lock:
-            activity = self.activities.get(activity_id)
-            return deepcopy(activity) if activity else None
+            if content_port is not None:
+                self._content_port = content_port
+            if activity_port is not None:
+                self._activity_port = activity_port
+            self._content_activity = ContentActivityService(
+                self._content_port,
+                self._activity_port,
+                self._clock,
+            )
+
+    def reset_content_activity_ports(self) -> None:
+        with self._lock:
+            self._default_content_activity_port.reset()
+            self._content_port = self._default_content_activity_port
+            self._activity_port = self._default_content_activity_port
+            self._content_activity = ContentActivityService(
+                self._content_port,
+                self._activity_port,
+                self._clock,
+            )
+
+    def content_feed(
+        self,
+        *,
+        cursor: str | None,
+        limit: int,
+        content_types: frozenset[str],
+    ):
+        return self._content_activity.content_feed(
+            cursor=cursor,
+            limit=limit,
+            content_types=content_types,
+        )
+
+    def content_detail(self, slug: str):
+        return self._content_activity.content_detail(slug)
+
+    def list_activities(
+        self, *, cursor: str | None = None, limit: int = 20
+    ):
+        return self._content_activity.list_activities(cursor=cursor, limit=limit)
+
+    def get_activity(self, activity_id: str):
+        return self._content_activity.get_activity(activity_id)
 
     def join_activity(
         self,
         activity_id: str,
         account_id: str,
         request: OnlineWriteIdentity,
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            if activity_id not in self.activities:
-                return None
-            key = (f"join:{activity_id}", account_id, request.idempotency_key)
-            if key in self._activity_results:
-                return deepcopy(self._activity_results[key])
-            result = {
-                "activityId": activity_id,
-                "userId": account_id,
-                "joined": True,
-                "progress": 0,
-                "revision": max(1, request.revision),
-                "state": "joined",
-                "idempotencyKey": request.idempotency_key,
-            }
-            self._activity_results[key] = result
-            self._activity_progress[(activity_id, account_id)] = result
-            self.activity_write_count += 1
-            return deepcopy(result)
+    ):
+        return self._content_activity.join_activity(activity_id, account_id, request)
 
     def update_activity_progress(
         self,
         activity_id: str,
         account_id: str,
         request: ActivityProgressRequest,
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            if activity_id not in self.activities:
-                return None
-            key = (f"progress:{activity_id}", account_id, request.idempotency_key)
-            if key in self._activity_results:
-                return deepcopy(self._activity_results[key])
-            previous = self._activity_progress.get((activity_id, account_id), {})
-            result = {
-                "activityId": activity_id,
-                "userId": account_id,
-                "joined": True,
-                "progress": max(int(previous.get("progress", 0)), request.progress),
-                "revision": max(int(previous.get("revision", 0)) + 1, request.revision),
-                "state": "joined",
-                "idempotencyKey": request.idempotency_key,
-            }
-            self._activity_results[key] = result
-            self._activity_progress[(activity_id, account_id)] = result
-            self.activity_write_count += 1
-            return deepcopy(result)
+    ):
+        return self._content_activity.update_activity_progress(
+            activity_id,
+            account_id,
+            request,
+        )
 
     def leave_activity(
         self,
         activity_id: str,
         account_id: str,
         request: OnlineWriteIdentity,
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            if activity_id not in self.activities:
-                return None
-            key = (f"leave:{activity_id}", account_id, request.idempotency_key)
-            if key in self._activity_results:
-                return deepcopy(self._activity_results[key])
-            previous = self._activity_progress.get((activity_id, account_id), {})
-            result = {
-                "activityId": activity_id,
-                "userId": account_id,
-                "joined": False,
-                "progress": int(previous.get("progress", 0)),
-                "revision": max(int(previous.get("revision", 0)) + 1, request.revision),
-                "state": "left",
-                "idempotencyKey": request.idempotency_key,
-            }
-            self._activity_results[key] = result
-            self._activity_progress[(activity_id, account_id)] = result
-            self.activity_write_count += 1
-            return deepcopy(result)
+    ):
+        return self._content_activity.leave_activity(activity_id, account_id, request)
 
-    def activity_leaderboard(self, activity_id: str) -> dict[str, Any] | None:
-        with self._lock:
-            if activity_id not in self.activities:
-                return None
-            rows = [
-                deepcopy(progress)
-                for (stored_activity_id, _), progress in self._activity_progress.items()
-                if stored_activity_id == activity_id
-            ]
-            rows.sort(key=lambda row: (-int(row["progress"]), str(row["userId"])))
-            # Leaderboards are public.  Keep the legacy userId for existing
-            # callers while exposing the strict display/rank fields consumed by
-            # the native client; user identity is never inferred from request
-            # bodies for protected writes.
-            items = []
-            for rank, row in enumerate(rows, start=1):
-                items.append(
-                    {
-                        **row,
-                        "rank": rank,
-                        "displayName": "Learner",
-                        "avatarUrl": None,
-                        "isCurrentUser": False,
-                    }
-                )
-            return {
-                "items": items,
-                "nextCursor": None,
-                "updatedAtEpochMillis": self._updated_at_epoch_millis,
-            }
+    def activity_leaderboard(
+        self,
+        activity_id: str,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+    ):
+        return self._content_activity.activity_leaderboard(
+            activity_id,
+            cursor=cursor,
+            limit=limit,
+        )
 
     def push_sync(self, account_id: str, request: SyncPushRequest) -> dict[str, Any]:
         results = []

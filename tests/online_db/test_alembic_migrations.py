@@ -18,6 +18,12 @@ ALLOWED_TABLES = {
     "idempotency_records",
     "migration_runs",
     "migration_validation_results",
+    "content_items",
+    "content_assets",
+    "activities",
+    "activity_tasks",
+    "activity_participations",
+    "activity_progress_events",
 }
 
 

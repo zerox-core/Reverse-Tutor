@@ -68,3 +68,56 @@ def test_live_fastapi_openapi_matches_slice_zero_auth_surface():
         "WeeklyInsightRequest",
     ):
         assert "userId" not in schemas[schema_name].get("properties", {})
+
+
+def test_live_fastapi_openapi_matches_content_and_activity_surface():
+    paths = server.app.openapi()["paths"]
+    expected_operations = {
+        "/api/v1/content/feed": ("get", "getContentFeed", "ContentFeedResponse"),
+        "/api/v1/content/{slug}": ("get", "getContentDetail", "ContentDetail"),
+        "/api/v1/activities": ("get", "listActivities", "ActivityListResponse"),
+        "/api/v1/activities/{activityId}": ("get", "getActivity", "Activity"),
+        "/api/v1/activities/{activityId}/join": (
+            "post",
+            "joinActivity",
+            "ActivityParticipation",
+        ),
+        "/api/v1/activities/{activityId}/progress": (
+            "post",
+            "updateActivityProgress",
+            "ActivityParticipation",
+        ),
+        "/api/v1/activities/{activityId}/participation": (
+            "delete",
+            "leaveActivity",
+            "ActivityParticipation",
+        ),
+        "/api/v1/activities/{activityId}/leaderboard": (
+            "get",
+            "getActivityLeaderboard",
+            "LeaderboardResponse",
+        ),
+    }
+
+    for path, (method, operation_id, response_schema) in expected_operations.items():
+        operation = paths[path][method]
+        assert operation["operationId"] == operation_id
+        assert operation["responses"]["200"]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": f"#/components/schemas/{response_schema}"}
+
+    for path in (
+        "/api/v1/content/feed",
+        "/api/v1/content/{slug}",
+        "/api/v1/activities",
+        "/api/v1/activities/{activityId}",
+        "/api/v1/activities/{activityId}/leaderboard",
+    ):
+        assert paths[path]["get"]["security"] == []
+
+    for path, method in (
+        ("/api/v1/activities/{activityId}/join", "post"),
+        ("/api/v1/activities/{activityId}/progress", "post"),
+        ("/api/v1/activities/{activityId}/participation", "delete"),
+    ):
+        assert paths[path][method]["security"] == [{"bearerAuth": []}]

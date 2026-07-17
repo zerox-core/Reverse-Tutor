@@ -38,9 +38,10 @@ import vision
 from adapters import dispatch_webhook
 from adapters.online import router as online_router
 from adapters.online.auth_routes import reset_auth_service, set_auth_service
-from adapters.online.dependencies import build_postgres_auth_service
+from adapters.online.dependencies import build_postgres_online_services
 from adapters.online.errors import OnlineApiError, error_response
 from adapters.online.request_context import request_id_from_header, request_id_var
+from adapters.online.service import online_service
 from online_db.settings import OnlineDatabaseSettings
 
 def configure_online_auth_from_env() -> bool:
@@ -49,10 +50,16 @@ def configure_online_auth_from_env() -> bool:
         # Production online writes are fail-closed: the configured database
         # must be migrated to the single Alembic head before serving traffic.
         settings = OnlineDatabaseSettings.from_env()
-        set_auth_service(build_postgres_auth_service(settings.database_url))
+        services = build_postgres_online_services(settings.database_url)
+        set_auth_service(services.auth_service)
+        online_service.set_content_activity_ports(
+            content_port=services.content_port,
+            activity_port=services.activity_port,
+        )
         return True
     if os.getenv("ONLINE_AUTH_ALLOW_IN_MEMORY", "") == "1":
         reset_auth_service()
+        online_service.reset_content_activity_ports()
         return False
     raise RuntimeError(
         "ONLINE_DATABASE_URL is required unless ONLINE_AUTH_ALLOW_IN_MEMORY=1"
@@ -72,6 +79,7 @@ async def app_lifespan(_app: FastAPI):
         yield
     finally:
         reset_auth_service()
+        online_service.reset_content_activity_ports()
 
 
 # --- App ---------------------------------------------------------------------
