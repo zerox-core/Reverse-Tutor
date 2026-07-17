@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${ONLINE_POSTGRES_USER:-reverse_tutor}
       POSTGRES_PASSWORD: ${ONLINE_POSTGRES_PASSWORD:-reverse_tutor_dev}
     ports:
-      - "${ONLINE_POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${ONLINE_POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test:
         - CMD-SHELL

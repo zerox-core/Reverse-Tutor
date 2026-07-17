@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from online_db.activity_store import ActivityDefinition, SqlAlchemyActivityStore
@@ -30,56 +31,61 @@ def seed_online_catalog(
     content_store = SqlAlchemyContentStore(session_factory)
     created_content = 0
     if content_store.get_by_slug(CONTENT_SLUG, published_only=False) is None:
-        content = content_store.create_item(
-            ContentItemInput(
-                slug=CONTENT_SLUG,
-                content_type="public_interest",
-                title="Verify links before opening them",
-                summary="Three checks for suspicious links.",
-                body_markdown=(
-                    "# Check the source\n\n"
-                    "Pause before opening a link. Verify the sender, inspect the "
-                    "domain, and avoid sharing information the page does not need."
+        try:
+            content_store.create_published_item(
+                ContentItemInput(
+                    slug=CONTENT_SLUG,
+                    content_type="public_interest",
+                    title="Verify links before opening them",
+                    summary="Three checks for suspicious links.",
+                    body_markdown=(
+                        "# Check the source\n\n"
+                        "Pause before opening a link. Verify the sender, inspect the "
+                        "domain, and avoid sharing information the page does not need."
+                    ),
+                    illustration_template="dialogue-security-01",
+                    illustration_config={
+                        "dialogues": [
+                            "Is this link safe?",
+                            "Check its source before opening it.",
+                        ],
+                        "palette": "cool-blue-amber",
+                    },
+                    publisher_name="Reverse Tutor",
                 ),
-                illustration_template="dialogue-security-01",
-                illustration_config={
-                    "dialogues": [
-                        "Is this link safe?",
-                        "Check its source before opening it.",
-                    ],
-                    "palette": "cool-blue-amber",
-                },
-                publisher_name="Reverse Tutor",
-            ),
-            now,
-        )
-        content_store.publish(content.id, now)
-        created_content = 1
+                now,
+            )
+            created_content = 1
+        except IntegrityError:
+            pass
 
     activity_store = SqlAlchemyActivityStore(session_factory)
     created_activities = 0
     if activity_store.get_activity(ACTIVITY_SLUG) is None:
-        activity_store.create_activity(
-            ActivityDefinition(
-                slug=ACTIVITY_SLUG,
-                title="21-day Python learning challenge",
-                description=(
-                    "Build a consistent Python learning rhythm with one daily "
-                    "challenge for 21 days."
+        try:
+            activity_store.create_activity(
+                ActivityDefinition(
+                    slug=ACTIVITY_SLUG,
+                    title="21-day Python learning challenge",
+                    description=(
+                        "Build a consistent Python learning rhythm with one daily "
+                        "challenge for 21 days."
+                    ),
+                    revision=1,
+                    rule_version=1,
+                    total_days=21,
+                    starts_at=now,
+                    ends_at=now + timedelta(days=21),
+                    requires_online_confirmation=True,
+                    allows_deferred_progress=True,
+                    state="active",
+                    session_template_id="challenge-python-21-days-v1",
                 ),
-                revision=1,
-                rule_version=1,
-                total_days=21,
-                starts_at=now,
-                ends_at=now + timedelta(days=21),
-                requires_online_confirmation=True,
-                allows_deferred_progress=True,
-                state="active",
-                session_template_id="challenge-python-21-days-v1",
-            ),
-            now,
-        )
-        created_activities = 1
+                now,
+            )
+            created_activities = 1
+        except IntegrityError:
+            pass
 
     return CatalogSeedResult(
         created_content=created_content,

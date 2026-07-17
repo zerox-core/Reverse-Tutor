@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from sqlalchemy import URL
@@ -50,6 +51,26 @@ def test_seed_online_catalog_is_repeatable(sqlite_session_factory):
     assert activity.ends_at == NOW + timedelta(days=21)
     assert activity.requires_online_confirmation is True
     assert activity.allows_deferred_progress is True
+
+
+def test_seed_publishes_new_content_without_a_second_store_transaction(
+    sqlite_session_factory,
+    monkeypatch,
+):
+    def reject_two_phase_publish(*_args, **_kwargs):
+        raise AssertionError("seed must not publish in a second transaction")
+
+    monkeypatch.setattr(SqlAlchemyContentStore, "publish", reject_two_phase_publish)
+
+    result = seed_online_catalog(sqlite_session_factory, NOW)
+
+    assert result.created_content == 1
+    content = SqlAlchemyContentStore(sqlite_session_factory).get_by_slug(
+        "verify-before-opening-links"
+    )
+    assert content is not None
+    assert content.status == "published"
+    assert content.publish_at == NOW
 
 
 def test_seed_online_catalog_never_overwrites_existing_slugs(
@@ -134,3 +155,9 @@ def test_seed_cli_checks_schema_before_building_factory_and_prints_counts(
         "Catalog seed complete: content created=1 skipped=0; "
         "activities created=0 skipped=1"
     )
+
+
+def test_compose_binds_development_postgres_to_loopback():
+    compose = Path("docker-compose.online.yml").read_text(encoding="utf-8")
+
+    assert '127.0.0.1:${ONLINE_POSTGRES_PORT:-5432}:5432' in compose

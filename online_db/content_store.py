@@ -84,6 +84,22 @@ class SqlAlchemyContentStore:
             bind.dispose()
 
     def create_item(self, item: ContentItemInput, now: datetime) -> ContentItemRecord:
+        return self._create_item(item, now, status="draft", publish_at=None)
+
+    def create_published_item(
+        self, item: ContentItemInput, now: datetime
+    ) -> ContentItemRecord:
+        now = _utc_input(now)
+        return self._create_item(item, now, status="published", publish_at=now)
+
+    def _create_item(
+        self,
+        item: ContentItemInput,
+        now: datetime,
+        *,
+        status: str,
+        publish_at: datetime | None,
+    ) -> ContentItemRecord:
         now = _utc_input(now)
         with self._session_factory() as database, database.begin():
             row = ContentItem(
@@ -96,8 +112,9 @@ class SqlAlchemyContentStore:
                 illustration_template=item.illustration_template,
                 illustration_config=item.illustration_config,
                 publisher_name=item.publisher_name,
-                status="draft",
+                status=status,
                 sort_order=item.sort_order,
+                publish_at=publish_at,
                 content_version=1,
                 created_at=now,
                 updated_at=now,
