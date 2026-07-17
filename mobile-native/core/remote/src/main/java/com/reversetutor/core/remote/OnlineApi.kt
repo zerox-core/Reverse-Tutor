@@ -13,51 +13,57 @@ object OnlineSyncEntityTypes {
     fun isAllowed(entityType: String): Boolean = entityType in Allowed
 }
 
-interface OnlineApi {
-    suspend fun listActivities(): OnlineResult<List<OnlineActivity>>
-    suspend fun getActivity(activityId: String): OnlineResult<OnlineActivity>
-    suspend fun activityLeaderboard(activityId: String): OnlineResult<List<ActivityProgress>>
-    suspend fun joinActivity(activityId: String, write: OnlineWriteIdentity): OnlineResult<ActivityProgress>
-    suspend fun updateActivityProgress(
-        activityId: String,
-        write: OnlineWriteIdentity,
-        progress: Long
-    ): OnlineResult<ActivityProgress>
-
-    suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse>
-    suspend fun pullSync(request: SyncPullRequest): OnlineResult<SyncPullResponse>
-    suspend fun weeklyInsight(request: WeeklyInsightRequest): OnlineResult<WeeklyInsight>
-    suspend fun latestRelease(): OnlineResult<OnlineRelease>
-}
+interface OnlineApi : ActivityApi, ContentApi, SyncApi, InsightApi, ReleaseApi
 
 sealed interface OnlineResult<out T> {
     data class Success<T>(val value: T) : OnlineResult<T>
-    data class Failure(val code: String, val retryable: Boolean) : OnlineResult<Nothing>
+    data class Failure(
+        val code: String,
+        val retryable: Boolean,
+        val userAction: String = "none",
+        val requestId: String? = null
+    ) : OnlineResult<Nothing>
 }
 
 data class OnlineWriteIdentity(
+    @Deprecated("Compatibility only; never serialized or used for authorization")
     val userId: String,
     val deviceId: String,
     val revision: Long,
     val idempotencyKey: String
-)
+) {
+    constructor(
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String
+    ) : this("", deviceId, revision, idempotencyKey)
+}
 
 data class OnlineActivity(
     val id: String,
     val title: String,
     val revision: Long,
     val startsAtEpochMillis: Long,
-    val endsAtEpochMillis: Long
+    val endsAtEpochMillis: Long,
+    val description: String = "",
+    val requiresOnlineConfirmation: Boolean = false,
+    val allowsDeferredProgress: Boolean = false,
+    val state: String = "offline",
+    val sessionTemplateId: String? = null
 )
 
 data class ActivityProgress(
     val activityId: String,
     val userId: String,
+    val joined: Boolean,
     val progress: Long,
-    val revision: Long
+    val revision: Long,
+    val state: String,
+    val idempotencyKey: String
 )
 
 data class SyncPushRequest(
+    @Deprecated("Compatibility only; never serialized or used for authorization")
     val userId: String,
     val deviceId: String,
     val items: List<SyncEnvelope>,
@@ -85,6 +91,7 @@ data class SyncPushItemResult(
 )
 
 data class SyncPullRequest(
+    @Deprecated("Compatibility only; never serialized or used for authorization")
     val userId: String,
     val deviceId: String,
     val cursor: String? = null,
@@ -97,6 +104,7 @@ data class SyncPullResponse(
 )
 
 data class WeeklyInsightRequest(
+    @Deprecated("Compatibility only; never serialized or used for authorization")
     val userId: String,
     val deviceId: String,
     val spaceId: String,

@@ -9,8 +9,12 @@ import com.reversetutor.core.model.SyncCursor
 import com.reversetutor.core.model.SyncEnvelope
 import com.reversetutor.core.model.SyncOwnership
 import com.reversetutor.core.remote.ActivityProgress
+import com.reversetutor.core.remote.ActivityPage
+import com.reversetutor.core.remote.ContentFeedPage
+import com.reversetutor.core.remote.LeaderboardPage
 import com.reversetutor.core.remote.OnlineActivity
 import com.reversetutor.core.remote.OnlineApi
+import com.reversetutor.core.remote.OnlineContentDetail
 import com.reversetutor.core.remote.OnlineRelease
 import com.reversetutor.core.remote.OnlineResult
 import com.reversetutor.core.remote.OnlineWriteIdentity
@@ -33,7 +37,11 @@ class OnlineRepositoryAdaptersTest {
     fun activityAndReleaseAdaptersExposeDomainTypesOnly() = runBlocking {
         val api = FakeOnlineApi().apply {
             activities = OnlineResult.Success(
-                listOf(OnlineActivity("activity-1", "Focus", 3, 10, 20))
+                ActivityPage(
+                    listOf(OnlineActivity("activity-1", "Focus", 3, 10, 20)),
+                    nextCursor = null,
+                    updatedAtEpochMillis = 30
+                )
             )
             release = OnlineResult.Success(OnlineRelease("2.0", 20, 10, "https://download", "abc"))
         }
@@ -171,7 +179,9 @@ private class RecordingSyncRepository(
 }
 
 private class FakeOnlineApi : OnlineApi {
-    var activities: OnlineResult<List<OnlineActivity>> = OnlineResult.Success(emptyList())
+    var activities: OnlineResult<ActivityPage> = OnlineResult.Success(
+        ActivityPage(emptyList(), null, 0)
+    )
     var push: OnlineResult<SyncPushResponse> = OnlineResult.Success(
         SyncPushResponse(cursor = null, items = emptyList())
     )
@@ -180,13 +190,26 @@ private class FakeOnlineApi : OnlineApi {
     )
     var pushCalls = 0
 
-    override suspend fun listActivities(): OnlineResult<List<OnlineActivity>> = activities
+    override suspend fun contentFeed(
+        cursor: String?,
+        limit: Int,
+        types: Set<String>,
+        etag: String?
+    ): OnlineResult<ContentFeedPage> = OnlineResult.Failure("not_implemented", false)
+
+    override suspend fun contentDetail(slug: String): OnlineResult<OnlineContentDetail> =
+        OnlineResult.Failure("not_implemented", false)
+
+    override suspend fun listActivities(cursor: String?, limit: Int): OnlineResult<ActivityPage> =
+        activities
     override suspend fun getActivity(activityId: String): OnlineResult<OnlineActivity> =
         OnlineResult.Failure("not_found", false)
 
     override suspend fun activityLeaderboard(
-        activityId: String
-    ): OnlineResult<List<ActivityProgress>> = OnlineResult.Success(emptyList())
+        activityId: String,
+        cursor: String?,
+        limit: Int
+    ): OnlineResult<LeaderboardPage> = OnlineResult.Success(LeaderboardPage(emptyList(), null, 0))
 
     override suspend fun joinActivity(
         activityId: String,
@@ -197,6 +220,11 @@ private class FakeOnlineApi : OnlineApi {
         activityId: String,
         write: OnlineWriteIdentity,
         progress: Long
+    ): OnlineResult<ActivityProgress> = OnlineResult.Failure("not_implemented", false)
+
+    override suspend fun leaveActivity(
+        activityId: String,
+        write: OnlineWriteIdentity
     ): OnlineResult<ActivityProgress> = OnlineResult.Failure("not_implemented", false)
 
     override suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse> {

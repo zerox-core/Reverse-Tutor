@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -32,7 +33,12 @@ class UrlConnectionOnlineHttpTransport(
                     } else {
                         connection.errorStream
                     })?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                    OnlineHttpResponse(statusCode = statusCode, body = body)
+                    val headers = connection.headerFields.entries
+                        .filter { it.key != null }
+                        .associate { (name, values) ->
+                            name.lowercase(Locale.ROOT) to values.joinToString(",")
+                        }
+                    OnlineHttpResponse(statusCode = statusCode, body = body, headers = headers)
                 } finally {
                     connection.disconnect()
                 }

@@ -9,8 +9,12 @@ data class OnlineHttpRequest(
 
 data class OnlineHttpResponse(
     val statusCode: Int,
-    val body: String = ""
-)
+    val body: String = "",
+    val headers: Map<String, String> = emptyMap()
+) {
+    fun header(name: String): String? =
+        headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
+}
 
 fun interface OnlineHttpTransport {
     suspend fun execute(request: OnlineHttpRequest): OnlineHttpResponse

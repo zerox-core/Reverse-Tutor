@@ -13,11 +13,16 @@ import com.reversetutor.core.data.migration.NativeExportRepository
 import com.reversetutor.core.data.migration.NativeImportRepository
 import com.reversetutor.core.data.model.ModelConnectionRepositoryImpl
 import com.reversetutor.core.data.online.OnlineActivityRepository
+import com.reversetutor.core.data.online.ContractMockOnlineApi
+import com.reversetutor.core.data.online.OnlineContentRepository
+import com.reversetutor.core.data.online.OnlineInsightRepository
 import com.reversetutor.core.data.online.OnlineSyncTransport
 import com.reversetutor.core.data.online.OnlineUpdateRepository
 import com.reversetutor.core.data.preferences.AppPreferencesRepository
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
+import com.reversetutor.core.data.search.RoomGlobalSearchRepository
 import com.reversetutor.core.data.session.SessionRepository
+import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.domain.ConversationRunCoordinator
@@ -44,13 +49,31 @@ data class HybridFrontendFactories(
     val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory
 )
 
-data class HybridOnlineConfiguration(
-    val baseUrl: String,
-    val authTokenProvider: OnlineAuthTokenProvider = OnlineAuthTokenProvider { null }
-)
+enum class HybridOnlineMode { LocalOnly, ContractMock, Http }
+
+sealed interface HybridOnlineConfiguration {
+    val mode: HybridOnlineMode
+
+    data object LocalOnly : HybridOnlineConfiguration {
+        override val mode = HybridOnlineMode.LocalOnly
+    }
+
+    data object ContractMock : HybridOnlineConfiguration {
+        override val mode = HybridOnlineMode.ContractMock
+    }
+
+    data class Http(
+        val baseUrl: String,
+        val authTokenProvider: OnlineAuthTokenProvider = OnlineAuthTokenProvider { null }
+    ) : HybridOnlineConfiguration {
+        override val mode = HybridOnlineMode.Http
+    }
+}
 
 data class HybridOnlineServices(
+    val contentRepository: OnlineContentRepository,
     val activityRepository: OnlineActivityRepository,
+    val insightRepository: OnlineInsightRepository,
     val syncCoordinator: SyncCoordinator,
     val updateRepository: OnlineUpdateRepository
 )
@@ -65,6 +88,11 @@ class HybridAppGraph private constructor(
     val sourceRepository: SourceRepository,
     val memoryRepository: MemoryRepository,
     val graphRepository: GraphRepository,
+    val learningRepository: LearningRepositoryImpl,
+    val conversationRunRepository: ConversationRunRepositoryImpl,
+    val modelConnectionRepository: ModelConnectionRepositoryImpl,
+    val globalSearchRepository: RoomGlobalSearchRepository,
+    val syncRepository: RoomSyncRepository,
     val localDataWipeRepository: LocalDataWipeRepository,
     val nativeImportRepository: NativeImportRepository,
     val nativeExportRepository: NativeExportRepository,
@@ -74,7 +102,7 @@ class HybridAppGraph private constructor(
     companion object {
         fun create(
             context: Context,
-            onlineConfiguration: HybridOnlineConfiguration? = null
+            onlineConfiguration: HybridOnlineConfiguration = HybridOnlineConfiguration.LocalOnly
         ): HybridAppGraph {
             val appContext = context.applicationContext
             val sessionRepository = DataModule.sessionRepository(appContext)
@@ -83,19 +111,25 @@ class HybridAppGraph private constructor(
             val learningRepository = DataModule.learningRepository(appContext)
             val syncRepository = DataModule.syncRepository(appContext)
             val runCoordinator = ConversationRunCoordinator(conversationRunRepository)
-            val onlineServices = onlineConfiguration?.let { configuration ->
-                val onlineApi = HttpOnlineApi(
-                    baseUrl = configuration.baseUrl,
+            val onlineApi = when (onlineConfiguration) {
+                HybridOnlineConfiguration.LocalOnly -> null
+                HybridOnlineConfiguration.ContractMock -> ContractMockOnlineApi()
+                is HybridOnlineConfiguration.Http -> HttpOnlineApi(
+                    baseUrl = onlineConfiguration.baseUrl,
                     transport = UrlConnectionOnlineHttpTransport(),
-                    authTokenProvider = configuration.authTokenProvider
+                    authTokenProvider = onlineConfiguration.authTokenProvider
                 )
+            }
+            val onlineServices = onlineApi?.let {
                 HybridOnlineServices(
-                    activityRepository = OnlineActivityRepository(onlineApi),
+                    contentRepository = OnlineContentRepository(it),
+                    activityRepository = OnlineActivityRepository(it),
+                    insightRepository = OnlineInsightRepository(it),
                     syncCoordinator = SyncCoordinator(
                         repository = syncRepository,
-                        transport = OnlineSyncTransport(onlineApi)
+                        transport = OnlineSyncTransport(it)
                     ),
-                    updateRepository = OnlineUpdateRepository(onlineApi)
+                    updateRepository = OnlineUpdateRepository(it)
                 )
             }
 
@@ -110,6 +144,11 @@ class HybridAppGraph private constructor(
                 sourceRepository = DataModule.sourceRepository(appContext),
                 memoryRepository = DataModule.memoryRepository(appContext),
                 graphRepository = DataModule.graphRepository(appContext),
+                learningRepository = learningRepository,
+                conversationRunRepository = conversationRunRepository,
+                modelConnectionRepository = modelConnectionRepository,
+                globalSearchRepository = DataModule.globalSearchRepository(appContext),
+                syncRepository = syncRepository,
                 localDataWipeRepository = DataModule.localDataWipeRepository(appContext),
                 nativeImportRepository = DataModule.nativeImportRepository(appContext),
                 nativeExportRepository = DataModule.nativeExportRepository(appContext),

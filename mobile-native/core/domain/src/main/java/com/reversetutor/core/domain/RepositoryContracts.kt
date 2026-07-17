@@ -148,6 +148,35 @@ interface GlobalSearchRepository {
 
 interface ActivityRepository {
     suspend fun listCachedActivities(): List<ActivitySummary>
+    suspend fun list(cursor: String? = null, limit: Int = 20): OnlineData<OnlineActivityPage>
+    suspend fun detail(activityId: String): OnlineData<ActivitySummary>
+    suspend fun leaderboard(
+        activityId: String,
+        cursor: String? = null,
+        limit: Int = 50
+    ): OnlineData<ActivityLeaderboardPage>
+    suspend fun join(
+        activityId: String,
+        userId: String,
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String
+    ): OnlineData<ActivityParticipation>
+    suspend fun updateProgress(
+        activityId: String,
+        userId: String,
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String,
+        progress: Long
+    ): OnlineData<ActivityParticipation>
+    suspend fun leave(
+        activityId: String,
+        userId: String,
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String
+    ): OnlineData<ActivityParticipation>
 }
 
 data class ActivitySummary(
@@ -155,7 +184,42 @@ data class ActivitySummary(
     val title: String,
     val revision: Long,
     val startsAtEpochMillis: Long? = null,
-    val endsAtEpochMillis: Long? = null
+    val endsAtEpochMillis: Long? = null,
+    val description: String = "",
+    val requiresOnlineConfirmation: Boolean = false,
+    val allowsDeferredProgress: Boolean = false,
+    val state: String = "offline",
+    val sessionTemplateId: String? = null
+)
+
+data class OnlineActivityPage(
+    val items: List<ActivitySummary>,
+    val nextCursor: String?,
+    val updatedAtEpochMillis: Long
+)
+
+data class ActivityParticipation(
+    val activityId: String,
+    val userId: String,
+    val joined: Boolean,
+    val progress: Long,
+    val revision: Long,
+    val state: String,
+    val idempotencyKey: String
+)
+
+data class ActivityLeaderboardEntry(
+    val rank: Long,
+    val displayName: String,
+    val avatarUrl: String?,
+    val progress: Long,
+    val isCurrentUser: Boolean
+)
+
+data class ActivityLeaderboardPage(
+    val items: List<ActivityLeaderboardEntry>,
+    val nextCursor: String?,
+    val updatedAtEpochMillis: Long
 )
 
 interface SyncRepository {
