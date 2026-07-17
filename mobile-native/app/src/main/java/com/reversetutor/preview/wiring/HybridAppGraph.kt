@@ -27,7 +27,9 @@ import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.domain.ConversationRunCoordinator
 import com.reversetutor.core.domain.SyncCoordinator
+import com.reversetutor.core.remote.AndroidOnlineAuthStateStore
 import com.reversetutor.core.remote.HttpOnlineApi
+import com.reversetutor.core.remote.OnlineAuthSessionManager
 import com.reversetutor.core.remote.OnlineAuthTokenProvider
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
 import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
@@ -38,6 +40,7 @@ import com.reversetutor.feature.memory.WeeklyDashboardPortViewModelFactory
 import com.reversetutor.feature.memory.WeeklyDashboardViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsPortViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsViewModelFactory
+import com.reversetutor.preview.BuildConfig
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 
@@ -64,9 +67,16 @@ sealed interface HybridOnlineConfiguration {
 
     data class Http(
         val baseUrl: String,
-        val authTokenProvider: OnlineAuthTokenProvider = OnlineAuthTokenProvider { null }
+        val authTokenProvider: OnlineAuthTokenProvider? = null
     ) : HybridOnlineConfiguration {
         override val mode = HybridOnlineMode.Http
+    }
+
+    companion object {
+        fun fromBaseUrl(baseUrl: String): HybridOnlineConfiguration {
+            val normalized = baseUrl.trim().trimEnd('/')
+            return if (normalized.isEmpty()) LocalOnly else Http(normalized)
+        }
     }
 }
 
@@ -114,10 +124,9 @@ class HybridAppGraph private constructor(
             val onlineApi = when (onlineConfiguration) {
                 HybridOnlineConfiguration.LocalOnly -> null
                 HybridOnlineConfiguration.ContractMock -> ContractMockOnlineApi()
-                is HybridOnlineConfiguration.Http -> HttpOnlineApi(
-                    baseUrl = onlineConfiguration.baseUrl,
-                    transport = UrlConnectionOnlineHttpTransport(),
-                    authTokenProvider = onlineConfiguration.authTokenProvider
+                is HybridOnlineConfiguration.Http -> createHttpOnlineApi(
+                    appContext,
+                    onlineConfiguration
                 )
             }
             val onlineServices = onlineApi?.let {
@@ -160,6 +169,26 @@ class HybridAppGraph private constructor(
                     learningRepository = learningRepository,
                     runCoordinator = runCoordinator
                 )
+            )
+        }
+
+        private fun createHttpOnlineApi(
+            context: Context,
+            configuration: HybridOnlineConfiguration.Http
+        ): HttpOnlineApi {
+            val transport = UrlConnectionOnlineHttpTransport()
+            val authTokenProvider = configuration.authTokenProvider ?: OnlineAuthSessionManager(
+                authApi = HttpOnlineApi(
+                    baseUrl = configuration.baseUrl,
+                    transport = transport
+                ),
+                stateStore = AndroidOnlineAuthStateStore(context.applicationContext),
+                appVersionCode = BuildConfig.VERSION_CODE.toLong()
+            )
+            return HttpOnlineApi(
+                baseUrl = configuration.baseUrl,
+                transport = transport,
+                authTokenProvider = authTokenProvider
             )
         }
 

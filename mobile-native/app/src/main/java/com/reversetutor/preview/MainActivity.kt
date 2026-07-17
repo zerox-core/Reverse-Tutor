@@ -15,11 +15,19 @@ import com.reversetutor.core.data.preferences.AppPreferences
 import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
 import com.reversetutor.preview.wiring.HybridAppGraph
+import com.reversetutor.preview.wiring.HybridOnlineConfiguration
 
 class MainActivity : ComponentActivity() {
     private var receivedImportPayload by mutableStateOf<ReceivedImportPayload?>(null)
 
-    private val appGraph by lazy { HybridAppGraph.create(this) }
+    private val appGraph by lazy {
+        HybridAppGraph.create(
+            context = this,
+            onlineConfiguration = HybridOnlineConfiguration.fromBaseUrl(
+                BuildConfig.ONLINE_API_BASE_URL
+            )
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -3,4 +3,7 @@
     <exclude
         domain="sharedpref"
         path="reverse_tutor_llm_profile_secrets.xml" />
+    <exclude
+        domain="sharedpref"
+        path="reverse_tutor_online_auth_credentials.xml" />
 </full-backup-content>

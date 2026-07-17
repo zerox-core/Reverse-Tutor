@@ -3,6 +3,14 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val onlineApiBaseUrl = providers.gradleProperty("reverseTutorOnlineBaseUrl")
+    .orElse(providers.environmentVariable("REVERSE_TUTOR_ONLINE_BASE_URL"))
+    .orElse("")
+    .get()
+val escapedOnlineApiBaseUrl = onlineApiBaseUrl
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 android {
     namespace = "com.reversetutor.preview"
     compileSdk = 34
@@ -13,10 +21,12 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "0.1.0-native-preview"
+        buildConfigField("String", "ONLINE_API_BASE_URL", "\"$escapedOnlineApiBaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
