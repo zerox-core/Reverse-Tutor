@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from threading import RLock
 from time import time_ns
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -16,20 +17,20 @@ class OnlineRuntimeStatus:
 
 
 class OnlineCatalogHealth(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     content_available: bool = Field(alias="contentAvailable")
     activity_available: bool = Field(alias="activityAvailable")
 
 
 class OnlineHealthResponse(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    status: str
-    mode: str
-    schema_head: str = Field(alias="schemaHead")
+    status: Literal["ready"]
+    mode: Literal["memory", "postgresql"]
+    schema_head: str = Field(alias="schemaHead", min_length=1)
     catalog: OnlineCatalogHealth
-    server_time_epoch_millis: int = Field(alias="serverTimeEpochMillis")
+    server_time_epoch_millis: int = Field(alias="serverTimeEpochMillis", ge=1)
 
 
 _lock = RLock()

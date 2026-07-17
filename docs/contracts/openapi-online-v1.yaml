@@ -474,7 +474,7 @@ components:
       properties:
         status:
           type: string
-          enum: [ready]
+          const: ready
         mode:
           type: string
           enum: [memory, postgresql]

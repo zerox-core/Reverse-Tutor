@@ -18,8 +18,18 @@ async def health_client():
     reset_online_runtime_status()
 
 
-async def test_online_health_is_public_minimal_and_reports_catalog(health_client):
+async def test_online_health_is_public_minimal_and_reports_catalog(
+    health_client,
+    monkeypatch,
+):
     set_online_runtime_status(mode="memory", schema_head="0003_content_and_activities")
+    writes_before = online_service.activity_write_count
+    monkeypatch.setattr(
+        "online_db.schema_check.assert_online_schema_at_head",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("health must not validate or migrate schema")
+        ),
+    )
 
     response = await health_client.get(
         "/api/v1/health",
@@ -44,6 +54,7 @@ async def test_online_health_is_public_minimal_and_reports_catalog(health_client
     assert "postgresql+" not in lowered
     assert "token" not in lowered
     assert "account" not in lowered
+    assert online_service.activity_write_count == writes_before
 
 
 async def test_online_health_openapi_is_public_and_has_stable_operation_id(
@@ -54,4 +65,13 @@ async def test_online_health_openapi_is_public_and_has_stable_operation_id(
 
     assert operation["operationId"] == "getOnlineHealth"
     assert operation["security"] == []
+    assert {parameter["name"] for parameter in operation["parameters"]} == {
+        "X-Request-Id"
+    }
 
+    schema = document["components"]["schemas"]["OnlineHealthResponse"]
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["status"]["const"] == "ready"
+    assert schema["properties"]["mode"]["enum"] == ["memory", "postgresql"]
+    assert schema["properties"]["schemaHead"]["minLength"] == 1
+    assert schema["properties"]["serverTimeEpochMillis"]["minimum"] == 1

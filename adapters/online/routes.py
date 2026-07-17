@@ -39,7 +39,8 @@ ActivityIdPath = Annotated[str, Path(alias="activityId", min_length=1)]
     operation_id="getOnlineHealth",
     openapi_extra={"security": []},
 )
-def online_health() -> OnlineHealthResponse:
+def online_health(request_id: RequestIdHeader = None) -> OnlineHealthResponse:
+    del request_id
     content_available, activity_available = online_service.catalog_availability()
     return online_health_response(
         content_available=content_available,
