@@ -27,6 +27,11 @@ interface OnlineAuthStateStore {
     suspend fun clear()
 }
 
+data class OnlineSessionIdentity(
+    val accountId: String,
+    val deviceId: String
+)
+
 object OnlineAuthStateCodec {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -91,6 +96,19 @@ class OnlineAuthSessionManager(
     }
 
     override suspend fun token(): String? = mutex.withLock {
+        authenticatedTokens()?.accessToken
+    }
+
+    suspend fun identity(): OnlineSessionIdentity? = mutex.withLock {
+        authenticatedTokens()?.let { tokens ->
+            OnlineSessionIdentity(
+                accountId = tokens.accountId,
+                deviceId = tokens.deviceId
+            )
+        }
+    }
+
+    private suspend fun authenticatedTokens(): AuthTokens? {
         val now = nowEpochMillis()
         var state = stateStore.read()
         if (state == null) {
@@ -100,24 +118,24 @@ class OnlineAuthSessionManager(
 
         val storedTokens = state.tokens
         if (storedTokens == null) {
-            return@withLock bootstrap(state, now)
+            return bootstrap(state, now)
         }
         if (!storedTokens.isValidForDevice(state.deviceId)) {
-            return@withLock null
+            return null
         }
         if (storedTokens.accessTokenExpiresAtEpochMillis - now > refreshLeewayMillis) {
-            return@withLock storedTokens.accessToken
+            return storedTokens
         }
         if (storedTokens.refreshTokenExpiresAtEpochMillis > now) {
-            return@withLock refresh(state, storedTokens, now)
+            return refresh(state, storedTokens, now)
         }
 
         state = newInstallation()
         stateStore.write(state)
-        bootstrap(state, now)
+        return bootstrap(state, now)
     }
 
-    private suspend fun bootstrap(state: OnlineAuthState, now: Long): String? =
+    private suspend fun bootstrap(state: OnlineAuthState, now: Long): AuthTokens? =
         when (val result = authApi.bootstrapAnonymous(
             AnonymousBootstrapRequest(
                 deviceId = state.deviceId,
@@ -133,7 +151,7 @@ class OnlineAuthSessionManager(
         initialState: OnlineAuthState,
         tokens: AuthTokens,
         now: Long
-    ): String? {
+    ): AuthTokens? {
         var state = initialState
         val idempotencyKey = state.pendingRefreshIdempotencyKey ?: newIdempotencyKey().also {
             state = state.copy(pendingRefreshIdempotencyKey = it)
@@ -162,7 +180,7 @@ class OnlineAuthSessionManager(
         state: OnlineAuthState,
         issued: AuthTokens,
         now: Long
-    ): String? {
+    ): AuthTokens? {
         if (!issued.isUsableIssueFor(state.deviceId, now)) return null
         stateStore.write(
             state.copy(
@@ -170,7 +188,7 @@ class OnlineAuthSessionManager(
                 pendingRefreshIdempotencyKey = null
             )
         )
-        return issued.accessToken
+        return issued
     }
 
     private fun newInstallation(): OnlineAuthState {

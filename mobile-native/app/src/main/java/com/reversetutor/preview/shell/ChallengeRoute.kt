@@ -67,6 +67,7 @@ import com.reversetutor.core.design.FormalGlossyIcon
 import com.reversetutor.core.design.FormalShapes
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
+import com.reversetutor.core.domain.ActivityLeaderboardPage
 import com.reversetutor.preview.R
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -79,12 +80,21 @@ fun ChallengeRoute(
     modifier: Modifier = Modifier,
     progress: Int = 12,
     total: Int = 21,
+    runtimeState: ChallengeRuntimeState? = null,
+    onRetry: () -> Unit = {},
     onExitBoundaryChanged: (Boolean) -> Unit = {},
     initialShowDetails: Boolean = false
 ) {
     var showDetails by remember(initialShowDetails) { mutableStateOf(initialShowDetails) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
+    val confirmedJoined = runtimeState?.joined ?: joined
+    val loading = runtimeState?.loading == true
+    val retryableFailure = runtimeState?.failure?.retryable == true
+
+    LaunchedEffect(confirmedJoined) {
+        if (confirmedJoined) showDetails = false
+    }
 
     LaunchedEffect(listState, showDetails) {
         snapshotFlow {
@@ -99,9 +109,10 @@ fun ChallengeRoute(
             .testTag("formal-challenge-716-237")
     ) {
         ChallengeContent(
-            joined = joined,
+            joined = confirmedJoined,
             progress = progress,
             total = total,
+            leaderboard = runtimeState?.leaderboard,
             onBack = onBack,
             onOpenDetails = { showDetails = true },
             listState = listState,
@@ -119,12 +130,12 @@ fun ChallengeRoute(
                 dragHandle = null
             ) {
                 ChallengeDetailSheet(
-                    joined = joined,
+                    joined = confirmedJoined,
+                    loading = loading,
+                    retryableFailure = retryableFailure,
                     onClose = { showDetails = false },
-                    onJoin = {
-                        showDetails = false
-                        onJoin()
-                    },
+                    onJoin = onJoin,
+                    onRetry = onRetry,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 520.dp, max = 650.dp)
@@ -140,6 +151,7 @@ private fun ChallengeContent(
     joined: Boolean,
     progress: Int,
     total: Int,
+    leaderboard: ActivityLeaderboardPage?,
     onBack: () -> Unit,
     onOpenDetails: () -> Unit,
     listState: LazyListState,
@@ -189,7 +201,12 @@ private fun ChallengeContent(
                     }
                 }
                 item { Spacer(Modifier.height(if (presentation.showFeedback) 18.dp else 2.dp)) }
-                item { LeaderboardSection(showCurrentUser = joined) }
+                item {
+                    LeaderboardSection(
+                        showCurrentUser = joined,
+                        leaderboard = leaderboard
+                    )
+                }
             }
             Surface(
                 onClick = onBack,
@@ -323,13 +340,32 @@ private fun FeedbackPill(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun LeaderboardSection(showCurrentUser: Boolean) {
+private fun LeaderboardSection(
+    showCurrentUser: Boolean,
+    leaderboard: ActivityLeaderboardPage?
+) {
     val type = LocalFormalTypeScale.current
-    val rows = listOf(
+    val referenceRows = listOf(
         LeaderboardRow(1, "小宇同学", 18, R.drawable.challenge_avatar_1, Color(0xFFF0CA31)),
         LeaderboardRow(2, "编程小能手", 16, R.drawable.challenge_avatar_2, Color(0xFF8EC9EE)),
         LeaderboardRow(3, "算法不秃头", 14, R.drawable.challenge_avatar_3, Color(0xFFF1B27A))
     )
+    val avatarResources = listOf(
+        R.drawable.challenge_avatar_1,
+        R.drawable.challenge_avatar_2,
+        R.drawable.challenge_avatar_3
+    )
+    val accents = listOf(Color(0xFFF0CA31), Color(0xFF8EC9EE), Color(0xFFF1B27A))
+    val rows = leaderboard?.items?.mapIndexed { index, entry ->
+        LeaderboardRow(
+            rank = entry.rank.toInt(),
+            name = entry.displayName,
+            days = entry.progress.toInt(),
+            avatarRes = avatarResources[index % avatarResources.size],
+            accent = accents[index % accents.size],
+            highlighted = entry.isCurrentUser
+        )
+    } ?: referenceRows
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = FormalColors.SurfaceElevated,
@@ -346,8 +382,8 @@ private fun LeaderboardSection(showCurrentUser: Boolean) {
                     Icon(Icons.Filled.Groups, contentDescription = null, tint = FormalColors.Muted, modifier = Modifier.size(20.dp))
                 }
             }
-            rows.forEach { LeaderboardItem(it) }
-            if (showCurrentUser) {
+            rows.forEach { LeaderboardItem(it, highlighted = it.highlighted) }
+            if (leaderboard == null && showCurrentUser) {
                 LeaderboardItem(LeaderboardRow(12, "我", 12, R.drawable.challenge_avatar_you, FormalColors.Primary), highlighted = true)
             }
         }
@@ -359,7 +395,8 @@ private data class LeaderboardRow(
     val name: String,
     val days: Int,
     val avatarRes: Int,
-    val accent: Color
+    val accent: Color,
+    val highlighted: Boolean = false
 )
 
 @Composable
@@ -392,8 +429,11 @@ private fun LeaderboardItem(row: LeaderboardRow, highlighted: Boolean = false) {
 @Composable
 private fun ChallengeDetailSheet(
     joined: Boolean,
+    loading: Boolean,
+    retryableFailure: Boolean,
     onClose: () -> Unit,
     onJoin: () -> Unit,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
@@ -432,8 +472,8 @@ private fun ChallengeDetailSheet(
             shadowElevation = 8.dp
         ) {
             Button(
-                enabled = !joined,
-                onClick = onJoin,
+                enabled = !joined && !loading,
+                onClick = if (retryableFailure) onRetry else onJoin,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 20.dp).fillMaxWidth().height(64.dp),
                 shape = RoundedCornerShape(FormalShapes.CardRadius),
                 colors = ButtonDefaults.buttonColors(
@@ -442,7 +482,13 @@ private fun ChallengeDetailSheet(
                 )
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (joined) "已加入挑战" else "加入挑战", style = type.style(14f, 19f, FontWeight.Medium, Color.White))
+                    val label = when {
+                        joined -> "已加入挑战"
+                        loading -> "加载中"
+                        retryableFailure -> "重试"
+                        else -> "加入挑战"
+                    }
+                    Text(label, style = type.style(14f, 19f, FontWeight.Medium, Color.White))
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
                 }
             }

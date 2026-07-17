@@ -116,6 +116,8 @@ fun AppShell(
         workspaceViewModelFactory.create()
     }
     val workspaceState by workspaceViewModel.uiState.collectAsState()
+    val challengeRuntimeCoordinator = hybridAppGraph.challengeRuntimeCoordinator
+    val challengeRuntimeState by challengeRuntimeCoordinator.state.collectAsState()
     val weeklyDashboardViewModelFactory = hybridAppGraph.frontend.weeklyDashboardViewModelFactory
     val weeklyDashboardViewModel = remember(weeklyDashboardViewModelFactory) {
         weeklyDashboardViewModelFactory.create(appScope)
@@ -123,6 +125,10 @@ fun AppShell(
     val weeklyDashboardState by weeklyDashboardViewModel.uiState.collectAsState()
     val workspaceInteractions = remember(workspaceViewModel) {
         WorkspaceInteractionBindings(workspaceViewModel::onAction)
+    }
+
+    LaunchedEffect(challengeRuntimeCoordinator) {
+        challengeRuntimeCoordinator.load()
     }
 
     BackHandler {
@@ -241,8 +247,9 @@ fun AppShell(
                         activeSessionId = activeSessionId,
                         activeSessionTitle = activeSessionTitle,
                         activeArticleSlug = activeArticleSlug,
-                        challengeJoined = figmaUiState.challengeJoined,
-                        challengeProgress = figmaUiState.challengeProgress,
+                        challengeRuntimeState = challengeRuntimeState,
+                        challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
+                            ?: figmaUiState.challengeProgress,
                         challengeTotal = figmaUiState.challengeTotal,
                         weeklyDashboardState = weeklyDashboardState,
                         onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
@@ -285,11 +292,21 @@ fun AppShell(
                             navigationState = navigationState.navigate(AppDestination.Challenge)
                         },
                         onChallengeJoined = {
-                            figmaUiState = figmaUiState.joinChallenge()
-                            workspaceViewModel.onAction(
-                                WorkspaceUiAction.SelectVerticalPage(WorkspaceVerticalPage.SessionHome)
-                            )
-                            navigationState = navigationState.navigate(AppDestination.Sessions)
+                            appScope.launch {
+                                challengeRuntimeCoordinator.join()
+                                if (challengeRuntimeCoordinator.state.value.joined) {
+                                    workspaceViewModel.onAction(
+                                        WorkspaceUiAction.SelectVerticalPage(
+                                            WorkspaceVerticalPage.SessionHome
+                                        )
+                                    )
+                                    navigationState =
+                                        navigationState.navigate(AppDestination.Sessions)
+                                }
+                            }
+                        },
+                        onChallengeRetry = {
+                            appScope.launch { challengeRuntimeCoordinator.retry() }
                         },
                         onOpenNewSession = {
                             navigationState = navigationState.navigate(AppDestination.NewSession)
@@ -587,7 +604,7 @@ private fun DestinationContent(
     activeSessionId: String?,
     activeSessionTitle: String?,
     activeArticleSlug: String,
-    challengeJoined: Boolean,
+    challengeRuntimeState: ChallengeRuntimeState,
     challengeProgress: Int,
     challengeTotal: Int,
     weeklyDashboardState: WeeklyDashboardUiState,
@@ -603,6 +620,7 @@ private fun DestinationContent(
     onOpenSessions: () -> Unit,
     onOpenChallenge: () -> Unit,
     onChallengeJoined: () -> Unit,
+    onChallengeRetry: () -> Unit,
     onOpenNewSession: () -> Unit,
     onOpenPublicArticle: (String) -> Unit,
     onOpenSearchTarget: (SearchTarget) -> Unit,
@@ -701,7 +719,7 @@ private fun DestinationContent(
                 sessionRepository = sessionRepository,
                 contentRepository = hybridAppGraph.online?.contentRepository,
                 avatarVisible = appPreferences.globalAvatarVisible,
-                challengeJoined = challengeJoined,
+                challengeJoined = challengeRuntimeState.joined,
                 challengeProgress = challengeProgress,
                 challengeTotal = challengeTotal,
                 onOpenSession = onOpenSession,
@@ -728,11 +746,13 @@ private fun DestinationContent(
         }
         if (destination == AppDestination.Challenge) {
             ChallengeRoute(
-                joined = challengeJoined,
+                joined = challengeRuntimeState.joined,
                 progress = challengeProgress,
                 total = challengeTotal,
                 onBack = onOpenSessions,
                 onJoin = onChallengeJoined,
+                runtimeState = challengeRuntimeState,
+                onRetry = onChallengeRetry,
                 onExitBoundaryChanged = onChallengeExitBoundaryChanged
             )
             return@ReverseTutorScreenSurface

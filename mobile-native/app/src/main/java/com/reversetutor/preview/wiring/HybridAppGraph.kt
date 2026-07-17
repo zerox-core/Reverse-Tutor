@@ -41,6 +41,7 @@ import com.reversetutor.feature.memory.WeeklyDashboardViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsPortViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsViewModelFactory
 import com.reversetutor.preview.BuildConfig
+import com.reversetutor.preview.shell.ChallengeRuntimeCoordinator
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 
@@ -88,6 +89,11 @@ data class HybridOnlineServices(
     val updateRepository: OnlineUpdateRepository
 )
 
+private data class HybridHttpOnlineRuntime(
+    val api: HttpOnlineApi,
+    val authSessionManager: OnlineAuthSessionManager?
+)
+
 class HybridAppGraph private constructor(
     val appPreferencesRepository: AppPreferencesRepository,
     val sessionRepository: SessionRepository,
@@ -107,6 +113,7 @@ class HybridAppGraph private constructor(
     val nativeImportRepository: NativeImportRepository,
     val nativeExportRepository: NativeExportRepository,
     val online: HybridOnlineServices?,
+    val challengeRuntimeCoordinator: ChallengeRuntimeCoordinator,
     val frontend: HybridFrontendFactories
 ) {
     companion object {
@@ -121,13 +128,13 @@ class HybridAppGraph private constructor(
             val learningRepository = DataModule.learningRepository(appContext)
             val syncRepository = DataModule.syncRepository(appContext)
             val runCoordinator = ConversationRunCoordinator(conversationRunRepository)
+            val httpRuntime = (onlineConfiguration as? HybridOnlineConfiguration.Http)?.let {
+                createHttpOnlineRuntime(appContext, it)
+            }
             val onlineApi = when (onlineConfiguration) {
                 HybridOnlineConfiguration.LocalOnly -> null
                 HybridOnlineConfiguration.ContractMock -> ContractMockOnlineApi()
-                is HybridOnlineConfiguration.Http -> createHttpOnlineApi(
-                    appContext,
-                    onlineConfiguration
-                )
+                is HybridOnlineConfiguration.Http -> requireNotNull(httpRuntime).api
             }
             val onlineServices = onlineApi?.let {
                 HybridOnlineServices(
@@ -141,6 +148,10 @@ class HybridAppGraph private constructor(
                     updateRepository = OnlineUpdateRepository(it)
                 )
             }
+            val challengeRuntimeCoordinator = ChallengeRuntimeCoordinator(
+                activityRepository = onlineServices?.activityRepository,
+                identityProvider = { httpRuntime?.authSessionManager?.identity() }
+            )
 
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
@@ -162,6 +173,7 @@ class HybridAppGraph private constructor(
                 nativeImportRepository = DataModule.nativeImportRepository(appContext),
                 nativeExportRepository = DataModule.nativeExportRepository(appContext),
                 online = onlineServices,
+                challengeRuntimeCoordinator = challengeRuntimeCoordinator,
                 frontend = createFrontendFactories(
                     sessionRepository = sessionRepository,
                     conversationRunRepository = conversationRunRepository,
@@ -172,23 +184,32 @@ class HybridAppGraph private constructor(
             )
         }
 
-        private fun createHttpOnlineApi(
+        private fun createHttpOnlineRuntime(
             context: Context,
             configuration: HybridOnlineConfiguration.Http
-        ): HttpOnlineApi {
+        ): HybridHttpOnlineRuntime {
             val transport = UrlConnectionOnlineHttpTransport()
-            val authTokenProvider = configuration.authTokenProvider ?: OnlineAuthSessionManager(
-                authApi = HttpOnlineApi(
+            val authSessionManager = when (val provider = configuration.authTokenProvider) {
+                is OnlineAuthSessionManager -> provider
+                null -> OnlineAuthSessionManager(
+                    authApi = HttpOnlineApi(
+                        baseUrl = configuration.baseUrl,
+                        transport = transport
+                    ),
+                    stateStore = AndroidOnlineAuthStateStore(context.applicationContext),
+                    appVersionCode = BuildConfig.VERSION_CODE.toLong()
+                )
+                else -> null
+            }
+            return HybridHttpOnlineRuntime(
+                api = HttpOnlineApi(
                     baseUrl = configuration.baseUrl,
-                    transport = transport
+                    transport = transport,
+                    authTokenProvider = requireNotNull(
+                        configuration.authTokenProvider ?: authSessionManager
+                    )
                 ),
-                stateStore = AndroidOnlineAuthStateStore(context.applicationContext),
-                appVersionCode = BuildConfig.VERSION_CODE.toLong()
-            )
-            return HttpOnlineApi(
-                baseUrl = configuration.baseUrl,
-                transport = transport,
-                authTokenProvider = authTokenProvider
+                authSessionManager = authSessionManager
             )
         }
 

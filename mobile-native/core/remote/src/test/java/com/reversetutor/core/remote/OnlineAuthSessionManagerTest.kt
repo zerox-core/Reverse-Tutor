@@ -62,6 +62,51 @@ class OnlineAuthSessionManagerTest {
     }
 
     @Test
+    fun identityBootstrapsAndReturnsIssuedAccountAndDevice() = runBlocking {
+        val issued = tokens(deviceId = "device-installation-0001")
+        val api = FakeAuthApi(bootstrapResults = listOf(OnlineResult.Success(issued)))
+        val manager = OnlineAuthSessionManager(
+            authApi = api,
+            stateStore = FakeOnlineAuthStateStore(),
+            appVersionCode = 7,
+            nowEpochMillis = { 1_000L },
+            deviceIdFactory = { "device-installation-0001" },
+            idempotencyKeyFactory = { "bootstrap-request-0001" }
+        )
+
+        assertEquals(
+            OnlineSessionIdentity(accountId = "account-1", deviceId = "device-installation-0001"),
+            manager.identity()
+        )
+        assertEquals(1, api.bootstrapRequests.size)
+    }
+
+    @Test
+    fun identityRefreshesExpiringCredentialsThroughTheAuthSessionPath() = runBlocking {
+        val original = tokens(accessExpiresAt = 1_030L, refreshExpiresAt = 20_000L)
+        val rotated = tokens(
+            accessToken = "access-token-2",
+            refreshToken = "refresh-token-2-with-at-least-32-characters",
+            accessExpiresAt = 10_000L,
+            refreshExpiresAt = 30_000L
+        )
+        val api = FakeAuthApi(refreshResults = listOf(OnlineResult.Success(rotated)))
+        val manager = OnlineAuthSessionManager(
+            authApi = api,
+            stateStore = FakeOnlineAuthStateStore(authState(tokens = original)),
+            appVersionCode = 7,
+            nowEpochMillis = { 1_000L },
+            idempotencyKeyFactory = { "refresh-request-0001" }
+        )
+
+        assertEquals(
+            OnlineSessionIdentity(accountId = "account-1", deviceId = "device-installation-0001"),
+            manager.identity()
+        )
+        assertEquals(1, api.refreshRequests.size)
+    }
+
+    @Test
     fun refreshRetryReusesPersistedIdempotencyKeyAndStoresRotation() = runBlocking {
         val original = tokens(accessExpiresAt = 1_030L, refreshExpiresAt = 20_000L)
         val rotated = tokens(
