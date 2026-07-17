@@ -17,7 +17,7 @@ data class SessionListItem(
     val avatarLabel: String
 ) {
     val unreadLabel: String =
-        if (unreadCount == 0) "No unread" else "$unreadCount unread"
+        if (unreadCount == 0) "无未读" else "$unreadCount 条未读"
 }
 
 data class SessionListUiState(
@@ -38,7 +38,7 @@ data class SessionListUiState(
             val visible = sessions
                 .asSequence()
                 .map { item ->
-                    if (avatarVisible) item else item.copy(avatarLabel = "Avatar hidden")
+                    if (avatarVisible) item else item.copy(avatarLabel = "头像已隐藏")
                 }
                 .filter { item ->
                     normalizedQuery.isEmpty() ||
@@ -54,17 +54,17 @@ data class SessionListUiState(
                 .toList()
 
             val emptyTitle = when {
-                sessions.isEmpty() -> "No sessions yet"
-                normalizedQuery.isNotEmpty() -> "No matching sessions"
-                filter == SessionListFilter.Pinned -> "No pinned sessions"
-                else -> "No sessions yet"
+                sessions.isEmpty() -> "还没有会话"
+                normalizedQuery.isNotEmpty() -> "没有匹配的会话"
+                filter == SessionListFilter.Pinned -> "还没有置顶会话"
+                else -> "还没有会话"
             }
 
             return SessionListUiState(
                 visibleSessions = visible,
                 query = query,
                 filter = filter,
-                summary = "${visible.size} ${if (visible.size == 1) "session" else "sessions"}",
+                summary = "${visible.size} 个会话",
                 emptyStateTitle = emptyTitle
             )
         }
@@ -78,10 +78,10 @@ fun TutorSession.toSessionListItem(avatarVisible: Boolean): SessionListItem =
         updatedAtEpochMillis = updatedAtEpochMillis,
         pinned = pinned,
         statusLabel = if (llmProfileId == null) {
-            "No model configured; proactive deferred"
+            "未配置模型 · 主动生成待启用"
         } else {
-            "Ready; proactive deferred"
+            "已就绪 · 主动生成待启用"
         },
         unreadCount = 0,
-        avatarLabel = if (avatarVisible) "Avatar placeholder" else "Avatar hidden"
+        avatarLabel = if (avatarVisible) "头像占位" else "头像已隐藏"
     )

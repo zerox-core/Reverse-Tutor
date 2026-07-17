@@ -25,6 +25,7 @@ rootProject.name = "ReverseTutorNative"
 include(":app")
 include(":core:protocol")
 include(":core:model")
+include(":core:design")
 include(":core:domain")
 include(":core:data")
 include(":core:llm")

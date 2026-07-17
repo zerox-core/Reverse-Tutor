@@ -109,7 +109,7 @@ fun SourcesScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Sources",
+                    text = "资料库",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
@@ -121,7 +121,7 @@ fun SourcesScreen(
                 )
                 if (!highlightedSourceId.isNullOrBlank()) {
                     Text(
-                        text = "Evidence target: $highlightedSourceId",
+                        text = "证据定位：$highlightedSourceId",
                         color = MaterialTheme.colorScheme.primary,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
@@ -129,7 +129,7 @@ fun SourcesScreen(
                 }
             }
             Button(onClick = onPickSource) {
-                Text("Add source")
+                Text("添加资料")
             }
         }
         Spacer(modifier = Modifier.height(16.dp))
@@ -164,9 +164,9 @@ private fun ParserStatusLegend() {
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text(text = "Parser status", style = MaterialTheme.typography.titleMedium)
+            Text(text = "解析状态", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "TXT and Markdown parse locally. HTML is sanitized as partial local extraction. PDF, DOCX, PPTX, EPUB, and image files stay visible as queued source material for assisted parsing or vision.",
+                text = "TXT 和 Markdown 可本地解析，HTML 会做安全清洗后部分提取。PDF、DOCX、PPTX、EPUB 和图片会保留为等待能力的资料，不会被隐藏。",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -189,7 +189,7 @@ private fun ImportStatusPanel(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = "Last import: $status",
+                text = "最近导入：$status",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium
             )
@@ -221,11 +221,11 @@ private fun EmptySources(
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Select TXT, Markdown, HTML, PDF, DOCX, PPTX, EPUB, image, or other files. Unsupported files remain visible with status.",
+                text = "选择 TXT、Markdown、HTML、PDF、DOCX、PPTX、EPUB、图片或其他文件。暂不支持的文件也会保留并显示状态。",
                 style = MaterialTheme.typography.bodyMedium
             )
             TextButton(onClick = onPickSource) {
-                Text("Choose file")
+                Text("选择文件")
             }
         }
     }
@@ -279,7 +279,7 @@ private fun SourceCard(
             Text(text = item.chunkCountLabel, style = MaterialTheme.typography.bodyMedium)
             if (item.snippets.isNotEmpty()) {
                 Text(
-                    text = "Snippets",
+                    text = "片段",
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold

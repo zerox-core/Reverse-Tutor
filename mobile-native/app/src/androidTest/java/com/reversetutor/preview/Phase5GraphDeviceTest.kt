@@ -48,6 +48,7 @@ class Phase5GraphDeviceTest {
         composeRule.onNodeWithText("Nodes: 2").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Edges: 1").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag("knowledge-graph-canvas").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Reset view").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Alpha").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Beta").performScrollTo().performClick()
         waitForText("Node detail")
@@ -62,7 +63,10 @@ class Phase5GraphDeviceTest {
 
         composeRule.onNodeWithText("Global graph").performScrollTo().performClick()
         waitForText("Cross-session graph view")
-        composeRule.onNodeWithText("Global graph: 2 nodes and 1 relations rendered with native Canvas.")
+        composeRule.onNodeWithText(
+            "Global graph: 2 nodes and 1 relations rendered with native Canvas.",
+            substring = true
+        )
             .performScrollTo()
             .assertIsDisplayed()
     }

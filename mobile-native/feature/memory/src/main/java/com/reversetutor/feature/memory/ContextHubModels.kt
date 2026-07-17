@@ -3,12 +3,12 @@ package com.reversetutor.feature.memory
 enum class ContextHubSection(
     val label: String
 ) {
-    Overview("Overview"),
-    Graph("Graph"),
-    Anchors("Anchors"),
-    Notes("Notes"),
-    Errors("Errors"),
-    SessionSettings("Session settings")
+    Overview("概览"),
+    Graph("图谱"),
+    Anchors("锚点"),
+    Notes("随笔"),
+    Errors("错因"),
+    SessionSettings("设置")
 }
 
 data class ContextHubUiState(
@@ -31,16 +31,16 @@ data class ContextHubUiState(
             val active = !sessionId.isNullOrBlank() && normalizedTitle != null
             return ContextHubUiState(
                 sessionId = sessionId,
-                sessionTitle = normalizedTitle ?: "No active session",
+                sessionTitle = normalizedTitle ?: "未选择会话",
                 sessionStatusLabel = if (active) {
-                    "Session-linked context shell"
+                    "已连接当前会话"
                 } else {
-                    "Open a session from Sessions before using context evidence."
+                    "请先从会话列表打开一个会话，再查看上下文证据。"
                 },
                 overviewLines = listOf(
-                    "Scope: per-session evidence hub",
-                    "Graph engine: native Canvas is available; stored graph data may still be empty",
-                    "Data state: empty shell; no legacy graph parity is claimed"
+                    "范围：当前会话的学习证据",
+                    "图谱：native Canvas 已接入，可能还没有节点",
+                    "资料：聊天、随笔和导入资料会逐步沉淀到这里"
                 ),
                 graphState = KnowledgeGraphUiState.from(
                     nodes = emptyList(),
@@ -60,17 +60,17 @@ data class ContextHubUiState(
             val resolvedGraphState = graphState ?: base.graphState
             return base.copy(
                 sessionStatusLabel = if (base.hasActiveSession) {
-                    "Session-linked memory evidence"
+                    "已连接当前会话的学习证据"
                 } else {
                     base.sessionStatusLabel
                 },
                 overviewLines = listOf(
-                    "Anchors: ${snapshot.anchors.size}",
-                    "Notes: ${snapshot.notes.size}",
-                    "Open errors: ${snapshot.errors.count { !it.resolved }}",
-                    "Graph nodes: ${resolvedGraphState.nodes.size}",
-                    "Graph edges: ${resolvedGraphState.edgeCount}",
-                    "Native graph status: ${resolvedGraphState.status.label}"
+                    "锚点：${snapshot.anchors.size}",
+                    "随笔：${snapshot.notes.size}",
+                    "未解决错因：${snapshot.errors.count { !it.resolved }}",
+                    "图谱节点：${resolvedGraphState.nodes.size}",
+                    "图谱关系：${resolvedGraphState.edgeCount}",
+                    "图谱状态：${resolvedGraphState.status.label}"
                 ),
                 graphState = resolvedGraphState,
                 sections = ContextHubSection.entries.map { section ->
@@ -115,45 +115,45 @@ private fun ContextHubSection.toState(): ContextHubSectionState =
     when (this) {
         ContextHubSection.Overview -> ContextHubSectionState(
             section = this,
-            statusLabel = "Empty",
-            title = "Session evidence overview",
-            body = "Learning summary, active anchors, recent evidence, and source status appear here after native memory extraction lands.",
-            nextActions = listOf("Continue chat", "Import sources when the Sources module is ready")
+            statusLabel = "空",
+            title = "会话证据概览",
+            body = "学习摘要、活跃锚点、近期证据和资料状态会在 native Memory 提取完成后显示在这里。",
+            nextActions = listOf("继续聊天", "导入资料")
         )
         ContextHubSection.Graph -> ContextHubSectionState(
             section = this,
             statusLabel = GraphRenderStatus.Empty.label,
-            title = "No graph nodes yet",
-            body = "Native Canvas graph rendering is available. Store graph nodes and relations to render them here.",
-            nextActions = listOf("Create memory evidence", "Import sources for graphable context")
+            title = "还没有图谱节点",
+            body = "native Canvas 图谱渲染已经可用。创建图谱节点和关系后会显示在这里。",
+            nextActions = listOf("创建随笔或锚点", "导入可形成图谱的资料")
         )
         ContextHubSection.Anchors -> ContextHubSectionState(
             section = this,
-            statusLabel = "Empty",
-            title = "No anchors yet",
-            body = "Requirements, source anchors, and imported materials will appear after anchor persistence and source linking land.",
-            nextActions = listOf("Keep evidence in chat for now", "Add anchors after P5 anchor work")
+            statusLabel = "空",
+            title = "还没有锚点",
+            body = "要求、资料锚点和导入材料会在锚点持久化与资料关联完成后显示。",
+            nextActions = listOf("先在聊天中保留证据", "后续把关键内容设为锚点")
         )
         ContextHubSection.Notes -> ContextHubSectionState(
             section = this,
-            statusLabel = "Empty",
-            title = "No notes yet",
-            body = "Notes created from chat messages and editable notes are deferred to the memory persistence task.",
-            nextActions = listOf("Use chat quote for short-term evidence", "Create notes after P5 note work")
+            statusLabel = "空",
+            title = "还没有随笔",
+            body = "从聊天消息创建的随笔会在这里沉淀，后续也会支持编辑。",
+            nextActions = listOf("在聊天中引用关键内容", "把有价值的消息记为随笔")
         )
         ContextHubSection.Errors -> ContextHubSectionState(
             section = this,
-            statusLabel = "Empty",
-            title = "No error history yet",
-            body = "Misconception and error evidence will appear after error-log persistence and review flows land.",
-            nextActions = listOf("Keep corrections in chat", "Review errors after P5 error work")
+            statusLabel = "空",
+            title = "还没有错因记录",
+            body = "误解、错误证据和纠正记录会在错因持久化与复盘流程完成后显示。",
+            nextActions = listOf("先在聊天中保留纠错过程", "后续进入错因复盘")
         )
         ContextHubSection.SessionSettings -> ContextHubSectionState(
             section = this,
-            statusLabel = "Deferred",
-            title = "Session settings deferred",
-            body = "Persona, strategy, deadline, avatar, and change warning controls are represented here as a surface, but editing belongs to the session settings task.",
-            nextActions = listOf("Use Settings for global profiles", "Return after session settings persistence lands")
+            statusLabel = "待启用",
+            title = "会话设置待启用",
+            body = "人设、策略、截止时间、头像和变更提醒会在会话设置任务中开放编辑。",
+            nextActions = listOf("全局模型配置请到设置", "会话设置持久化完成后再编辑")
         )
     }
 
@@ -177,10 +177,14 @@ private fun ContextHubSection.toState(
             } else {
                 ContextHubSectionState(
                     section = this,
-                    statusLabel = snapshot.anchors.countLabel("anchor", "anchors"),
-                    title = "Anchors",
+                    statusLabel = snapshot.anchors.countLabel("个锚点"),
+                    title = "锚点",
                     body = snapshot.anchors.joinToString("\n\n") { it.toBodyLine() },
-                    nextActions = listOf("Review source evidence", "Link anchors into graph after graph work lands")
+                    nextActions = listOf(
+                        "打开关联资料证据",
+                        "打开关联聊天证据",
+                        "后续把锚点接入图谱"
+                    )
                 )
             }
         }
@@ -190,10 +194,13 @@ private fun ContextHubSection.toState(
             } else {
                 ContextHubSectionState(
                     section = this,
-                    statusLabel = snapshot.notes.countLabel("note", "notes"),
-                    title = "Notes",
+                    statusLabel = snapshot.notes.countLabel("篇随笔"),
+                    title = "随笔",
                     body = snapshot.notes.joinToString("\n\n") { it.toBodyLine() },
-                    nextActions = listOf("Open linked chat message when jump support lands", "Edit or delete notes from memory actions")
+                    nextActions = listOf(
+                        "打开关联聊天证据",
+                        "后续可从记忆动作编辑或删除"
+                    )
                 )
             }
         }
@@ -204,10 +211,14 @@ private fun ContextHubSection.toState(
                 val openCount = snapshot.errors.count { !it.resolved }
                 ContextHubSectionState(
                     section = this,
-                    statusLabel = if (openCount == 1) "1 open" else "$openCount open",
-                    title = "Errors",
+                    statusLabel = "$openCount 个未解决",
+                    title = "错因",
                     body = snapshot.errors.joinToString("\n\n") { it.toBodyLine() },
-                    nextActions = listOf("Resolve after correction evidence", "Connect to diagnostics review after Phase 3")
+                    nextActions = listOf(
+                        "打开关联聊天证据",
+                        "补充纠正证据后解决",
+                        "后续接入诊断复盘"
+                    )
                 )
             }
         }
@@ -215,26 +226,28 @@ private fun ContextHubSection.toState(
 
 private fun KnowledgeGraphUiState.nextActions(): List<String> =
     when (status) {
-        GraphRenderStatus.Loading -> listOf("Wait for graph snapshot")
-        GraphRenderStatus.Empty -> listOf("Create notes or anchors", "Import sources for graphable evidence")
-        GraphRenderStatus.Ready -> listOf("Select nodes for detail", "Pan or zoom the native graph")
-        GraphRenderStatus.Invalid -> listOf("Review invalid relations", "Select valid nodes for evidence")
-        GraphRenderStatus.Large -> listOf("Use node list for precise selection", "Cluster and filtering remain follow-up work")
+        GraphRenderStatus.Loading -> listOf("等待图谱快照")
+        GraphRenderStatus.Empty -> listOf("创建随笔或锚点", "导入可形成图谱的资料")
+        GraphRenderStatus.Ready -> listOf("选择节点查看详情", "拖动或缩放 native 图谱")
+        GraphRenderStatus.Invalid -> listOf("检查无效关系", "选择有效节点查看证据")
+        GraphRenderStatus.Large -> listOf("使用节点列表精确选择", "聚类和筛选后续补齐")
     }
 
-private fun List<ContextMemoryEntry>.countLabel(
-    singular: String,
-    plural: String
-): String =
-    "${size} ${if (size == 1) singular else plural}"
+private fun List<ContextMemoryEntry>.countLabel(unit: String): String = "$size $unit"
 
 private fun ContextMemoryEntry.toBodyLine(): String =
     buildString {
         append(title)
         append(": ")
         append(body)
-        sourceMessageId?.let { append("\nMessage: ").append(it) }
-        sourceId?.let { append("\nSource: ").append(it) }
+        val references = buildList {
+            sourceMessageId?.let { add("聊天消息：$it") }
+            sourceId?.let { add("资料：$it") }
+        }
+        if (references.isNotEmpty()) {
+            append("\n证据引用")
+            references.forEach { append("\n").append(it) }
+        }
     }
 
 private fun ContextErrorEntry.toBodyLine(): String =
@@ -242,7 +255,10 @@ private fun ContextErrorEntry.toBodyLine(): String =
         append(title)
         append(": ")
         append(detail)
-        append("\nStatus: ")
-        append(if (resolved) "resolved" else "open")
-        sourceMessageId?.let { append("\nMessage: ").append(it) }
+        append("\n状态：")
+        append(if (resolved) "已解决" else "未解决")
+        sourceMessageId?.let {
+            append("\n证据引用")
+            append("\n聊天消息：").append(it)
+        }
     }

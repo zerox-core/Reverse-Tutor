@@ -15,45 +15,45 @@ object BuiltInSessionTemplates {
     val all: List<NewSessionTemplate> = listOf(
         NewSessionTemplate(
             id = "school",
-            title = "School study",
-            role = "Patient school tutor",
-            goal = "Understand current homework and class concepts",
-            profileText = "Use short questions, check foundations, and keep explanations age-appropriate."
+            title = "校内学习",
+            role = "耐心的校内辅导老师",
+            goal = "理解当前作业和课堂知识点",
+            profileText = "用简短问题检查基础，解释要贴合学生年龄和当前教材。"
         ),
         NewSessionTemplate(
             id = "exam",
-            title = "Exam sprint",
-            role = "Socratic exam coach",
-            goal = "Prepare for quizzes, tests, and exam review",
-            profileText = "Be concise, strict about mistakes, and turn weak points into practice plans."
+            title = "考前冲刺",
+            role = "苏格拉底式考试教练",
+            goal = "准备测验、考试和复习",
+            profileText = "回答要简洁，对错误保持严格，并把薄弱点转成练习计划。"
         ),
         NewSessionTemplate(
             id = "work",
-            title = "Work assistant",
-            role = "Practical work mentor",
-            goal = "Clarify work tasks, documents, decisions, and next actions",
-            profileText = "Prefer concrete summaries, tradeoffs, and reusable checklists."
+            title = "工作助手",
+            role = "务实的工作导师",
+            goal = "梳理工作任务、文档、决策和下一步行动",
+            profileText = "优先给出具体摘要、取舍说明和可复用清单。"
         ),
         NewSessionTemplate(
             id = "language",
-            title = "Language practice",
-            role = "Conversation language coach",
-            goal = "Build vocabulary, grammar, listening, and speaking confidence",
-            profileText = "Correct gently, ask follow-up questions, and adapt examples to daily life."
+            title = "语言练习",
+            role = "对话式语言教练",
+            goal = "提升词汇、语法、听力和口语信心",
+            profileText = "温和纠错，持续追问，并把例子改成日常生活场景。"
         ),
         NewSessionTemplate(
             id = "habit",
-            title = "Habit builder",
-            role = "Accountability coach",
-            goal = "Build a repeatable habit with reflection and small actions",
-            profileText = "Use encouraging check-ins, identify blockers, and keep plans realistic."
+            title = "习惯养成",
+            role = "行动监督教练",
+            goal = "通过复盘和小行动建立可重复习惯",
+            profileText = "用鼓励式检查识别阻碍，计划必须小而可执行。"
         ),
         NewSessionTemplate(
             id = "skill",
-            title = "Skill learning",
-            role = "Step-by-step skill mentor",
-            goal = "Learn a practical skill through drills and feedback",
-            profileText = "Break work into levels, give practice tasks, and explain why each step matters."
+            title = "技能学习",
+            role = "分步骤技能导师",
+            goal = "通过练习和反馈学习一项实用技能",
+            profileText = "把任务拆成等级，给出练习，并解释每一步为什么重要。"
         )
     )
 
@@ -70,10 +70,10 @@ data class NewSessionDraft(
     val sourceHandoffRequested: Boolean = false
 ) {
     fun validationErrors(): List<String> = buildList {
-        if (title.isBlank()) add("Title is required.")
-        if (role.isBlank()) add("Role is required.")
-        if (goal.isBlank()) add("Goal is required.")
-        if (profileText.isBlank()) add("Profile is required.")
+        if (title.isBlank()) add("请填写会话名称。")
+        if (role.isBlank()) add("请填写角色。")
+        if (goal.isBlank()) add("请填写目标。")
+        if (profileText.isBlank()) add("请填写学生画像。")
     }
 
     fun toCreationInput(): SessionCreationInput =

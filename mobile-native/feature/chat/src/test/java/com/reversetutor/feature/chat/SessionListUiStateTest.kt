@@ -19,7 +19,7 @@ class SessionListUiStateTest {
         )
 
         assertEquals(listOf("pinned", "old"), state.visibleSessions.map { it.id })
-        assertEquals("2 sessions", state.summary)
+        assertEquals("2 个会话", state.summary)
     }
 
     @Test
@@ -35,7 +35,7 @@ class SessionListUiStateTest {
         )
 
         assertEquals(listOf("two"), state.visibleSessions.map { it.id })
-        assertEquals("Avatar hidden", state.visibleSessions.single().avatarLabel)
+        assertEquals("头像已隐藏", state.visibleSessions.single().avatarLabel)
     }
 
     @Test
@@ -48,7 +48,7 @@ class SessionListUiStateTest {
         )
 
         assertTrue(state.visibleSessions.isEmpty())
-        assertEquals("No matching sessions", state.emptyStateTitle)
+        assertEquals("没有匹配的会话", state.emptyStateTitle)
     }
 
     private fun item(

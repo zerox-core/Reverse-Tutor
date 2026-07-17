@@ -2,7 +2,6 @@ package com.reversetutor.feature.settings
 
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -39,6 +39,7 @@ import com.reversetutor.core.llm.LlmProviderPreset
 import com.reversetutor.core.model.LlmProviderKind
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun SettingsFoundationScreen(
     state: SettingsUiState,
     onOpenAbout: () -> Unit,
@@ -53,22 +54,29 @@ fun SettingsFoundationScreen(
     onTestLlmProfile: (String) -> Unit = {},
     localDataWipeState: LocalDataWipeUiState = LocalDataWipeUiState(),
     onWipeLocalData: () -> Unit = {},
+    onOpenImportExport: () -> Unit = {},
     onReturnToSessions: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val firstPreset = llmProfileState.presets.firstOrNull()
+    val providerGroups = remember(llmProfileState.presets) {
+        settingsModelPresetGroups(llmProfileState.presets)
+    }
+    val firstPreset = providerGroups.firstOrNull()?.presets?.firstOrNull()
     var profileName by remember { mutableStateOf("") }
     var selectedProvider by remember {
         mutableStateOf(firstPreset?.provider ?: LlmProviderKind.OpenAiCompatible)
     }
     var selectedPresetId by remember { mutableStateOf(firstPreset?.id) }
+    var selectedGroupId by remember { mutableStateOf(providerGroups.firstOrNull()?.id ?: "openai") }
     var model by remember { mutableStateOf(firstPreset?.model.orEmpty()) }
     var baseUrl by remember { mutableStateOf(firstPreset?.baseUrl.orEmpty()) }
     var apiKey by remember { mutableStateOf("") }
+    var showProfileForm by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<LlmProfileItem?>(null) }
     var showWipeDialog by remember { mutableStateOf(false) }
-    var wipeConfirmation by remember { mutableStateOf("") }
     val saveEnabled = profileName.trim().isNotEmpty() && model.trim().isNotEmpty()
+    val selectedGroup = providerGroups.firstOrNull { it.id == selectedGroupId }
+        ?: providerGroups.first()
 
     Column(
         modifier = modifier
@@ -79,57 +87,24 @@ fun SettingsFoundationScreen(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "Settings foundation",
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "DataStore-backed preview",
+            text = "配置您的工作空间和模型参数",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 15.sp
         )
         Spacer(modifier = Modifier.height(20.dp))
-        SettingsInfoRow(label = "Theme", value = state.themeLabel)
-        SettingsInfoRow(label = "Avatar", value = state.avatarVisibilityLabel)
-        Spacer(modifier = Modifier.height(14.dp))
         Text(
-            text = "Global memos",
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        state.memoPreviewLines.forEach { memo ->
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                shape = RoundedCornerShape(6.dp)
-            ) {
-                Text(
-                    text = memo,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    fontSize = 14.sp
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(onClick = onOpenAbout) {
-            Text("About diagnostics")
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
-        Text(
-            text = "LLM profiles",
+            text = "模型配置",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = "服务商预设、Base URL、模型和 API Key。密钥只显示保存状态。",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 14.sp
+        )
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = llmProfileState.summary,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -137,103 +112,109 @@ fun SettingsFoundationScreen(
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "Presets",
+            text = "预设",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            llmProfileState.presets.forEach { preset ->
-                val selected = preset.id == selectedPresetId
-                Surface(
+            providerGroups.forEach { group ->
+                SettingsPresetChip(
+                    label = group.label,
+                    selected = group.id == selectedGroup.id,
+                    onClick = { selectedGroupId = group.id }
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = selectedGroup.description,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 13.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            selectedGroup.presets.forEach { preset ->
+                SettingsPresetChip(
+                    label = preset.label,
+                    selected = preset.id == selectedPresetId,
                     onClick = {
                         selectedPresetId = preset.id
                         selectedProvider = preset.provider
                         model = preset.model
                         baseUrl = preset.baseUrl.orEmpty()
-                        if (profileName.isBlank()) {
-                            profileName = preset.label
-                        }
-                    },
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                    contentColor = if (selected) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = preset.label,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                        profileName = preset.label
+                        showProfileForm = true
+                    }
+                )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
-        OutlinedTextField(
-            value = profileName,
-            onValueChange = { profileName = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Profile name") },
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        SettingsInfoRow(label = "Provider", value = selectedProvider.name)
-        OutlinedTextField(
-            value = model,
-            onValueChange = { model = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Model") },
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = baseUrl,
-            onValueChange = { baseUrl = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Base URL") },
-            singleLine = true
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("API key") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation()
-        )
         Spacer(modifier = Modifier.height(10.dp))
-        Button(
-            onClick = {
-                onSaveLlmProfile(
-                    LlmProfileInput(
-                        name = profileName,
-                        provider = selectedProvider,
-                        model = model,
-                        baseUrl = baseUrl,
-                        apiKey = apiKey
+        TextButton(onClick = { showProfileForm = !showProfileForm }) {
+            Text(if (showProfileForm) "收起输入区" else "展开输入区")
+        }
+        if (showProfileForm) {
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = profileName,
+                onValueChange = { profileName = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("配置名称") },
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsInfoRow(label = "服务商", value = selectedProvider.name)
+            OutlinedTextField(
+                value = model,
+                onValueChange = { model = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("模型") },
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Base URL") },
+                singleLine = true
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("API Key") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Button(
+                onClick = {
+                    onSaveLlmProfile(
+                        LlmProfileInput(
+                            name = profileName,
+                            provider = selectedProvider,
+                            model = model,
+                            baseUrl = baseUrl,
+                            apiKey = apiKey
+                        )
                     )
-                )
-                profileName = ""
-                apiKey = ""
-            },
-            enabled = saveEnabled
-        ) {
-            Text("Save profile")
+                    profileName = ""
+                    apiKey = ""
+                    showProfileForm = false
+                },
+                enabled = saveEnabled
+            ) {
+                Text("保存配置")
+            }
         }
 
         Spacer(modifier = Modifier.height(18.dp))
@@ -257,17 +238,21 @@ fun SettingsFoundationScreen(
 
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Local data",
+            text = "数据管理",
             color = MaterialTheme.colorScheme.onSurface,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Clear Room data, saved profiles, local secrets, and preview memos before restoring the default preview state.",
+            text = "导入、导出和备份都从这里进入。",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )
+        Spacer(modifier = Modifier.height(10.dp))
+        TextButton(onClick = onOpenImportExport) {
+            Text("导入与导出")
+        }
         val wipeStatusLabel = localDataWipeState.statusLabel
         if (wipeStatusLabel != null) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -279,18 +264,80 @@ fun SettingsFoundationScreen(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Safe empty-state return is ready from Sessions.",
+                text = "已恢复到可从会话列表重新开始的空状态。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp
             )
             Spacer(modifier = Modifier.height(8.dp))
             TextButton(onClick = onReturnToSessions) {
-                Text("Return to Sessions")
+                Text("返回会话")
             }
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        TextButton(onClick = { showWipeDialog = true }) {
-            Text("Wipe local data")
+        Spacer(modifier = Modifier.height(28.dp))
+        Text(
+            text = "外观、记忆与诊断",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsInfoRow(label = "主题", value = state.themeLabel)
+        SettingsInfoRow(label = "头像", value = state.avatarVisibilityLabel)
+        Spacer(modifier = Modifier.height(14.dp))
+        Text(
+            text = "全局备忘",
+            color = MaterialTheme.colorScheme.onSurface,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        state.memoPreviewLines.forEach { memo ->
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = memo,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    fontSize = 14.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(onClick = onOpenAbout) {
+            Text("关于诊断")
+        }
+        Spacer(modifier = Modifier.height(28.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "危险区域",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "此操作将永久删除本机设备上的所有对话、上下文和配置文件。此操作不可逆。",
+                    fontSize = 14.sp
+                )
+                TextButton(
+                    onClick = { showWipeDialog = true },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("擦除本地数据")
+                }
+            }
         }
     }
 
@@ -298,7 +345,7 @@ fun SettingsFoundationScreen(
     if (deleteTarget != null) {
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
-            title = { Text("Delete profile") },
+            title = { Text("删除配置") },
             text = { Text(deleteTarget.name) },
             confirmButton = {
                 TextButton(
@@ -307,12 +354,12 @@ fun SettingsFoundationScreen(
                         pendingDelete = null
                     }
                 ) {
-                    Text("Delete")
+                    Text("删除")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             }
         )
@@ -320,42 +367,27 @@ fun SettingsFoundationScreen(
 
     if (showWipeDialog) {
         AlertDialog(
-            onDismissRequest = {
-                showWipeDialog = false
-                wipeConfirmation = ""
-            },
-            title = { Text("Wipe local data") },
+            onDismissRequest = { showWipeDialog = false },
+            title = { Text(localDataWipeState.confirmationTitle) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("This clears local user data and restores the default preview state.")
-                    OutlinedTextField(
-                        value = wipeConfirmation,
-                        onValueChange = { wipeConfirmation = it },
-                        singleLine = true,
-                        label = { Text("Type ${localDataWipeState.requiredPhrase}") }
-                    )
-                }
+                Text(localDataWipeState.confirmationBody)
             },
             confirmButton = {
                 TextButton(
-                    enabled = localDataWipeState.canConfirm(wipeConfirmation),
                     onClick = {
                         showWipeDialog = false
-                        wipeConfirmation = ""
                         onWipeLocalData()
-                    }
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Wipe data")
+                    Text(localDataWipeState.confirmLabel)
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = {
-                        showWipeDialog = false
-                        wipeConfirmation = ""
-                    }
+                    onClick = { showWipeDialog = false }
                 ) {
-                    Text("Cancel")
+                    Text(localDataWipeState.dismissLabel)
                 }
             }
         )
@@ -364,6 +396,171 @@ fun SettingsFoundationScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
+private fun SettingsPresetChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        contentColor = if (selected) {
+            MaterialTheme.colorScheme.onPrimary
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        shape = RoundedCornerShape(6.dp)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+private data class SettingsModelPreset(
+    val id: String,
+    val label: String,
+    val provider: LlmProviderKind,
+    val baseUrl: String?,
+    val model: String
+)
+
+private data class SettingsModelGroup(
+    val id: String,
+    val label: String,
+    val description: String,
+    val presets: List<SettingsModelPreset>
+)
+
+private fun settingsModelPresetGroups(
+    basePresets: List<LlmProviderPreset>
+): List<SettingsModelGroup> {
+    val openAiPresets = basePresets
+        .filter { it.provider == LlmProviderKind.OpenAiCompatible }
+        .map { it.toSettingsModelPreset() }
+        .ifEmpty {
+            listOf(
+                SettingsModelPreset(
+                    id = "openai-compatible",
+                    label = "OpenAI 兼容",
+                    provider = LlmProviderKind.OpenAiCompatible,
+                    baseUrl = "https://api.openai.com/v1",
+                    model = "gpt-4o-mini"
+                )
+            )
+        }
+    val customPresets = basePresets
+        .filter { it.provider == LlmProviderKind.Custom || it.provider == LlmProviderKind.Local }
+        .map { it.toSettingsModelPreset() }
+        .ifEmpty {
+            listOf(
+                SettingsModelPreset(
+                    id = "custom-local",
+                    label = "自定义/本地",
+                    provider = LlmProviderKind.Custom,
+                    baseUrl = "http://localhost:11434",
+                    model = "local-model"
+                )
+            )
+        }
+
+    return listOf(
+        SettingsModelGroup(
+            id = "openai",
+            label = "OpenAI / A 类",
+            description = "OpenAI 兼容协议，适合 A 类模型或兼容网关。",
+            presets = openAiPresets
+        ),
+        SettingsModelGroup(
+            id = "kimi",
+            label = "Kimi",
+            description = "Moonshot/Kimi OpenAI 兼容接口，保存前请确认账号权限。",
+            presets = listOf(
+                SettingsModelPreset(
+                    id = "kimi-k27-code",
+                    label = "Kimi K2.7 Code",
+                    provider = LlmProviderKind.OpenAiCompatible,
+                    baseUrl = "https://api.moonshot.ai/v1",
+                    model = "kimi-k2.7-code-highspeed"
+                ),
+                SettingsModelPreset(
+                    id = "kimi-k26",
+                    label = "Kimi K2.6",
+                    provider = LlmProviderKind.OpenAiCompatible,
+                    baseUrl = "https://api.moonshot.ai/v1",
+                    model = "kimi-k2.6"
+                )
+            )
+        ),
+        SettingsModelGroup(
+            id = "deepseek",
+            label = "DeepSeek",
+            description = "DeepSeek 官方 OpenAI 兼容接口。",
+            presets = listOf(
+                SettingsModelPreset(
+                    id = "deepseek-v4-flash",
+                    label = "DeepSeek V4 Flash",
+                    provider = LlmProviderKind.DeepSeek,
+                    baseUrl = "https://api.deepseek.com",
+                    model = "deepseek-v4-flash"
+                ),
+                SettingsModelPreset(
+                    id = "deepseek-v4-pro",
+                    label = "DeepSeek V4 Pro",
+                    provider = LlmProviderKind.DeepSeek,
+                    baseUrl = "https://api.deepseek.com",
+                    model = "deepseek-v4-pro"
+                )
+            )
+        ),
+        SettingsModelGroup(
+            id = "glm",
+            label = "GLM",
+            description = "智谱 GLM / Z.ai 兼容接口，按账号控制台可用模型调整。",
+            presets = listOf(
+                SettingsModelPreset(
+                    id = "glm-5-2",
+                    label = "GLM-5.2",
+                    provider = LlmProviderKind.FreeGlm,
+                    baseUrl = "https://open.bigmodel.cn/api/paas/v4",
+                    model = "glm-5.2"
+                ),
+                SettingsModelPreset(
+                    id = "glm-5v",
+                    label = "GLM-5V",
+                    provider = LlmProviderKind.FreeGlm,
+                    baseUrl = "https://open.bigmodel.cn/api/paas/v4",
+                    model = "glm-5v-turbo"
+                )
+            )
+        ),
+        SettingsModelGroup(
+            id = "custom",
+            label = "自定义",
+            description = "本地模型、私有网关或其他 OpenAI 兼容服务。",
+            presets = customPresets
+        )
+    )
+}
+
+private fun LlmProviderPreset.toSettingsModelPreset(): SettingsModelPreset =
+    SettingsModelPreset(
+        id = id,
+        label = label,
+        provider = provider,
+        baseUrl = baseUrl,
+        model = model
+    )
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun ImportExportScreen(
     state: ImportPipelineUiState,
     exportState: ExportPipelineUiState = ExportPipelineUiState.idle(),
@@ -395,7 +592,7 @@ fun ImportExportScreen(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "Import/export",
+            text = "导入与导出",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.headlineMedium
         )
@@ -404,7 +601,7 @@ fun ImportExportScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "Import data",
+            text = "导入数据",
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleLarge
         )
@@ -428,7 +625,7 @@ fun ImportExportScreen(
                 shape = RoundedCornerShape(6.dp)
             ) {
                 Text(
-                    text = "Mode: ${state.modeLabel}",
+                    text = "模式：${state.modeLabel}",
                     modifier = Modifier
                         .heightIn(min = 40.dp)
                         .padding(horizontal = 12.dp, vertical = 9.dp),
@@ -436,13 +633,13 @@ fun ImportExportScreen(
                 )
             }
             Button(onClick = onPickFile) {
-                Text("Choose JSON")
+                Text("选择 JSON")
             }
             TextButton(
                 enabled = importText.isNotBlank(),
                 onClick = onDryRun
             ) {
-                Text("Dry run")
+                Text("试运行")
             }
             Button(
                 enabled = state.canImport,
@@ -454,13 +651,13 @@ fun ImportExportScreen(
                     }
                 }
             ) {
-                Text("Import")
+                Text("导入")
             }
         }
         if (state.selectedMode == NativeImportMode.Overwrite) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Overwrite replaces the current target space and requires ${ImportPipelineUiState.overwriteConfirmationPhrase}.",
+                text = "覆盖模式会替换当前目标空间，且需要输入 ${ImportPipelineUiState.overwriteConfirmationPhrase} 确认。",
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -472,14 +669,14 @@ fun ImportExportScreen(
             modifier = Modifier.fillMaxWidth(),
             minLines = 6,
             maxLines = 12,
-            label = { Text("Import JSON") }
+            label = { Text("导入 JSON") }
         )
         Spacer(modifier = Modifier.height(18.dp))
         ImportResultPanel(state)
 
         Spacer(modifier = Modifier.height(28.dp))
         Text(
-            text = "Export",
+            text = "导出",
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleLarge
         )
@@ -498,16 +695,16 @@ fun ImportExportScreen(
                 enabled = canExportCurrentSession,
                 onClick = onExportCurrentSession
             ) {
-                Text("Current session")
+                Text("当前会话")
             }
             Button(onClick = onExportGraphSnapshot) {
-                Text("Graph snapshot")
+                Text("图谱快照")
             }
             Button(onClick = onExportFullBackup) {
-                Text("Full backup")
+                Text("完整备份")
             }
             TextButton(onClick = onExportPreset) {
-                Text("Preset")
+                Text("预设")
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -519,18 +716,18 @@ fun ImportExportScreen(
                 enabled = exportState.canShareOrSave,
                 onClick = onShareExport
             ) {
-                Text("Share")
+                Text("共享")
             }
             TextButton(
                 enabled = exportState.canShareOrSave,
                 onClick = onSaveExport
             ) {
-                Text("Save")
+                Text("保存")
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = exportState.targetFileName ?: "No export prepared",
+            text = exportState.targetFileName ?: "尚未准备导出",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium
         )
@@ -544,15 +741,15 @@ fun ImportExportScreen(
                 showOverwriteDialog = false
                 overwriteConfirmation = ""
             },
-            title = { Text("Overwrite import") },
+            title = { Text("覆盖导入") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("This replaces local data in the target space before importing this file.")
+                    Text("这会在导入当前文件前替换目标空间中的本地数据。")
                     OutlinedTextField(
                         value = overwriteConfirmation,
                         onValueChange = { overwriteConfirmation = it },
                         singleLine = true,
-                        label = { Text("Type ${ImportPipelineUiState.overwriteConfirmationPhrase}") }
+                        label = { Text("输入 ${ImportPipelineUiState.overwriteConfirmationPhrase}") }
                     )
                 }
             },
@@ -565,7 +762,7 @@ fun ImportExportScreen(
                         onImport(true)
                     }
                 ) {
-                    Text("Overwrite")
+                    Text("覆盖")
                 }
             },
             dismissButton = {
@@ -575,7 +772,7 @@ fun ImportExportScreen(
                         overwriteConfirmation = ""
                     }
                 ) {
-                    Text("Cancel")
+                    Text("取消")
                 }
             }
         )
@@ -595,11 +792,11 @@ private fun MigrationNotice() {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = "Migration preview",
+                text = "迁移预览",
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Use exported JSON only. Direct IndexedDB migration is not used. API keys stay out of imports and exports.",
+                text = "仅使用导出的 JSON。不会直接迁移 IndexedDB，API Key 不会进入导入或导出。",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -613,16 +810,16 @@ private fun ImportFlowSteps(
     importText: String
 ) {
     val hasSource = state.selectedFileName != null || importText.isNotBlank()
-    val hasResult = state.statusLabel != "No import result"
+    val hasResult = state.statusLabel != "暂无导入结果"
     val steps = listOf(
-        "Select" to hasSource,
-        "Detect" to hasResult,
-        "Validate" to hasResult,
-        "Dry-run" to (state.statusLabel == "Dry run" || state.canImport),
-        "Mode" to true,
-        "Confirm" to (state.selectedMode != NativeImportMode.Overwrite || hasResult),
-        "Write" to (state.statusLabel == "Completed" || state.statusLabel == "Partial"),
-        "Result" to hasResult
+        "选择" to hasSource,
+        "识别" to hasResult,
+        "校验" to hasResult,
+        "试运行" to (state.statusLabel == "试运行完成" || state.canImport),
+        "模式" to true,
+        "确认" to (state.selectedMode != NativeImportMode.Overwrite || hasResult),
+        "写入" to (state.statusLabel == "已完成" || state.statusLabel == "部分完成"),
+        "结果" to hasResult
     )
 
     FlowRow(
@@ -683,13 +880,13 @@ private fun ImportModeSelector(
     onImportModeChange: (NativeImportMode) -> Unit
 ) {
     Text(
-        text = "Mode",
+        text = "模式",
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         style = MaterialTheme.typography.labelMedium
     )
     Spacer(modifier = Modifier.height(4.dp))
     Text(
-        text = "Current mode: ${selectedMode.label}",
+        text = "当前模式：${selectedMode.settingsLabel}",
         color = MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.bodyMedium
     )
@@ -702,11 +899,11 @@ private fun ImportModeSelector(
             val selected = mode == selectedMode
             if (selected) {
                 Button(onClick = { onImportModeChange(mode) }) {
-                    Text(mode.label)
+                    Text(mode.settingsLabel)
                 }
             } else {
                 TextButton(onClick = { onImportModeChange(mode) }) {
-                    Text(mode.label)
+                    Text(mode.settingsLabel)
                 }
             }
         }
@@ -730,13 +927,13 @@ private fun ExportResultPanel(state: ExportPipelineUiState) {
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium
             )
-            Text(text = "Type: ${state.kindLabel}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "类型：${state.kindLabel}", style = MaterialTheme.typography.bodyMedium)
             Text(text = state.documentLabel, style = MaterialTheme.typography.bodyMedium)
             state.targetFileName?.let { Text(text = it, style = MaterialTheme.typography.bodyMedium) }
-            ResultLines(title = "Summary", lines = state.summaryLines)
-            ResultLines(title = "Warnings", lines = state.warnings)
-            ResultLines(title = "Errors", lines = state.errors)
-            ResultLines(title = "Next actions", lines = state.nextActionLines)
+            ResultLines(title = "摘要", lines = state.summaryLines)
+            ResultLines(title = "警告", lines = state.warnings)
+            ResultLines(title = "错误", lines = state.errors)
+            ResultLines(title = "下一步", lines = state.nextActionLines)
         }
     }
 }
@@ -758,18 +955,18 @@ private fun ImportResultPanel(state: ImportPipelineUiState) {
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium
             )
-            Text(text = "Selected mode: ${state.modeLabel}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "选择模式：${state.modeLabel}", style = MaterialTheme.typography.bodyMedium)
             Text(text = state.targetSpaceLabel, style = MaterialTheme.typography.bodyMedium)
             Text(text = state.sourceFileLabel, style = MaterialTheme.typography.bodyMedium)
             Text(text = state.schemaLabel, style = MaterialTheme.typography.bodyMedium)
             Text(text = state.documentTypeLabel, style = MaterialTheme.typography.bodyMedium)
             Text(text = state.apiKeyHandlingLabel, style = MaterialTheme.typography.bodyMedium)
-            ResultLines(title = "Inserted", lines = state.insertedLines)
-            ResultLines(title = "Skipped", lines = state.skippedLines)
-            ResultLines(title = "Failed", lines = state.failedLines)
-            ResultLines(title = "Warnings", lines = state.warnings)
-            ResultLines(title = "Errors", lines = state.errors)
-            ResultLines(title = "Next actions", lines = state.nextActionLines)
+            ResultLines(title = "已写入", lines = state.insertedLines)
+            ResultLines(title = "已跳过", lines = state.skippedLines)
+            ResultLines(title = "失败", lines = state.failedLines)
+            ResultLines(title = "警告", lines = state.warnings)
+            ResultLines(title = "错误", lines = state.errors)
+            ResultLines(title = "下一步", lines = state.nextActionLines)
         }
     }
 }
@@ -823,7 +1020,7 @@ private fun LlmProfileCard(
                     )
                 }
                 Text(
-                    text = if (item.active) "Active" else "Inactive",
+                    text = if (item.active) "当前" else "未启用",
                     color = if (item.active) {
                         MaterialTheme.colorScheme.primary
                     } else {
@@ -843,14 +1040,14 @@ private fun LlmProfileCard(
             ) {
                 if (!item.active) {
                     TextButton(onClick = onActivate) {
-                        Text("Set active")
+                        Text("设为当前")
                     }
                 }
                 TextButton(onClick = onTest) {
-                    Text("Test")
+                    Text("测试")
                 }
                 TextButton(onClick = onDelete) {
-                    Text("Delete")
+                    Text("删除")
                 }
             }
         }
@@ -887,7 +1084,7 @@ fun AboutDiagnosticsScreen(
         }
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Native Android diagnostics only.",
+            text = "仅显示 Native Android 诊断信息。",
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 14.sp
         )

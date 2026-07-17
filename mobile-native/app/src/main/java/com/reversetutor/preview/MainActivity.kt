@@ -1,6 +1,7 @@
 package com.reversetutor.preview
 
 import android.content.Intent
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
 import com.reversetutor.core.data.preferences.AppPreferences
 import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
@@ -21,6 +23,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureSystemBars()
         receivedImportPayload = readImportPayload(intent)
         setContent {
             val appPreferences by appGraph.appPreferencesRepository.preferences.collectAsState(
@@ -30,6 +33,7 @@ class MainActivity : ComponentActivity() {
 
             ReverseTutorTheme {
                 AppShell(
+                    hybridAppGraph = appGraph,
                     appPreferences = appPreferences,
                     sessionRepository = appGraph.sessionRepository,
                     messageRepository = appGraph.messageRepository,
@@ -39,14 +43,22 @@ class MainActivity : ComponentActivity() {
                     sourceRepository = appGraph.sourceRepository,
                     memoryRepository = appGraph.memoryRepository,
                     graphRepository = appGraph.graphRepository,
-                    localDataWipeRepository = appGraph.localDataWipeRepository,
-                    nativeImportRepository = appGraph.nativeImportRepository,
-                    nativeExportRepository = appGraph.nativeExportRepository,
                     initialImportText = receivedImport?.text,
                     initialImportFileName = receivedImport?.fileName,
                     onExitRequested = ::finish
                 )
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun configureSystemBars() {
+        val background = AndroidColor.rgb(244, 247, 253)
+        window.statusBarColor = background
+        window.navigationBarColor = background
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
         }
     }
 

@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,37 +44,30 @@ import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.llm.LlmProfileRepository
-import com.reversetutor.core.data.migration.NativeExportRepository
-import com.reversetutor.core.data.migration.NativeImportRepository
-import com.reversetutor.core.data.migration.NativeImportMode
 import com.reversetutor.core.data.memory.MemoryRepository
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sources.SourceImportInput
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.preferences.AppPreferences
-import com.reversetutor.core.data.wipe.LocalDataWipeRepository
-import com.reversetutor.core.llm.LlmConnectionResult
 import com.reversetutor.core.llm.LlmProviderPreset
-import com.reversetutor.core.llm.MockLlmConnectionTester
 import com.reversetutor.core.model.LlmProfile
+import com.reversetutor.core.model.SearchTarget
+import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.feature.chat.ChatRoute
 import com.reversetutor.feature.chat.ChatImageDraft
-import com.reversetutor.feature.chat.NewSessionRoute
+import com.reversetutor.feature.chat.FigmaNewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
-import com.reversetutor.feature.memory.ContextHubRoute
+import com.reversetutor.feature.chat.toSessionListItem
+import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
+import com.reversetutor.feature.memory.FormalWeeklySessionOption
 import com.reversetutor.feature.memory.GlobalGraphRoute
+import com.reversetutor.feature.memory.WeeklyDashboardUiState
 import com.reversetutor.feature.sources.SourcesRoute
-import com.reversetutor.feature.settings.AboutDiagnosticsScreen
-import com.reversetutor.feature.settings.ExportPipelineUiState
 import com.reversetutor.feature.settings.FirstLaunchImportPromptUiState
-import com.reversetutor.feature.settings.ImportExportScreen
-import com.reversetutor.feature.settings.ImportPipelineUiState
-import com.reversetutor.feature.settings.LocalDataWipeUiState
+import com.reversetutor.feature.settings.FormalLlmConfigurationScreen
 import com.reversetutor.feature.settings.LlmProfileSettingsUiState
-import com.reversetutor.feature.settings.NativeDiagnosticsInfo
-import com.reversetutor.feature.settings.SettingsFoundationScreen
-import com.reversetutor.feature.settings.SettingsUiState
+import com.reversetutor.feature.settings.FormalSettingsScreen
 import com.reversetutor.preview.background.BackgroundGenerationWorker
 import com.reversetutor.preview.theme.ReverseTutorDesign
 import com.reversetutor.preview.theme.ReverseTutorStatusTone
@@ -84,16 +78,14 @@ import com.reversetutor.preview.ui.ReverseTutorScaffold
 import com.reversetutor.preview.ui.ReverseTutorScreenSurface
 import com.reversetutor.preview.ui.ReverseTutorStatusStrip
 import com.reversetutor.preview.ui.ReverseTutorTopAppBar
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import com.reversetutor.preview.wiring.HybridAppGraph
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 @Composable
 fun AppShell(
+    hybridAppGraph: HybridAppGraph,
     appPreferences: AppPreferences = AppPreferences.defaults,
     sessionRepository: SessionRepository,
     messageRepository: MessageRepository,
@@ -103,9 +95,6 @@ fun AppShell(
     sourceRepository: SourceRepository,
     memoryRepository: MemoryRepository,
     graphRepository: GraphRepository,
-    localDataWipeRepository: LocalDataWipeRepository,
-    nativeImportRepository: NativeImportRepository,
-    nativeExportRepository: NativeExportRepository,
     firstLaunchImportPromptState: FirstLaunchImportPromptUiState = FirstLaunchImportPromptUiState.preview(),
     initialImportText: String? = null,
     initialImportFileName: String? = null,
@@ -114,11 +103,27 @@ fun AppShell(
     var navigationState by remember { mutableStateOf(AppNavigationState()) }
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var activeSessionTitle by remember { mutableStateOf<String?>(null) }
-    var challengeJoined by remember { mutableStateOf(false) }
+    var activeArticleSlug by remember { mutableStateOf("") }
+    var figmaUiState by remember { mutableStateOf(FigmaAppUiState()) }
+    var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
     var showFirstLaunchImportPrompt by remember(firstLaunchImportPromptState) {
         mutableStateOf(firstLaunchImportPromptState.shouldShow)
     }
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val appScope = rememberCoroutineScope()
+    val workspaceViewModelFactory = hybridAppGraph.frontend.workspaceViewModelFactory
+    val workspaceViewModel = remember(workspaceViewModelFactory) {
+        workspaceViewModelFactory.create()
+    }
+    val workspaceState by workspaceViewModel.uiState.collectAsState()
+    val weeklyDashboardViewModelFactory = hybridAppGraph.frontend.weeklyDashboardViewModelFactory
+    val weeklyDashboardViewModel = remember(weeklyDashboardViewModelFactory) {
+        weeklyDashboardViewModelFactory.create(appScope)
+    }
+    val weeklyDashboardState by weeklyDashboardViewModel.uiState.collectAsState()
+    val workspaceInteractions = remember(workspaceViewModel) {
+        WorkspaceInteractionBindings(workspaceViewModel::onAction)
+    }
 
     BackHandler {
         val transition = navigationState.handleSystemBack()
@@ -132,6 +137,19 @@ fun AppShell(
     LaunchedEffect(initialImportText, initialImportFileName) {
         if (!initialImportText.isNullOrBlank()) {
             navigationState = navigationState.navigate(AppDestination.ImportExport)
+        }
+    }
+
+    LaunchedEffect(navigationState.current) {
+        workspaceSelectionFor(navigationState.current)?.let { selection ->
+            if (selection.horizontal != workspaceState.currentPage) {
+                workspaceViewModel.onAction(WorkspaceUiAction.SelectPage(selection.horizontal))
+            }
+            selection.vertical?.let { verticalPage ->
+                if (verticalPage != workspaceState.verticalPage) {
+                    workspaceViewModel.onAction(WorkspaceUiAction.SelectVerticalPage(verticalPage))
+                }
+            }
         }
     }
 
@@ -155,6 +173,7 @@ fun AppShell(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = navigationState.drawerOpen,
         drawerContent = {
             AppDrawer(
                 current = navigationState.current,
@@ -169,9 +188,7 @@ fun AppShell(
     ) {
         ReverseTutorScaffold(
             topBar = {
-                if (navigationState.current != AppDestination.Challenge &&
-                    navigationState.current != AppDestination.Sessions
-                ) {
+                if (!navigationState.current.ownsInContentTopBar()) {
                     PreviewTopBar(
                         destination = navigationState.current,
                         activeSessionTitle = activeSessionTitle,
@@ -184,7 +201,12 @@ fun AppShell(
                             }
                         },
                         onStatusClick = {
-                            navigationState = navigationState.openModal(AppModal.Status)
+                            if (navigationState.current == AppDestination.Chat) {
+                                navigationState =
+                                    navigationState.navigate(AppDestination.SessionSettingsLibrary)
+                            } else {
+                                navigationState = navigationState.openModal(AppModal.Status)
+                            }
                         },
                         onChallengeClick = {
                             navigationState = navigationState.navigate(AppDestination.Challenge)
@@ -201,70 +223,154 @@ fun AppShell(
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                DestinationContent(
-                    destination = navigationState.current,
-                    appPreferences = appPreferences,
-                    sessionRepository = sessionRepository,
-                    messageRepository = messageRepository,
-                    llmProfileRepository = llmProfileRepository,
-                    chatGenerationRepository = chatGenerationRepository,
-                    backgroundGenerationRepository = backgroundGenerationRepository,
-                    sourceRepository = sourceRepository,
-                    memoryRepository = memoryRepository,
-                    graphRepository = graphRepository,
-                    localDataWipeRepository = localDataWipeRepository,
-                    nativeImportRepository = nativeImportRepository,
-                    nativeExportRepository = nativeExportRepository,
-                    initialImportText = initialImportText,
-                    initialImportFileName = initialImportFileName,
-                    activeSessionId = activeSessionId,
-                    activeSessionTitle = activeSessionTitle,
-                    challengeJoined = challengeJoined,
-                    onOpenChat = {
-                        navigationState = navigationState.navigate(AppDestination.Chat)
-                    },
-                    onOpenSession = { session ->
-                        activeSessionId = session.id
-                        activeSessionTitle = session.title
-                        navigationState = navigationState.navigate(AppDestination.Chat)
-                    },
-                    onOpenContextHub = {
-                        navigationState = navigationState.navigate(AppDestination.ContextHub)
-                    },
-                    onOpenGlobalGraph = {
-                        navigationState = navigationState.navigate(AppDestination.GlobalGraph)
-                    },
-                    onOpenSources = {
-                        navigationState = navigationState.navigate(AppDestination.Sources)
-                    },
-                    onOpenSessions = {
-                        navigationState = navigationState.navigate(AppDestination.Sessions)
-                    },
-                    onOpenChallenge = {
-                        navigationState = navigationState.navigate(AppDestination.Challenge)
-                    },
-                    onChallengeJoined = {
-                        challengeJoined = true
-                        navigationState = navigationState.navigate(AppDestination.Sessions)
-                    },
-                    onOpenNewSession = {
-                        navigationState = navigationState.navigate(AppDestination.NewSession)
-                    },
-                    onSessionCreated = { session ->
-                        activeSessionId = session.id
-                        activeSessionTitle = session.title
-                        navigationState = navigationState.navigate(AppDestination.Chat)
-                    },
-                    onOpenSettings = {
-                        navigationState = navigationState.navigate(AppDestination.Settings)
-                    },
-                    onOpenImportExport = {
-                        navigationState = navigationState.navigate(AppDestination.ImportExport)
-                    },
-                    onOpenAbout = {
-                        navigationState = navigationState.navigate(AppDestination.About)
-                    }
-                )
+                val renderDestination: @Composable (AppDestination) -> Unit = { destination ->
+                    DestinationContent(
+                        destination = destination,
+                        hybridAppGraph = hybridAppGraph,
+                        appPreferences = appPreferences,
+                        sessionRepository = sessionRepository,
+                        messageRepository = messageRepository,
+                        llmProfileRepository = llmProfileRepository,
+                        chatGenerationRepository = chatGenerationRepository,
+                        backgroundGenerationRepository = backgroundGenerationRepository,
+                        sourceRepository = sourceRepository,
+                        memoryRepository = memoryRepository,
+                        graphRepository = graphRepository,
+                        initialImportText = initialImportText,
+                        initialImportFileName = initialImportFileName,
+                        activeSessionId = activeSessionId,
+                        activeSessionTitle = activeSessionTitle,
+                        activeArticleSlug = activeArticleSlug,
+                        challengeJoined = figmaUiState.challengeJoined,
+                        challengeProgress = figmaUiState.challengeProgress,
+                        challengeTotal = figmaUiState.challengeTotal,
+                        weeklyDashboardState = weeklyDashboardState,
+                        onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
+                        onGraphInteractionChanged =
+                            workspaceInteractions::onFullscreenGraphInteractionChanged,
+                        onChallengeExitBoundaryChanged = { canReturnHome ->
+                            workspaceViewModel.onAction(
+                                WorkspaceUiAction.SetChallengeExitBoundary(canReturnHome)
+                            )
+                        },
+                        onWorkspaceChromeObscuredChanged = { page, obscured ->
+                            workspaceChromeObscuredPages = if (obscured) {
+                                workspaceChromeObscuredPages + page
+                            } else {
+                                workspaceChromeObscuredPages - page
+                            }
+                        },
+                        onOpenChat = {
+                            navigationState = navigationState.navigate(AppDestination.Chat)
+                        },
+                        onOpenSession = { session ->
+                            activeSessionId = session.id
+                            activeSessionTitle = session.title
+                            navigationState = navigationState.navigate(AppDestination.Chat)
+                        },
+                        onOpenContextHub = {
+                            navigationState =
+                                navigationState.navigate(AppDestination.SessionSettingsGraph)
+                        },
+                        onOpenGlobalGraph = {
+                            navigationState = navigationState.navigate(AppDestination.GlobalGraph)
+                        },
+                        onOpenSources = {
+                            navigationState = navigationState.navigate(AppDestination.Sources)
+                        },
+                        onOpenSessions = {
+                            navigationState = navigationState.navigate(AppDestination.Sessions)
+                        },
+                        onOpenChallenge = {
+                            navigationState = navigationState.navigate(AppDestination.Challenge)
+                        },
+                        onChallengeJoined = {
+                            figmaUiState = figmaUiState.joinChallenge()
+                            workspaceViewModel.onAction(
+                                WorkspaceUiAction.SelectVerticalPage(WorkspaceVerticalPage.SessionHome)
+                            )
+                            navigationState = navigationState.navigate(AppDestination.Sessions)
+                        },
+                        onOpenNewSession = {
+                            navigationState = navigationState.navigate(AppDestination.NewSession)
+                        },
+                        onOpenPublicArticle = { slug ->
+                            activeArticleSlug = slug
+                            navigationState = navigationState.navigate(AppDestination.PublicArticle)
+                        },
+                        onOpenSearchTarget = { target ->
+                            appScope.launch {
+                                when (target.type) {
+                                    SearchTargetType.Session,
+                                    SearchTargetType.Message -> {
+                                        val sessionId = target.sessionId ?: target.entityId
+                                        sessionRepository.getSession(sessionId)?.let { session ->
+                                            activeSessionId = session.id
+                                            activeSessionTitle = session.title
+                                            navigationState = navigationState.navigate(AppDestination.Chat)
+                                        }
+                                    }
+                                    SearchTargetType.Source -> {
+                                        navigationState = navigationState.navigate(AppDestination.Sources)
+                                    }
+                                    SearchTargetType.Memory,
+                                    SearchTargetType.GraphNode -> {
+                                        navigationState = navigationState.navigate(AppDestination.GlobalGraph)
+                                    }
+                                    SearchTargetType.StudyPlan -> {
+                                        navigationState = navigationState.navigate(AppDestination.WeeklyDashboard)
+                                    }
+                                }
+                            }
+                        },
+                        onSessionCreated = { session ->
+                            activeSessionId = session.id
+                            activeSessionTitle = session.title
+                            navigationState = navigationState.navigate(AppDestination.Chat)
+                        },
+                        onOpenSettings = {
+                            navigationState = navigationState.navigate(AppDestination.Settings)
+                        },
+                        onOpenImportExport = {
+                            navigationState = navigationState.navigate(AppDestination.ImportExport)
+                        },
+                        onOpenAbout = {
+                            navigationState = navigationState.navigate(AppDestination.About)
+                        },
+                        onNavigateDestination = { destination ->
+                            navigationState = navigationState.navigate(destination)
+                        }
+                    )
+                }
+                if (navigationState.current.workspacePage != null) {
+                    WorkspacePagerHost(
+                        state = workspaceState.selectedForDestination(navigationState.current),
+                        interactions = workspaceInteractions,
+                        onPageSelected = { page ->
+                            workspaceViewModel.onAction(WorkspaceUiAction.SelectPage(page))
+                            if (navigationState.current != page.destination) {
+                                navigationState = navigationState.navigate(page.destination)
+                            }
+                        },
+                        onVerticalPageSelected = { page ->
+                            workspaceViewModel.onAction(WorkspaceUiAction.SelectVerticalPage(page))
+                            val destination = when (page) {
+                                WorkspaceVerticalPage.Challenge -> AppDestination.Challenge
+                                WorkspaceVerticalPage.SessionHome -> AppDestination.Sessions
+                            }
+                            if (navigationState.current != destination) {
+                                navigationState = navigationState.navigate(destination)
+                            }
+                        },
+                        showIndicator = workspaceChromeObscuredPages.isEmpty(),
+                        challengeContent = {
+                            renderDestination(AppDestination.Challenge)
+                        },
+                        pageContent = { page -> renderDestination(page.destination) }
+                    )
+                } else {
+                    renderDestination(navigationState.current)
+                }
             }
         }
     }
@@ -290,6 +396,21 @@ fun AppShell(
             }
         )
     }
+
+    if (navigationState.current == AppDestination.NewSession &&
+        !figmaUiState.activityAnnouncementDismissed &&
+        !showFirstLaunchImportPrompt
+    ) {
+        ActivityAnnouncementDialog(
+            onDismiss = {
+                figmaUiState = figmaUiState.dismissActivityAnnouncement()
+            },
+            onViewChallenge = {
+                figmaUiState = figmaUiState.dismissActivityAnnouncement()
+                navigationState = navigationState.navigate(AppDestination.Challenge)
+            }
+        )
+    }
 }
 
 @Composable
@@ -306,12 +427,21 @@ private fun PreviewTopBar(
     } else {
         destination.title
     }
+
     ReverseTutorTopAppBar(
         title = title,
         subtitle = destination.status,
         navigationLabel = if (destination.usesDrawerNavigation()) "菜单" else "返回",
         onNavigationClick = onNavigationClick,
-        actionLabel = if (destination == AppDestination.Sessions) null else "状态",
+        actionLabel = when (destination) {
+            AppDestination.Chat -> "⚙"
+            AppDestination.NewSession,
+            AppDestination.SessionSettingsLibrary,
+            AppDestination.SessionSettingsGraph,
+            AppDestination.SessionSettingsPersona,
+            AppDestination.SessionSettingsPersonalization -> "⋮"
+            else -> null
+        },
         onActionClick = onStatusClick,
         actions = {
             if (destination == AppDestination.Sessions) {
@@ -337,9 +467,13 @@ private fun AppDrawer(
 ) {
     val spacing = ReverseTutorDesign.spacing
     val selectedDestination = when (current) {
-        AppDestination.GlobalGraph -> AppDestination.ContextHub
+        AppDestination.LlmConfiguration,
         AppDestination.ImportExport,
-        AppDestination.About -> AppDestination.Settings
+        AppDestination.About,
+        AppDestination.TokenUsage,
+        AppDestination.Update -> AppDestination.Settings
+        AppDestination.GlobalSearch,
+        AppDestination.PublicArticle -> AppDestination.Sessions
         else -> current
     }
 
@@ -418,9 +552,27 @@ private fun AppDrawer(
 private fun AppDestination.usesDrawerNavigation(): Boolean =
     AppDestination.drawerItems.any { it.enabled && it.destination == this }
 
+private fun AppDestination.ownsInContentTopBar(): Boolean =
+    workspacePage != null ||
+        this == AppDestination.Chat ||
+        this == AppDestination.NewSession ||
+        this == AppDestination.Settings ||
+        this == AppDestination.LlmConfiguration ||
+        this == AppDestination.GlobalSearch ||
+        this == AppDestination.PublicArticle ||
+        this == AppDestination.ImportExport ||
+        this == AppDestination.About ||
+        this == AppDestination.TokenUsage ||
+        this == AppDestination.Update ||
+        this == AppDestination.SessionSettingsLibrary ||
+        this == AppDestination.SessionSettingsGraph ||
+        this == AppDestination.SessionSettingsPersona ||
+        this == AppDestination.SessionSettingsPersonalization
+
 @Composable
 private fun DestinationContent(
     destination: AppDestination,
+    hybridAppGraph: HybridAppGraph,
     appPreferences: AppPreferences,
     sessionRepository: SessionRepository,
     messageRepository: MessageRepository,
@@ -430,14 +582,19 @@ private fun DestinationContent(
     sourceRepository: SourceRepository,
     memoryRepository: MemoryRepository,
     graphRepository: GraphRepository,
-    localDataWipeRepository: LocalDataWipeRepository,
-    nativeImportRepository: NativeImportRepository,
-    nativeExportRepository: NativeExportRepository,
     initialImportText: String?,
     initialImportFileName: String?,
     activeSessionId: String?,
     activeSessionTitle: String?,
+    activeArticleSlug: String,
     challengeJoined: Boolean,
+    challengeProgress: Int,
+    challengeTotal: Int,
+    weeklyDashboardState: WeeklyDashboardUiState,
+    onComposerFocusChanged: (Boolean) -> Unit,
+    onGraphInteractionChanged: (Boolean) -> Unit,
+    onChallengeExitBoundaryChanged: (Boolean) -> Unit,
+    onWorkspaceChromeObscuredChanged: (WorkspacePage, Boolean) -> Unit,
     onOpenChat: () -> Unit,
     onOpenSession: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
     onOpenContextHub: () -> Unit,
@@ -447,67 +604,22 @@ private fun DestinationContent(
     onOpenChallenge: () -> Unit,
     onChallengeJoined: () -> Unit,
     onOpenNewSession: () -> Unit,
+    onOpenPublicArticle: (String) -> Unit,
+    onOpenSearchTarget: (SearchTarget) -> Unit,
     onSessionCreated: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImportExport: () -> Unit,
-    onOpenAbout: () -> Unit
+    onOpenAbout: () -> Unit,
+    onNavigateDestination: (AppDestination) -> Unit
 ) {
-    val diagnostics = remember {
-        NativeDiagnosticsInfo.preview(
-            packageName = "com.reversetutor.preview",
-            versionName = "0.1.0-native-preview",
-            versionCode = 1
-        )
-    }
-    val settingsState = remember(diagnostics) {
-        SettingsUiState.from(
-            preferences = appPreferences,
-            diagnostics = diagnostics
-        )
-    }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val connectionTester = remember { MockLlmConnectionTester() }
     var llmProfiles by remember { mutableStateOf(emptyList<LlmProfile>()) }
-    var llmConnectionResult by remember { mutableStateOf<LlmConnectionResult?>(null) }
-    var wipeStatusLabel by remember { mutableStateOf<String?>(null) }
-    var importText by remember { mutableStateOf("") }
-    var importFileName by remember { mutableStateOf("pasted-import.json") }
     var pendingSourceImport by remember { mutableStateOf<SourceImportInput?>(null) }
     var pendingChatImageDraft by remember { mutableStateOf<ChatImageDraft?>(null) }
     var pendingChatEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingSourceEvidenceTarget by remember { mutableStateOf<String?>(null) }
-    var selectedImportMode by remember { mutableStateOf(NativeImportMode.Append) }
-    var importState by remember { mutableStateOf(ImportPipelineUiState.idle(selectedImportMode)) }
-    var exportState by remember { mutableStateOf(ExportPipelineUiState.idle()) }
-    val importFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val fileText = context.contentResolver.openInputStream(uri)
-                    ?.bufferedReader(Charsets.UTF_8)
-                    ?.use { it.readText() }
-                    .orEmpty()
-                importText = fileText
-                importFileName = uri.lastPathSegment?.substringAfterLast('/') ?: "selected-import.json"
-                importState = ImportPipelineUiState.idle(selectedImportMode).copy(selectedFileName = importFileName)
-            }
-        }
-    }
-    val exportSaveLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
-        val json = exportState.json
-        if (uri != null && !json.isNullOrBlank()) {
-            scope.launch {
-                context.contentResolver.openOutputStream(uri)
-                    ?.bufferedWriter(Charsets.UTF_8)
-                    ?.use { it.write(json) }
-                exportState = ExportPipelineUiState.saved(exportState.targetFileName)
-            }
-        }
-    }
+    var weeklySessions by remember { mutableStateOf(emptyList<com.reversetutor.core.model.TutorSession>()) }
     val sourceFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -560,18 +672,26 @@ private fun DestinationContent(
     val llmProfileState = LlmProfileSettingsUiState.from(
         profiles = llmProfiles,
         presets = LlmProviderPreset.defaults,
-        connectionResult = llmConnectionResult
+        connectionResult = null
     )
-    LaunchedEffect(initialImportText, initialImportFileName) {
-        if (!initialImportText.isNullOrBlank()) {
-            importText = initialImportText
-            importFileName = initialImportFileName ?: "received-import.json"
-            importState = ImportPipelineUiState.idle(selectedImportMode).copy(selectedFileName = importFileName)
-        }
-    }
     LaunchedEffect(destination) {
         if (destination == AppDestination.Settings) {
             llmProfiles = llmProfileRepository.listProfiles()
+        }
+        if (destination == AppDestination.WeeklyDashboard) {
+            weeklySessions = sessionRepository.listSessions().filterNot { it.archived }
+        }
+    }
+
+    val weeklySessionOptions = remember(weeklySessions) {
+        val activeThreshold = System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1_000L
+        weeklySessions.map { session ->
+            FormalWeeklySessionOption(
+                id = session.id,
+                title = session.title,
+                detail = if (session.pinned) "学习模式 · 已置顶" else "学习模式",
+                activeThisWeek = session.updatedAtEpochMillis >= activeThreshold
+            )
         }
     }
 
@@ -579,27 +699,41 @@ private fun DestinationContent(
         if (destination == AppDestination.Sessions) {
             SessionsRoute(
                 sessionRepository = sessionRepository,
+                contentRepository = hybridAppGraph.online?.contentRepository,
                 avatarVisible = appPreferences.globalAvatarVisible,
                 challengeJoined = challengeJoined,
+                challengeProgress = challengeProgress,
+                challengeTotal = challengeTotal,
                 onOpenSession = onOpenSession,
                 onNewSession = onOpenNewSession,
-                onOpenChallenge = onOpenChallenge
+                onOpenChallenge = onOpenChallenge,
+                onOpenPublicContent = { content ->
+                    if (content.canOpen) onOpenPublicArticle(content.slug)
+                },
+                onOpenWeekly = { onNavigateDestination(AppDestination.WeeklyDashboard) },
+                showSpatialIndicator = false,
+                onWorkspaceChromeObscuredChanged = { obscured ->
+                    onWorkspaceChromeObscuredChanged(WorkspacePage.SessionHome, obscured)
+                }
             )
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.NewSession) {
-            NewSessionRoute(
+            FigmaNewSessionRoute(
                 sessionRepository = sessionRepository,
                 onCreated = onSessionCreated,
-                onCancel = onOpenSessions
+                onBack = onOpenSessions
             )
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.Challenge) {
             ChallengeRoute(
                 joined = challengeJoined,
+                progress = challengeProgress,
+                total = challengeTotal,
                 onBack = onOpenSessions,
-                onJoin = onChallengeJoined
+                onJoin = onChallengeJoined,
+                onExitBoundaryChanged = onChallengeExitBoundaryChanged
             )
             return@ReverseTutorScreenSurface
         }
@@ -623,28 +757,61 @@ private fun DestinationContent(
                 onBackgroundGenerationQueued = { jobId ->
                     BackgroundGenerationWorker.enqueue(context, jobId)
                 },
-                onOpenContextHub = onOpenContextHub
+                onComposerFocusChanged = onComposerFocusChanged,
+                onOpenContextHub = onOpenContextHub,
+                onBack = onOpenSessions
             )
             return@ReverseTutorScreenSurface
         }
-        if (destination == AppDestination.ContextHub) {
-            ContextHubRoute(
-                memoryRepository = memoryRepository,
+        if (destination == AppDestination.WeeklyDashboard) {
+            FormalWeeklyDashboardScreen(
+                dashboardState = weeklyDashboardState,
+                sessionOptions = weeklySessionOptions,
+                selectedSessionIds = weeklySessionOptions
+                    .filter { it.activeThisWeek }
+                    .take(3)
+                    .mapTo(linkedSetOf()) { it.id },
+                onOpenSession = { sessionId ->
+                    weeklySessions
+                        .firstOrNull { it.id == sessionId }
+                        ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                        ?.let(onOpenSession)
+                },
+                onOpenQuestion = { onOpenGlobalGraph() },
+                onQuickSwitchModel = onOpenSettings,
+                showSpatialIndicator = false
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.Community) {
+            CommunityRoute(onBack = onOpenGlobalGraph)
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.SessionSettingsGraph) {
+            SessionWorldTreeRoute(
                 graphRepository = graphRepository,
                 sessionId = activeSessionId,
-                sessionTitle = activeSessionTitle,
-                onOpenChat = onOpenChat,
-                onOpenSources = onOpenSources,
-                onOpenChatEvidence = { messageId ->
-                    pendingChatEvidenceTarget = messageId
-                    onOpenChat()
-                },
-                onOpenSourceEvidence = { sourceId ->
-                    pendingSourceEvidenceTarget = sourceId
-                    onOpenSources()
-                },
-                onOpenSettings = onOpenSettings,
-                onOpenGlobalGraph = onOpenGlobalGraph
+                sessionTitle = activeSessionTitle ?: "当前会话",
+                onBack = onOpenChat,
+                onGraphInteractionChanged = onGraphInteractionChanged
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.SessionSettingsLibrary ||
+            destination == AppDestination.SessionSettingsPersona ||
+            destination == AppDestination.SessionSettingsPersonalization
+        ) {
+            SessionSettingsRoute(
+                destination = destination,
+                sessionTitle = activeSessionTitle ?: "宏观经济学基础",
+                onSelectDestination = onNavigateDestination,
+                onOpenBrain = { onNavigateDestination(AppDestination.GlobalGraph) },
+                onBack = onOpenChat,
+                onPickSource = {
+                    sourceFileLauncher.launch(
+                        arrayOf("text/*", "application/pdf", "image/*", "*/*")
+                    )
+                }
             )
             return@ReverseTutorScreenSurface
         }
@@ -653,7 +820,11 @@ private fun DestinationContent(
                 graphRepository = graphRepository,
                 onOpenChat = onOpenChat,
                 onOpenSources = onOpenSources,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                onGraphInteractionChanged = onGraphInteractionChanged,
+                onWorkspaceChromeObscuredChanged = { obscured ->
+                    onWorkspaceChromeObscuredChanged(WorkspacePage.GlobalGraph, obscured)
+                }
             )
             return@ReverseTutorScreenSurface
         }
@@ -680,159 +851,84 @@ private fun DestinationContent(
             )
             return@ReverseTutorScreenSurface
         }
+        if (destination == AppDestination.GlobalSearch) {
+            FormalGlobalSearchRoute(
+                searchRepository = hybridAppGraph.globalSearchRepository,
+                onBack = onOpenSessions,
+                onTargetSelected = onOpenSearchTarget
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.PublicArticle) {
+            FormalPublicArticleRoute(
+                contentRepository = hybridAppGraph.online?.contentRepository,
+                slug = activeArticleSlug,
+                onBack = onOpenSessions
+            )
+            return@ReverseTutorScreenSurface
+        }
         if (destination == AppDestination.Settings) {
-            SettingsFoundationScreen(
-                state = settingsState,
-                onOpenAbout = onOpenAbout,
+            FormalSettingsScreen(
                 llmProfileState = llmProfileState,
-                onSaveLlmProfile = { input ->
-                    scope.launch {
-                        llmProfileRepository.saveProfile(
-                            input = input,
-                            nowEpochMillis = System.currentTimeMillis()
-                        )
-                        llmProfiles = llmProfileRepository.listProfiles()
-                        llmConnectionResult = null
-                    }
+                onBack = onOpenSessions,
+                onOpenLlmConfiguration = {
+                    onNavigateDestination(AppDestination.LlmConfiguration)
                 },
-                onActivateLlmProfile = { profileId ->
-                    scope.launch {
-                        llmProfileRepository.activateProfile(
-                            profileId = profileId,
-                            nowEpochMillis = System.currentTimeMillis()
-                        )
-                        llmProfiles = llmProfileRepository.listProfiles()
-                    }
-                },
-                onDeleteLlmProfile = { profileId ->
-                    scope.launch {
-                        llmProfileRepository.deleteProfile(profileId)
-                        llmProfiles = llmProfileRepository.listProfiles()
-                    }
-                },
-                onTestLlmProfile = { profileId ->
-                    val profile = llmProfiles.firstOrNull { it.id == profileId }
-                    if (profile != null) {
-                        llmConnectionResult = connectionTester.testConnection(profile)
-                    }
-                },
-                localDataWipeState = LocalDataWipeUiState(statusLabel = wipeStatusLabel),
-                onWipeLocalData = {
-                    scope.launch {
-                        val result = localDataWipeRepository.wipeLocalData(System.currentTimeMillis())
-                        llmProfiles = llmProfileRepository.listProfiles()
-                        llmConnectionResult = null
-                        wipeStatusLabel = "本地数据已清空。已恢复默认预览，并移除密钥引用 ${result.deletedSecretRefCount} 个。"
-                    }
-                },
+                onOpenStorage = onOpenAbout,
                 onOpenImportExport = onOpenImportExport,
-                onReturnToSessions = {
-                    onOpenSessions()
-                }
+                onOpenAbout = onOpenAbout
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.LlmConfiguration) {
+            FormalLlmConfigurationScreen(
+                state = llmProfileState,
+                onBack = { onNavigateDestination(AppDestination.Settings) },
+                onActivateProfile = { profileId ->
+                    scope.launch {
+                        llmProfileRepository.activateProfile(profileId, System.currentTimeMillis())
+                        llmProfiles = llmProfileRepository.listProfiles()
+                    }
+                },
+                onTestProfile = {}
             )
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.About) {
-            AboutDiagnosticsScreen(diagnostics = diagnostics)
+            FormalDiagnosticsRoute(
+                hybridAppGraph = hybridAppGraph,
+                onBack = { onNavigateDestination(AppDestination.Settings) }
+            )
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.ImportExport) {
-            ImportExportScreen(
-                state = importState,
-                exportState = exportState,
-                importText = importText,
-                canExportCurrentSession = activeSessionId != null,
-                onImportTextChange = {
-                    importText = it
-                    importFileName = "pasted-import.json"
-                    importState = ImportPipelineUiState.idle(selectedImportMode).copy(selectedFileName = importFileName)
-                },
-                onImportModeChange = { mode ->
-                    selectedImportMode = mode
-                    importState = ImportPipelineUiState.idle(mode).copy(selectedFileName = importFileName)
-                },
-                onPickFile = {
-                    importFileLauncher.launch(arrayOf("application/json", "text/*"))
-                },
-                onDryRun = {
+            FormalImportExportRoute(
+                hybridAppGraph = hybridAppGraph,
+                onBack = { onNavigateDestination(AppDestination.Settings) },
+                initialImportText = initialImportText,
+                initialImportFileName = initialImportFileName
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.TokenUsage) {
+            FormalTokenRoute(
+                hybridAppGraph = hybridAppGraph,
+                onBack = { onNavigateDestination(AppDestination.Settings) },
+                onOpenSession = { sessionId ->
                     scope.launch {
-                        importState = ImportPipelineUiState.from(
-                            nativeImportRepository.dryRun(
-                                json = importText,
-                                sourceFileName = importFileName,
-                                nowEpochMillis = System.currentTimeMillis(),
-                                mode = selectedImportMode
-                            )
-                        )
+                        sessionRepository.getSession(sessionId)?.toSessionListItem(appPreferences.globalAvatarVisible)?.let(onOpenSession)
                     }
-                },
-                onImport = { overwriteConfirmed ->
-                    scope.launch {
-                        val result = nativeImportRepository.importJson(
-                            json = importText,
-                            sourceFileName = importFileName,
-                            nowEpochMillis = System.currentTimeMillis(),
-                            mode = selectedImportMode,
-                            overwriteConfirmed = overwriteConfirmed
-                        )
-                        importState = ImportPipelineUiState.from(result)
-                    }
-                },
-                onExportCurrentSession = {
-                    val sessionId = activeSessionId
-                    if (sessionId == null) {
-                        exportState = ExportPipelineUiState.unavailable("请先打开一个会话，再导出当前会话。")
-                    } else {
-                        scope.launch {
-                            exportState = ExportPipelineUiState.from(
-                                nativeExportRepository.currentSession(
-                                    sessionId = sessionId,
-                                    createdAt = System.currentTimeMillis().toExportTimestamp()
-                                )
-                            )
-                        }
-                    }
-                },
-                onExportGraphSnapshot = {
-                    scope.launch {
-                        exportState = ExportPipelineUiState.from(
-                            nativeExportRepository.graphSnapshot(
-                                createdAt = System.currentTimeMillis().toExportTimestamp()
-                            )
-                        )
-                    }
-                },
-                onExportFullBackup = {
-                    scope.launch {
-                        exportState = ExportPipelineUiState.from(
-                            nativeExportRepository.fullBackup(
-                                createdAt = System.currentTimeMillis().toExportTimestamp()
-                            )
-                        )
-                    }
-                },
-                onExportPreset = {
-                    exportState = ExportPipelineUiState.unavailable(
-                        message = "协议已支持预设导出，但当前预览还没有选择预设归属。",
-                        kindLabel = "预设"
-                    )
-                },
-                onShareExport = {
-                    val json = exportState.json
-                    if (!json.isNullOrBlank()) {
-                        context.shareExportText(
-                            fileName = exportState.targetFileName ?: "reverse-tutor-export.json",
-                            json = json
-                        )
-                    }
-                },
-                onSaveExport = {
-                    exportSaveLauncher.launch(exportState.targetFileName ?: "reverse-tutor-export.json")
                 }
             )
             return@ReverseTutorScreenSurface
         }
-
+        if (destination == AppDestination.Update) {
+            FormalUpdateRoute(
+                hybridAppGraph = hybridAppGraph,
+                onBack = { onNavigateDestination(AppDestination.Settings) }
+            )
+            return@ReverseTutorScreenSurface
+        }
         val spacing = ReverseTutorDesign.spacing
         Column(
             modifier = Modifier
@@ -876,18 +972,6 @@ private fun DestinationContent(
     }
 }
 
-private fun Context.shareExportText(
-    fileName: String,
-    json: String
-) {
-    val intent = Intent(Intent.ACTION_SEND)
-        .setType("application/json")
-        .putExtra(Intent.EXTRA_TITLE, fileName)
-        .putExtra(Intent.EXTRA_SUBJECT, fileName)
-        .putExtra(Intent.EXTRA_TEXT, json)
-    startActivity(Intent.createChooser(intent, "共享导出"))
-}
-
 private fun Context.tryPersistReadPermission(uri: android.net.Uri) {
     runCatching {
         contentResolver.takePersistableUriPermission(
@@ -895,12 +979,6 @@ private fun Context.tryPersistReadPermission(uri: android.net.Uri) {
             Intent.FLAG_GRANT_READ_URI_PERMISSION
         )
     }
-}
-
-private fun Long.toExportTimestamp(): String {
-    val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
-    formatter.timeZone = TimeZone.getTimeZone("UTC")
-    return formatter.format(Date(this))
 }
 
 @Composable

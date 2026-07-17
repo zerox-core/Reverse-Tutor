@@ -19,7 +19,14 @@ class WorkspaceViewModel(
         action: WorkspaceUiAction
     ): WorkspaceUiState =
         when (action) {
-            is WorkspaceUiAction.SelectPage -> state.copy(currentPage = action.page)
+            is WorkspaceUiAction.SelectPage -> state.copy(
+                currentPage = action.page,
+                verticalPage = if (action.page == WorkspacePage.SessionHome) {
+                    state.verticalPage
+                } else {
+                    WorkspaceVerticalPage.SessionHome
+                }
+            )
             is WorkspaceUiAction.SetComposerInputActive -> state.copy(
                 interactionLocks = state.interactionLocks.copy(
                     composerInputActive = action.active
@@ -33,6 +40,23 @@ class WorkspaceViewModel(
             is WorkspaceUiAction.SetFullscreenGraphActive -> state.copy(
                 interactionLocks = state.interactionLocks.copy(
                     fullscreenGraphActive = action.active
+                )
+            )
+            is WorkspaceUiAction.SelectVerticalPage -> state.copy(
+                currentPage = WorkspacePage.SessionHome,
+                verticalPage = action.page
+            )
+            is WorkspaceUiAction.SetChallengeExitBoundary -> state.copy(
+                challengeCanReturnHome = action.canReturnHome
+            )
+            is WorkspaceUiAction.SetChallengeDragActive -> state.copy(
+                interactionLocks = state.interactionLocks.copy(
+                    challengeDragActive = action.active
+                )
+            )
+            is WorkspaceUiAction.SetGraphEdgePagingActive -> state.copy(
+                interactionLocks = state.interactionLocks.copy(
+                    graphEdgePagingActive = action.active
                 )
             )
             is WorkspaceUiAction.RecordVerticalScroll -> state.copy(

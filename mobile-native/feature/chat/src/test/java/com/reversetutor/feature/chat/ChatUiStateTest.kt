@@ -58,9 +58,14 @@ class ChatUiStateTest {
         )
 
         assertEquals("Algebra", state.sessionTitle)
-        assertEquals(listOf("Assistant", "You"), state.messages.map { it.roleLabel })
-        assertEquals("Replying to: Factor x^2 - 4", state.messages.last().quoteLabel)
-        assertEquals(listOf("Image: question.png"), state.messages.last().attachmentLabels)
+        assertEquals("林澈", state.learnerName)
+        assertEquals("正在理解函数", state.learnerStatus)
+        assertEquals("基础语法 / 函数 / 参数与返回值", state.contextPath)
+        assertEquals(listOf("林澈", "我"), state.messages.map { it.roleLabel })
+        assertEquals("正在回复：Factor x^2 - 4", state.messages.last().quoteLabel)
+        assertEquals(listOf("图片：question.png"), state.messages.last().attachmentLabels)
+        assertEquals("content://images/question.png", state.messages.last().attachments.single().uri)
+        assertTrue(state.messages.last().attachments.single().isImage)
         assertEquals(listOf("space-1", "space-1"), state.messages.map { it.spaceId })
     }
 
@@ -106,7 +111,7 @@ class ChatUiStateTest {
     @Test
     fun actionModelKeepsOnlyRegenerateDeferredAfterNotePersistenceLands() {
         assertEquals(
-            listOf("Quote", "Note", "Regenerate", "Delete"),
+            listOf("引用", "记为随笔", "重新生成", "删除"),
             ChatMessageAction.entries.map { it.label }
         )
         assertEquals(
@@ -117,10 +122,10 @@ class ChatUiStateTest {
 
     @Test
     fun generationStateSummarizesNoModelPendingAndFailureStates() {
-        assertEquals("No model configured", ChatGenerationUiState.NoModel.statusLabel)
-        assertEquals("Generating reply...", ChatGenerationUiState.Pending.statusLabel)
+        assertEquals("未配置模型", ChatGenerationUiState.NoModel.statusLabel)
+        assertEquals("正在生成回复...", ChatGenerationUiState.Pending.statusLabel)
         assertEquals(
-            "Provider failed: Timeout",
+            "生成失败：Timeout",
             ChatGenerationUiState.Failure("Timeout").statusLabel
         )
 
@@ -132,7 +137,7 @@ class ChatUiStateTest {
         )
 
         assertEquals(ChatGenerationUiState.NoModel, state.generation)
-        assertEquals("No model configured", state.generationStatusLabel)
+        assertEquals("未配置模型", state.generationStatusLabel)
     }
 
     private fun message(

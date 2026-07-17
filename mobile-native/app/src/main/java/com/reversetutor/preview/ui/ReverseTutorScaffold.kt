@@ -1,15 +1,14 @@
 package com.reversetutor.preview.ui
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -18,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import com.reversetutor.preview.theme.ReverseTutorDesign
 
 @Composable
@@ -42,6 +42,9 @@ fun ReverseTutorTopAppBar(
     subtitle: String?,
     actionLabel: String?,
     onActionClick: (() -> Unit)?,
+    navigationLabel: String? = null,
+    onNavigationClick: (() -> Unit)? = null,
+    actions: @Composable RowScope.() -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val spacing = ReverseTutorDesign.spacing
@@ -59,14 +62,21 @@ fun ReverseTutorTopAppBar(
             horizontalArrangement = Arrangement.spacedBy(spacing.space3),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (navigationLabel != null && onNavigationClick != null) {
+                ReverseTutorActionButton(
+                    label = if (navigationLabel == "菜单") "☰" else "‹",
+                    onClick = onNavigationClick,
+                    tone = ReverseTutorActionTone.Quiet
+                )
+            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(spacing.space1)
             ) {
                 Text(
                     text = title,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.headlineMedium
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.titleLarge
                 )
                 if (subtitle != null) {
                     Text(
@@ -83,6 +93,7 @@ fun ReverseTutorTopAppBar(
                     tone = ReverseTutorActionTone.Quiet
                 )
             }
+            actions()
         }
     }
 }
@@ -111,7 +122,6 @@ fun ReverseTutorNavigationStrip(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
                 .heightIn(min = spacing.minTouchTarget + spacing.space2)
                 .padding(horizontal = spacing.space3, vertical = spacing.space2),
             horizontalArrangement = Arrangement.spacedBy(spacing.space2),
@@ -121,7 +131,8 @@ fun ReverseTutorNavigationStrip(
                 ReverseTutorNavigationChip(
                     label = item.label,
                     selected = item.key == selectedKey,
-                    onClick = { onItemSelected(item.key) }
+                    onClick = { onItemSelected(item.key) },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -132,7 +143,8 @@ fun ReverseTutorNavigationStrip(
 private fun ReverseTutorNavigationChip(
     label: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val spacing = ReverseTutorDesign.spacing
     val shapes = ReverseTutorDesign.shapes
@@ -151,14 +163,17 @@ private fun ReverseTutorNavigationChip(
         onClick = onClick,
         color = container,
         contentColor = content,
-        shape = RoundedCornerShape(shapes.radiusMedium)
+        shape = RoundedCornerShape(shapes.radiusMedium),
+        modifier = modifier
     ) {
         Text(
             text = label,
             modifier = Modifier
+                .fillMaxWidth()
                 .heightIn(min = spacing.minTouchTarget)
-                .padding(horizontal = spacing.space3, vertical = spacing.space2),
-            style = MaterialTheme.typography.labelLarge
+                .padding(horizontal = spacing.space1, vertical = spacing.space2),
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.labelMedium
         )
     }
 }

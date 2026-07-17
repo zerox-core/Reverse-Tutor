@@ -9,6 +9,7 @@ import com.reversetutor.core.model.MemoryItemKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,7 +22,7 @@ class KnowledgeGraphUiStateTest {
         )
 
         assertEquals(GraphRenderStatus.Empty, state.status)
-        assertEquals("No graph nodes yet", state.title)
+        assertEquals("还没有图谱节点", state.title)
         assertTrue(state.visibleEdges.isEmpty())
     }
 
@@ -73,9 +74,10 @@ class KnowledgeGraphUiStateTest {
         )
 
         assertEquals(listOf("node-a"), state.nodes.map { it.id })
-        assertEquals("Needs review", state.nodes.single().statusLabel)
+        assertEquals(listOf("node-b"), state.lockedNodes.map { it.id })
+        assertEquals("需审核", state.nodes.single().statusLabel)
         assertEquals(
-            listOf("Approve", "Archive", "Hide"),
+            listOf("通过", "归档", "隐藏"),
             state.nodes.single().reviewActions.map { it.label }
         )
     }
@@ -116,15 +118,213 @@ class KnowledgeGraphUiStateTest {
         assertTrue(node.reviewCards.single().body.contains("Difference of squares"))
     }
 
+    @Test
+    fun readyGraphSummaryNamesNativeInteractionAndListFallback() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                node("node-a", "Alpha"),
+                node("node-b", "Beta")
+            ),
+            edges = listOf(edge("edge-valid", "node-a", "node-b"))
+        )
+
+        assertTrue(state.summary.contains("拖动"))
+        assertTrue(state.summary.contains("缩放"))
+        assertTrue(state.summary.contains("选择"))
+        assertTrue(state.summary.contains("节点列表"))
+    }
+
+    @Test
+    fun hierarchyAnchorsFollowDirectedDepthInsteadOfCircularOrder() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                node("root", "Root", kind = GraphNodeKind.Session),
+                node("child", "Child"),
+                node("leaf", "Leaf")
+            ),
+            edges = listOf(
+                edge("root-child", "root", "child"),
+                edge("child-leaf", "child", "leaf")
+            ),
+            scope = GraphScope.Global
+        )
+
+        val root = state.nodes.first { it.id == "root" }
+        val child = state.nodes.first { it.id == "child" }
+        val leaf = state.nodes.first { it.id == "leaf" }
+
+        assertEquals(listOf(0, 1, 2), listOf(root.depth, child.depth, leaf.depth))
+        assertTrue(root.anchorY < child.anchorY)
+        assertTrue(child.anchorY < leaf.anchorY)
+        assertNotEquals(root.y, child.y)
+        assertNotEquals(child.y, leaf.y)
+    }
+
+    @Test
+    fun physicsLayoutIsDeterministicBoundedAndRetainsInertiaState() {
+        val nodes = listOf(
+            node("root", "Root", kind = GraphNodeKind.Session),
+            node("a", "A"),
+            node("b", "B"),
+            node("c", "C"),
+            node("d", "D")
+        )
+        val edges = listOf(
+            edge("root-a", "root", "a"),
+            edge("root-b", "root", "b"),
+            edge("root-c", "root", "c"),
+            edge("root-d", "root", "d")
+        )
+
+        val first = KnowledgeGraphUiState.from(nodes, edges, scope = GraphScope.Global)
+        val second = KnowledgeGraphUiState.from(nodes, edges, scope = GraphScope.Global)
+
+        assertEquals(first.nodes.map { it.x to it.y }, second.nodes.map { it.x to it.y })
+        first.nodes.forEach { layoutNode ->
+            assertTrue(layoutNode.x in 0.07f..0.93f)
+            assertTrue(layoutNode.y in 0.07f..0.93f)
+            assertTrue(kotlin.math.abs(layoutNode.velocityX) <= 0.032f)
+            assertTrue(kotlin.math.abs(layoutNode.velocityY) <= 0.032f)
+        }
+        assertEquals(first.nodes.size, first.nodes.map { it.x to it.y }.distinct().size)
+        first.nodes.forEachIndexed { index, left ->
+            first.nodes.drop(index + 1).forEach { right ->
+                val overlapsHorizontally = kotlin.math.abs(left.x - right.x) < left.cardHalfWidth + right.cardHalfWidth
+                val overlapsVertically = kotlin.math.abs(left.y - right.y) < left.cardHalfHeight + right.cardHalfHeight
+                assertFalse("layout cards overlap: ${left.id}/${right.id}", overlapsHorizontally && overlapsVertically)
+            }
+        }
+    }
+
+    @Test
+    fun semanticZoomUsesCirclesOnlyForGlobalOverview() {
+        assertEquals(GraphSemanticMode.OverviewCircles, graphSemanticMode(GraphScope.Global, 1f))
+        assertEquals(GraphSemanticMode.DetailCards, graphSemanticMode(GraphScope.Global, 1.5f))
+        assertEquals(GraphSemanticMode.DetailCards, graphSemanticMode(GraphScope.Session, 0.72f))
+    }
+
+    @Test
+    fun globalOverviewUsesTopologyToKeepClusterLeavesCompact() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                node("root", "Root", kind = GraphNodeKind.Session),
+                node("hub", "Hub"),
+                node("leaf-a", "Leaf A"),
+                node("leaf-b", "Leaf B"),
+                node("leaf-c", "Leaf C")
+            ),
+            edges = listOf(
+                edge("root-hub", "root", "hub"),
+                edge("hub-a", "hub", "leaf-a"),
+                edge("hub-b", "hub", "leaf-b"),
+                edge("hub-c", "hub", "leaf-c")
+            ),
+            scope = GraphScope.Global
+        )
+
+        val root = state.nodes.first { it.id == "root" }
+        val hub = state.nodes.first { it.id == "hub" }
+        val leaf = state.nodes.first { it.id == "leaf-a" }
+
+        assertTrue(root.radius > hub.radius)
+        assertTrue(hub.radius > leaf.radius)
+        assertEquals(0.014f, leaf.radius)
+    }
+
+    @Test
+    fun globalOverviewLabelsFlipBeforeCrossingTheViewportEdge() {
+        assertEquals(
+            GraphOverviewLabelPlacement.Inside,
+            graphOverviewLabelPlacement(
+                wantsInside = true,
+                centerX = 195f,
+                radius = 24f,
+                labelWidth = 40f,
+                viewportWidth = 390f,
+                margin = 8f,
+                gap = 5f
+            )
+        )
+        assertEquals(
+            GraphOverviewLabelPlacement.Right,
+            graphOverviewLabelPlacement(
+                wantsInside = false,
+                centerX = 28f,
+                radius = 6f,
+                labelWidth = 70f,
+                viewportWidth = 390f,
+                margin = 8f,
+                gap = 5f
+            )
+        )
+        assertEquals(
+            GraphOverviewLabelPlacement.Left,
+            graphOverviewLabelPlacement(
+                wantsInside = false,
+                centerX = 362f,
+                radius = 6f,
+                labelWidth = 70f,
+                viewportWidth = 390f,
+                margin = 8f,
+                gap = 5f
+            )
+        )
+    }
+
+    @Test
+    fun sessionCardLayoutKeepsNodesInsideTheFormalViewportLanes() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                node("root", "Python", kind = GraphNodeKind.Session),
+                node("student", "Student", kind = GraphNodeKind.Person),
+                node("goal", "Goal", kind = GraphNodeKind.Requirement),
+                node("material", "Material", kind = GraphNodeKind.Source),
+                node("concept-a", "Concept A"),
+                node("concept-b", "Concept B")
+            ),
+            edges = listOf(
+                edge("root-student", "root", "student"),
+                edge("root-goal", "root", "goal"),
+                edge("root-material", "root", "material"),
+                edge("root-a", "root", "concept-a"),
+                edge("root-b", "root", "concept-b")
+            ),
+            scope = GraphScope.Session
+        )
+
+        state.allNodes.forEach { node ->
+            assertTrue("session node escaped horizontally: ${node.id}", node.x in 0.17f..0.85f)
+        }
+    }
+
+    @Test
+    fun lockedNodesCanBeShownWithoutRebuildingRepositoryState() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                node("active", "Active"),
+                node("locked", "Locked", status = GraphNodeStatus.Hidden)
+            ),
+            edges = listOf(edge("active-locked", "active", "locked")),
+            scope = GraphScope.Session
+        )
+
+        assertEquals(listOf("active"), state.renderSnapshot(showLockedNodes = false).nodes.map { it.id })
+        assertEquals(setOf("active", "locked"), state.renderSnapshot(showLockedNodes = true).nodes.map { it.id }.toSet())
+        assertTrue(state.renderSnapshot(showLockedNodes = false).edges.isEmpty())
+        assertEquals(listOf("active-locked"), state.renderSnapshot(showLockedNodes = true).edges.map { it.id })
+        assertEquals("locked", state.withSelection("locked").selectedNode?.id)
+    }
+
     private fun node(
         id: String,
         label: String,
-        status: GraphNodeStatus = GraphNodeStatus.Active
+        status: GraphNodeStatus = GraphNodeStatus.Active,
+        kind: GraphNodeKind = GraphNodeKind.Concept
     ): GraphNode = GraphNode(
         id = id,
         spaceId = "space-1",
         label = label,
-        kind = GraphNodeKind.Concept,
+        kind = kind,
         createdAtEpochMillis = 100L,
         status = status
     )

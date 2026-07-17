@@ -2,9 +2,10 @@ package com.reversetutor.feature.chat
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -35,9 +36,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,138 +47,117 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reversetutor.core.data.session.SessionRepository
+import com.reversetutor.core.domain.ContentRepository
+import com.reversetutor.core.domain.OnlineData
 import com.reversetutor.core.model.TutorSession
 import com.reversetutor.core.protocol.NativeSessionPresetValidator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
 fun SessionsRoute(
     sessionRepository: SessionRepository,
     avatarVisible: Boolean,
+    contentRepository: ContentRepository? = null,
     challengeJoined: Boolean = false,
+    challengeProgress: Int = 0,
+    challengeTotal: Int = 21,
     onOpenSession: (SessionListItem) -> Unit,
     onNewSession: () -> Unit = {},
     onOpenChallenge: () -> Unit = {},
+    onOpenPublicContent: (FormalPublicContentUi) -> Unit = {},
+    onOpenWeekly: () -> Unit = {},
+    showSpatialIndicator: Boolean = true,
+    onWorkspaceChromeObscuredChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val scope = rememberCoroutineScope()
     var sessions by remember { mutableStateOf(emptyList<TutorSession>()) }
-    var query by remember { mutableStateOf("") }
-    var filter by remember { mutableStateOf(SessionListFilter.All) }
-    var refreshKey by remember { mutableIntStateOf(0) }
-    var renameTarget by remember { mutableStateOf<SessionListItem?>(null) }
-    var deleteTarget by remember { mutableStateOf<SessionListItem?>(null) }
-    var noticeText by remember { mutableStateOf<String?>(null) }
-
-    fun reload() {
-        refreshKey += 1
-    }
-
-    LaunchedEffect(refreshKey) {
-        sessionRepository.ensurePreviewSeed(System.currentTimeMillis())
-        sessions = sessionRepository.listSessions()
-    }
-
-    SessionsScreen(
-        state = SessionListUiState.from(
-            sessions = sessions.map { it.toSessionListItem(avatarVisible) },
-            query = query,
-            filter = filter,
-            avatarVisible = avatarVisible
-        ),
-        challengeJoined = challengeJoined,
-        onOpenSession = onOpenSession,
-        onNewSession = onNewSession,
-        onOpenChallenge = onOpenChallenge,
-        onRenameSession = { renameTarget = it },
-        onTogglePinned = { item ->
-            scope.launch {
-                sessionRepository.setPinned(
-                    id = item.id,
-                    pinned = !item.pinned,
-                    updatedAtEpochMillis = System.currentTimeMillis()
-                )
-                reload()
+    var showNewSessionSheet by remember { mutableStateOf(false) }
+    var publicContent by remember(contentRepository) {
+        mutableStateOf(
+            if (contentRepository == null) {
+                FormalPublicContentUi.offline()
+            } else {
+                FormalPublicContentUi.loading()
             }
+        )
+    }
+
+    LaunchedEffect(sessionRepository) {
+        sessions = sessionRepository.listSessions().filterNot { it.archived }
+    }
+
+    LaunchedEffect(showNewSessionSheet) {
+        onWorkspaceChromeObscuredChanged(showNewSessionSheet)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onWorkspaceChromeObscuredChanged(false) }
+    }
+
+    LaunchedEffect(contentRepository) {
+        val repository = contentRepository ?: return@LaunchedEffect
+        publicContent = try {
+            when (val result = repository.feed(limit = 4, types = setOf("public_interest"))) {
+                is OnlineData.Content -> result.value.toFormalPublicContentUi()
+                    ?: FormalPublicContentUi.unavailable()
+                is OnlineData.Failure -> FormalPublicContentUi.unavailable()
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            FormalPublicContentUi.unavailable()
+        }
+    }
+
+    val sessionListState = SessionListUiState.from(
+        sessions = sessions.map { it.toSessionListItem(avatarVisible) },
+        query = "",
+        filter = SessionListFilter.All,
+        avatarVisible = avatarVisible
+    )
+    val challenge = if (challengeJoined) {
+        val safeTotal = challengeTotal.coerceAtLeast(1)
+        val safeProgress = challengeProgress.coerceIn(0, safeTotal)
+        FormalJoinedChallengeUi(
+            id = "challenge-21-days",
+            title = "21 天学习挑战",
+            dayLabel = "挑战进行中 · 第 ${safeProgress.coerceAtLeast(1)} 天",
+            todayPrompt = "今天：用三句话讲清楚机会成本",
+            progressFraction = safeProgress.toFloat() / safeTotal.toFloat()
+        )
+    } else {
+        null
+    }
+
+    FormalHomeScreen(
+        state = sessionListState.toFormalHomeUiState(
+            publicContent = publicContent,
+            challenge = challenge,
+            isNewSessionSheetVisible = showNewSessionSheet
+        ),
+        onPublicContentClick = onOpenPublicContent,
+        onSessionClick = { formalSession ->
+            sessionListState.visibleSessions
+                .firstOrNull { it.id == formalSession.id }
+                ?.let(onOpenSession)
         },
-        onDeleteSession = { deleteTarget = it },
-        onExportSession = {
-            noticeText = "会话导出请到“设置 > 导入与导出”中处理。"
+        onOpenChallenge = onOpenChallenge,
+        onShowNewSessionSheet = { showNewSessionSheet = true },
+        onDismissNewSessionSheet = { showNewSessionSheet = false },
+        onStartLearningSetup = {
+            showNewSessionSheet = false
+            onNewSession()
         },
-        onAvatarSession = {
-            noticeText = "单会话头像将在头像与画像工作中处理。"
-        },
+        onOpenWeekly = onOpenWeekly,
+        showSpatialIndicator = showSpatialIndicator,
         modifier = modifier
     )
-
-    val currentRenameTarget = renameTarget
-    if (currentRenameTarget != null) {
-        RenameSessionDialog(
-            item = currentRenameTarget,
-            onDismiss = { renameTarget = null },
-            onConfirm = { title ->
-                scope.launch {
-                    sessionRepository.renameSession(
-                        id = currentRenameTarget.id,
-                        title = title,
-                        updatedAtEpochMillis = System.currentTimeMillis()
-                    )
-                    renameTarget = null
-                    reload()
-                }
-            }
-        )
-    }
-
-    val currentDeleteTarget = deleteTarget
-    if (currentDeleteTarget != null) {
-        AlertDialog(
-            onDismissRequest = { deleteTarget = null },
-            title = { Text("删除会话") },
-            text = { Text("删除“${currentDeleteTarget.title}”？") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            sessionRepository.archiveSession(
-                                id = currentDeleteTarget.id,
-                                updatedAtEpochMillis = System.currentTimeMillis()
-                            )
-                            deleteTarget = null
-                            reload()
-                        }
-                    }
-                ) {
-                    Text("删除")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
-    val currentNotice = noticeText
-    if (currentNotice != null) {
-        AlertDialog(
-            onDismissRequest = { noticeText = null },
-            title = { Text("延期待办") },
-            text = { Text(currentNotice) },
-            confirmButton = {
-                TextButton(onClick = { noticeText = null }) {
-                    Text("知道了")
-                }
-            }
-        )
-    }
 }
 
 @Composable
@@ -187,6 +167,7 @@ fun SessionsScreen(
     onOpenSession: (SessionListItem) -> Unit,
     onNewSession: () -> Unit,
     onOpenChallenge: () -> Unit,
+    onOpenMenu: () -> Unit,
     onRenameSession: (SessionListItem) -> Unit,
     onTogglePinned: (SessionListItem) -> Unit,
     onDeleteSession: (SessionListItem) -> Unit,
@@ -194,30 +175,16 @@ fun SessionsScreen(
     onAvatarSession: (SessionListItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var pullDistance by remember { mutableStateOf(0f) }
     val firstSession = state.visibleSessions.firstOrNull()
     val secondSession = state.visibleSessions.drop(1).firstOrNull()
     val thirdSession = state.visibleSessions.drop(2).firstOrNull()
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(HomeBackground)
-            .pointerInput(onOpenChallenge) {
-                detectVerticalDragGestures(
-                    onDragEnd = { pullDistance = 0f },
-                    onDragCancel = { pullDistance = 0f },
-                    onVerticalDrag = { _, dragAmount ->
-                        if (dragAmount > 0) {
-                            pullDistance += dragAmount
-                            if (pullDistance > 84f) {
-                                pullDistance = 0f
-                                onOpenChallenge()
-                            }
-                        }
-                    }
-                )
-            }
     ) {
+        val cardWidth = (maxWidth - 32.dp).coerceAtMost(358.dp)
+        val cardStart = (maxWidth - cardWidth) / 2
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -233,55 +200,106 @@ fun SessionsScreen(
         )
         HomeTopBar(
             onOpenChallenge = onOpenChallenge,
-            onNewSession = onNewSession
+            onNewSession = onNewSession,
+            onOpenMenu = onOpenMenu
         )
-        FigmaContinueCard(
-            onOpen = {
-                firstSession?.let(onOpenSession)
-            },
-            modifier = Modifier.offset(x = 15.dp, y = 83.dp)
-        )
-        Text(
-            text = "最近学习",
-            color = HomeInk,
-            fontSize = 18.sp,
-            lineHeight = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.offset(x = 15.dp, y = 187.dp)
-        )
-        FigmaSessionCard(
-            title = "宏观经济学基础",
-            time = "10 分钟前",
-            body = "复习了 GDP、国内生产总值和供需关系。",
-            onOpen = { (firstSession ?: secondSession ?: thirdSession)?.let(onOpenSession) },
-            modifier = Modifier.offset(x = 15.dp, y = 223.dp)
-        )
-        FigmaSessionCard(
-            title = "英语写作专场：议论文结构",
-            time = "昨天",
-            body = "重点讨论 thesis statement 和反例段落。",
-            onOpen = { (secondSession ?: firstSession ?: thirdSession)?.let(onOpenSession) },
-            modifier = Modifier.offset(x = 15.dp, y = 305.dp)
-        )
-        FigmaSessionCard(
-            title = "机器学习入门",
-            time = "周二",
-            body = "整理过拟合、正则化和交叉验证的对比。",
-            onOpen = { (thirdSession ?: secondSession ?: firstSession)?.let(onOpenSession) },
-            modifier = Modifier.offset(x = 15.dp, y = 387.dp)
-        )
+        if (challengeJoined) {
+            Text(
+                text = "最近学习",
+                color = HomeInk,
+                fontSize = 18.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.offset(x = 16.dp, y = 86.dp)
+            )
+            JoinedChallengeSessionCard(
+                onOpenChallenge = onOpenChallenge,
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 122.dp)
+            )
+            FigmaSessionCard(
+                title = firstSession?.title ?: "宏观经济学基础",
+                time = "10 分钟前",
+                body = firstSession?.statusLabel ?: "复习了 GDP、国内生产总值和供需关系。",
+                onOpen = { (firstSession ?: secondSession ?: thirdSession)?.let(onOpenSession) },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 226.dp)
+            )
+            FigmaSessionCard(
+                title = secondSession?.title ?: "英语写作专场：议论文结构",
+                time = "昨天",
+                body = secondSession?.statusLabel ?: "重点讨论 thesis statement 和反例段落。",
+                onOpen = { (secondSession ?: firstSession ?: thirdSession)?.let(onOpenSession) },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 308.dp)
+            )
+            FigmaSessionCard(
+                title = thirdSession?.title ?: "机器学习入门",
+                time = "周二",
+                body = thirdSession?.statusLabel ?: "整理过拟合、正则化和交叉验证的对比。",
+                onOpen = { (thirdSession ?: secondSession ?: firstSession)?.let(onOpenSession) },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 390.dp)
+            )
+        } else {
+            FigmaContinueCard(
+                title = firstSession?.title ?: "宏观经济学基础",
+                body = firstSession?.statusLabel ?: "上次停在 GDP 与财政政策推演，可以直接接着问。",
+                onOpen = {
+                    firstSession?.let(onOpenSession)
+                },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 84.dp)
+            )
+            Text(
+                text = "最近学习",
+                color = HomeInk,
+                fontSize = 18.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.offset(x = 16.dp, y = 188.dp)
+            )
+            FigmaSessionCard(
+                title = firstSession?.title ?: "宏观经济学基础",
+                time = "10 分钟前",
+                body = firstSession?.statusLabel ?: "复习了 GDP、国内生产总值和供需关系。",
+                onOpen = { (firstSession ?: secondSession ?: thirdSession)?.let(onOpenSession) },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 224.dp)
+            )
+            FigmaSessionCard(
+                title = secondSession?.title ?: "英语写作专场：议论文结构",
+                time = "昨天",
+                body = secondSession?.statusLabel ?: "重点讨论 thesis statement 和反例段落。",
+                onOpen = { (secondSession ?: firstSession ?: thirdSession)?.let(onOpenSession) },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 306.dp)
+            )
+            FigmaSessionCard(
+                title = thirdSession?.title ?: "机器学习入门",
+                time = "周二",
+                body = thirdSession?.statusLabel ?: "整理过拟合、正则化和交叉验证的对比。",
+                onOpen = { (thirdSession ?: secondSession ?: firstSession)?.let(onOpenSession) },
+                cardWidth = cardWidth,
+                modifier = Modifier.offset(x = cardStart, y = 388.dp)
+            )
+        }
     }
 }
 
 @Composable
 private fun HomeTopBar(
     onOpenChallenge: () -> Unit,
-    onNewSession: () -> Unit
+    onNewSession: () -> Unit,
+    onOpenMenu: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.offset(x = 15.dp, y = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Box(
+            modifier = Modifier
+                .offset(x = 4.dp, y = 4.dp)
+                .size(44.dp)
+                .clickable(onClick = onOpenMenu),
+            contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
@@ -306,35 +324,42 @@ private fun HomeTopBar(
             fontSize = 21.sp,
             lineHeight = 25.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.offset(x = 47.dp, y = 7.dp)
+            modifier = Modifier.offset(x = 48.dp, y = 8.dp)
         )
         Text(
             text = "会话列表 · 本地优先",
             color = Color(0xFF768093),
             fontSize = 11.sp,
             lineHeight = 15.sp,
-            modifier = Modifier.offset(x = 47.dp, y = 32.dp)
+            modifier = Modifier.offset(x = 48.dp, y = 33.dp)
         )
-        HomePillButton(
-            label = "挑战",
-            onClick = onOpenChallenge,
-            modifier = Modifier.offset(x = 271.dp, y = 12.dp),
-            width = 48.dp,
-            container = Color(0xFFF7F8FF),
-            content = Color(0xFF4F55D7),
-            border = Color(0xFFDDE2F0),
-            shadow = false
-        )
-        HomePillButton(
-            label = "新建",
-            onClick = onNewSession,
-            modifier = Modifier.offset(x = 327.dp, y = 12.dp),
-            width = 46.dp,
-            container = PrimaryPurple,
-            content = Color.White,
-            border = Color.Transparent,
-            shadow = true
-        )
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 13.dp, end = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            HomePillButton(
+                label = "挑战",
+                onClick = onOpenChallenge,
+                modifier = Modifier,
+                width = 48.dp,
+                container = Color(0xFFF7F8FF),
+                content = Color(0xFF4F55D7),
+                border = Color(0xFFDDE2F0),
+                shadow = false
+            )
+            HomePillButton(
+                label = "新建",
+                onClick = onNewSession,
+                modifier = Modifier,
+                width = 46.dp,
+                container = PrimaryPurple,
+                content = Color.White,
+                border = Color.Transparent,
+                shadow = true
+            )
+        }
     }
 }
 
@@ -380,14 +405,17 @@ private fun HomePillButton(
 
 @Composable
 private fun FigmaContinueCard(
+    title: String,
+    body: String,
     onOpen: () -> Unit,
+    cardWidth: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onOpen,
         modifier = Modifier
             .then(modifier)
-            .width(358.dp)
+            .width(cardWidth)
             .height(78.dp)
             .shadow(18.dp, RoundedCornerShape(18.dp), ambientColor = Color(0x0D000000), spotColor = Color(0x0D000000)),
         color = CardWhite,
@@ -395,28 +423,38 @@ private fun FigmaContinueCard(
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, CardBorder)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Text(
-                text = "继续：宏观经济学基础",
-                color = HomeInk,
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.offset(x = 13.dp, y = 11.dp)
-            )
-            Text(
-                text = "上次停在 GDP 与财政政策推演，可以直接接着问。",
-                color = HomeBody,
-                fontSize = 12.sp,
-                lineHeight = 17.sp,
-                modifier = Modifier
-                    .offset(x = 13.dp, y = 39.dp)
-                    .width(260.dp)
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 13.dp, end = 13.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = "继续：$title",
+                    color = HomeInk,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = body,
+                    color = HomeBody,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
             Surface(
                 onClick = onOpen,
                 modifier = Modifier
-                    .offset(x = 285.dp, y = 22.dp)
                     .width(52.dp)
                     .height(32.dp)
                     .shadow(14.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x1F000000), spotColor = Color(0x1F000000)),
@@ -438,12 +476,13 @@ private fun FigmaSessionCard(
     time: String,
     body: String,
     onOpen: () -> Unit,
+    cardWidth: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onOpen,
         modifier = modifier
-            .width(358.dp)
+            .width(cardWidth)
             .height(70.dp)
             .shadow(9.dp, RoundedCornerShape(18.dp), ambientColor = Color(0x0D000000), spotColor = Color(0x0D000000)),
         color = CardWhite,
@@ -451,33 +490,40 @@ private fun FigmaSessionCard(
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, CardBorder)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Text(
-                text = title,
-                color = HomeInk,
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.offset(x = 13.dp, y = 11.dp)
-            )
-            Text(
-                text = time,
-                color = Color(0xFF768093),
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-                textAlign = TextAlign.Right,
-                modifier = Modifier
-                    .offset(x = 287.dp, y = 12.dp)
-                    .width(56.dp)
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 13.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = title,
+                    color = HomeInk,
+                    fontSize = 16.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = time,
+                    color = Color(0xFF768093),
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp,
+                    textAlign = TextAlign.Right,
+                    maxLines = 1
+                )
+            }
             Text(
                 text = body,
                 color = HomeBody,
                 fontSize = 12.sp,
                 lineHeight = 18.sp,
-                modifier = Modifier
-                    .offset(x = 13.dp, y = 39.dp)
-                    .width(310.dp)
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -485,33 +531,102 @@ private fun FigmaSessionCard(
 
 @Composable
 private fun JoinedChallengeSessionCard(
-    onOpenChallenge: () -> Unit
+    onOpenChallenge: () -> Unit,
+    cardWidth: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onOpenChallenge,
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = RoundedCornerShape(8.dp)
+        modifier = modifier
+            .width(cardWidth)
+            .height(88.dp)
+            .shadow(9.dp, RoundedCornerShape(18.dp), ambientColor = Color(0x0D000000), spotColor = Color(0x0D000000)),
+        color = CardWhite,
+        contentColor = HomeInk,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, CardBorder)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val trailingWidth = 118.dp
             Text(
-                text = "Python 学习挑战",
+                text = "21天 Python 学习挑战",
+                color = HomeInk,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
+                lineHeight = 22.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .offset(x = 13.dp, y = 11.dp)
+                    .width((maxWidth - trailingWidth - 13.dp).coerceAtLeast(96.dp))
             )
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 11.dp, end = 60.dp)
+                    .width(58.dp)
+                    .height(24.dp),
+                color = Color(0xFFF0F3FF),
+                contentColor = Color(0xFF5057D8),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFCCD4FF))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("挑战中", fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
+                }
+            }
             Text(
-                text = "今日任务：完成 1 次打卡 · 距离结束 15 天",
-                fontSize = 13.sp
-            )
-            Text(
-                text = "打开挑战",
-                color = MaterialTheme.colorScheme.primary,
+                text = "◷",
+                color = Color(0xFF667085),
                 fontSize = 13.sp,
-                fontWeight = FontWeight.Medium
+                lineHeight = 15.sp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 13.dp, end = 48.dp)
+            )
+            Text(
+                text = "剩 15 天",
+                color = Color(0xFF667085),
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 12.dp, end = 13.dp)
+            )
+            Text(
+                text = "今日任务：完成 Python 基础练习，并回传学习数据。",
+                color = HomeBody,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                modifier = Modifier
+                    .offset(x = 13.dp, y = 41.dp)
+                    .width((maxWidth - 26.dp).coerceAtLeast(120.dp))
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = 13.dp, y = 67.dp)
+                    .width((maxWidth - 95.dp).coerceAtLeast(120.dp))
+                    .height(4.dp)
+                    .background(Color(0xFFE3E7F4), RoundedCornerShape(2.dp))
+            )
+            Box(
+                modifier = Modifier
+                    .offset(x = 13.dp, y = 67.dp)
+                    .width(((maxWidth - 95.dp) * 0.58f).coerceAtLeast(72.dp))
+                    .height(4.dp)
+                    .background(Color(0xFF5D63E8), RoundedCornerShape(2.dp))
+            )
+            Text(
+                text = "12/21",
+                color = Color(0xFF5057D8),
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Right,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 60.dp, end = 13.dp)
             )
         }
     }

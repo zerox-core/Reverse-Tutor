@@ -7,6 +7,9 @@ import com.reversetutor.core.model.MessageRole
 
 data class ChatUiState(
     val sessionTitle: String,
+    val learnerName: String,
+    val learnerStatus: String,
+    val contextPath: String,
     val messages: List<ChatTimelineItem>,
     val composer: ChatComposerState,
     val generation: ChatGenerationUiState = ChatGenerationUiState.Idle
@@ -19,10 +22,16 @@ data class ChatUiState(
             sessionTitle: String,
             records: List<MessageRecord>,
             composer: ChatComposerState,
-            generation: ChatGenerationUiState = ChatGenerationUiState.Idle
+            generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
+            learnerName: String = "林澈",
+            learnerStatus: String = "正在理解函数",
+            contextPath: String = "基础语法 / 函数 / 参数与返回值"
         ): ChatUiState =
             ChatUiState(
                 sessionTitle = sessionTitle,
+                learnerName = learnerName,
+                learnerStatus = learnerStatus,
+                contextPath = contextPath,
                 messages = records
                     .sortedBy { it.message.createdAtEpochMillis }
                     .map { record ->
@@ -30,13 +39,21 @@ data class ChatUiState(
                             id = record.message.id,
                             spaceId = record.message.spaceId,
                             role = record.message.role,
-                            roleLabel = record.message.role.toChatLabel(),
+                            roleLabel = record.message.role.toChatLabel(learnerName),
                             text = record.message.text,
                             createdAtEpochMillis = record.message.createdAtEpochMillis,
                             attachmentLabels = record.attachments.map { attachment ->
                                 attachment.toTimelineLabel()
                             },
-                            quoteLabel = record.quote?.let { "Replying to: ${it.excerpt}" }
+                            attachments = record.attachments.map { attachment ->
+                                ChatAttachmentUi(
+                                    name = attachment.name,
+                                    mimeType = attachment.mimeType,
+                                    uri = attachment.uri,
+                                    sourceId = attachment.sourceId
+                                )
+                            },
+                            quoteLabel = record.quote?.let { "正在回复：${it.excerpt}" }
                         )
                     },
                 composer = composer,
@@ -53,15 +70,15 @@ sealed interface ChatGenerationUiState {
     }
 
     object NoModel : ChatGenerationUiState {
-        override val statusLabel: String = "No model configured"
+        override val statusLabel: String = "未配置模型"
     }
 
     object Pending : ChatGenerationUiState {
-        override val statusLabel: String = "Generating reply..."
+        override val statusLabel: String = "正在生成回复..."
     }
 
     data class Failure(val message: String) : ChatGenerationUiState {
-        override val statusLabel: String = "Provider failed: $message"
+        override val statusLabel: String = "生成失败：$message"
     }
 }
 
@@ -73,8 +90,19 @@ data class ChatTimelineItem(
     val text: String,
     val createdAtEpochMillis: Long,
     val attachmentLabels: List<String>,
+    val attachments: List<ChatAttachmentUi>,
     val quoteLabel: String?
 )
+
+data class ChatAttachmentUi(
+    val name: String,
+    val mimeType: String?,
+    val uri: String?,
+    val sourceId: String?
+) {
+    val isImage: Boolean
+        get() = mimeType?.startsWith("image/") == true
+}
 
 data class ChatComposerState(
     val text: String,
@@ -106,8 +134,8 @@ data class ChatImageDraft(
 ) {
     val displayLabel: String
         get() = buildString {
-            append("Image: ")
-            append(name.ifBlank { "attachment" })
+            append("图片：")
+            append(name.ifBlank { "附件" })
             if (!mimeType.isNullOrBlank()) {
                 append(" (")
                 append(mimeType)
@@ -133,23 +161,23 @@ enum class ChatMessageAction(
     val label: String,
     val deferred: Boolean
 ) {
-    Quote("Quote", false),
-    Note("Note", false),
-    Regenerate("Regenerate", true),
-    Delete("Delete", false)
+    Quote("引用", false),
+    Note("记为随笔", false),
+    Regenerate("重新生成", true),
+    Delete("删除", false)
 }
 
-private fun MessageRole.toChatLabel(): String =
+private fun MessageRole.toChatLabel(learnerName: String): String =
     when (this) {
-        MessageRole.User -> "You"
-        MessageRole.Assistant -> "Assistant"
-        MessageRole.System -> "System"
-        MessageRole.Tool -> "Tool"
+        MessageRole.User -> "我"
+        MessageRole.Assistant -> learnerName
+        MessageRole.System -> "学习记录"
+        MessageRole.Tool -> "资料"
     }
 
 private fun com.reversetutor.core.model.MessageAttachment.toTimelineLabel(): String =
     if (mimeType?.startsWith("image/") == true) {
-        "Image: $name"
+        "图片：$name"
     } else {
-        "Attachment: $name"
+        "附件：$name"
     }
