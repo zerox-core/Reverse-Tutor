@@ -9,6 +9,7 @@ servers:
   - url: http://127.0.0.1:8000/api/v1
     description: Local development
 tags:
+  - name: System
   - name: Auth
   - name: Content
   - name: Activities
@@ -16,6 +17,22 @@ tags:
   - name: Insights
   - name: Releases
 paths:
+  /health:
+    get:
+      tags: [System]
+      operationId: getOnlineHealth
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Online runtime and catalog readiness without secret configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnlineHealthResponse'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
   /auth/anonymous:
     post:
       tags: [Auth]
@@ -450,6 +467,34 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
   schemas:
+    OnlineHealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, mode, schemaHead, catalog, serverTimeEpochMillis]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+        mode:
+          type: string
+          enum: [memory, postgresql]
+        schemaHead:
+          type: string
+        catalog:
+          $ref: '#/components/schemas/OnlineCatalogHealth'
+        serverTimeEpochMillis:
+          type: integer
+          format: int64
+          minimum: 1
+    OnlineCatalogHealth:
+      type: object
+      additionalProperties: false
+      required: [contentAvailable, activityAvailable]
+      properties:
+        contentAvailable:
+          type: boolean
+        activityAvailable:
+          type: boolean
     ErrorEnvelope:
       type: object
       required: [error]

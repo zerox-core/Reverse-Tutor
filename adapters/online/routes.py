@@ -17,6 +17,7 @@ from .content_activity_models import (
 from .content_activity_ports import ActivityPortConflict
 from .content_activity_service import ContentNotFound, ContentOffline
 from .errors import OnlineApiError
+from .health import OnlineHealthResponse, online_health_response
 from .models import (
     ActivityProgressRequest,
     OnlineWriteIdentity,
@@ -29,6 +30,21 @@ from .service import online_service
 router = APIRouter(prefix="/api/v1")
 RequestIdHeader = Annotated[str | None, Header(alias="X-Request-Id", max_length=128)]
 ActivityIdPath = Annotated[str, Path(alias="activityId", min_length=1)]
+
+
+@router.get(
+    "/health",
+    response_model=OnlineHealthResponse,
+    tags=["System"],
+    operation_id="getOnlineHealth",
+    openapi_extra={"security": []},
+)
+def online_health() -> OnlineHealthResponse:
+    content_available, activity_available = online_service.catalog_availability()
+    return online_health_response(
+        content_available=content_available,
+        activity_available=activity_available,
+    )
 
 
 @router.get(

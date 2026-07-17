@@ -32,6 +32,17 @@ def test_slice_zero_openapi_contains_auth_and_error_contracts():
     ]
 
 
+def test_canonical_openapi_contains_public_online_health():
+    document = _contract()
+    operation = document["paths"]["/health"]["get"]
+
+    assert operation["operationId"] == "getOnlineHealth"
+    assert operation["security"] == []
+    assert operation["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/OnlineHealthResponse"}
+
+
 def test_protected_request_bodies_do_not_trust_user_id():
     schemas = _contract()["components"]["schemas"]
 

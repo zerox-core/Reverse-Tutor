@@ -150,6 +150,15 @@ class OnlineHybridService:
             limit=limit,
         )
 
+    def catalog_availability(self) -> tuple[bool, bool]:
+        content = self.content_feed(
+            cursor=None,
+            limit=1,
+            content_types=frozenset(),
+        )
+        activities = self.list_activities(cursor=None, limit=1)
+        return bool(content.body.items), bool(activities.items)
+
     def push_sync(self, account_id: str, request: SyncPushRequest) -> dict[str, Any]:
         results = []
         for item in request.items:
