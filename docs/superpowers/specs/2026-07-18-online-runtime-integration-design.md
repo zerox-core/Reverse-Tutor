@@ -54,4 +54,3 @@ Turn the existing PostgreSQL-first catalog, FastAPI HTTP contracts, and Android 
 - FastAPI: readiness response, no sensitive fields, empty and seeded catalog behavior.
 - Android JVM: initial load, local-only fallback, authenticated join, retryable failure, conflict reload, deterministic idempotency.
 - Integration: PostgreSQL migration and seed, FastAPI HTTP smoke, Android repository contract. Real-device HTTP/Keystore smoke requires a reachable server URL.
-
