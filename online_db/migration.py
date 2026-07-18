@@ -29,9 +29,10 @@ from sqlalchemy.orm import Session, sessionmaker
 import online_db.models  # noqa: F401
 from online_db.base import OnlineBase
 from online_db.models import MigrationRun, MigrationValidationResult
+from online_db.schema_check import online_schema_head
 
 
-TARGET_REVISION = "0002_migration_audit"
+TARGET_REVISION = online_schema_head()
 ONLINE_MIGRATION_TABLES = {
     "anonymous_accounts",
     "account_devices",

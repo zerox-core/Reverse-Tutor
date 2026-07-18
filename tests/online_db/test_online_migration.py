@@ -23,6 +23,7 @@ from online_db.models import (
     MigrationRun,
     MigrationValidationResult,
 )
+from online_db.schema_check import online_schema_head
 
 
 EXPECTED_CHECKS = {
@@ -35,6 +36,7 @@ EXPECTED_CHECKS = {
     "alembic_revision",
     "sequence_identity",
 }
+EXPECTED_TARGET_REVISION = online_schema_head()
 
 
 def sqlite_path(tmp_path):
@@ -83,7 +85,7 @@ def test_empty_source_records_repeatable_validation_report(
 
     assert result.migration_run_id == run_id
     assert len(result.source_sha256) == 64
-    assert result.target_revision == "0002_migration_audit"
+    assert result.target_revision == EXPECTED_TARGET_REVISION
     assert result.status == "passed"
     assert {check.name for check in result.checks} == EXPECTED_CHECKS
     assert all(check.passed for check in result.checks)
@@ -354,7 +356,7 @@ def test_validation_checks_real_foreign_key_orphans_and_unique_duplicates(
                 for check in _validate_target(
                     connection,
                     source_counts,
-                    "0002_migration_audit",
+                    EXPECTED_TARGET_REVISION,
                 )
             }
 
