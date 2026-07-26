@@ -79,6 +79,15 @@ class WorkspaceViewModel(
                     graphEdgePagingActive = action.active
                 )
             )
+            is WorkspaceUiAction.SetSurfaceState -> state.copy(
+                surfaceStates = state.surfaceStates + (action.page to action.state)
+            )
+            is WorkspaceUiAction.RetrySurface -> state.copy(
+                surfaceStates = state.surfaceStates +
+                    (action.page to WorkspaceSurfaceState.Loading),
+                surfaceRetryGenerations = state.surfaceRetryGenerations +
+                    (action.page to ((state.surfaceRetryGenerations[action.page] ?: 0L) + 1L))
+            )
             is WorkspaceUiAction.RecordVerticalScroll -> state.copy(
                 verticalScrollOffsets = state.verticalScrollOffsets +
                     (action.page to action.offset.coerceAtLeast(0))

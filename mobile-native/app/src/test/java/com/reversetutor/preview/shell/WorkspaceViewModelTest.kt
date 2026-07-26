@@ -7,7 +7,7 @@ import org.junit.Test
 
 class WorkspaceViewModelTest {
     @Test
-    fun workspaceStartsOnSessionHomeInFourPageOrder() {
+    fun workspaceStartsOnSessionHomeInFivePageOrder() {
         val viewModel = WorkspaceViewModel()
 
         assertEquals(
@@ -302,10 +302,9 @@ class WorkspaceViewModelTest {
     }
 
     @Test
-    fun transientIndicatorsAndChallengePagingUseRealDeviceTuning() {
+    fun transientIndicatorsUseRealDeviceTuning() {
         assertEquals(700L, TransientIndicatorSpec.HoldMillis)
         assertEquals(240, TransientIndicatorSpec.FadeMillis)
-        assertEquals(0.65f, HomeChallengePagingSpec.PositionalThreshold, 0.001f)
     }
 
     @Test
@@ -382,6 +381,89 @@ class WorkspaceViewModelTest {
                 AppNavigationState(drawerOpen = true),
                 canvasState
             )
+        )
+        assertFalse(
+            shouldExitGraphCanvasBeforeNavigation(
+                AppNavigationState(),
+                canvasState,
+                pageLocalActionSurfaceActive = true
+            )
+        )
+        assertEquals(
+            WorkspaceBackTarget.AppNavigationSurface,
+            workspaceBackTarget(
+                AppNavigationState(modal = AppModal.Status),
+                canvasState,
+                pageLocalActionSurfaceActive = true
+            )
+        )
+        assertEquals(
+            WorkspaceBackTarget.PageLocalActionSurface,
+            workspaceBackTarget(
+                AppNavigationState(),
+                canvasState,
+                pageLocalActionSurfaceActive = true
+            )
+        )
+        assertEquals(
+            WorkspaceBackTarget.GraphCanvas,
+            workspaceBackTarget(
+                AppNavigationState(),
+                canvasState,
+                pageLocalActionSurfaceActive = false
+            )
+        )
+    }
+
+    @Test
+    fun workspaceSurfaceSlotsArePageLocalAndDoNotBlockSettings() {
+        val viewModel = WorkspaceViewModel()
+        viewModel.onAction(
+            WorkspaceUiAction.SetSurfaceState(
+                WorkspacePage.GlobalGraph,
+                WorkspaceSurfaceState.Offline("图谱连接不可用")
+            )
+        )
+
+        assertTrue(
+            viewModel.uiState.value.surfaceStateFor(WorkspacePage.GlobalGraph) is
+                WorkspaceSurfaceState.Offline
+        )
+        assertEquals(
+            WorkspaceSurfaceState.Content,
+            viewModel.uiState.value.surfaceStateFor(WorkspacePage.Settings)
+        )
+
+        viewModel.onAction(WorkspaceUiAction.RetrySurface(WorkspacePage.GlobalGraph))
+
+        assertEquals(
+            WorkspaceSurfaceState.Loading,
+            viewModel.uiState.value.surfaceStateFor(WorkspacePage.GlobalGraph)
+        )
+        assertEquals(1L, viewModel.uiState.value.surfaceRetryGenerations[WorkspacePage.GlobalGraph])
+        assertEquals(
+            WorkspaceSurfaceState.Content,
+            viewModel.uiState.value.surfaceStateFor(WorkspacePage.Settings)
+        )
+    }
+
+    @Test
+    fun reusableSurfacePresentationsCoverEveryNonContentStateAndRetrySlot() {
+        val states = listOf(
+            WorkspaceSurfaceState.Loading,
+            WorkspaceSurfaceState.Empty(),
+            WorkspaceSurfaceState.Offline(),
+            WorkspaceSurfaceState.Error(),
+            WorkspaceSurfaceState.PermissionDenied()
+        )
+
+        assertEquals(
+            listOf("正在加载", "暂无内容", "网络不可用", "出现错误", "权限受限"),
+            states.map { workspaceSurfacePresentation(it)?.title }
+        )
+        assertEquals(
+            listOf(null, "刷新", "重试", "重试", "重新检查权限"),
+            states.map { workspaceSurfacePresentation(it)?.actionLabel }
         )
     }
 

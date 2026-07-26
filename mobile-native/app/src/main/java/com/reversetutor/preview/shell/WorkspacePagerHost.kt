@@ -31,6 +31,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -65,32 +66,47 @@ internal fun WorkspacePagerHost(
     val workspaceGestureGuard = Modifier.pointerInput(
         state.horizontalPagingEnabled,
         state.interactionLocks.graphCanvasModeActive,
+        state.interactionLocks.innerHorizontalControlActive,
         gestureSlopPx
     ) {
         awaitEachGesture {
-            val firstDown = awaitFirstDown(requireUnconsumed = false)
-            var horizontalDistancePx = 0f
-            var verticalDistancePx = 0f
-            do {
-                val event = awaitPointerEvent()
-                event.changes.firstOrNull { it.id == firstDown.id }?.let { change ->
-                    horizontalDistancePx += change.position.x - change.previousPosition.x
-                    verticalDistancePx += change.position.y - change.previousPosition.y
-                }
-                if (kotlin.math.abs(horizontalDistancePx) >= gestureSlopPx ||
-                    kotlin.math.abs(verticalDistancePx) >= gestureSlopPx
-                ) {
-                    gestureOwner = workspaceGestureOwner(
-                        horizontalDeltaPx = horizontalDistancePx,
-                        verticalDeltaPx = verticalDistancePx,
-                        innerHorizontalControlActive = state.interactionLocks
-                            .innerHorizontalControlActive,
-                        graphCanvasModeActive = state.interactionLocks.graphCanvasModeActive,
-                        workspacePagingEnabled = state.horizontalPagingEnabled
-                    )
-                }
-            } while (event.changes.any { it.pressed })
-            gestureOwner = WorkspaceGestureOwner.WorkspacePager
+            try {
+                val firstDown = awaitFirstDown(requireUnconsumed = false)
+                var horizontalDistancePx = 0f
+                var verticalDistancePx = 0f
+                var gestureDecided = false
+                do {
+                    val event = awaitPointerEvent()
+                    event.changes.firstOrNull { it.id == firstDown.id }?.let { change ->
+                        horizontalDistancePx += change.position.x - change.previousPosition.x
+                        verticalDistancePx += change.position.y - change.previousPosition.y
+                    }
+                    if (!gestureDecided &&
+                        (kotlin.math.abs(horizontalDistancePx) >= gestureSlopPx ||
+                            kotlin.math.abs(verticalDistancePx) >= gestureSlopPx)
+                    ) {
+                        gestureDecided = true
+                        gestureOwner = workspaceGestureOwner(
+                            horizontalDeltaPx = horizontalDistancePx,
+                            verticalDeltaPx = verticalDistancePx,
+                            innerHorizontalControlActive = state.interactionLocks
+                                .innerHorizontalControlActive,
+                            graphCanvasModeActive = state.interactionLocks.graphCanvasModeActive,
+                            workspacePagingEnabled = state.horizontalPagingEnabled
+                        )
+                    }
+                } while (event.changes.any { it.pressed })
+            } finally {
+                gestureOwner = WorkspaceGestureOwner.WorkspacePager
+            }
+        }
+    }
+
+    LaunchedEffect(gestureOwner, pagerState) {
+        if (gestureOwner != WorkspaceGestureOwner.WorkspacePager &&
+            pagerState.isScrollInProgress
+        ) {
+            pagerState.scrollToPage(pagerState.settledPage)
         }
     }
 
@@ -121,25 +137,32 @@ internal fun WorkspacePagerHost(
         Box(modifier = Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = state.horizontalPagingEnabled,
+                userScrollEnabled = state.horizontalPagingEnabled &&
+                    gestureOwner == WorkspaceGestureOwner.WorkspacePager,
                 modifier = Modifier
                     .fillMaxSize()
                     .then(workspaceGestureGuard)
             ) { pageIndex ->
                 val page = WorkspaceLoopingPager.pageAt(state.pages, pageIndex)
-                when (page) {
-                    WorkspacePage.SessionHome -> HomeChallengePagerHost(
-                        selectedPage = state.verticalPage,
-                        challengeCanReturnHome = state.challengeCanReturnHome,
-                        onDragActiveChanged = interactions::onChallengeDragChanged,
-                        onPageSelected = onVerticalPageSelected,
-                        challengeContent = challengeContent,
-                        homeContent = { pageContent(WorkspacePage.SessionHome) }
-                    )
-                    WorkspacePage.GlobalGraph -> key(state.resourceReleaseGeneration) {
-                        pageContent(page)
+                WorkspaceSurfaceShell(
+                    state = state.surfaceStateFor(page),
+                    onRetry = { interactions.onRetrySurface(page) }
+                ) {
+                    when (page) {
+                        WorkspacePage.SessionHome -> HomeChallengePagerHost(
+                            state.verticalPage,
+                            state.verticalPage != WorkspaceVerticalPage.Challenge ||
+                                state.challengeCanReturnHome,
+                            interactions::onChallengeDragChanged,
+                            onVerticalPageSelected,
+                            challengeContent,
+                            { pageContent(WorkspacePage.SessionHome) }
+                        )
+                        WorkspacePage.GlobalGraph -> key(state.resourceReleaseGeneration) {
+                            pageContent(page)
+                        }
+                        else -> pageContent(page)
                     }
-                    else -> pageContent(page)
                 }
             }
             if (
@@ -173,7 +196,7 @@ internal fun WorkspacePagerHost(
                         pagerState = pagerState,
                         pages = state.pages,
                         homeSelected = state.currentPage == WorkspacePage.SessionHome,
-                        modifier = Modifier
+                        modifier = Modifier.workspaceHorizontalGestureControl(interactions)
                     )
                 }
             }
@@ -192,6 +215,25 @@ internal fun WorkspacePagerHost(
                     )
                 }
             }
+        }
+    }
+}
+
+internal fun Modifier.workspaceHorizontalGestureControl(
+    interactions: WorkspaceInteractionBindings
+): Modifier = pointerInput(interactions) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        interactions.onInnerHorizontalControlChanged(true)
+        try {
+            do {
+                val event = awaitPointerEvent()
+                event.changes.forEach { change ->
+                    if (change.positionChanged()) change.consume()
+                }
+            } while (event.changes.any { it.pressed })
+        } finally {
+            interactions.onInnerHorizontalControlChanged(false)
         }
     }
 }

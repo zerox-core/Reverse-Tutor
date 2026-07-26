@@ -227,6 +227,11 @@ class WorkspaceSpatialNavigationDeviceTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("workspace-community").assertIsDisplayed()
         assertIndicatorPosition(3f)
+
+        composeRule.onNodeWithTag("workspace-community").performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("workspace-settings").assertIsDisplayed()
+        assertIndicatorPosition(4f)
     }
 
     @Test
@@ -272,8 +277,8 @@ class WorkspaceSpatialNavigationDeviceTest {
 private fun SpatialWorkspaceTestContent() {
     var selectedPage by remember { mutableStateOf(WorkspaceVerticalPage.SessionHome) }
     HomeChallengePagerHost(
-        selectedPage = selectedPage,
-        userScrollEnabled = true,
+        selectedPage,
+        true,
         onDragActiveChanged = {},
         onPageSelected = { selectedPage = it },
         challengeContent = {
@@ -333,6 +338,7 @@ private fun GraphWorkspaceTestContent() {
                         WorkspacePage.SessionHome -> WorkspaceTestPage("workspace-home", Color.White)
                         WorkspacePage.GlobalGraph -> WorkspaceTestPage("workspace-graph", Color(0xFFF0F5F4))
                         WorkspacePage.Community -> WorkspaceTestPage("workspace-community", Color(0xFFF8F8F8))
+                        WorkspacePage.Settings -> WorkspaceTestPage("workspace-settings", Color(0xFFF2F2F7))
                     }
                 }
             )
@@ -362,6 +368,7 @@ private fun OrderedWorkspaceTestContent() {
                 WorkspacePage.SessionHome -> WorkspaceTestPage("workspace-home", Color.White)
                 WorkspacePage.GlobalGraph -> WorkspaceTestPage("workspace-graph", Color(0xFFF0F5F4))
                 WorkspacePage.Community -> WorkspaceTestPage("workspace-community", Color(0xFFF8F8F8))
+                WorkspacePage.Settings -> WorkspaceTestPage("workspace-settings", Color(0xFFF2F2F7))
             }
         }
     )

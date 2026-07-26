@@ -129,6 +129,8 @@ fun FormalGlobalKnowledgeGraphScreen(
     onEditNode: ((GraphLayoutNode) -> Unit)? = null,
     onOpenChatEvidence: ((GraphLayoutNode) -> Unit)? = null,
     onOpenSourceEvidence: ((GraphLayoutNode) -> Unit)? = null,
+    canvasModeActive: Boolean = false,
+    onCanvasModeChange: (Boolean) -> Unit = {},
     onGraphInteractionChanged: (Boolean) -> Unit = {}
 ) {
     Box(
@@ -143,6 +145,11 @@ fun FormalGlobalKnowledgeGraphScreen(
                 subtitle = subtitle,
                 inlineSubtitle = true,
                 onBack = onBack,
+                onBackgroundClick = if (canvasModeActive) {
+                    { onCanvasModeChange(false) }
+                } else {
+                    null
+                },
                 onSearch = onSearch,
                 onMore = onMore
             )
@@ -153,12 +160,34 @@ fun FormalGlobalKnowledgeGraphScreen(
                     state = state,
                     showLockedNodes = false,
                     onSelectedNodeChange = onSelectedNodeChange,
+                    interactionEnabled = canvasModeActive,
+                    onRequestInteraction = { onCanvasModeChange(true) },
                     onInteractionChanged = onGraphInteractionChanged,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                 )
             }
+        }
+        Surface(
+            onClick = { onCanvasModeChange(!canvasModeActive) },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 70.dp),
+            color = if (canvasModeActive) FormalColors.Primary else FormalColors.Surface,
+            contentColor = if (canvasModeActive) Color.White else FormalColors.Muted,
+            shape = RoundedCornerShape(FormalShapes.PillRadius),
+            border = if (canvasModeActive) null else BorderStroke(1.dp, FormalColors.Border),
+            shadowElevation = 2.dp
+        ) {
+            Text(
+                text = if (canvasModeActive) "画布模式 · 退出" else "页面模式",
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                color = if (canvasModeActive) Color.White else FormalColors.Muted,
+                fontSize = LocalFormalTypeScale.current.size(11f),
+                lineHeight = LocalFormalTypeScale.current.size(16f),
+                fontWeight = FontWeight.Medium
+            )
         }
         state.selectedNode?.let { node ->
             GraphScreenScrim(onClick = { onSelectedNodeChange(null) })
@@ -342,6 +371,7 @@ private fun FormalGraphTopBar(
     subtitle: String,
     inlineSubtitle: Boolean = false,
     onBack: (() -> Unit)?,
+    onBackgroundClick: (() -> Unit)? = null,
     onSearch: (() -> Unit)? = null,
     showLockedNodes: Boolean? = null,
     onShowLockedNodesChange: ((Boolean) -> Unit)? = null,
@@ -353,6 +383,11 @@ private fun FormalGraphTopBar(
             .fillMaxWidth()
             .height(72.dp)
             .background(Color(0xF2FBFCFF))
+            .then(
+                onBackgroundClick?.let { onClick ->
+                    Modifier.clickable(onClick = onClick)
+                } ?: Modifier
+            )
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

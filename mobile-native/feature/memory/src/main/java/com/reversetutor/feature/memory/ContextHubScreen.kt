@@ -153,8 +153,12 @@ fun GlobalGraphRoute(
     onOpenChat: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenSettings: () -> Unit,
+    onBack: () -> Unit = {},
+    canvasModeActive: Boolean = false,
+    onCanvasModeChange: (Boolean) -> Unit = {},
     onGraphInteractionChanged: (Boolean) -> Unit = {},
     onWorkspaceChromeObscuredChanged: (Boolean) -> Unit = {},
+    onPageLocalActionSurfaceChanged: (Boolean, () -> Unit) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -166,9 +170,16 @@ fun GlobalGraphRoute(
 
     LaunchedEffect(selectedNodeId) {
         onWorkspaceChromeObscuredChanged(selectedNodeId != null)
+        onPageLocalActionSurfaceChanged(
+            selectedNodeId != null,
+            { selectedNodeId = null }
+        )
     }
     DisposableEffect(Unit) {
-        onDispose { onWorkspaceChromeObscuredChanged(false) }
+        onDispose {
+            onWorkspaceChromeObscuredChanged(false)
+            onPageLocalActionSurfaceChanged(false) {}
+        }
     }
 
     fun saveGraphNode(
@@ -208,9 +219,14 @@ fun GlobalGraphRoute(
         modifier = modifier,
         title = "全局图谱",
         subtitle = "跨会话知识结构",
+        onBack = {
+            if (canvasModeActive) onCanvasModeChange(false) else onBack()
+        },
         onMore = onOpenSettings,
         onOpenChatEvidence = { node -> node.sourceMessageId?.let { onOpenChat() } },
         onOpenSourceEvidence = { node -> node.sourceId?.let { onOpenSources() } },
+        canvasModeActive = canvasModeActive,
+        onCanvasModeChange = onCanvasModeChange,
         onGraphInteractionChanged = onGraphInteractionChanged
     )
 }

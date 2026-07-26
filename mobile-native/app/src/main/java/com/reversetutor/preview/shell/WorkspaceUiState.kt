@@ -75,10 +75,32 @@ internal fun workspaceGestureOwner(
 
 internal fun shouldExitGraphCanvasBeforeNavigation(
     navigationState: AppNavigationState,
-    workspaceState: WorkspaceUiState
-): Boolean = navigationState.modal == null &&
-    !navigationState.drawerOpen &&
-    workspaceState.interactionLocks.graphCanvasModeActive
+    workspaceState: WorkspaceUiState,
+    pageLocalActionSurfaceActive: Boolean = false
+): Boolean = workspaceBackTarget(
+    navigationState = navigationState,
+    workspaceState = workspaceState,
+    pageLocalActionSurfaceActive = pageLocalActionSurfaceActive
+) == WorkspaceBackTarget.GraphCanvas
+
+internal enum class WorkspaceBackTarget {
+    AppNavigationSurface,
+    PageLocalActionSurface,
+    GraphCanvas,
+    Navigation
+}
+
+internal fun workspaceBackTarget(
+    navigationState: AppNavigationState,
+    workspaceState: WorkspaceUiState,
+    pageLocalActionSurfaceActive: Boolean
+): WorkspaceBackTarget = when {
+    navigationState.modal != null || navigationState.drawerOpen ->
+        WorkspaceBackTarget.AppNavigationSurface
+    pageLocalActionSurfaceActive -> WorkspaceBackTarget.PageLocalActionSurface
+    workspaceState.interactionLocks.graphCanvasModeActive -> WorkspaceBackTarget.GraphCanvas
+    else -> WorkspaceBackTarget.Navigation
+}
 
 val WorkspacePage.destination: AppDestination
     get() = when (this) {
@@ -162,6 +184,8 @@ data class WorkspaceUiState(
     val verticalPage: WorkspaceVerticalPage = WorkspaceVerticalPage.SessionHome,
     val challengeCanReturnHome: Boolean = false,
     val interactionLocks: WorkspaceInteractionLocks = WorkspaceInteractionLocks(),
+    val surfaceStates: Map<WorkspacePage, WorkspaceSurfaceState> = emptyMap(),
+    val surfaceRetryGenerations: Map<WorkspacePage, Long> = emptyMap(),
     val verticalScrollOffsets: Map<WorkspacePage, Int> = emptyMap(),
     val resourceReleaseGeneration: Long = 0L
 ) {
@@ -170,6 +194,9 @@ data class WorkspaceUiState(
 
     val graphCanvasInteractionEnabled: Boolean
         get() = interactionLocks.graphCanvasInteractionEnabled
+
+    fun surfaceStateFor(page: WorkspacePage): WorkspaceSurfaceState =
+        surfaceStates[page] ?: WorkspaceSurfaceState.Content
 }
 
 sealed interface WorkspaceUiAction {
@@ -183,6 +210,11 @@ sealed interface WorkspaceUiAction {
     data class SetChallengeExitBoundary(val canReturnHome: Boolean) : WorkspaceUiAction
     data class SetChallengeDragActive(val active: Boolean) : WorkspaceUiAction
     data class SetGraphEdgePagingActive(val active: Boolean) : WorkspaceUiAction
+    data class SetSurfaceState(
+        val page: WorkspacePage,
+        val state: WorkspaceSurfaceState
+    ) : WorkspaceUiAction
+    data class RetrySurface(val page: WorkspacePage) : WorkspaceUiAction
     data class RecordVerticalScroll(
         val page: WorkspacePage,
         val offset: Int
@@ -219,6 +251,10 @@ class WorkspaceInteractionBindings(
 
     fun onGraphEdgePagingChanged(active: Boolean) {
         dispatch(WorkspaceUiAction.SetGraphEdgePagingActive(active))
+    }
+
+    fun onRetrySurface(page: WorkspacePage) {
+        dispatch(WorkspaceUiAction.RetrySurface(page))
     }
 }
 

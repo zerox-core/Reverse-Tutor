@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -172,6 +173,8 @@ fun FormalGraphCanvas(
     expandedSessionRoot: Boolean = false,
     showToolbar: Boolean = false,
     onFilterClick: (() -> Unit)? = null,
+    interactionEnabled: Boolean = true,
+    onRequestInteraction: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
     onViewportChanged: (GraphViewportState) -> Unit = {}
 ) {
@@ -199,7 +202,7 @@ fun FormalGraphCanvas(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { canvasSize = it }
-                .pointerInput(
+                .then(if (interactionEnabled) Modifier.pointerInput(
                     state.allNodes,
                     showLockedNodes,
                     onSelectedNodeChange,
@@ -280,7 +283,9 @@ fun FormalGraphCanvas(
                             }
                         }
                     }
-                }
+                } else Modifier.pointerInput(onRequestInteraction) {
+                    detectTapGestures(onTap = { onRequestInteraction() })
+                })
         ) {
             drawGraphDotGrid()
             withTransform({

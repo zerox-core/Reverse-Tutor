@@ -3,6 +3,7 @@ package com.reversetutor.feature.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,15 +47,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
-import com.reversetutor.core.design.FormalElevations
 import com.reversetutor.core.design.FormalShapes
-import com.reversetutor.core.design.FormalTypography
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
 
@@ -235,7 +233,7 @@ private fun AccountAndSyncCard(
         color = colors.surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, colors.border),
-        shadowElevation = FormalElevations.Panel
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
@@ -259,12 +257,22 @@ private fun AccountAndSyncCard(
                 Text(
                     text = state.accountTitle,
                     color = colors.ink,
-                    style = FormalTypography.cardTitle(typeScale, colors.ink)
+                    style = typeScale.style(
+                        sizeSp = 16f,
+                        lineHeightSp = 23f,
+                        weight = FontWeight.SemiBold,
+                        color = colors.ink
+                    )
                 )
                 Text(
                     text = state.accountStatus,
                     color = colors.muted,
-                    style = FormalTypography.status(typeScale, colors.muted)
+                    style = typeScale.style(
+                        sizeSp = 11f,
+                        lineHeightSp = 16f,
+                        weight = FontWeight.Medium,
+                        color = colors.muted
+                    )
                 )
             }
             Box(
@@ -302,7 +310,12 @@ private fun SettingsSection(
     Text(
         text = section.title,
         color = colors.sectionLabel,
-        style = FormalTypography.status(typeScale, colors.sectionLabel)
+        style = typeScale.style(
+            sizeSp = 11f,
+            lineHeightSp = 16f,
+            weight = FontWeight.Medium,
+            color = colors.sectionLabel
+        )
     )
     Spacer(Modifier.height(7.dp))
     Surface(
@@ -310,7 +323,7 @@ private fun SettingsSection(
         color = colors.surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, colors.border),
-        shadowElevation = FormalElevations.Panel
+        shadowElevation = 2.dp
     ) {
         Column {
             section.rows.forEachIndexed { index, row ->
@@ -344,8 +357,14 @@ private fun FormalSettingsRow(
 ) {
     val typeScale = LocalFormalTypeScale.current
     val interaction = row.action?.let { action ->
-        Modifier.clickable(
-            role = if (row.toggleEnabled != null) Role.Switch else Role.Button,
+        row.toggleEnabled?.let { checked ->
+            Modifier.toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = { onAction(action) }
+            )
+        } ?: Modifier.clickable(
+            role = Role.Button,
             onClickLabel = row.label,
             onClick = { onAction(action) }
         )
@@ -368,7 +387,11 @@ private fun FormalSettingsRow(
         Text(
             text = row.label,
             color = colors.rowLabel,
-            style = FormalTypography.metadata(typeScale, colors.rowLabel),
+            style = typeScale.style(
+                sizeSp = 12f,
+                lineHeightSp = 18f,
+                color = colors.rowLabel
+            ),
             modifier = Modifier.weight(1f)
         )
         row.value?.let { value ->
@@ -380,7 +403,7 @@ private fun FormalSettingsRow(
             Spacer(Modifier.width(8.dp))
         }
         row.toggleEnabled?.let { enabled ->
-            SettingsToggle(label = row.label, enabled = enabled, colors = colors)
+            SettingsToggle(enabled = enabled, colors = colors)
         }
         if (row.hasChevron) {
             Icon(
@@ -395,7 +418,6 @@ private fun FormalSettingsRow(
 
 @Composable
 private fun SettingsToggle(
-    label: String,
     enabled: Boolean,
     colors: FormalSettingsColors
 ) {
@@ -403,9 +425,7 @@ private fun SettingsToggle(
         modifier = Modifier
             .width(42.dp)
             .height(24.dp)
-            .semantics {
-                contentDescription = "$label：${if (enabled) "开启" else "关闭"}"
-            }
+            .clearAndSetSemantics { }
             .background(
                 color = if (enabled) colors.primary else colors.toggleOff,
                 shape = RoundedCornerShape(FormalShapes.PillRadius)
@@ -634,7 +654,7 @@ private fun formalSettingsColors(): FormalSettingsColors {
             sectionLabel = Color(0xFF454F61),
             muted = FormalColors.Muted,
             value = Color(0xFF667082),
-            border = FormalColors.BorderStrong,
+            border = Color(0xFFB9BAC0),
             divider = FormalColors.Divider,
             primary = FormalColors.Primary,
             success = FormalColors.Success,

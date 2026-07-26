@@ -61,7 +61,6 @@ import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.feature.chat.ChatRoute
 import com.reversetutor.feature.chat.ChatImageDraft
 import com.reversetutor.feature.chat.FigmaNewSessionRoute
-import com.reversetutor.feature.chat.NewSessionLaunchRequest
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
@@ -109,9 +108,11 @@ fun AppShell(
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var activeSessionTitle by remember { mutableStateOf<String?>(null) }
     var activeArticleSlug by remember { mutableStateOf("") }
-    var newSessionLaunchRequest by remember { mutableStateOf<NewSessionLaunchRequest?>(null) }
     var figmaUiState by remember { mutableStateOf(FigmaAppUiState()) }
     var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
+    var pageLocalActionDismissers by remember {
+        mutableStateOf(emptyMap<WorkspacePage, () -> Unit>())
+    }
     var showFirstLaunchImportPrompt by remember(firstLaunchImportPromptState) {
         mutableStateOf(firstLaunchImportPromptState.shouldShow)
     }
@@ -151,15 +152,29 @@ fun AppShell(
     }
 
     BackHandler {
-        if (shouldExitGraphCanvasBeforeNavigation(navigationState, workspaceState)) {
-            workspaceViewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(false))
-            return@BackHandler
-        }
-        val transition = navigationState.handleSystemBack()
-        if (transition.result == BackResult.AllowSystemExit) {
-            onExitRequested()
-        } else {
-            navigationState = transition.state
+        when (
+            workspaceBackTarget(
+                navigationState = navigationState,
+                workspaceState = workspaceState,
+                pageLocalActionSurfaceActive =
+                    pageLocalActionDismissers.containsKey(workspaceState.currentPage)
+            )
+        ) {
+            WorkspaceBackTarget.PageLocalActionSurface -> {
+                pageLocalActionDismissers[workspaceState.currentPage]?.invoke()
+            }
+            WorkspaceBackTarget.GraphCanvas -> {
+                workspaceViewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(false))
+            }
+            WorkspaceBackTarget.AppNavigationSurface,
+            WorkspaceBackTarget.Navigation -> {
+                val transition = navigationState.handleSystemBack()
+                if (transition.result == BackResult.AllowSystemExit) {
+                    onExitRequested()
+                } else {
+                    navigationState = transition.state
+                }
+            }
         }
     }
 
@@ -271,9 +286,6 @@ fun AppShell(
                         activeSessionTitle = activeSessionTitle,
                         activeArticleSlug = activeArticleSlug,
                         challengeRuntimeState = challengeRuntimeState,
-                        challengePageActive = navigationState.current == AppDestination.Challenge &&
-                            workspaceState.verticalPage == WorkspaceVerticalPage.Challenge,
-                        newSessionLaunchRequest = newSessionLaunchRequest,
                         challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
                             ?: figmaUiState.challengeProgress,
                         challengeTotal = figmaUiState.challengeTotal,
@@ -293,6 +305,13 @@ fun AppShell(
                                 workspaceChromeObscuredPages + page
                             } else {
                                 workspaceChromeObscuredPages - page
+                            }
+                        },
+                        onPageLocalActionSurfaceChanged = { page, active, dismiss ->
+                            pageLocalActionDismissers = if (active) {
+                                pageLocalActionDismissers + (page to dismiss)
+                            } else {
+                                pageLocalActionDismissers - page
                             }
                         },
                         onOpenChat = {
@@ -323,9 +342,6 @@ fun AppShell(
                             appScope.launch {
                                 challengeRuntimeCoordinator.join()
                                 if (challengeRuntimeCoordinator.state.value.joined) {
-                                    newSessionLaunchRequest = NewSessionLaunchRequest.challenge(
-                                        System.currentTimeMillis()
-                                    )
                                     workspaceViewModel.onAction(
                                         WorkspaceUiAction.SelectVerticalPage(
                                             WorkspaceVerticalPage.SessionHome
@@ -636,8 +652,6 @@ private fun DestinationContent(
     activeSessionTitle: String?,
     activeArticleSlug: String,
     challengeRuntimeState: ChallengeRuntimeState,
-    challengePageActive: Boolean,
-    newSessionLaunchRequest: NewSessionLaunchRequest?,
     challengeProgress: Int,
     challengeTotal: Int,
     weeklyDashboardState: WeeklyDashboardUiState,
@@ -647,6 +661,7 @@ private fun DestinationContent(
     onGraphCanvasModeChanged: (Boolean) -> Unit,
     onChallengeExitBoundaryChanged: (Boolean) -> Unit,
     onWorkspaceChromeObscuredChanged: (WorkspacePage, Boolean) -> Unit,
+    onPageLocalActionSurfaceChanged: (WorkspacePage, Boolean, () -> Unit) -> Unit,
     onOpenChat: () -> Unit,
     onOpenSession: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
     onOpenContextHub: () -> Unit,
@@ -757,7 +772,6 @@ private fun DestinationContent(
                 challengeJoined = challengeRuntimeState.joined,
                 challengeProgress = challengeProgress,
                 challengeTotal = challengeTotal,
-                newSessionLaunchRequest = newSessionLaunchRequest,
                 onOpenSession = onOpenSession,
                 onNewSession = onOpenNewSession,
                 onOpenChallenge = onOpenChallenge,
@@ -789,7 +803,6 @@ private fun DestinationContent(
                 onJoin = onChallengeJoined,
                 runtimeState = challengeRuntimeState,
                 onRetry = onChallengeRetry,
-                active = challengePageActive,
                 onExitBoundaryChanged = onChallengeExitBoundaryChanged
             )
             return@ReverseTutorScreenSurface
@@ -816,10 +829,6 @@ private fun DestinationContent(
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,
-                onOpenSessionSettings = {
-                    onNavigateDestination(AppDestination.SessionSettingsLibrary)
-                },
-                onOpenSources = onOpenSources,
                 onBack = onOpenSessions
             )
             return@ReverseTutorScreenSurface
@@ -888,6 +897,13 @@ private fun DestinationContent(
                 onGraphInteractionChanged = onGraphInteractionChanged,
                 onWorkspaceChromeObscuredChanged = { obscured ->
                     onWorkspaceChromeObscuredChanged(WorkspacePage.GlobalGraph, obscured)
+                },
+                onPageLocalActionSurfaceChanged = { active, dismiss ->
+                    onPageLocalActionSurfaceChanged(
+                        WorkspacePage.GlobalGraph,
+                        active,
+                        dismiss
+                    )
                 }
             )
             return@ReverseTutorScreenSurface
@@ -940,21 +956,7 @@ private fun DestinationContent(
                 },
                 onOpenStorage = onOpenAbout,
                 onOpenImportExport = onOpenImportExport,
-                onOpenAbout = onOpenAbout,
-                challengeReminderEnabled = appPreferences.challengeReminderEnabled,
-                hapticFeedbackEnabled = appPreferences.hapticFeedbackEnabled,
-                onChallengeReminderChanged = { enabled ->
-                    scope.launch {
-                        hybridAppGraph.appPreferencesRepository
-                            .setChallengeReminderEnabled(enabled)
-                    }
-                },
-                onHapticFeedbackChanged = { enabled ->
-                    scope.launch {
-                        hybridAppGraph.appPreferencesRepository
-                            .setHapticFeedbackEnabled(enabled)
-                    }
-                }
+                onOpenAbout = onOpenAbout
             )
             return@ReverseTutorScreenSurface
         }
@@ -965,12 +967,6 @@ private fun DestinationContent(
                 onActivateProfile = { profileId ->
                     scope.launch {
                         llmProfileRepository.activateProfile(profileId, System.currentTimeMillis())
-                        llmProfiles = llmProfileRepository.listProfiles()
-                    }
-                },
-                onSaveProfile = { input ->
-                    scope.launch {
-                        llmProfileRepository.saveProfile(input, System.currentTimeMillis())
                         llmProfiles = llmProfileRepository.listProfiles()
                     }
                 },
