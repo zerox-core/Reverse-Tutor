@@ -7,6 +7,7 @@ enum class AppDestination(
 ) {
     Sessions("sessions", "会话", "会话列表 · 本地优先"),
     Chat("chat", "聊天", "当前学习会话"),
+    ChatReferences("chat-references", "资料与引用", "当前会话查询"),
     ContextHub("brain", "学习大脑", "全局图谱和薄弱节点"),
     WeeklyDashboard("weekly-dashboard", "本周", "跨会话学习概览"),
     GlobalGraph("global-graph", "全局图谱", "跨会话只读图谱"),
@@ -14,6 +15,7 @@ enum class AppDestination(
     Community("community", "社区", "挑战、模板和公开学习树"),
     SessionSettings("session-settings", "会话设置", "当前会话设置"),
     SessionSettingsLibrary("session-settings-library", "会话设置", "资料库"),
+    SessionSettingsSources("session-settings-sources", "会话设置", "资料管理"),
     SessionSettingsGraph("session-settings-graph", "会话设置", "图谱"),
     SessionSettingsPersona("session-settings-persona", "会话设置", "人格目标"),
     SessionSettingsPersonalization("session-settings-personalization", "会话设置", "个性化"),
@@ -93,8 +95,10 @@ data class AppNavigationState(
             AppDestination.NewSession,
             AppDestination.GlobalSearch,
             AppDestination.PublicArticle -> listOf(AppDestination.Sessions, destination)
+            AppDestination.ChatReferences,
             AppDestination.SessionSettings,
             AppDestination.SessionSettingsLibrary,
+            AppDestination.SessionSettingsSources,
             AppDestination.SessionSettingsGraph,
             AppDestination.SessionSettingsPersona,
             AppDestination.SessionSettingsPersonalization -> listOf(
@@ -133,8 +137,10 @@ data class AppNavigationState(
             return BackTransition(closeModal(), BackResult.Consumed)
         }
 
-        if (current == AppDestination.SessionSettings ||
+        if (current == AppDestination.ChatReferences ||
+            current == AppDestination.SessionSettings ||
             current == AppDestination.SessionSettingsLibrary ||
+            current == AppDestination.SessionSettingsSources ||
             current == AppDestination.SessionSettingsGraph ||
             current == AppDestination.SessionSettingsPersona ||
             current == AppDestination.SessionSettingsPersonalization

@@ -58,6 +58,7 @@ import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.SessionSettingsCoordinator
 import com.reversetutor.feature.chat.SessionSettingsDocument
 import com.reversetutor.feature.chat.SessionSettingsScreen
+import com.reversetutor.feature.chat.SessionSettingsSection
 import com.reversetutor.feature.chat.SessionSettingsStore
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.SourceFileDeleteCapability
@@ -129,6 +130,7 @@ fun SessionSettingsRoute(
     sessionSettingsStore: SessionSettingsStore? = null,
     coordinatorFactory: SessionSettingsCoordinatorFactory? = null,
     initialSources: List<SessionSource> = emptyList(),
+    highlightedSourceId: String? = null,
     pickedSource: PickedSessionSource? = null,
     onPickedSourceConsumed: () -> Unit = {},
     onSourcesChanged: () -> Unit = {},
@@ -150,7 +152,7 @@ fun SessionSettingsRoute(
     }
     val sessionHomeState by sessionHomeViewModel.uiState.collectAsState()
     val activeSession = sessionHomeState.sessions.firstOrNull { it.id == sessionId }
-    if (destination == AppDestination.SessionSettings &&
+    if (destination in setOf(AppDestination.SessionSettings, AppDestination.SessionSettingsSources) &&
         sessionId != null &&
         tagLibraryPersistence != null &&
         sessionSettingsStore != null
@@ -207,6 +209,12 @@ fun SessionSettingsRoute(
         SessionSettingsScreen(
             coordinator = coordinator,
             tagLibraryPersistence = tagLibraryPersistence,
+            initialSection = if (destination == AppDestination.SessionSettingsSources) {
+                SessionSettingsSection.SourceManagement
+            } else {
+                null
+            },
+            highlightedSourceId = highlightedSourceId,
             onBack = onBack,
             onProfileBoundary = { profile ->
                 onSessionLearnerRoleChanged(profile.learnerRole)

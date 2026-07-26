@@ -135,10 +135,22 @@ data class ChatAttachmentUi(
 data class ChatComposerState(
     val text: String,
     val quoteTarget: ChatQuoteTarget? = null,
-    val imageDraft: ChatImageDraft? = null
+    val imageDraft: ChatImageDraft? = null,
+    val attachments: List<ChatDraftAttachment> = emptyList(),
+    val isSending: Boolean = false,
+    val sendFailure: String? = null,
+    val notice: String? = null
 ) {
+    val orderedAttachments: List<ChatDraftAttachment>
+        get() = if (imageDraft == null) {
+            attachments
+        } else {
+            attachments + imageDraft.toChatDraftAttachment()
+        }
     val canSend: Boolean
-        get() = text.trim().isNotEmpty() || imageDraft != null
+        get() = !isSending &&
+            (text.isNotBlank() || orderedAttachments.any { it.readiness == ChatAttachmentReadiness.Ready }) &&
+            orderedAttachments.all { it.readiness == ChatAttachmentReadiness.Ready }
 
     fun toQuoteDraft(): MessageQuoteDraft? {
         if (!canSend) return null
@@ -150,7 +162,29 @@ data class ChatComposerState(
     }
 
     fun toAttachmentDrafts(): List<MessageAttachmentDraft> =
-        imageDraft?.toAttachmentDraft()?.let(::listOf).orEmpty()
+        orderedAttachments.map {
+            MessageAttachmentDraft(
+                name = it.name,
+                mimeType = it.mimeType,
+                uri = it.uri,
+                sourceId = it.sourceId
+            )
+        }
+
+    fun toPersistentDraft(clientRequestId: String): ChatComposerDraft = ChatComposerDraft(
+        clientRequestId = clientRequestId,
+        text = text,
+        quote = quoteTarget,
+        attachments = orderedAttachments
+    )
+
+    companion object {
+        fun from(draft: ChatComposerDraft): ChatComposerState = ChatComposerState(
+            text = draft.text,
+            quoteTarget = draft.quote,
+            attachments = draft.attachments
+        )
+    }
 }
 
 data class ChatImageDraft(
@@ -178,6 +212,16 @@ data class ChatImageDraft(
             uri = uri,
             sourceId = sourceId
         )
+
+    fun toChatDraftAttachment(): ChatDraftAttachment = ChatDraftAttachment(
+        id = "image-$requestId",
+        kind = ChatAttachmentKind.Image,
+        name = name,
+        mimeType = mimeType,
+        uri = uri,
+        sourceId = sourceId,
+        readiness = ChatAttachmentReadiness.Ready
+    )
 }
 
 data class ChatQuoteTarget(

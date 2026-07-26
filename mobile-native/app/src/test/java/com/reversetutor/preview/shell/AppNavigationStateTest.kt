@@ -8,6 +8,17 @@ import org.junit.Test
 
 class AppNavigationStateTest {
     @Test
+    fun chatQueryAndSourceManagementBackReturnToChat() {
+        listOf(
+            AppDestination.ChatReferences,
+            AppDestination.SessionSettingsSources
+        ).forEach { destination ->
+            val state = AppNavigationState().navigate(destination)
+
+            assertEquals(AppDestination.Chat, state.handleSystemBack().state.current)
+        }
+    }
+    @Test
     fun defaultDestinationIsSessions() {
         val state = AppNavigationState()
 

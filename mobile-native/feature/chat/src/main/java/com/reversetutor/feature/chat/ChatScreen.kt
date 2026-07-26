@@ -91,12 +91,29 @@ fun ChatRoute(
     learnerRole: String = "学习者",
     sessionSnapshot: NewSessionConfiguration? = null,
     pendingImageDraft: ChatImageDraft? = null,
+    pendingAttachment: ChatDraftAttachment? = null,
+    attachmentNotice: String? = null,
+    availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
+    draftStore: ChatDraftStore = ChatDraftStore.None,
+    attachmentOrderStore: ChatAttachmentOrderStore = ChatAttachmentOrderStore.None,
+    cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     evidenceTargetMessageId: String? = null,
     onPickImage: () -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    onRequestCameraPermission: () -> Unit = {},
+    onOpenCameraSettings: () -> Unit = {},
+    onRetryAttachment: (ChatDraftAttachment) -> Unit = {},
     onImageDraftConsumed: () -> Unit = {},
+    onAttachmentConsumed: () -> Unit = {},
+    onAttachmentNoticeConsumed: () -> Unit = {},
     onBackgroundGenerationQueued: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    onOpenSessionSources: () -> Unit = {},
+    onOpenSources: () -> Unit = {},
+    onExport: () -> Unit = {},
+    onOpenModelSettings: () -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
@@ -105,25 +122,99 @@ fun ChatRoute(
 ) {
     val scope = rememberCoroutineScope()
     var records by remember(sessionId) { mutableStateOf(emptyList<MessageRecord>()) }
-    var composer by remember(sessionId) { mutableStateOf(ChatComposerState(text = "")) }
+    val restoredDraft = remember(sessionId, draftStore) {
+        draftStore.load(sessionId) ?: ChatComposerDraft()
+    }
+    var clientRequestId by remember(sessionId) { mutableStateOf(restoredDraft.clientRequestId) }
+    var composer by remember(sessionId) { mutableStateOf(ChatComposerState.from(restoredDraft)) }
     var generation by remember(sessionId) { mutableStateOf<ChatGenerationUiState>(ChatGenerationUiState.Idle) }
     var activeGenerationToken by remember(sessionId) { mutableStateOf<LlmGenerationToken?>(null) }
     var activeBackgroundJobId by remember(sessionId) { mutableStateOf<String?>(null) }
     var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
     var noticeText by remember { mutableStateOf<String?>(null) }
+    val sendCoordinator = remember(sessionId, messageRepository, draftStore, attachmentOrderStore) {
+        ChatSendCoordinator(
+            draftStore = draftStore,
+            sendPort = ChatRepositorySendAdapter(
+                sessionId = sessionId,
+                submitter = ChatRepositoryMessageSubmitter { request ->
+                    messageRepository.sendUserMessage(
+                        sessionId = request.sessionId,
+                        text = request.text,
+                        nowEpochMillis = request.nowEpochMillis,
+                        messageId = request.messageId,
+                        quote = request.quote,
+                        attachments = request.attachments
+                    ) != null
+                }
+            ),
+            attachmentOrderStore = attachmentOrderStore
+        )
+    }
 
     fun reload() {
         refreshKey += 1
     }
 
+    fun updateComposer(next: ChatComposerState, persist: Boolean = true) {
+        composer = next
+        if (persist) {
+            draftStore.save(sessionId, next.toPersistentDraft(clientRequestId))
+        }
+    }
+
+    fun addAttachment(attachment: ChatDraftAttachment) {
+        val draft = composer.toPersistentDraft(clientRequestId)
+        when (val result = ChatAttachmentPolicy.add(draft, attachment)) {
+            is ChatAttachmentMutation.Accepted -> updateComposer(
+                ChatComposerState.from(result.draft).copy(notice = null)
+            )
+            is ChatAttachmentMutation.Rejected -> updateComposer(
+                composer.copy(
+                    notice = when (result.reason) {
+                        ChatAttachmentRejection.TooMany -> "每条消息最多添加 9 个附件。"
+                        ChatAttachmentRejection.ImageTooLarge -> "单张图片不能超过 20 MB。"
+                    }
+                )
+            )
+        }
+    }
+
     LaunchedEffect(sessionId, refreshKey) {
-        records = messageRepository.listMessageRecords(sessionId)
+        records = applyStoredAttachmentOrder(
+            messageRepository.listMessageRecords(sessionId),
+            attachmentOrderStore
+        )
     }
 
     LaunchedEffect(pendingImageDraft?.requestId) {
         val imageDraft = pendingImageDraft ?: return@LaunchedEffect
-        composer = composer.copy(imageDraft = imageDraft)
+        addAttachment(imageDraft.toChatDraftAttachment())
         onImageDraftConsumed()
+    }
+
+    LaunchedEffect(pendingAttachment?.id) {
+        val attachment = pendingAttachment ?: return@LaunchedEffect
+        if (composer.orderedAttachments.any { it.id == attachment.id }) {
+            updateComposer(
+                ChatComposerState.from(
+                    composer.toPersistentDraft(clientRequestId).copy(
+                        attachments = composer.orderedAttachments.map {
+                            if (it.id == attachment.id) attachment else it
+                        }
+                    )
+                )
+            )
+        } else {
+            addAttachment(attachment)
+        }
+        onAttachmentConsumed()
+    }
+
+    LaunchedEffect(attachmentNotice) {
+        val notice = attachmentNotice ?: return@LaunchedEffect
+        updateComposer(composer.copy(notice = notice))
+        onAttachmentNoticeConsumed()
     }
 
     LaunchedEffect(activeBackgroundJobId, sessionId) {
@@ -153,20 +244,33 @@ fun ChatRoute(
             learnerRoleFallback = learnerRole,
             sessionSnapshot = sessionSnapshot
         ),
-        onComposerTextChange = { composer = composer.copy(text = it) },
+        onComposerTextChange = { updateComposer(composer.copy(text = it, sendFailure = null, notice = null)) },
         onSendMessage = {
             if (composer.canSend) {
-                val sentComposer = composer
+                val sentComposer = composer.copy(isSending = true, sendFailure = null, notice = null)
+                updateComposer(sentComposer)
                 scope.launch {
-                    val userMessage = messageRepository.sendUserMessage(
-                        sessionId = sessionId,
-                        text = sentComposer.text,
-                        nowEpochMillis = System.currentTimeMillis(),
-                        quote = sentComposer.toQuoteDraft(),
-                        attachments = sentComposer.toAttachmentDrafts()
-                    ) ?: return@launch
+                    val sentDraft = sentComposer.toPersistentDraft(clientRequestId)
+                    val attempt = sendCoordinator.send(sessionId, sentDraft)
+                    when (attempt) {
+                        is ChatSendAttempt.Failed -> {
+                            updateComposer(
+                                ChatComposerState.from(sentDraft).copy(
+                                    isSending = false,
+                                    sendFailure = attempt.message
+                                )
+                            )
+                            return@launch
+                        }
+                        ChatSendAttempt.DuplicateBlocked -> return@launch
+                        is ChatSendAttempt.Sent -> Unit
+                    }
+                    clientRequestId = ChatComposerDraft().clientRequestId
                     composer = ChatComposerState(text = "")
                     reload()
+                    val userMessage = messageRepository.listMessages(sessionId)
+                        .firstOrNull { it.id == attempt.messageId }
+                        ?: return@launch
                     val generator = chatGenerationRepository ?: return@launch
                     val token = LlmGenerationToken("${userMessage.id}-${System.currentTimeMillis()}")
                     activeGenerationToken = token
@@ -181,6 +285,7 @@ fun ChatRoute(
                         usedAtEpochMillis = System.currentTimeMillis()
                     )
                     val imageAttachments = sentComposer.toAttachmentDrafts()
+                        .filter { it.mimeType?.startsWith("image/") == true }
                         .mapIndexed { index, attachment ->
                             attachment.toAttachment(
                                 spaceId = userMessage.spaceId,
@@ -229,23 +334,26 @@ fun ChatRoute(
             }
         },
         onCancelQuote = {
-            composer = composer.copy(quoteTarget = null)
+            updateComposer(composer.copy(quoteTarget = null))
         },
         onCreateImageDraft = {
             onPickImage()
         },
         onCancelImageDraft = {
-            composer = composer.copy(imageDraft = null)
+            val imageId = composer.orderedAttachments.lastOrNull { it.kind == ChatAttachmentKind.Image }?.id
+            if (imageId != null) {
+                updateComposer(ChatComposerState.from(ChatAttachmentPolicy.remove(composer.toPersistentDraft(clientRequestId), imageId)))
+            }
         },
         onMessageAction = { item, action ->
             when (action) {
                 ChatMessageAction.Quote -> {
-                    composer = composer.copy(
+                    updateComposer(composer.copy(
                         quoteTarget = ChatQuoteTarget(
                             messageId = item.id,
                             excerpt = item.text.toQuoteExcerpt()
                         )
-                    )
+                    ))
                 }
                 ChatMessageAction.Note -> {
                     val repository = memoryRepository
@@ -283,6 +391,43 @@ fun ChatRoute(
         },
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
+        onOpenSearch = onOpenSearch,
+        onOpenSources = onOpenSources,
+        onExport = onExport,
+        onOpenModelSettings = onOpenModelSettings,
+        availableSourceAttachments = availableSourceAttachments,
+        cameraPermissionState = cameraPermissionState,
+        onPickImages = onPickImage,
+        onSelectSource = ::addAttachment,
+        onTakePhoto = onTakePhoto,
+        onRequestCameraPermission = onRequestCameraPermission,
+        onOpenCameraSettings = onOpenCameraSettings,
+        onOpenSessionSources = onOpenSessionSources,
+        onRemoveAttachment = { id ->
+            updateComposer(
+                ChatComposerState.from(
+                    ChatAttachmentPolicy.remove(composer.toPersistentDraft(clientRequestId), id)
+                )
+            )
+        },
+        onRetryAttachment = { id ->
+            val attachment = composer.orderedAttachments.firstOrNull { it.id == id }
+            if (attachment != null) {
+                updateComposer(
+                    ChatComposerState.from(
+                        ChatAttachmentPolicy.retry(composer.toPersistentDraft(clientRequestId), id)
+                    )
+                )
+                onRetryAttachment(attachment)
+            }
+        },
+        onMoveAttachment = { from, to ->
+            updateComposer(
+                ChatComposerState.from(
+                    ChatAttachmentPolicy.move(composer.toPersistentDraft(clientRequestId), from, to)
+                )
+            )
+        },
         onOpenSessionSettings = onOpenSessionSettings,
         initialScrollPosition = initialScrollPosition,
         onScrollPositionChanged = onScrollPositionChanged,
@@ -317,6 +462,22 @@ fun ChatScreen(
     onMessageAction: (ChatTimelineItem, ChatMessageAction) -> Unit,
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
+    onOpenSearch: () -> Unit = {},
+    onOpenSources: () -> Unit = {},
+    onExport: () -> Unit = {},
+    onOpenModelSettings: () -> Unit = {},
+    availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
+    cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
+    onPickImages: () -> Unit = onCreateImageDraft,
+    onSelectSource: (ChatDraftAttachment) -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    onRequestCameraPermission: () -> Unit = {},
+    onOpenCameraSettings: () -> Unit = {},
+    onOpenSessionSources: () -> Unit = {},
+    onRemoveAttachment: (String) -> Unit = {},
+    onRetryAttachment: (String) -> Unit = {},
+    onMoveAttachment: (Int, Int) -> Unit = { _, _ -> },
+    onRetrySend: () -> Unit = onSendMessage,
     onOpenSessionSettings: () -> Unit = {},
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
@@ -333,7 +494,23 @@ fun ChatScreen(
         onCancelImageDraft = onCancelImageDraft,
         onMessageAction = onMessageAction,
         onComposerFocusChanged = onComposerFocusChanged,
-        onOpenSettings = onOpenContextHub,
+        onOpenContextHub = onOpenContextHub,
+        onOpenModelSettings = onOpenModelSettings,
+        onOpenSources = onOpenSources,
+        onExport = onExport,
+        onOpenSearch = onOpenSearch,
+        availableSourceAttachments = availableSourceAttachments,
+        cameraPermissionState = cameraPermissionState,
+        onPickImages = onPickImages,
+        onSelectSource = onSelectSource,
+        onTakePhoto = onTakePhoto,
+        onRequestCameraPermission = onRequestCameraPermission,
+        onOpenCameraSettings = onOpenCameraSettings,
+        onOpenSessionSources = onOpenSessionSources,
+        onRemoveAttachment = onRemoveAttachment,
+        onRetryAttachment = onRetryAttachment,
+        onMoveAttachment = onMoveAttachment,
+        onRetrySend = onRetrySend,
         onOpenSessionSettings = onOpenSessionSettings,
         initialScrollPosition = initialScrollPosition,
         onScrollPositionChanged = onScrollPositionChanged,
@@ -924,7 +1101,7 @@ private fun ChatComposer(
                     Button(
                         enabled = composer.canSend,
                         onClick = onSend,
-                        modifier = Modifier.size(42.dp),
+                        modifier = Modifier.size(44.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(
                             disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,

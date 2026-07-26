@@ -1,7 +1,14 @@
 package com.reversetutor.preview.shell
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -44,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.core.content.ContextCompat
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.llm.ChatGenerationRepository
@@ -59,7 +67,13 @@ import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.SearchTarget
 import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.feature.chat.ChatRoute
-import com.reversetutor.feature.chat.ChatImageDraft
+import com.reversetutor.feature.chat.ChatAttachmentKind
+import com.reversetutor.feature.chat.ChatAttachmentReadiness
+import com.reversetutor.feature.chat.ChatDraftAttachment
+import com.reversetutor.feature.chat.ChatPermissionState
+import com.reversetutor.feature.chat.ChatQueryHighlight
+import com.reversetutor.feature.chat.ChatReferenceQueryRoute
+import com.reversetutor.feature.chat.ChatReferenceQueryState
 import com.reversetutor.feature.chat.ChatScrollMemory
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
@@ -86,10 +100,14 @@ import com.reversetutor.preview.ui.ReverseTutorStatusStrip
 import com.reversetutor.preview.ui.ReverseTutorTopAppBar
 import com.reversetutor.preview.wiring.HybridAppGraph
 import com.reversetutor.preview.wiring.SharedPreferencesChatSourceUsagePort
+import com.reversetutor.preview.wiring.SharedPreferencesChatAttachmentOrderStore
+import com.reversetutor.preview.wiring.SharedPreferencesChatDraftStore
 import com.reversetutor.preview.wiring.SharedPreferencesSessionSettingsStore
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AppShell(
@@ -518,7 +536,9 @@ private fun PreviewTopBar(
         actionLabel = when (destination) {
             AppDestination.Chat -> "⚙"
             AppDestination.NewSession,
+            AppDestination.ChatReferences,
             AppDestination.SessionSettingsLibrary,
+            AppDestination.SessionSettingsSources,
             AppDestination.SessionSettingsGraph,
             AppDestination.SessionSettingsPersona,
             AppDestination.SessionSettingsPersonalization -> "⋮"
@@ -637,6 +657,7 @@ private fun AppDestination.usesDrawerNavigation(): Boolean =
 private fun AppDestination.ownsInContentTopBar(): Boolean =
     workspacePage != null ||
         this == AppDestination.Chat ||
+        this == AppDestination.ChatReferences ||
         this == AppDestination.NewSession ||
         this == AppDestination.Settings ||
         this == AppDestination.LlmConfiguration ||
@@ -648,6 +669,7 @@ private fun AppDestination.ownsInContentTopBar(): Boolean =
         this == AppDestination.Update ||
         this == AppDestination.SessionSettings ||
         this == AppDestination.SessionSettingsLibrary ||
+        this == AppDestination.SessionSettingsSources ||
         this == AppDestination.SessionSettingsGraph ||
         this == AppDestination.SessionSettingsPersona ||
         this == AppDestination.SessionSettingsPersonalization
@@ -719,9 +741,50 @@ private fun DestinationContent(
     var failedSessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
     var sessionSettingsImportError by remember { mutableStateOf<String?>(null) }
     var sessionSettingsRefreshKey by remember { mutableStateOf(0) }
-    var pendingChatImageDraft by remember { mutableStateOf<ChatImageDraft?>(null) }
+    val chatDraftStore = remember(context) { SharedPreferencesChatDraftStore(context) }
+    val chatAttachmentOrderStore = remember(context) { SharedPreferencesChatAttachmentOrderStore(context) }
+    val chatPermissionPreferences = remember(context) {
+        context.getSharedPreferences("reverse-tutor-chat-permissions", Context.MODE_PRIVATE)
+    }
+    var pendingChatAttachments by remember { mutableStateOf(emptyList<ChatDraftAttachment>()) }
+    var pendingChatAttachmentNotice by remember { mutableStateOf<String?>(null) }
     var pendingChatEvidenceTarget by remember { mutableStateOf<String?>(null) }
+    var pendingGraphEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingSourceEvidenceTarget by remember { mutableStateOf<String?>(null) }
+    var chatReferenceQueryState by remember(activeSessionId) { mutableStateOf(ChatReferenceQueryState()) }
+    var cameraPermissionState by remember(context) {
+        mutableStateOf(
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                ChatPermissionState.Granted
+            } else if (chatPermissionPreferences.getBoolean("camera-requested", false) &&
+                (context as? Activity)?.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) != true
+            ) {
+                ChatPermissionState.PermanentlyDenied
+            } else {
+                ChatPermissionState.Requestable
+            }
+        )
+    }
+    val destinationLifecycleOwner = context as? LifecycleOwner
+    DisposableEffect(destinationLifecycleOwner, context) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                cameraPermissionState = if (
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    ChatPermissionState.Granted
+                } else {
+                    if (cameraPermissionState == ChatPermissionState.Granted) {
+                        ChatPermissionState.Requestable
+                    } else {
+                        cameraPermissionState
+                    }
+                }
+            }
+        }
+        destinationLifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { destinationLifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
     var weeklySessions by remember { mutableStateOf(emptyList<com.reversetutor.core.model.TutorSession>()) }
     val sourceFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -781,34 +844,48 @@ private fun DestinationContent(
             sessionSettingsReplaceTarget = null
         }
     }
+    fun acceptPlatformAttachment(input: ChatAttachmentPlatformInput) {
+        val next = reduceChatAttachmentActivityResult(
+            currentAttachments = pendingChatAttachments,
+            input = input,
+            currentNotice = pendingChatAttachmentNotice
+        )
+        pendingChatAttachments = next.attachments
+        pendingChatAttachmentNotice = next.notice
+    }
     val chatImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            scope.launch {
-                context.tryPersistReadPermission(uri)
-                val requestId = System.currentTimeMillis()
-                val mimeType = context.contentResolver.getType(uri)
-                val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "selected-image"
-                val import = sourceRepository.importSource(
-                    input = SourceImportInput(
-                        requestId = requestId,
-                        fileName = fileName,
-                        mimeType = mimeType,
-                        uri = uri.toString(),
-                        text = null
-                    ),
-                    nowEpochMillis = requestId
-                )
-                pendingChatImageDraft = ChatImageDraft(
-                    requestId = requestId,
-                    name = fileName,
-                    mimeType = mimeType,
-                    uri = uri.toString(),
-                    sourceId = import.source.id
-                )
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        scope.launch {
+            val batchId = System.currentTimeMillis()
+            val inputs = withContext(Dispatchers.IO) {
+                uris.mapIndexed { index, uri ->
+                    context.readChatAttachmentInput(
+                        uri = uri,
+                        id = "image-$batchId-$index"
+                    )
+                }
             }
+            inputs.forEach(::acceptPlatformAttachment)
         }
+    }
+    val chatCameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            val id = "camera-${System.currentTimeMillis()}"
+            acceptPlatformAttachment(context.persistCameraAttachment(bitmap, id))
+        }
+    }
+    val chatCameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val activity = context as? Activity
+        cameraPermissionState = mapCameraPermissionResult(
+            granted = granted,
+            shouldShowRationale = activity?.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) == true
+        )
+        if (granted) chatCameraLauncher.launch(null)
     }
     val llmProfileState = LlmProfileSettingsUiState.from(
         profiles = llmProfiles,
@@ -825,7 +902,13 @@ private fun DestinationContent(
     }
     LaunchedEffect(destination, activeSessionId, sessionSettingsRefreshKey) {
         val currentSessionId = activeSessionId
-        if (destination == AppDestination.SessionSettings && currentSessionId != null) {
+        if (destination in setOf(
+                AppDestination.Chat,
+                AppDestination.ChatReferences,
+                AppDestination.SessionSettings,
+                AppDestination.SessionSettingsSources
+            ) && currentSessionId != null
+        ) {
             val sessions = sessionRepository.listSessions()
             val persistence = hybridAppGraph.frontend.newSessionPersistence
             val snapshots = sessions.associate { it.id to persistence.loadSessionSnapshot(it.id) }
@@ -843,6 +926,41 @@ private fun DestinationContent(
 
     val activeSessionSnapshot = remember(activeSessionId, sessionSettingsRefreshKey) {
         activeSessionId?.let(hybridAppGraph.frontend.newSessionPersistence::loadSessionSnapshot)
+    }
+    val chatReferenceQueryPort = remember(
+        sessionRepository,
+        messageRepository,
+        sourceRepository,
+        graphRepository,
+        hybridAppGraph.frontend.newSessionPersistence
+    ) {
+        RepositoryChatReferenceQueryPort(
+            sessionRepository = sessionRepository,
+            messageRepository = messageRepository,
+            sourceRepository = sourceRepository,
+            graphRepository = graphRepository,
+            sourceIdsForSession = { sessionId ->
+                hybridAppGraph.frontend.newSessionPersistence
+                    .loadSessionSnapshot(sessionId)
+                    ?.sourceSelections
+                    ?.toSet()
+                    .orEmpty()
+            },
+            offline = { !context.hasNetworkConnection() }
+        )
+    }
+    val availableChatSourceAttachments = remember(sessionSettingsSources) {
+        sessionSettingsSources
+            .filter { it.currentSessionReferenced && it.readState == com.reversetutor.feature.chat.SourceReadState.Ready }
+            .map { source ->
+                ChatDraftAttachment(
+                    id = "source-${source.id}",
+                    kind = ChatAttachmentKind.Source,
+                    name = source.displayName,
+                    sourceId = source.id,
+                    readiness = ChatAttachmentReadiness.Ready
+                )
+            }
     }
 
     val weeklySessionOptions = remember(weeklySessions) {
@@ -915,25 +1033,112 @@ private fun DestinationContent(
                 sessionTitle = activeSessionTitle,
                 learnerRole = activeSessionLearnerRole,
                 sessionSnapshot = activeSessionSnapshot,
-                pendingImageDraft = pendingChatImageDraft,
+                pendingAttachment = pendingChatAttachments.firstOrNull(),
+                attachmentNotice = pendingChatAttachmentNotice,
+                availableSourceAttachments = availableChatSourceAttachments,
+                draftStore = chatDraftStore,
+                attachmentOrderStore = chatAttachmentOrderStore,
+                cameraPermissionState = cameraPermissionState,
                 evidenceTargetMessageId = pendingChatEvidenceTarget,
                 onPickImage = {
                     chatImageLauncher.launch(arrayOf("image/*"))
                 },
-                onImageDraftConsumed = {
-                    pendingChatImageDraft = null
+                onTakePhoto = { chatCameraLauncher.launch(null) },
+                onRequestCameraPermission = {
+                    chatPermissionPreferences.edit().putBoolean("camera-requested", true).apply()
+                    chatCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                },
+                onOpenCameraSettings = {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                    )
+                },
+                onRetryAttachment = { attachment ->
+                    val uri = attachment.uri?.let(Uri::parse)
+                    if (uri != null) {
+                        scope.launch {
+                            acceptPlatformAttachment(
+                                withContext(Dispatchers.IO) {
+                                    context.readChatAttachmentInput(uri, attachment.id, attachment.kind)
+                                }
+                            )
+                        }
+                    } else {
+                        pendingChatAttachments = pendingChatAttachments + attachment.copy(
+                            readiness = ChatAttachmentReadiness.Failed("无法重试，请重新选择。", retryable = true)
+                        )
+                    }
+                },
+                onAttachmentConsumed = {
+                    pendingChatAttachments = pendingChatAttachments.drop(1)
+                },
+                onAttachmentNoticeConsumed = {
+                    pendingChatAttachmentNotice = null
                 },
                 onBackgroundGenerationQueued = { jobId ->
                     BackgroundGenerationWorker.enqueue(context, jobId)
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,
+                onOpenSearch = { onNavigateDestination(AppDestination.ChatReferences) },
+                onOpenSessionSources = { onNavigateDestination(AppDestination.SessionSettingsSources) },
+                onOpenSources = onOpenSources,
+                onExport = {},
+                onOpenModelSettings = onOpenSettings,
                 onOpenSessionSettings = {
                     onNavigateDestination(AppDestination.SessionSettings)
                 },
                 initialScrollPosition = chatScrollMemory.restore(activeSessionId),
                 onScrollPositionChanged = { chatScrollMemory.capture(activeSessionId, it) },
                 onBack = onOpenSessions
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.ChatReferences && activeSessionId != null) {
+            ChatReferenceQueryRoute(
+                sessionId = activeSessionId,
+                queryPort = chatReferenceQueryPort,
+                initialState = chatReferenceQueryState,
+                onStateChanged = { chatReferenceQueryState = it },
+                onNavigate = { request ->
+                    scope.launch {
+                        when (val highlight = request.highlight) {
+                            is ChatQueryHighlight.Message -> {
+                                pendingChatEvidenceTarget = highlight.messageId
+                                if (highlight.sessionId != activeSessionId) {
+                                    sessionRepository.getSession(highlight.sessionId)
+                                        ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                                        ?.let(onOpenSession)
+                                } else {
+                                    onOpenChat()
+                                }
+                            }
+                            is ChatQueryHighlight.GraphNode -> {
+                                pendingGraphEvidenceTarget = highlight.nodeId
+                                if (highlight.sessionId != activeSessionId) {
+                                    sessionRepository.getSession(highlight.sessionId)
+                                        ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                                        ?.let(onOpenSession)
+                                }
+                                onNavigateDestination(AppDestination.SessionSettingsGraph)
+                            }
+                            is ChatQueryHighlight.Source -> {
+                                pendingSourceEvidenceTarget = highlight.sourceId
+                                val targetSessionId = highlight.sessionId
+                                if (targetSessionId != null && targetSessionId != activeSessionId) {
+                                    sessionRepository.getSession(targetSessionId)
+                                        ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                                        ?.let(onOpenSession)
+                                }
+                                onNavigateDestination(AppDestination.SessionSettingsSources)
+                            }
+                        }
+                    }
+                },
+                onBack = onOpenChat
             )
             return@ReverseTutorScreenSurface
         }
@@ -967,11 +1172,13 @@ private fun DestinationContent(
                 sessionId = activeSessionId,
                 sessionTitle = activeSessionTitle ?: "当前会话",
                 onBack = onOpenChat,
+                highlightedNodeId = pendingGraphEvidenceTarget,
                 onGraphInteractionChanged = onGraphInteractionChanged
             )
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.SessionSettings ||
+            destination == AppDestination.SessionSettingsSources ||
             destination == AppDestination.SessionSettingsLibrary ||
             destination == AppDestination.SessionSettingsPersona ||
             destination == AppDestination.SessionSettingsPersonalization
@@ -985,6 +1192,7 @@ private fun DestinationContent(
                 tagLibraryPersistence = hybridAppGraph.frontend.tagLibraryPersistence,
                 sessionSettingsStore = sessionSettingsStore,
                 initialSources = sessionSettingsSources,
+                highlightedSourceId = pendingSourceEvidenceTarget,
                 pickedSource = pickedSessionSource,
                 onPickedSourceConsumed = { pickedSessionSource = null },
                 onSourcesChanged = { sessionSettingsRefreshKey += 1 },
@@ -1279,4 +1487,12 @@ private fun StatusDialog(
         onDismiss = onDismiss,
         tone = ReverseTutorStatusTone.Info
     )
+}
+
+private fun Context.hasNetworkConnection(): Boolean {
+    val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+    val network = manager.activeNetwork ?: return false
+    val capabilities = manager.getNetworkCapabilities(network) ?: return false
+    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }

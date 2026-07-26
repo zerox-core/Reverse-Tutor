@@ -72,6 +72,8 @@ import kotlinx.coroutines.delay
 fun SessionSettingsScreen(
     coordinator: SessionSettingsCoordinator,
     tagLibraryPersistence: TagLibraryPersistence,
+    initialSection: SessionSettingsSection? = null,
+    highlightedSourceId: String? = null,
     onBack: () -> Unit,
     onProfileBoundary: (SessionSettingsProfile) -> Unit = {},
     onPickSource: (String?) -> Unit = {},
@@ -86,7 +88,7 @@ fun SessionSettingsScreen(
     onUndoSessionDelete: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var section by remember { mutableStateOf<SessionSettingsSection?>(null) }
+    var section by remember(initialSection) { mutableStateOf(initialSection) }
     var revision by remember { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val tagEditor = remember(tagLibraryPersistence) { TagLibraryEditor(tagLibraryPersistence) }
@@ -180,7 +182,12 @@ fun SessionSettingsScreen(
                 refresh
             )
             SessionSettingsSection.ConversationStrategy -> StrategyPage(coordinator, refresh)
-            SessionSettingsSection.SourceManagement -> SourceManagementPage(coordinator, onPickSource, refresh)
+            SessionSettingsSection.SourceManagement -> SourceManagementPage(
+                coordinator,
+                onPickSource,
+                refresh,
+                highlightedSourceId
+            )
             SessionSettingsSection.WorldTree -> WorldTreePage(
                 coordinator,
                 tagEditor,
@@ -427,11 +434,12 @@ private fun StrategySegments(label: String, selected: String, values: List<Strin
 private fun SourceManagementPage(
     coordinator: SessionSettingsCoordinator,
     onPickSource: (String?) -> Unit,
-    refresh: () -> Unit
+    refresh: () -> Unit,
+    highlightedSourceId: String? = null
 ) {
     var filter by remember { mutableStateOf(SourceFilter.All) }
     var query by remember { mutableStateOf("") }
-    var detailId by remember { mutableStateOf<String?>(null) }
+    var detailId by remember(highlightedSourceId) { mutableStateOf(highlightedSourceId) }
     var aliasSource by remember { mutableStateOf<SessionSource?>(null) }
     val detail = detailId?.let(coordinator::source)
     if (detail != null) {

@@ -7,6 +7,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -26,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -36,10 +39,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Collections
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
-import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,6 +69,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -83,15 +93,33 @@ internal fun ReverseTeachingChatScreen(
     onCancelImageDraft: () -> Unit,
     onMessageAction: (ChatTimelineItem, ChatMessageAction) -> Unit,
     onComposerFocusChanged: (Boolean) -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenContextHub: () -> Unit,
+    onOpenModelSettings: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onOpenSources: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onExport: () -> Unit = {},
     onBack: () -> Unit,
     evidenceTargetMessageId: String?,
+    availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
+    cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
+    onOpenSearch: () -> Unit = {},
+    onPickImages: () -> Unit = onCreateImageDraft,
+    onSelectSource: (ChatDraftAttachment) -> Unit = {},
+    onTakePhoto: () -> Unit = {},
+    onRequestCameraPermission: () -> Unit = {},
+    onOpenCameraSettings: () -> Unit = {},
+    onOpenSessionSources: () -> Unit = {},
+    onRemoveAttachment: (String) -> Unit = {},
+    onRetryAttachment: (String) -> Unit = {},
+    onMoveAttachment: (Int, Int) -> Unit = { _, _ -> },
+    onRetrySend: () -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedMessageId by remember(state.sessionTitle) { mutableStateOf<String?>(null) }
+    var showAttachmentActions by remember(state.sessionTitle) { mutableStateOf(false) }
+    var showSourcePicker by remember(state.sessionTitle) { mutableStateOf(false) }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = initialScrollPosition.index,
         initialFirstVisibleItemScrollOffset = initialScrollPosition.offset
@@ -103,6 +131,16 @@ internal fun ReverseTeachingChatScreen(
             .collect(onScrollPositionChanged)
     }
 
+    LaunchedEffect(evidenceTargetMessageId, state.messages) {
+        val targetIndex = state.messages.indexOfFirst { it.id == evidenceTargetMessageId }
+        if (targetIndex >= 0) {
+            listState.animateScrollToItem(targetIndex + 1)
+            selectedMessageId = evidenceTargetMessageId
+            kotlinx.coroutines.delay(1_800L)
+            if (selectedMessageId == evidenceTargetMessageId) selectedMessageId = null
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -112,7 +150,8 @@ internal fun ReverseTeachingChatScreen(
         ReverseTeachingChatHeader(
             state = state,
             onBack = onBack,
-            onOpenSettings = onOpenSettings,
+            onOpenSettings = onOpenContextHub,
+            onOpenSearch = onOpenSearch,
             onOpenSessionSettings = onOpenSessionSettings
         )
         LazyColumn(
@@ -175,7 +214,7 @@ internal fun ReverseTeachingChatScreen(
                         learnerAvatarReference = state.learnerAvatarReference,
                         avatarVisible = state.avatarVisible,
                         label = label,
-                        onOpenSettings = onOpenSettings,
+                        onOpenSettings = onOpenModelSettings,
                         onRetry = state.messages.lastOrNull { it.role == MessageRole.Assistant }?.let { item ->
                             { onMessageAction(item, ChatMessageAction.Regenerate) }
                         }
@@ -189,10 +228,12 @@ internal fun ReverseTeachingChatScreen(
                 .background(Color(0xEAF3F5FA)),
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            state.composer.imageDraft?.let { draft ->
-                ComposerPreview(
-                    label = draft.displayLabel,
-                    onDismiss = onCancelImageDraft
+            if (state.composer.orderedAttachments.isNotEmpty()) {
+                ComposerAttachmentStrip(
+                    attachments = state.composer.orderedAttachments,
+                    onRemove = onRemoveAttachment,
+                    onRetry = onRetryAttachment,
+                    onMove = onMoveAttachment
                 )
             }
             state.composer.quoteTarget?.let { quote ->
@@ -204,12 +245,63 @@ internal fun ReverseTeachingChatScreen(
             ReverseTeachingComposer(
                 text = state.composer.text,
                 canSend = state.composer.canSend,
+                isSending = state.composer.isSending,
                 onTextChange = onComposerTextChange,
-                onAdd = onCreateImageDraft,
+                onAdd = { showAttachmentActions = true },
                 onSend = onSendMessage,
                 onFocusChanged = onComposerFocusChanged
             )
+            state.composer.sendFailure?.let { failure ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(failure, modifier = Modifier.weight(1f), color = Color(0xFF9D3340), fontSize = 11.sp)
+                    TextButton(onClick = onRetrySend) { Text("重试") }
+                }
+            }
+            state.composer.notice?.let { notice ->
+                Text(notice, modifier = Modifier.padding(horizontal = 18.dp), color = Color(0xFF7A5B16), fontSize = 11.sp)
+            }
         }
+    }
+
+    if (showAttachmentActions) {
+        ChatAttachmentActionSheet(
+            permissionState = cameraPermissionState,
+            onDismiss = { showAttachmentActions = false },
+            onPickImages = {
+                showAttachmentActions = false
+                onPickImages()
+            },
+            onPickSource = {
+                showAttachmentActions = false
+                showSourcePicker = true
+            },
+            onTakePhoto = {
+                showAttachmentActions = false
+                when (cameraPermissionState) {
+                    ChatPermissionState.Granted -> onTakePhoto()
+                    ChatPermissionState.PermanentlyDenied -> onOpenCameraSettings()
+                    ChatPermissionState.Requestable,
+                    ChatPermissionState.Denied -> onRequestCameraPermission()
+                }
+            },
+            onOpenSessionSources = {
+                showAttachmentActions = false
+                onOpenSessionSources()
+            }
+        )
+    }
+    if (showSourcePicker) {
+        ChatSourcePickerSheet(
+            sources = availableSourceAttachments,
+            onDismiss = { showSourcePicker = false },
+            onSelect = {
+                showSourcePicker = false
+                onSelectSource(it)
+            }
+        )
     }
 }
 
@@ -218,6 +310,7 @@ private fun ReverseTeachingChatHeader(
     state: ChatUiState,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     onOpenSessionSettings: () -> Unit
 ) {
     Surface(
@@ -276,16 +369,16 @@ private fun ReverseTeachingChatHeader(
                 }
             }
             FormalHeaderIconButton(
-                imageVector = Icons.Rounded.AccountTree,
-                contentDescription = "会话世界树",
-                onClick = onOpenSettings,
+                imageVector = Icons.Rounded.Search,
+                contentDescription = "资料与引用",
+                onClick = onOpenSearch,
                 filled = true
             )
             Spacer(Modifier.width(6.dp))
             FormalHeaderIconButton(
-                imageVector = Icons.Rounded.MoreHoriz,
-                contentDescription = "会话设置",
-                onClick = onOpenSessionSettings,
+                imageVector = Icons.Rounded.AccountTree,
+                contentDescription = "当前会话图谱",
+                onClick = onOpenSettings,
                 filled = true
             )
         }
@@ -302,7 +395,7 @@ private fun FormalHeaderIconButton(
     Surface(
         onClick = onClick,
         modifier = Modifier
-            .size(if (filled) 36.dp else 44.dp)
+            .size(44.dp)
             .then(
                 if (filled) {
                     Modifier.shadow(
@@ -800,9 +893,180 @@ private fun ComposerPreview(label: String, onDismiss: () -> Unit) {
 }
 
 @Composable
+private fun ComposerAttachmentStrip(
+    attachments: List<ChatDraftAttachment>,
+    onRemove: (String) -> Unit,
+    onRetry: (String) -> Unit,
+    onMove: (Int, Int) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        attachments.forEachIndexed { index, attachment ->
+            var accumulatedDrag by remember(attachment.id, index) { mutableStateOf(0f) }
+            Surface(
+                modifier = Modifier
+                    .width(168.dp)
+                    .height(58.dp)
+                    .pointerInput(attachment.id, index, attachments.size) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { accumulatedDrag = 0f },
+                            onDragEnd = { accumulatedDrag = 0f },
+                            onDragCancel = { accumulatedDrag = 0f },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                accumulatedDrag += amount.x
+                                when {
+                                    accumulatedDrag > 72f && index < attachments.lastIndex -> {
+                                        onMove(index, index + 1)
+                                        accumulatedDrag = 0f
+                                    }
+                                    accumulatedDrag < -72f && index > 0 -> {
+                                        onMove(index, index - 1)
+                                        accumulatedDrag = 0f
+                                    }
+                                }
+                            }
+                        )
+                    },
+                color = Color(0xFFF9FBFE),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, Color(0xFFD4DCE8))
+            ) {
+                Row(
+                    modifier = Modifier.padding(start = 10.dp, end = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "${attachment.displayType} · ${attachment.name}",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 11.sp
+                        )
+                        when (val readiness = attachment.readiness) {
+                            ChatAttachmentReadiness.Preparing -> Text("准备中", color = ChatMuted, fontSize = 10.sp)
+                            ChatAttachmentReadiness.Ready -> Text("已准备", color = Color(0xFF287A56), fontSize = 10.sp)
+                            is ChatAttachmentReadiness.Failed -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(readiness.message, modifier = Modifier.weight(1f), maxLines = 1, color = Color(0xFF9D3340), fontSize = 9.sp)
+                                if (readiness.retryable) {
+                                    TextButton(onClick = { onRetry(attachment.id) }) { Text("重试", fontSize = 9.sp) }
+                                }
+                            }
+                        }
+                    }
+                    IconButton(onClick = { onRemove(attachment.id) }, modifier = Modifier.size(36.dp)) {
+                        Icon(Icons.Filled.Close, contentDescription = "移除${attachment.name}", modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ChatAttachmentActionSheet(
+    permissionState: ChatPermissionState,
+    onDismiss: () -> Unit,
+    onPickImages: () -> Unit,
+    onPickSource: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onOpenSessionSources: () -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "添加到消息",
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        AttachmentSheetAction(Icons.Rounded.Collections, "选择图片", null, onPickImages)
+        AttachmentSheetAction(Icons.Rounded.Description, "选择应用内资料", null, onPickSource)
+        AttachmentSheetAction(
+            Icons.Rounded.CameraAlt,
+            "拍照",
+            when (permissionState) {
+                ChatPermissionState.Denied -> "相机权限被拒绝，可重新授权"
+                ChatPermissionState.PermanentlyDenied -> "相机权限已关闭，前往系统设置"
+                else -> null
+            },
+            onTakePhoto
+        )
+        AttachmentSheetAction(Icons.Rounded.Description, "查看本会话资料", null, onOpenSessionSources)
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun AttachmentSheetAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String?,
+    onClick: () -> Unit
+) {
+    Surface(onClick = onClick, color = Color.Transparent, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(title, fontSize = 15.sp)
+                if (subtitle != null) Text(subtitle, color = ChatMuted, fontSize = 11.sp)
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ChatSourcePickerSheet(
+    sources: List<ChatDraftAttachment>,
+    onDismiss: () -> Unit,
+    onSelect: (ChatDraftAttachment) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(
+            "选择应用内资料",
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        if (sources.isEmpty()) {
+            Text(
+                "本会话没有可引用的资料",
+                modifier = Modifier.padding(20.dp),
+                color = ChatMuted
+            )
+        } else {
+            sources.forEach { source ->
+                Surface(
+                    onClick = { onSelect(source) },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color.Transparent
+                ) {
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("应用内资料", color = ChatMuted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
 private fun ReverseTeachingComposer(
     text: String,
     canSend: Boolean,
+    isSending: Boolean,
     onTextChange: (String) -> Unit,
     onAdd: () -> Unit,
     onSend: () -> Unit,
@@ -813,7 +1077,7 @@ private fun ReverseTeachingComposer(
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp)
-            .height(48.dp),
+            .heightIn(min = 56.dp, max = 136.dp),
         color = Color(0xFFF2F6FC),
         shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, Color(0xFFC7D8EA))
@@ -826,7 +1090,7 @@ private fun ReverseTeachingComposer(
         ) {
             Surface(
                 onClick = onAdd,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(44.dp),
                 color = Color.Transparent,
                 contentColor = Color(0xFF577394),
                 shape = CircleShape
@@ -839,8 +1103,10 @@ private fun ReverseTeachingComposer(
                 BasicTextField(
                     value = text,
                     onValueChange = onTextChange,
-                    singleLine = true,
-                    textStyle = TextStyle(color = ChatInk, fontSize = 12.sp, lineHeight = 18.sp),
+                    singleLine = false,
+                    minLines = 1,
+                    maxLines = 5,
+                    textStyle = TextStyle(color = ChatInk, fontSize = 14.sp, lineHeight = 20.sp),
                     cursorBrush = SolidColor(Color(0xFF4283D9)),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -856,18 +1122,19 @@ private fun ReverseTeachingComposer(
                 }
             }
             Surface(
-                onClick = { if (canSend) onSend() },
+                onClick = onSend,
+                enabled = canSend,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(44.dp)
                     .shadow(4.dp, CircleShape),
-                color = Color(0xFF4287E8),
+                color = if (canSend) Color(0xFF4287E8) else Color(0xFFAFB9C8),
                 contentColor = Color.White,
                 shape = CircleShape
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Filled.ArrowUpward,
-                        contentDescription = "发送",
+                        contentDescription = if (isSending) "正在发送" else "发送",
                         modifier = Modifier.size(19.dp)
                     )
                 }

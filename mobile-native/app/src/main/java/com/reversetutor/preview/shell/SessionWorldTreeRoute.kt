@@ -20,12 +20,13 @@ internal fun SessionWorldTreeRoute(
     sessionId: String?,
     sessionTitle: String,
     onBack: () -> Unit,
+    highlightedNodeId: String? = null,
     modifier: Modifier = Modifier,
     onGraphInteractionChanged: (Boolean) -> Unit = {}
 ) {
     val dataScope = remember(sessionId) { DataGraphScope.Session(sessionId ?: "missing-session") }
     var state by remember(sessionId) { mutableStateOf(KnowledgeGraphUiState.loading(GraphScope.Session)) }
-    var selectedNodeId by remember(sessionId) { mutableStateOf<String?>(null) }
+    var selectedNodeId by remember(sessionId, highlightedNodeId) { mutableStateOf(highlightedNodeId) }
     var showLockedNodes by remember(sessionId) { mutableStateOf(true) }
 
     LaunchedEffect(dataScope) {
