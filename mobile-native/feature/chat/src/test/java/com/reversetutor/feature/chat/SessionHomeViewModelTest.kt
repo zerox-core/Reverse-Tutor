@@ -34,6 +34,7 @@ class SessionHomeViewModelTest {
         assertNull(validateSessionTitle("同名会话"))
         assertNull(validateSessionTitle("同名会话"))
         assertNull(validateSessionTitle("a".repeat(30)))
+        assertNull(validateSessionTitle("  ${"a".repeat(30)}  "))
         assertEquals("会话名称最多 30 个字符", validateSessionTitle("a".repeat(31)))
     }
 
@@ -93,7 +94,7 @@ class SessionHomeViewModelTest {
     @Test
     fun deleteStagesImmediatelyAndUndoWithinFiveSecondsRestoresFullCard() = runTest {
         assertEquals("欢迎来到反转家教", WelcomeMockTitle)
-        assertEquals("小六学", WelcomeMockLearner)
+        assertEquals("小六子", WelcomeMockLearner)
         assertEquals("老师老师，第一节课我来教你，以后你就要好好来教我啦。", WelcomeMockOpening)
         val welcome = item(WelcomeMockSessionId).copy(
             title = WelcomeMockTitle,

@@ -1,11 +1,11 @@
 package com.reversetutor.preview.wiring
 
-import com.reversetutor.core.domain.ConversationRunCoordinator
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
 import com.reversetutor.core.data.session.SessionCreationInput
 import com.reversetutor.core.data.session.SessionDeletionRepository
 import com.reversetutor.core.data.session.SessionRepository
+import com.reversetutor.core.domain.ConversationRunCoordinator
 import com.reversetutor.core.model.Message
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.ModelBinding
@@ -18,6 +18,7 @@ import com.reversetutor.core.model.WeeklySummary
 import com.reversetutor.feature.chat.ChatRunsPort
 import com.reversetutor.feature.chat.HomePort
 import com.reversetutor.feature.chat.SessionHomePort
+import com.reversetutor.feature.chat.SessionHomePersistence
 import com.reversetutor.feature.chat.SessionListItem
 import com.reversetutor.feature.chat.WelcomeMockLearner
 import com.reversetutor.feature.chat.WelcomeMockOpening
@@ -28,6 +29,13 @@ import com.reversetutor.feature.memory.WeeklyDashboardPort
 import com.reversetutor.feature.memory.WeeklyDashboardSnapshot
 import com.reversetutor.feature.settings.ModelConnectionsPort
 import com.reversetutor.feature.settings.ModelConnectionsSnapshot
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class RepositoryHomePortAdapter(
     private val listSessions: suspend () -> List<TutorSession>
@@ -41,11 +49,14 @@ class RepositorySessionHomePortAdapter(
     private val messageRepository: MessageRepository,
     private val sessionDeletionRepository: SessionDeletionRepository,
     private val conversationRunRepository: ConversationRunRepositoryImpl,
-    private val nowEpochMillis: () -> Long = System::currentTimeMillis
+    private val persistence: SessionHomePersistence,
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val deletionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : SessionHomePort {
-    private val stagedSessions = mutableMapOf<String, TutorSession>()
+    private val scheduledDeletes = ConcurrentHashMap<String, Job>()
 
     override suspend fun loadSessionCards(): List<SessionListItem> {
+        recoverPendingDeletes()
         ensureWelcomeSession()
         return sessionRepository.listSessions()
             .filterNot { it.archived }
@@ -77,8 +88,12 @@ class RepositorySessionHomePortAdapter(
                     avatarLabel = session.title.trim().take(1),
                     learnerRole = learnerRole,
                     latestMessageSummary = latestSummary,
-                    perSessionAvatarVisible = true,
-                    pinnedAtEpochMillis = session.updatedAtEpochMillis.takeIf { session.pinned },
+                    perSessionAvatarVisible = persistence.avatarVisible(session.id) ?: true,
+                    pinnedAtEpochMillis = if (session.pinned) {
+                        persistence.pinnedAt(session.id) ?: session.updatedAtEpochMillis
+                    } else {
+                        null
+                    },
                     isWelcomeMock = session.id == WelcomeMockSessionId
                 )
             }
@@ -89,44 +104,103 @@ class RepositorySessionHomePortAdapter(
         title: String,
         nowEpochMillis: Long
     ): Boolean {
-        val existing = sessionRepository.getSession(sessionId) ?: return false
-        if (!sessionRepository.renameSession(sessionId, title, nowEpochMillis)) return false
-        sessionRepository.saveSession(existing.copy(title = title.trim()))
-        return true
+        return sessionRepository.renameSession(sessionId, title.trim(), nowEpochMillis)
     }
 
     override suspend fun setPinned(
         sessionId: String,
         pinned: Boolean,
         nowEpochMillis: Long
-    ): Boolean = sessionRepository.setPinned(sessionId, pinned, nowEpochMillis)
+    ): Boolean {
+        val updated = sessionRepository.setPinned(sessionId, pinned, nowEpochMillis)
+        if (updated) persistence.setPinnedAt(sessionId, nowEpochMillis.takeIf { pinned })
+        return updated
+    }
+
+    override suspend fun setAvatarVisible(sessionId: String, visible: Boolean): Boolean {
+        sessionRepository.getSession(sessionId) ?: return false
+        persistence.setAvatarVisible(sessionId, visible)
+        return true
+    }
 
     override suspend fun stageDelete(sessionId: String, nowEpochMillis: Long): Boolean {
-        val session = sessionRepository.getSession(sessionId) ?: return false
-        stagedSessions[sessionId] = session
-        return sessionRepository.archiveSession(sessionId, nowEpochMillis)
+        sessionRepository.getSession(sessionId) ?: return false
+        val archived = sessionRepository.archiveSession(sessionId, nowEpochMillis)
+        if (archived) {
+            persistence.setPendingDeleteAt(sessionId, nowEpochMillis + 5_000L)
+        }
+        return archived
     }
 
     override suspend fun undoDelete(sessionId: String): Boolean {
-        val session = stagedSessions.remove(sessionId) ?: return false
+        val session = sessionRepository.getSession(sessionId) ?: return false
+        if (persistence.pendingDeleteAt(sessionId) == null) return false
+        scheduledDeletes.remove(sessionId)?.cancel()
+        persistence.clearPendingDelete(sessionId)
         sessionRepository.saveSession(session.copy(archived = false))
         return true
     }
 
     override suspend fun commitDelete(sessionId: String, nowEpochMillis: Long): Boolean {
-        stagedSessions.remove(sessionId)
-        return sessionDeletionRepository.deleteSession(
+        scheduledDeletes.remove(sessionId)
+        val deleted = sessionDeletionRepository.deleteSession(
             sessionId = sessionId,
             deletedAtEpochMillis = nowEpochMillis,
             revision = nowEpochMillis,
             idempotencyKey = "session-home-delete-$sessionId-$nowEpochMillis"
         )
+        persistence.clearPendingDelete(sessionId)
+        if (sessionId == WelcomeMockSessionId && deleted) {
+            persistence.setWelcomeDeletionSuppressed(true)
+        }
+        return deleted
+    }
+
+    override suspend fun scheduleDeleteCommit(
+        sessionId: String,
+        delayMillis: Long,
+        nowEpochMillis: Long
+    ): Boolean {
+        val dueAt = persistence.pendingDeleteAt(sessionId)
+            ?: (nowEpochMillis + delayMillis).also {
+                persistence.setPendingDeleteAt(sessionId, it)
+            }
+        val job = scheduleDurableFinalization(sessionId, dueAt)
+        job.join()
+        return persistence.pendingDeleteAt(sessionId) == null
+    }
+
+    override suspend fun cancelScheduledDelete(sessionId: String) {
+        scheduledDeletes.remove(sessionId)?.cancel()
+    }
+
+    private suspend fun recoverPendingDeletes() {
+        val now = nowEpochMillis()
+        persistence.pendingDeletes().forEach { (sessionId, dueAt) ->
+            if (dueAt <= now) {
+                commitDelete(sessionId, now)
+            } else if (!scheduledDeletes.containsKey(sessionId)) {
+                scheduleDurableFinalization(sessionId, dueAt)
+            }
+        }
+    }
+
+    private fun scheduleDurableFinalization(sessionId: String, dueAt: Long): Job {
+        scheduledDeletes[sessionId]?.cancel()
+        val job = deletionScope.launch {
+            delay((dueAt - nowEpochMillis()).coerceAtLeast(0L))
+            commitDelete(sessionId, nowEpochMillis())
+        }
+        scheduledDeletes[sessionId] = job
+        return job
     }
 
     private suspend fun ensureWelcomeSession() {
         val existing = sessionRepository.getSession(WelcomeMockSessionId)
         if (existing == null) {
-            val tombstoneExists = conversationRunRepository.isSessionDeleted(WelcomeMockSessionId)
+            val tombstoneExists = persistence.isWelcomeDeletionSuppressed() ||
+                (persistence.hasObservedWelcomeSession() &&
+                    conversationRunRepository.isSessionDeleted(WelcomeMockSessionId))
             val hasOtherSessions = sessionRepository.listSessions().any { !it.archived }
             if (!shouldCreateWelcomeSession(
                     sessionExists = false,
@@ -145,9 +219,13 @@ class RepositorySessionHomePortAdapter(
                 nowEpochMillis = nowEpochMillis(),
                 sessionId = WelcomeMockSessionId
             )
+            persistence.setWelcomeSessionObserved()
         } else if (existing.archived) {
+            persistence.setWelcomeSessionObserved()
             return
         }
+
+        persistence.setWelcomeSessionObserved()
 
         if (messageRepository.listMessages(WelcomeMockSessionId).isEmpty()) {
             val createdAt = nowEpochMillis()

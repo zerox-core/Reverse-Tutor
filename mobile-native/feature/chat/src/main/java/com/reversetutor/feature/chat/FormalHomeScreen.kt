@@ -899,7 +899,7 @@ private fun RenameHomeSessionDialog(
         text = {
             OutlinedTextField(
                 value = title,
-                onValueChange = { if (it.length <= SessionRenameMaxLength) title = it },
+                onValueChange = { title = it },
                 singleLine = true,
                 label = { Text("会话名称") },
                 supportingText = { Text(validationError ?: "1–30 个非空白字符；允许重名") },

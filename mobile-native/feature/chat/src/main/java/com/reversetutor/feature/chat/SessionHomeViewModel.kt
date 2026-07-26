@@ -3,7 +3,6 @@ package com.reversetutor.feature.chat
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,7 +11,7 @@ import kotlinx.coroutines.launch
 
 const val WelcomeMockSessionId = "welcome-reverse-tutor"
 const val WelcomeMockTitle = "欢迎来到反转家教"
-const val WelcomeMockLearner = "小六学"
+const val WelcomeMockLearner = "小六子"
 const val WelcomeMockOpening = "老师老师，第一节课我来教你，以后你就要好好来教我啦。"
 
 internal const val SessionRenameMaxLength = 30
@@ -43,9 +42,21 @@ interface SessionHomePort {
     suspend fun loadSessionCards(): List<SessionListItem>
     suspend fun renameSession(sessionId: String, title: String, nowEpochMillis: Long): Boolean
     suspend fun setPinned(sessionId: String, pinned: Boolean, nowEpochMillis: Long): Boolean
+    suspend fun setAvatarVisible(sessionId: String, visible: Boolean): Boolean = false
     suspend fun stageDelete(sessionId: String, nowEpochMillis: Long): Boolean
     suspend fun undoDelete(sessionId: String): Boolean
     suspend fun commitDelete(sessionId: String, nowEpochMillis: Long): Boolean
+
+    suspend fun scheduleDeleteCommit(
+        sessionId: String,
+        delayMillis: Long,
+        nowEpochMillis: Long
+    ): Boolean {
+        kotlinx.coroutines.delay(delayMillis)
+        return commitDelete(sessionId, nowEpochMillis + delayMillis)
+    }
+
+    suspend fun cancelScheduledDelete(sessionId: String) = Unit
 }
 
 internal fun validateSessionTitle(title: String): String? {
@@ -205,8 +216,7 @@ class SessionHomeViewModel(
                     )
                 }
                 deleteJob = scope.launch {
-                    delay(undoWindowMillis)
-                    port.commitDelete(session.id, nowEpochMillis())
+                    port.scheduleDeleteCommit(session.id, undoWindowMillis, stagedAt)
                     mutableUiState.update { state ->
                         if (state.undo?.session?.id == session.id) state.copy(undo = null) else state
                     }
@@ -229,6 +239,7 @@ class SessionHomeViewModel(
         deleteJob = null
         scope.launch {
             try {
+                port.cancelScheduledDelete(undo.session.id)
                 check(port.undoDelete(undo.session.id)) { "无法恢复会话" }
                 mutableUiState.update { state ->
                     val restored = (state.sessions + undo.session).distinctBy { it.id }.sortedForHome()

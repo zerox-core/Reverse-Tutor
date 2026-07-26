@@ -68,3 +68,59 @@ Focused Task 2A JVM coverage includes card height/action invariants, title valid
 - No connected-device Compose interaction run was requested or performed; JVM, lint, Android-test compilation, and debug assembly are green.
 - Per-session avatar visibility is modeled and honored without adding a frozen persistence field. Existing sessions default to visible; a later session-settings contract can supply persisted per-session values without changing this card behavior.
 - If the process is killed during the five-second Undo window, the staged archive remains suppressed and safe, but the transient Undo affordance cannot survive process death. No new persistence contract was introduced for a cross-process Undo timer.
+
+## Round 1/5 review fixes (2026-07-26)
+
+### Status and commit
+
+- Round status: COMPLETE
+- Review base: `45a70e79bbbb88eecb335234d17892843115e9dd`
+- Fix implementation commit: `5fdfbbea8734e8cfeed0d59b9e50aa5921f99b88`
+- Clean implementation worktree: `F:\xw\reverse-tutor-task2a-clean`
+
+### Findings addressed
+
+- Fresh-install Mock detection now records feature-local welcome-state observation and explicit-deletion suppression in persistent app storage. A genuinely absent row on first launch creates the Mock; an adapter-owned hard deletion or a later observed core tombstone suppresses recreation. The exact persisted content is title `欢迎来到反转家教`, learner `小六子`, and opening line `老师老师，第一节课我来教你，以后你就要好好来教我啦。`.
+- Per-session avatar visibility now reads and writes through `SessionHomePersistence`, whose production implementation is `SharedPreferencesSessionHomePersistence`. `RepositorySessionHomePortAdapter.setAvatarVisible()` is the production action path; global visibility still overrides it in the existing UI mapping and removes the avatar slot.
+- Delete staging persists the finalization deadline before the Undo period. The production adapter schedules hard deletion in an adapter-owned supervisor scope, independent of route disposal, and `loadSessionCards()` recovers pending deadlines after process recreation: future deadlines are rescheduled and expired deadlines are finalized immediately through the existing `SessionDeletionRepository`. Undo cancels the durable job, clears the persisted deadline, and restores the archived row.
+- Rename now uses only the existing atomic `SessionRepository.renameSession()` action. Pin time is persisted independently in feature-local state when pin/unpin succeeds, so rename never restores a stale full row or changes latest-pin ordering.
+- Rename input no longer discards raw text above 30 code units. Validation is applied to the trimmed value, so whitespace-padded valid titles of 30 characters are accepted and pasted over-limit values remain visible with the existing validation error.
+
+### Focused production-adapter coverage
+
+Added `RepositorySessionHomePortAdapterTest` under `app/src/androidTest` with real `DataModule` repositories and the production SharedPreferences adapter. It covers:
+
+- fresh install and exact persisted Mock content;
+- create/delete/Undo/reload and permanent Mock suppression;
+- expired staged-delete recovery after adapter reload;
+- persisted per-session avatar visibility through the production port action;
+- rename preserving pin ordering and unrelated pin/archive fields.
+
+No Android device was attached (`adb devices` returned an empty device list), so these real-repository instrumentation tests were compiled but not executed.
+
+### Verification evidence
+
+Focused affected checks after the final source edit:
+
+```text
+gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
+BUILD SUCCESSFUL in 18s
+194 actionable tasks: 23 executed, 171 up-to-date
+CHAT_TESTS=34 CHAT_FAILURES=0 APP_TESTS=84 APP_FAILURES=0
+```
+
+Full requested gate before the final source edit (the subsequent edit only exposed the already-persisted avatar setter and its instrumentation-test call; the focused rerun above compiled and tested that final source):
+
+```text
+gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :feature:chat:lintDebug :app:lintDebug :app:compileDebugAndroidTestKotlin :app:assembleDebug
+BUILD SUCCESSFUL in 1m 3s
+439 actionable tasks: 40 executed, 399 up-to-date
+```
+
+The authoritative full committed-HEAD gate is recorded in the final handoff after committing this report.
+
+### Scope and remaining concerns
+
+- Round 1 changed only Task 2A app/chat sources, app adapter tests, and this report. No core, PWA, backend, protocol, Room, SecretStore, signing, or build file changed.
+- Feature-owned SharedPreferences are used because the frozen settings repository has no per-session avatar/deletion-deadline keys. This is durable local app state and does not alter frozen contracts.
+- The real-repository instrumentation tests require an attached Android device or emulator to execute; compilation is green, but this environment had none.

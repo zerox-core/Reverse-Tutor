@@ -180,6 +180,7 @@ class HybridAppGraph private constructor(
                 online = onlineServices,
                 challengeRuntimeCoordinator = challengeRuntimeCoordinator,
                 frontend = createFrontendFactories(
+                    context = appContext,
                     sessionRepository = sessionRepository,
                     messageRepository = messageRepository,
                     sessionDeletionRepository = sessionDeletionRepository,
@@ -221,6 +222,7 @@ class HybridAppGraph private constructor(
         }
 
         private fun createFrontendFactories(
+            context: Context,
             sessionRepository: SessionRepository,
             messageRepository: MessageRepository,
             sessionDeletionRepository: SessionDeletionRepository,
@@ -236,7 +238,8 @@ class HybridAppGraph private constructor(
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,
                 sessionDeletionRepository = sessionDeletionRepository,
-                conversationRunRepository = conversationRunRepository
+                conversationRunRepository = conversationRunRepository,
+                persistence = SharedPreferencesSessionHomePersistence(context)
             )
             val chatRunsPort = RepositoryChatRunsPortAdapter(
                 listRuns = conversationRunRepository::listBySession,
