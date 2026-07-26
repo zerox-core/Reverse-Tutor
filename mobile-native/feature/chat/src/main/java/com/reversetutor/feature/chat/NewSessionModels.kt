@@ -72,16 +72,14 @@ data class NewSessionDraft(
     fun validationErrors(): List<String> = buildList {
         if (title.isBlank()) add("请填写会话名称。")
         if (role.isBlank()) add("请填写角色。")
-        if (goal.isBlank()) add("请填写目标。")
-        if (profileText.isBlank()) add("请填写学生画像。")
     }
 
     fun toCreationInput(): SessionCreationInput =
         SessionCreationInput(
             title = title.trim(),
             role = role.trim(),
-            goal = goal.trim(),
-            profileText = profileText.trim(),
+            goal = goal.trim().ifEmpty { "未填写" },
+            profileText = profileText.trim().ifEmpty { "未填写" },
             templateId = templateId,
             sourceHandoffRequested = sourceHandoffRequested
         )

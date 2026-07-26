@@ -39,21 +39,21 @@ class FigmaResponsiveDeviceTest {
         waitForText("选择产品方向")
         composeRule.onNodeWithText("开始设置  →").performClick()
         dismissActivityAnnouncementIfPresent()
-        waitForText("学习预设")
+        waitForText("内置预设")
         composeRule.onNodeWithText("自定义").performClick()
-        waitForText("自定义世界树")
-        composeRule.onNodeWithText("把你的世界写下来").assertIsDisplayed()
+        waitForText("基本资料")
+        composeRule.onNodeWithText("自定义栏目").assertIsDisplayed()
 
         composeRule.activityRule.scenario.onActivity {
             it.onBackPressedDispatcher.onBackPressed()
         }
-        waitForText("学习预设")
+        waitForText("内置预设")
     }
 
     private fun dismissActivityAnnouncementIfPresent() {
         composeRule.waitUntil(timeoutMillis = 2_000) {
             composeRule.onAllNodesWithText("稍后再说").fetchSemanticsNodes().isNotEmpty() ||
-                composeRule.onAllNodesWithText("学习预设").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("内置预设").fetchSemanticsNodes().isNotEmpty()
         }
         val dismissNodes = composeRule.onAllNodesWithText("稍后再说")
         if (dismissNodes.fetchSemanticsNodes().isNotEmpty()) {

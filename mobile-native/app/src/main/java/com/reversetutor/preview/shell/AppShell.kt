@@ -60,7 +60,7 @@ import com.reversetutor.core.model.SearchTarget
 import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.feature.chat.ChatRoute
 import com.reversetutor.feature.chat.ChatImageDraft
-import com.reversetutor.feature.chat.FigmaNewSessionRoute
+import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
@@ -787,8 +787,9 @@ private fun DestinationContent(
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.NewSession) {
-            FigmaNewSessionRoute(
-                sessionRepository = sessionRepository,
+            Task2B1NewSessionRoute(
+                createPort = hybridAppGraph.frontend.newSessionCreatePort,
+                persistence = hybridAppGraph.frontend.newSessionPersistence,
                 onCreated = onSessionCreated,
                 onBack = onOpenSessions
             )
