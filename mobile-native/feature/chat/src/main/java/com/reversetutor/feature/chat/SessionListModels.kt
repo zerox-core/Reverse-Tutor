@@ -14,7 +14,12 @@ data class SessionListItem(
     val pinned: Boolean,
     val statusLabel: String,
     val unreadCount: Int,
-    val avatarLabel: String
+    val avatarLabel: String,
+    val learnerRole: String = "学习者",
+    val latestMessageSummary: String = statusLabel,
+    val perSessionAvatarVisible: Boolean = true,
+    val pinnedAtEpochMillis: Long? = if (pinned) updatedAtEpochMillis else null,
+    val isWelcomeMock: Boolean = false
 ) {
     val unreadLabel: String =
         if (unreadCount == 0) "无未读" else "$unreadCount 条未读"
@@ -38,7 +43,11 @@ data class SessionListUiState(
             val visible = sessions
                 .asSequence()
                 .map { item ->
-                    if (avatarVisible) item else item.copy(avatarLabel = "头像已隐藏")
+                    if (avatarVisible && item.perSessionAvatarVisible) {
+                        item
+                    } else {
+                        item.copy(avatarLabel = "", perSessionAvatarVisible = false)
+                    }
                 }
                 .filter { item ->
                     normalizedQuery.isEmpty() ||
@@ -49,6 +58,7 @@ data class SessionListUiState(
                 }
                 .sortedWith(
                     compareByDescending<SessionListItem> { it.pinned }
+                        .thenByDescending { it.pinnedAtEpochMillis ?: Long.MIN_VALUE }
                         .thenByDescending { it.updatedAtEpochMillis }
                 )
                 .toList()
@@ -83,5 +93,7 @@ fun TutorSession.toSessionListItem(avatarVisible: Boolean): SessionListItem =
             "已就绪 · 主动生成待启用"
         },
         unreadCount = 0,
-        avatarLabel = if (avatarVisible) "头像占位" else "头像已隐藏"
+        avatarLabel = if (avatarVisible) title.trim().take(1) else "",
+        perSessionAvatarVisible = avatarVisible,
+        pinnedAtEpochMillis = updatedAtEpochMillis.takeIf { pinned }
     )

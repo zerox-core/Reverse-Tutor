@@ -21,6 +21,7 @@ import com.reversetutor.core.data.online.OnlineUpdateRepository
 import com.reversetutor.core.data.preferences.AppPreferencesRepository
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
 import com.reversetutor.core.data.search.RoomGlobalSearchRepository
+import com.reversetutor.core.data.session.SessionDeletionRepository
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
@@ -36,6 +37,7 @@ import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
 import com.reversetutor.feature.chat.ChatRunsViewModelFactory
 import com.reversetutor.feature.chat.HomePortViewModelFactory
 import com.reversetutor.feature.chat.HomeViewModelFactory
+import com.reversetutor.feature.chat.SessionHomePort
 import com.reversetutor.feature.memory.WeeklyDashboardPortViewModelFactory
 import com.reversetutor.feature.memory.WeeklyDashboardViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsPortViewModelFactory
@@ -48,6 +50,7 @@ import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 data class HybridFrontendFactories(
     val workspaceViewModelFactory: WorkspaceViewModelFactory,
     val homeViewModelFactory: HomeViewModelFactory,
+    val sessionHomePort: SessionHomePort,
     val chatRunsViewModelFactory: ChatRunsViewModelFactory,
     val modelConnectionsViewModelFactory: ModelConnectionsViewModelFactory,
     val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory
@@ -123,6 +126,8 @@ class HybridAppGraph private constructor(
         ): HybridAppGraph {
             val appContext = context.applicationContext
             val sessionRepository = DataModule.sessionRepository(appContext)
+            val messageRepository = DataModule.messageRepository(appContext)
+            val sessionDeletionRepository = DataModule.sessionDeletionRepository(appContext)
             val conversationRunRepository = DataModule.conversationRunRepository(appContext)
             val modelConnectionRepository = DataModule.modelConnectionRepository(appContext)
             val learningRepository = DataModule.learningRepository(appContext)
@@ -156,7 +161,7 @@ class HybridAppGraph private constructor(
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
                 sessionRepository = sessionRepository,
-                messageRepository = DataModule.messageRepository(appContext),
+                messageRepository = messageRepository,
                 llmProfileRepository = DataModule.llmProfileRepository(appContext),
                 chatGenerationRepository = DataModule.chatGenerationRepository(appContext),
                 backgroundGenerationRepository =
@@ -176,6 +181,8 @@ class HybridAppGraph private constructor(
                 challengeRuntimeCoordinator = challengeRuntimeCoordinator,
                 frontend = createFrontendFactories(
                     sessionRepository = sessionRepository,
+                    messageRepository = messageRepository,
+                    sessionDeletionRepository = sessionDeletionRepository,
                     conversationRunRepository = conversationRunRepository,
                     modelConnectionRepository = modelConnectionRepository,
                     learningRepository = learningRepository,
@@ -215,6 +222,8 @@ class HybridAppGraph private constructor(
 
         private fun createFrontendFactories(
             sessionRepository: SessionRepository,
+            messageRepository: MessageRepository,
+            sessionDeletionRepository: SessionDeletionRepository,
             conversationRunRepository: ConversationRunRepositoryImpl,
             modelConnectionRepository: ModelConnectionRepositoryImpl,
             learningRepository: LearningRepositoryImpl,
@@ -223,6 +232,12 @@ class HybridAppGraph private constructor(
             val homePort = RepositoryHomePortAdapter {
                 sessionRepository.listSessions()
             }
+            val sessionHomePort = RepositorySessionHomePortAdapter(
+                sessionRepository = sessionRepository,
+                messageRepository = messageRepository,
+                sessionDeletionRepository = sessionDeletionRepository,
+                conversationRunRepository = conversationRunRepository
+            )
             val chatRunsPort = RepositoryChatRunsPortAdapter(
                 listRuns = conversationRunRepository::listBySession,
                 findRun = conversationRunRepository::findRun,
@@ -252,6 +267,7 @@ class HybridAppGraph private constructor(
             return HybridFrontendFactories(
                 workspaceViewModelFactory = DefaultWorkspaceViewModelFactory,
                 homeViewModelFactory = HomePortViewModelFactory(homePort),
+                sessionHomePort = sessionHomePort,
                 chatRunsViewModelFactory = ChatRunsPortViewModelFactory(chatRunsPort),
                 modelConnectionsViewModelFactory =
                     ModelConnectionsPortViewModelFactory(modelConnectionsPort),

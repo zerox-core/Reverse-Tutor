@@ -1,9 +1,18 @@
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class
+)
+
 package com.reversetutor.feature.chat
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,16 +30,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +77,22 @@ enum class FormalHomeVariant {
     Default,
     NewSessionSheet,
     JoinedChallenge
+}
+
+internal object HomeSessionLayout {
+    val RegularHeight = 80.dp
+    val PinnedHeight = 92.dp
+    val HorizontalPadding = 14.dp
+    val AvatarSize = 34.dp
+    val AvatarGap = 10.dp
+    val TrailingReserve = 82.dp
+}
+
+enum class HomeSessionAction {
+    Rename,
+    Pin,
+    Export,
+    Delete
 }
 
 enum class FormalPublicContentAvailability {
@@ -132,7 +172,10 @@ data class FormalHomeSessionUi(
     val summary: String,
     val timeLabel: String,
     val updatedAtEpochMillis: Long,
-    val pinned: Boolean
+    val pinned: Boolean,
+    val learnerRole: String = "学习者",
+    val avatarLabel: String? = null,
+    val pinnedAtEpochMillis: Long? = if (pinned) updatedAtEpochMillis else null
 )
 
 data class FormalJoinedChallengeUi(
@@ -152,12 +195,15 @@ data class FormalHomeUiState(
     val publicContent: FormalPublicContentUi,
     val sessions: List<FormalHomeSessionUi> = emptyList(),
     val challenge: FormalJoinedChallengeUi? = null,
-    val isNewSessionSheetVisible: Boolean = false
+    val isNewSessionSheetVisible: Boolean = false,
+    val sessionSurfaceState: SessionHomeSurfaceState = SessionHomeSurfaceState.Content,
+    val sessionErrorMessage: String? = null
 ) {
     val visibleSessions: List<FormalHomeSessionUi>
         get() = sessions
             .sortedWith(
                 compareByDescending<FormalHomeSessionUi> { it.pinned }
+                    .thenByDescending { it.pinnedAtEpochMillis ?: Long.MIN_VALUE }
                     .thenByDescending { it.updatedAtEpochMillis }
             )
             .take(4)
@@ -174,6 +220,8 @@ fun SessionListUiState.toFormalHomeUiState(
     publicContent: FormalPublicContentUi,
     challenge: FormalJoinedChallengeUi? = null,
     isNewSessionSheetVisible: Boolean = false,
+    sessionSurfaceState: SessionHomeSurfaceState = SessionHomeSurfaceState.Content,
+    sessionErrorMessage: String? = null,
     nowEpochMillis: Long = System.currentTimeMillis()
 ): FormalHomeUiState = FormalHomeUiState(
     publicContent = publicContent,
@@ -184,11 +232,16 @@ fun SessionListUiState.toFormalHomeUiState(
             summary = item.statusLabel,
             timeLabel = relativeTimeLabel(item.updatedAtEpochMillis, nowEpochMillis),
             updatedAtEpochMillis = item.updatedAtEpochMillis,
-            pinned = item.pinned
+            pinned = item.pinned,
+            learnerRole = item.learnerRole,
+            avatarLabel = item.avatarLabel.takeIf { it.isNotBlank() },
+            pinnedAtEpochMillis = item.pinnedAtEpochMillis
         )
     },
     challenge = challenge,
-    isNewSessionSheetVisible = isNewSessionSheetVisible
+    isNewSessionSheetVisible = isNewSessionSheetVisible,
+    sessionSurfaceState = sessionSurfaceState,
+    sessionErrorMessage = sessionErrorMessage
 )
 
 private fun relativeTimeLabel(updatedAtEpochMillis: Long, nowEpochMillis: Long): String {
@@ -210,6 +263,11 @@ fun FormalHomeScreen(
     state: FormalHomeUiState,
     onPublicContentClick: (FormalPublicContentUi) -> Unit,
     onSessionClick: (FormalHomeSessionUi) -> Unit,
+    onRenameSession: (String, String) -> Unit = { _, _ -> },
+    onTogglePinned: (String) -> Unit = {},
+    onRequestDelete: (String) -> Unit = {},
+    onRetrySessions: () -> Unit = {},
+    onActionOverlayChanged: (Boolean) -> Unit = {},
     onOpenChallenge: () -> Unit,
     onShowNewSessionSheet: () -> Unit,
     onDismissNewSessionSheet: () -> Unit,
@@ -218,6 +276,14 @@ fun FormalHomeScreen(
     showSpatialIndicator: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    var actionSession by remember { mutableStateOf<FormalHomeSessionUi?>(null) }
+    var renameSession by remember { mutableStateOf<FormalHomeSessionUi?>(null) }
+    LaunchedEffect(actionSession, renameSession) {
+        onActionOverlayChanged(actionSession != null || renameSession != null)
+    }
+    DisposableEffect(Unit) {
+        onDispose { onActionOverlayChanged(false) }
+    }
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -238,12 +304,39 @@ fun FormalHomeScreen(
                 onOpenChallenge = onOpenChallenge,
                 onShowNewSessionSheet = onShowNewSessionSheet,
                 onOpenWeekly = onOpenWeekly,
-                showSpatialIndicator = showSpatialIndicator
+                showSpatialIndicator = showSpatialIndicator,
+                onRetrySessions = onRetrySessions,
+                onSessionLongClick = { actionSession = it }
             )
             if (state.isNewSessionSheetVisible) {
                 FormalNewSessionSheet(
                     onDismiss = onDismissNewSessionSheet,
                     onStartLearningSetup = onStartLearningSetup
+                )
+            }
+            actionSession?.let { session ->
+                HomeSessionActionSheet(
+                    session = session,
+                    onDismiss = { actionSession = null },
+                    onAction = { action ->
+                        actionSession = null
+                        when (action) {
+                            HomeSessionAction.Rename -> renameSession = session
+                            HomeSessionAction.Pin -> onTogglePinned(session.id)
+                            HomeSessionAction.Export -> Unit
+                            HomeSessionAction.Delete -> onRequestDelete(session.id)
+                        }
+                    }
+                )
+            }
+            renameSession?.let { session ->
+                RenameHomeSessionDialog(
+                    session = session,
+                    onDismiss = { renameSession = null },
+                    onConfirm = { title ->
+                        onRenameSession(session.id, title)
+                        renameSession = null
+                    }
                 )
             }
         }
@@ -258,7 +351,9 @@ private fun FormalHomeContent(
     onOpenChallenge: () -> Unit,
     onShowNewSessionSheet: () -> Unit,
     onOpenWeekly: () -> Unit,
-    showSpatialIndicator: Boolean
+    showSpatialIndicator: Boolean,
+    onRetrySessions: () -> Unit,
+    onSessionLongClick: (FormalHomeSessionUi) -> Unit
 ) {
     val headerSpacerHeight = if (state.variant == FormalHomeVariant.Default) 23.dp else 48.dp
     Box(modifier = Modifier.fillMaxSize()) {
@@ -279,11 +374,28 @@ private fun FormalHomeContent(
                     JoinedChallengeCard(challenge = challenge, onClick = onOpenChallenge)
                 }
             }
-            SessionEntryList(
-                sessions = state.visibleSessions,
-                roomySpacing = state.variant != FormalHomeVariant.Default,
-                onSessionClick = onSessionClick
-            )
+            when (state.sessionSurfaceState) {
+                SessionHomeSurfaceState.Content -> SessionEntryList(
+                    sessions = state.visibleSessions,
+                    roomySpacing = state.variant != FormalHomeVariant.Default,
+                    onSessionClick = onSessionClick,
+                    onSessionLongClick = onSessionLongClick
+                )
+                SessionHomeSurfaceState.Loading -> SessionHomeStatusCard(
+                    title = "正在加载本地会话",
+                    detail = "请稍候"
+                )
+                SessionHomeSurfaceState.Empty -> SessionHomeStatusCard(
+                    title = "还没有会话",
+                    detail = "新建会话后会显示在这里"
+                )
+                SessionHomeSurfaceState.Error -> SessionHomeStatusCard(
+                    title = "无法加载会话",
+                    detail = state.sessionErrorMessage ?: "请重试",
+                    actionLabel = "重试",
+                    onAction = onRetrySessions
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
             if (showSpatialIndicator) {
                 WeeklyPageIndicator(onClick = onOpenWeekly)
@@ -561,18 +673,18 @@ private fun IllustrationPerson(
 private fun SessionEntryList(
     sessions: List<FormalHomeSessionUi>,
     roomySpacing: Boolean,
-    onSessionClick: (FormalHomeSessionUi) -> Unit
+    onSessionClick: (FormalHomeSessionUi) -> Unit,
+    onSessionLongClick: (FormalHomeSessionUi) -> Unit
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(322.dp),
-        verticalArrangement = Arrangement.spacedBy(if (roomySpacing) 8.dp else 4.dp)
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(if (roomySpacing) 8.dp else 6.dp)
     ) {
         sessions.forEach { session ->
             SessionEntryCard(
                 session = session,
-                onClick = { onSessionClick(session) }
+                onClick = { onSessionClick(session) },
+                onLongClick = { onSessionLongClick(session) }
             )
         }
     }
@@ -581,27 +693,65 @@ private fun SessionEntryList(
 @Composable
 private fun SessionEntryCard(
     session: FormalHomeSessionUi,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
-    val height = if (session.pinned) 82.dp else 72.dp
+    val haptics = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.985f else 1f, label = "session-card-press")
+    val height = if (session.pinned) HomeSessionLayout.PinnedHeight else HomeSessionLayout.RegularHeight
     val background = if (session.pinned) Color(0xFFFFF3E2) else FormalColors.SurfaceElevated.copy(alpha = 0.78f)
     val border = if (session.pinned) Color(0xADE7C88F) else FormalColors.Border.copy(alpha = 0.45f)
     Surface(
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height)
+            .scale(scale)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongClick()
+                }
+            ),
         color = background,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, border)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            val avatarStart = if (session.avatarLabel == null) {
+                HomeSessionLayout.HorizontalPadding
+            } else {
+                HomeSessionLayout.HorizontalPadding +
+                    HomeSessionLayout.AvatarSize + HomeSessionLayout.AvatarGap
+            }
+            session.avatarLabel?.let { avatar ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = HomeSessionLayout.HorizontalPadding)
+                        .size(HomeSessionLayout.AvatarSize)
+                        .background(
+                            if (session.pinned) Color(0xFFFFE3B7) else Color(0xFFE5E9FF),
+                            CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = avatar.take(1),
+                        style = type.style(13f, 18f, FontWeight.Bold, FormalColors.Primary)
+                    )
+                }
+            }
             Column(
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 14.dp, end = 90.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(start = avatarStart, end = HomeSessionLayout.TrailingReserve),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 Text(
                     text = session.title,
@@ -611,6 +761,12 @@ private fun SessionEntryCard(
                         FontWeight.Medium,
                         FormalColors.Ink
                     ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = session.learnerRole,
+                    style = type.style(10f, 15f, FontWeight.Medium, Color(0xFF59667D)),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -627,7 +783,7 @@ private fun SessionEntryCard(
                 maxLines = 1,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
-                    .padding(end = 14.dp)
+                    .padding(end = HomeSessionLayout.HorizontalPadding)
             )
             if (session.pinned) {
                 PinnedRibbon(modifier = Modifier.align(Alignment.TopStart))
@@ -649,6 +805,119 @@ private fun SessionEntryCard(
             }
         }
     }
+}
+
+@Composable
+private fun SessionHomeStatusCard(
+    title: String,
+    detail: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {}
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(HomeSessionLayout.RegularHeight),
+        color = FormalColors.SurfaceElevated.copy(alpha = 0.78f),
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, FormalColors.Border.copy(alpha = 0.45f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = HomeSessionLayout.HorizontalPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, color = FormalColors.Ink, fontWeight = FontWeight.Medium)
+                Text(text = detail, color = FormalColors.Muted, maxLines = 1)
+            }
+            actionLabel?.let { label ->
+                TextButton(onClick = onAction) { Text(label) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSessionActionSheet(
+    session: FormalHomeSessionUi,
+    onDismiss: () -> Unit,
+    onAction: (HomeSessionAction) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 24.dp)
+        ) {
+            Text(
+                text = session.title,
+                color = FormalColors.Ink,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            HomeSessionAction.entries.forEach { action ->
+                val label = when (action) {
+                    HomeSessionAction.Rename -> "重命名"
+                    HomeSessionAction.Pin -> if (session.pinned) "取消置顶" else "置顶"
+                    HomeSessionAction.Export -> "导出（稍后提供）"
+                    HomeSessionAction.Delete -> "删除会话"
+                }
+                val enabled = action != HomeSessionAction.Export
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = label,
+                            color = when {
+                                !enabled -> FormalColors.Muted
+                                action == HomeSessionAction.Delete -> FormalColors.Danger
+                                else -> FormalColors.Ink
+                            }
+                        )
+                    },
+                    modifier = Modifier.clickable(enabled = enabled) { onAction(action) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RenameHomeSessionDialog(
+    session: FormalHomeSessionUi,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var title by remember(session.id) { mutableStateOf(session.title) }
+    val validationError = validateSessionTitle(title)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("重命名会话") },
+        text = {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { if (it.length <= SessionRenameMaxLength) title = it },
+                singleLine = true,
+                label = { Text("会话名称") },
+                supportingText = { Text(validationError ?: "1–30 个非空白字符；允许重名") },
+                isError = validationError != null
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = validationError == null,
+                onClick = { onConfirm(title.trim()) }
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 @Composable

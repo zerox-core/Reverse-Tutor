@@ -766,7 +766,7 @@ private fun DestinationContent(
     ReverseTutorScreenSurface {
         if (destination == AppDestination.Sessions) {
             SessionsRoute(
-                sessionRepository = sessionRepository,
+                sessionHomePort = hybridAppGraph.frontend.sessionHomePort,
                 contentRepository = hybridAppGraph.online?.contentRepository,
                 avatarVisible = appPreferences.globalAvatarVisible,
                 challengeJoined = challengeRuntimeState.joined,

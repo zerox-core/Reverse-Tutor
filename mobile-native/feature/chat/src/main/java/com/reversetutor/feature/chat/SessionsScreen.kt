@@ -32,10 +32,15 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,14 +60,13 @@ import androidx.compose.ui.unit.sp
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.domain.ContentRepository
 import com.reversetutor.core.domain.OnlineData
-import com.reversetutor.core.model.TutorSession
 import com.reversetutor.core.protocol.NativeSessionPresetValidator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @Composable
 fun SessionsRoute(
-    sessionRepository: SessionRepository,
+    sessionHomePort: SessionHomePort,
     avatarVisible: Boolean,
     contentRepository: ContentRepository? = null,
     challengeJoined: Boolean = false,
@@ -77,7 +81,12 @@ fun SessionsRoute(
     onWorkspaceChromeObscuredChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var sessions by remember { mutableStateOf(emptyList<TutorSession>()) }
+    val scope = rememberCoroutineScope()
+    val homeViewModel = remember(sessionHomePort) {
+        SessionHomeViewModel(port = sessionHomePort, scope = scope)
+    }
+    val homeState by homeViewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var showNewSessionSheet by remember { mutableStateOf(false) }
     var publicContent by remember(contentRepository) {
         mutableStateOf(
@@ -89,12 +98,11 @@ fun SessionsRoute(
         )
     }
 
-    LaunchedEffect(sessionRepository) {
-        sessions = sessionRepository.listSessions().filterNot { it.archived }
-    }
-
-    LaunchedEffect(showNewSessionSheet) {
-        onWorkspaceChromeObscuredChanged(showNewSessionSheet)
+    var sessionActionOverlayVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(showNewSessionSheet, homeState.pendingDelete, sessionActionOverlayVisible) {
+        onWorkspaceChromeObscuredChanged(
+            showNewSessionSheet || homeState.pendingDelete != null || sessionActionOverlayVisible
+        )
     }
     DisposableEffect(Unit) {
         onDispose { onWorkspaceChromeObscuredChanged(false) }
@@ -116,7 +124,7 @@ fun SessionsRoute(
     }
 
     val sessionListState = SessionListUiState.from(
-        sessions = sessions.map { it.toSessionListItem(avatarVisible) },
+        sessions = homeState.sessions,
         query = "",
         filter = SessionListFilter.All,
         avatarVisible = avatarVisible
@@ -135,29 +143,73 @@ fun SessionsRoute(
         null
     }
 
-    FormalHomeScreen(
-        state = sessionListState.toFormalHomeUiState(
-            publicContent = publicContent,
-            challenge = challenge,
-            isNewSessionSheetVisible = showNewSessionSheet
-        ),
-        onPublicContentClick = onOpenPublicContent,
-        onSessionClick = { formalSession ->
-            sessionListState.visibleSessions
-                .firstOrNull { it.id == formalSession.id }
-                ?.let(onOpenSession)
-        },
-        onOpenChallenge = onOpenChallenge,
-        onShowNewSessionSheet = { showNewSessionSheet = true },
-        onDismissNewSessionSheet = { showNewSessionSheet = false },
-        onStartLearningSetup = {
-            showNewSessionSheet = false
-            onNewSession()
-        },
-        onOpenWeekly = onOpenWeekly,
-        showSpatialIndicator = showSpatialIndicator,
-        modifier = modifier
-    )
+    LaunchedEffect(homeState.undo?.session?.id) {
+        val undo = homeState.undo ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "已删除“${undo.session.title}”",
+            actionLabel = "撤销",
+            duration = SnackbarDuration.Indefinite
+        )
+        if (result == SnackbarResult.ActionPerformed) homeViewModel.undoDelete()
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        FormalHomeScreen(
+            state = sessionListState.toFormalHomeUiState(
+                publicContent = publicContent,
+                challenge = challenge,
+                isNewSessionSheetVisible = showNewSessionSheet,
+                sessionSurfaceState = homeState.surfaceState,
+                sessionErrorMessage = homeState.errorMessage
+            ),
+            onPublicContentClick = onOpenPublicContent,
+            onSessionClick = { formalSession ->
+                sessionListState.visibleSessions
+                    .firstOrNull { it.id == formalSession.id }
+                    ?.let(onOpenSession)
+            },
+            onRenameSession = homeViewModel::rename,
+            onTogglePinned = homeViewModel::togglePinned,
+            onRequestDelete = homeViewModel::requestDelete,
+            onRetrySessions = homeViewModel::refresh,
+            onActionOverlayChanged = { sessionActionOverlayVisible = it },
+            onOpenChallenge = onOpenChallenge,
+            onShowNewSessionSheet = { showNewSessionSheet = true },
+            onDismissNewSessionSheet = { showNewSessionSheet = false },
+            onStartLearningSetup = {
+                showNewSessionSheet = false
+                onNewSession()
+            },
+            onOpenWeekly = onOpenWeekly,
+            showSpatialIndicator = showSpatialIndicator
+        )
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        )
+    }
+
+    homeState.pendingDelete?.let { session ->
+        AlertDialog(
+            onDismissRequest = homeViewModel::dismissDelete,
+            title = { Text("删除“${session.title}”？") },
+            text = {
+                Text("将删除此会话的消息、设置和学习进度。共享资料与收藏不会被删除。")
+            },
+            confirmButton = {
+                TextButton(onClick = homeViewModel::confirmDelete) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = homeViewModel::dismissDelete) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 }
 
 @Composable

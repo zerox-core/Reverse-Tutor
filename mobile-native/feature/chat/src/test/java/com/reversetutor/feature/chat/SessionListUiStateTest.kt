@@ -35,7 +35,7 @@ class SessionListUiStateTest {
         )
 
         assertEquals(listOf("two"), state.visibleSessions.map { it.id })
-        assertEquals("头像已隐藏", state.visibleSessions.single().avatarLabel)
+        assertEquals("", state.visibleSessions.single().avatarLabel)
     }
 
     @Test
