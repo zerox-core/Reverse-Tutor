@@ -29,13 +29,9 @@ import com.reversetutor.feature.memory.WeeklyDashboardPort
 import com.reversetutor.feature.memory.WeeklyDashboardSnapshot
 import com.reversetutor.feature.settings.ModelConnectionsPort
 import com.reversetutor.feature.settings.ModelConnectionsSnapshot
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 class RepositoryHomePortAdapter(
     private val listSessions: suspend () -> List<TutorSession>
@@ -53,7 +49,25 @@ class RepositorySessionHomePortAdapter(
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val deletionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : SessionHomePort {
-    private val scheduledDeletes = ConcurrentHashMap<String, Job>()
+    private val deletionCoordinator = DurableSessionDeletionCoordinator(
+        persistence = persistence,
+        sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },
+        deleteSession = { sessionId, deletedAtEpochMillis, revision, idempotencyKey ->
+            sessionDeletionRepository.deleteSession(
+                sessionId = sessionId,
+                deletedAtEpochMillis = deletedAtEpochMillis,
+                revision = revision,
+                idempotencyKey = idempotencyKey
+            )
+        },
+        onConfirmedDeletion = { sessionId ->
+            if (sessionId == WelcomeMockSessionId) {
+                persistence.setWelcomeDeletionSuppressed(true)
+            }
+        },
+        nowEpochMillis = nowEpochMillis,
+        scope = deletionScope
+    )
 
     override suspend fun loadSessionCards(): List<SessionListItem> {
         recoverPendingDeletes()
@@ -133,28 +147,16 @@ class RepositorySessionHomePortAdapter(
     }
 
     override suspend fun undoDelete(sessionId: String): Boolean {
+        deletionCoordinator.cancelAndJoin(sessionId)
         val session = sessionRepository.getSession(sessionId) ?: return false
         if (persistence.pendingDeleteAt(sessionId) == null) return false
-        scheduledDeletes.remove(sessionId)?.cancel()
         persistence.clearPendingDelete(sessionId)
         sessionRepository.saveSession(session.copy(archived = false))
         return true
     }
 
-    override suspend fun commitDelete(sessionId: String, nowEpochMillis: Long): Boolean {
-        scheduledDeletes.remove(sessionId)
-        val deleted = sessionDeletionRepository.deleteSession(
-            sessionId = sessionId,
-            deletedAtEpochMillis = nowEpochMillis,
-            revision = nowEpochMillis,
-            idempotencyKey = "session-home-delete-$sessionId-$nowEpochMillis"
-        )
-        persistence.clearPendingDelete(sessionId)
-        if (sessionId == WelcomeMockSessionId && deleted) {
-            persistence.setWelcomeDeletionSuppressed(true)
-        }
-        return deleted
-    }
+    override suspend fun commitDelete(sessionId: String, nowEpochMillis: Long): Boolean =
+        deletionCoordinator.finalizeDirect(sessionId, nowEpochMillis)
 
     override suspend fun scheduleDeleteCommit(
         sessionId: String,
@@ -165,34 +167,22 @@ class RepositorySessionHomePortAdapter(
             ?: (nowEpochMillis + delayMillis).also {
                 persistence.setPendingDeleteAt(sessionId, it)
             }
-        val job = scheduleDurableFinalization(sessionId, dueAt)
-        job.join()
-        return persistence.pendingDeleteAt(sessionId) == null
+        return deletionCoordinator.schedule(sessionId, dueAt)
     }
 
     override suspend fun cancelScheduledDelete(sessionId: String) {
-        scheduledDeletes.remove(sessionId)?.cancel()
+        deletionCoordinator.cancelAndJoin(sessionId)
     }
 
     private suspend fun recoverPendingDeletes() {
         val now = nowEpochMillis()
         persistence.pendingDeletes().forEach { (sessionId, dueAt) ->
             if (dueAt <= now) {
-                commitDelete(sessionId, now)
-            } else if (!scheduledDeletes.containsKey(sessionId)) {
-                scheduleDurableFinalization(sessionId, dueAt)
+                deletionCoordinator.finalizeDirect(sessionId, now)
+            } else {
+                deletionCoordinator.startRecovery(sessionId, dueAt)
             }
         }
-    }
-
-    private fun scheduleDurableFinalization(sessionId: String, dueAt: Long): Job {
-        scheduledDeletes[sessionId]?.cancel()
-        val job = deletionScope.launch {
-            delay((dueAt - nowEpochMillis()).coerceAtLeast(0L))
-            commitDelete(sessionId, nowEpochMillis())
-        }
-        scheduledDeletes[sessionId] = job
-        return job
     }
 
     private suspend fun ensureWelcomeSession() {

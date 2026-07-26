@@ -61,10 +61,16 @@ class RepositorySessionHomePortAdapterTest {
     fun createDeleteUndoReloadAndExplicitMockSuppressionUsePersistedState() = runBlocking {
         val first = adapter()
         first.loadSessionCards()
+        assertTrue(first.setAvatarVisible(WelcomeMockSessionId, false))
+        assertTrue(first.setPinned(WelcomeMockSessionId, true, now))
         assertTrue(first.stageDelete(WelcomeMockSessionId, now))
+        assertEquals(false, persistence.avatarVisible(WelcomeMockSessionId))
+        assertEquals(now, persistence.pinnedAt(WelcomeMockSessionId))
         assertTrue(first.undoDelete(WelcomeMockSessionId))
 
         assertEquals(WelcomeMockTitle, adapter().loadSessionCards().single().title)
+        assertEquals(false, persistence.avatarVisible(WelcomeMockSessionId))
+        assertEquals(now, persistence.pinnedAt(WelcomeMockSessionId))
 
         assertTrue(first.stageDelete(WelcomeMockSessionId, now))
         assertTrue(first.commitDelete(WelcomeMockSessionId, now + 5_000L))
@@ -72,6 +78,8 @@ class RepositorySessionHomePortAdapterTest {
         assertTrue(adapter().loadSessionCards().isEmpty())
         assertNull(sessionRepository.getSession(WelcomeMockSessionId))
         assertTrue(persistence.isWelcomeDeletionSuppressed())
+        assertNull(persistence.avatarVisible(WelcomeMockSessionId))
+        assertNull(persistence.pinnedAt(WelcomeMockSessionId))
     }
 
     @Test

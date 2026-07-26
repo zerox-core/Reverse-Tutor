@@ -25,10 +25,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,17 +50,27 @@ import com.reversetutor.preview.ui.RtIconKey
 import com.reversetutor.preview.ui.RtSectionHeader
 import com.reversetutor.preview.ui.RtSliderRow
 import com.reversetutor.preview.ui.RtToggleRow
+import com.reversetutor.feature.chat.SessionHomePort
+import com.reversetutor.feature.chat.SessionHomeViewModel
 
 @Composable
 fun SessionSettingsRoute(
     destination: AppDestination,
+    sessionId: String?,
     sessionTitle: String,
+    sessionHomePort: SessionHomePort,
     onSelectDestination: (AppDestination) -> Unit,
     onOpenBrain: () -> Unit,
     onPickSource: () -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
+    val sessionHomeViewModel = remember(sessionHomePort) {
+        SessionHomeViewModel(sessionHomePort, scope)
+    }
+    val sessionHomeState by sessionHomeViewModel.uiState.collectAsState()
+    val activeSession = sessionHomeState.sessions.firstOrNull { it.id == sessionId }
     if (destination == AppDestination.SessionSettingsLibrary) {
         SessionLibrarySettingsScreen(
             sessionTitle = sessionTitle,
@@ -81,6 +93,11 @@ fun SessionSettingsRoute(
     if (destination == AppDestination.SessionSettingsPersonalization) {
         FormalPersonalizationScreen(
             sessionTitle = sessionTitle,
+            avatarVisible = activeSession?.perSessionAvatarVisible ?: true,
+            avatarControlEnabled = activeSession != null && !sessionHomeState.actionInProgress,
+            onAvatarVisibleChange = { visible ->
+                sessionId?.let { sessionHomeViewModel.setAvatarVisible(it, visible) }
+            },
             onBack = onBack,
             onSelectDestination = onSelectDestination,
             modifier = modifier

@@ -92,6 +92,19 @@ class SessionHomeViewModelTest {
     }
 
     @Test
+    fun avatarActionPersistsAndUpdatesOwnedSessionState() = runTest {
+        val port = FakeSessionHomePort(cards = mutableListOf(item("one")))
+        val viewModel = SessionHomeViewModel(port, this)
+        advanceUntilIdle()
+
+        viewModel.setAvatarVisible("one", false)
+        advanceUntilIdle()
+
+        assertEquals(listOf("one" to false), port.avatarVisibilityChanges)
+        assertFalse(viewModel.uiState.value.sessions.single().perSessionAvatarVisible)
+    }
+
+    @Test
     fun deleteStagesImmediatelyAndUndoWithinFiveSecondsRestoresFullCard() = runTest {
         assertEquals("欢迎来到反转家教", WelcomeMockTitle)
         assertEquals("小六子", WelcomeMockLearner)
@@ -171,6 +184,7 @@ private class FakeSessionHomePort(
     val staged = mutableListOf<String>()
     val restored = mutableListOf<String>()
     val committed = mutableListOf<String>()
+    val avatarVisibilityChanges = mutableListOf<Pair<String, Boolean>>()
 
     override suspend fun loadSessionCards(): List<SessionListItem> = cards.toList()
 
@@ -188,6 +202,11 @@ private class FakeSessionHomePort(
         pinned: Boolean,
         nowEpochMillis: Long
     ): Boolean = true
+
+    override suspend fun setAvatarVisible(sessionId: String, visible: Boolean): Boolean {
+        avatarVisibilityChanges += sessionId to visible
+        return true
+    }
 
     override suspend fun stageDelete(sessionId: String, nowEpochMillis: Long): Boolean {
         staged += sessionId

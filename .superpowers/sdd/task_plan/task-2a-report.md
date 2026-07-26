@@ -124,3 +124,55 @@ The authoritative full committed-HEAD gate is recorded in the final handoff afte
 - Round 1 changed only Task 2A app/chat sources, app adapter tests, and this report. No core, PWA, backend, protocol, Room, SecretStore, signing, or build file changed.
 - Feature-owned SharedPreferences are used because the frozen settings repository has no per-session avatar/deletion-deadline keys. This is durable local app state and does not alter frozen contracts.
 - The real-repository instrumentation tests require an attached Android device or emulator to execute; compilation is green, but this environment had none.
+
+## Round 2/5 review fixes (2026-07-26)
+
+### Status and commit
+
+- Round status: COMPLETE
+- Review base: `cc639348c0086efcf357352e957b78b00f5a33f4`
+- Fix implementation commit: `6601c76ab70aa6aedcab784a6a5d73be0af0f7da`
+- Clean implementation worktree: `F:\xw\reverse-tutor-task2a-r2-clean`
+
+### Findings addressed
+
+- Per-session avatar visibility now has a normal production owner and caller. `AppShell` passes the active session and production `SessionHomePort` into `SessionSettingsRoute`; that route owns a `SessionHomeViewModel`; and the session-personalization screen exposes an enabled `显示会话头像` switch. The ViewModel persists through `setAvatarVisible()` and updates its owned card state after repository success.
+- Durable deletion is now coordinated by one adapter-owned `DurableSessionDeletionCoordinator` per adapter. Scheduled recovery and direct finalization share a per-session mutex and job registry. Direct finalization removes, cancels, and joins the owned job before repository deletion, preventing the previous background/direct race.
+- A false deletion result is treated as success only after `SessionRepository` absence explicitly confirms the session was already deleted. Otherwise the persisted deadline, avatar state, and pin timestamp remain intact for retry. Retries reuse the persisted deadline as the revision/idempotency key instead of generating a new operation identity.
+- Confirmed hard deletion clears the deadline plus only that session's feature-owned avatar and pin keys. Staging and Undo retain avatar/pin metadata; another session's metadata is unchanged.
+
+### Focused coverage
+
+- `SessionHomeViewModelTest.avatarActionPersistsAndUpdatesOwnedSessionState` verifies the ViewModel production action owner.
+- `FormalPersonalizationAvatarTest` renders the production `SessionSettingsRoute`, toggles the tagged avatar switch, and verifies the call reaches `SessionHomeViewModel` and `SessionHomePort`.
+- `DurableSessionDeletionCoordinatorTest` covers route-waiter cancellation, direct/scheduled competition with cancel-and-join, one repository delete, false-result retry retention, stable retry revision, explicit-absence idempotence, confirmed cleanup, staging metadata retention, and isolation of other-session metadata.
+- `RepositorySessionHomePortAdapterTest` now also verifies avatar/pin metadata survive staging and Undo and are removed only after hard deletion.
+
+No Android device was attached (`adb devices` returned an empty device list), so the Compose/real-repository instrumentation tests were compiled but not executed. All JVM coordinator and ViewModel tests ran.
+
+### Verification evidence
+
+Focused final-source checks:
+
+```text
+gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
+BUILD SUCCESSFUL in 15s
+194 actionable tasks: 19 executed, 175 up-to-date
+CHAT_TESTS=35 CHAT_FAILURES=0 APP_TESTS=88 APP_FAILURES=0
+```
+
+Full requested gate after the API-23 lint correction:
+
+```text
+gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :feature:chat:lintDebug :app:lintDebug :app:compileDebugAndroidTestKotlin :app:assembleDebug
+BUILD SUCCESSFUL in 44s
+439 actionable tasks: 26 executed, 413 up-to-date
+```
+
+The authoritative clean committed-HEAD gate is recorded in the final handoff after committing this report.
+
+### Scope and remaining concerns
+
+- Round 2 changes only Task 2A app/chat sources, app/chat tests, and this report. No core, PWA, backend, protocol, Room, SecretStore, signing, or build file changed.
+- The session-personalization switch is reachable when an active chat session opens its settings. It remains disabled in presentation-only settings entry with no active session.
+- Device-only Compose and real-Room adapter tests still require an attached emulator/device; this environment could compile but not execute them.

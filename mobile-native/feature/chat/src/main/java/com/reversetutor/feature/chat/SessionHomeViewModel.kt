@@ -187,6 +187,34 @@ class SessionHomeViewModel(
         }
     }
 
+    fun setAvatarVisible(sessionId: String, visible: Boolean) {
+        if (mutableUiState.value.sessions.none { it.id == sessionId }) return
+        scope.launch {
+            mutableUiState.update { it.copy(actionInProgress = true, errorMessage = null) }
+            try {
+                check(port.setAvatarVisible(sessionId, visible)) {
+                    "无法更新会话头像显示"
+                }
+                mutableUiState.update { state ->
+                    state.copy(
+                        sessions = state.sessions.map { item ->
+                            if (item.id == sessionId) {
+                                item.copy(perSessionAvatarVisible = visible)
+                            } else {
+                                item
+                            }
+                        },
+                        actionInProgress = false
+                    )
+                }
+            } catch (error: Throwable) {
+                mutableUiState.update {
+                    it.copy(actionInProgress = false, errorMessage = error.message)
+                }
+            }
+        }
+    }
+
     fun confirmDelete() {
         val session = mutableUiState.value.pendingDelete ?: return
         val previousUndo = mutableUiState.value.undo

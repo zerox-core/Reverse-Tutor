@@ -169,7 +169,10 @@ internal fun FormalPersonalizationScreen(
     sessionTitle: String,
     onBack: () -> Unit,
     onSelectDestination: (AppDestination) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    avatarVisible: Boolean = true,
+    avatarControlEnabled: Boolean = false,
+    onAvatarVisibleChange: (Boolean) -> Unit = {}
 ) {
     val type = LocalFormalTypeScale.current
     var notificationEnabled by rememberSaveable { mutableStateOf(true) }
@@ -237,6 +240,28 @@ internal fun FormalPersonalizationScreen(
                 SettingsSectionLabel("显示与反馈")
                 FormalSettingsGroup {
                     PersonalizationRow(Icons.Filled.ViewAgenda, "布局大小", "标准")
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FormalMiniIcon(Icons.Filled.PersonOutline)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "显示会话头像",
+                            modifier = Modifier.weight(1f),
+                            style = type.style(12f, 18f, color = FormalColors.Ink)
+                        )
+                        Switch(
+                            checked = avatarVisible,
+                            onCheckedChange = onAvatarVisibleChange,
+                            enabled = avatarControlEnabled,
+                            modifier = Modifier.testTag("session-avatar-visibility-switch"),
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = FormalColors.Primary
+                            )
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         verticalAlignment = Alignment.CenterVertically

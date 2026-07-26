@@ -873,7 +873,9 @@ private fun DestinationContent(
         ) {
             SessionSettingsRoute(
                 destination = destination,
+                sessionId = activeSessionId,
                 sessionTitle = activeSessionTitle ?: "宏观经济学基础",
+                sessionHomePort = hybridAppGraph.frontend.sessionHomePort,
                 onSelectDestination = onNavigateDestination,
                 onOpenBrain = { onNavigateDestination(AppDestination.GlobalGraph) },
                 onBack = onOpenChat,
