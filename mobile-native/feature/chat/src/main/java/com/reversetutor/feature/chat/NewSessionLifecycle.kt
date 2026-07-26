@@ -28,6 +28,7 @@ data class NewSessionConfiguration(
     val story: String = "",
     val sourceSelections: List<String> = emptyList(),
     val customFields: Map<String, String> = emptyMap(),
+    val customColumns: List<CustomColumn> = emptyList(),
     val openingMessage: String = "准备好后，请开始讲给我听吧。",
     val learnerImageRef: String? = null,
     val storyImageRef: String? = null,
@@ -43,7 +44,7 @@ data class NewSessionConfiguration(
             val completed = listOf(
                 title.isNotBlank(), learnerRole.isNotBlank(), learnerProfile.isNotBlank(),
                 goal.isNotBlank(), plan.isNotBlank(), dialogueStrategy.isNotBlank(),
-                story.isNotBlank(), sourceSelections.isNotEmpty(), customFields.isNotEmpty(),
+                story.isNotBlank(), sourceSelections.isNotEmpty(), effectiveCustomColumns().isNotEmpty(),
                 openingMessage.isNotBlank()
             ).count { it }
             return completed * 10
@@ -59,7 +60,7 @@ data class NewSessionConfiguration(
         NewSessionSection.WorldTree -> story.ifBlank { "未填写" }
             .replace(Regex("\\s+"), " ").take(36)
         NewSessionSection.Sources -> "已选择 ${sourceSelections.size} 项"
-        NewSessionSection.CustomFields -> "${customFields.size} 个栏目"
+        NewSessionSection.CustomFields -> "${effectiveCustomColumns().size} 个栏目"
     }
 
     fun toCoreDraft(): NewSessionDraft = NewSessionDraft(
@@ -72,9 +73,15 @@ data class NewSessionConfiguration(
             append("\nDialogue: ").append(dialogueStrategy.ifBlank { "未填写" })
             append("\nStory: ").append(story.ifBlank { "未填写" })
             append("\nSources: ").append(sourceSelections.joinToString().ifBlank { "未选择" })
-            if (customFields.isNotEmpty()) {
+            if (effectiveCustomColumns().isNotEmpty()) {
                 append("\nCustom: ")
-                append(customFields.entries.joinToString { "${it.key}=${it.value}" })
+                append(effectiveCustomColumns().joinToString { column ->
+                    buildString {
+                        append(column.name).append('=').append(column.content)
+                        val tags = column.tags.values.map(TagSelectionValue::text)
+                        if (tags.isNotEmpty()) append(" [").append(tags.joinToString()).append(']')
+                    }
+                })
             }
         },
         templateId = builtInPresetId,
@@ -100,6 +107,12 @@ data class NewSessionConfiguration(
                 builtInPresetId = preset.id
             )
     }
+
+    fun effectiveCustomColumns(): List<CustomColumn> =
+        if (customColumns.isNotEmpty()) customColumns.map(CustomColumn::deepCopy)
+        else customFields.entries.mapIndexed { index, entry ->
+            CustomColumn("legacy-column-$index", entry.key, entry.value)
+        }
 }
 
 data class NewSessionDraftRecord(
@@ -482,6 +495,7 @@ class NewSessionLifecycleCoordinator(
             story = current.story,
             sourceSelections = current.sourceSelections,
             customFields = current.customFields,
+            customColumns = current.customColumns.map(CustomColumn::deepCopy),
             openingMessage = current.openingMessage,
             learnerImageRef = current.learnerImageRef,
             storyImageRef = current.storyImageRef,
@@ -542,13 +556,13 @@ class NewSessionLifecycleCoordinator(
             if (errors.isNotEmpty()) return CreateSessionOutcome.Invalid(errors)
             val attempt = createAttemptId ?: "create-${idFactory()}".also { createAttemptId = it }
             state = state.copy(creating = true, createError = null)
-            NewSessionCreateRequest(attempt, draft.id, draft.configuration.copy())
+            NewSessionCreateRequest(attempt, draft.id, draft.configuration.deepCopy())
         }
         return runCatching { createPort.createSession(request) }
             .fold(
                 onSuccess = { created ->
                     runCatching {
-                        persistence.promoteDraft(request.draftId, created.session.id, request.snapshot.copy())
+                        persistence.promoteDraft(request.draftId, created.session.id, request.snapshot.deepCopy())
                     }.fold(
                         onSuccess = {
                             val remainingDrafts = state.drafts.filterNot { it.id == request.draftId }
@@ -629,7 +643,11 @@ fun configurationDifferences(
     add("对话策略", before.dialogueStrategy, after.dialogueStrategy)
     add("世界树", before.story, after.story)
     add("资料", before.sourceSelections.joinToString(), after.sourceSelections.joinToString())
-    add("自定义栏目", before.customFields.entries.joinToString(), after.customFields.entries.joinToString())
+    add(
+        "自定义栏目",
+        before.effectiveCustomColumns().joinToString { "${it.name}=${it.content}:${it.tags.values.map(TagSelectionValue::text)}" },
+        after.effectiveCustomColumns().joinToString { "${it.name}=${it.content}:${it.tags.values.map(TagSelectionValue::text)}" }
+    )
     add("开场消息", before.openingMessage, after.openingMessage)
     add("学习者图片", before.learnerImageRef.orEmpty(), after.learnerImageRef.orEmpty())
     add("故事图片", before.storyImageRef.orEmpty(), after.storyImageRef.orEmpty())

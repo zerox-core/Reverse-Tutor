@@ -40,6 +40,7 @@ import com.reversetutor.feature.chat.HomeViewModelFactory
 import com.reversetutor.feature.chat.NewSessionCreatePort
 import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.SessionHomePort
+import com.reversetutor.feature.chat.TagLibraryPersistence
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.WeeklyDashboardPortViewModelFactory
 import com.reversetutor.feature.memory.WeeklyDashboardViewModelFactory
@@ -56,6 +57,7 @@ data class HybridFrontendFactories(
     val sessionHomePort: SessionHomePort,
     val newSessionCreatePort: NewSessionCreatePort,
     val newSessionPersistence: NewSessionPersistence,
+    val tagLibraryPersistence: TagLibraryPersistence,
     val chatRunsViewModelFactory: ChatRunsViewModelFactory,
     val modelConnectionsViewModelFactory: ModelConnectionsViewModelFactory,
     val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory
@@ -247,6 +249,7 @@ class HybridAppGraph private constructor(
                 persistence = SharedPreferencesSessionHomePersistence(context)
             )
             val newSessionPersistence = SharedPreferencesNewSessionPersistence(context)
+            val tagLibraryPersistence = SharedPreferencesTagLibraryPersistence(context)
             val newSessionCreatePort = RepositoryNewSessionCreatePortAdapter(
                 createSession = { input, nowEpochMillis, sessionId ->
                     sessionRepository.createSession(input, nowEpochMillis, sessionId)
@@ -287,6 +290,7 @@ class HybridAppGraph private constructor(
                 sessionHomePort = sessionHomePort,
                 newSessionCreatePort = newSessionCreatePort,
                 newSessionPersistence = newSessionPersistence,
+                tagLibraryPersistence = tagLibraryPersistence,
                 chatRunsViewModelFactory = ChatRunsPortViewModelFactory(chatRunsPort),
                 modelConnectionsViewModelFactory =
                     ModelConnectionsPortViewModelFactory(modelConnectionsPort),

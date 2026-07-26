@@ -2,11 +2,15 @@ package com.reversetutor.preview.wiring
 
 import android.content.Context
 import com.reversetutor.feature.chat.EditorScrollPosition
+import com.reversetutor.feature.chat.CustomColumn
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
 import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.NewSessionSection
+import com.reversetutor.feature.chat.TagFieldSelection
+import com.reversetutor.feature.chat.TagSelectionValue
+import com.reversetutor.feature.chat.deepCopy
 
 class SharedPreferencesNewSessionPersistence(context: Context) : NewSessionPersistence {
     private val preferences = context.getSharedPreferences("new_session_feature_state", Context.MODE_PRIVATE)
@@ -42,7 +46,7 @@ class SharedPreferencesNewSessionPersistence(context: Context) : NewSessionPersi
         check(
             preferences.edit()
                 .putString(DraftsKey, NewSessionSnapshotCodec.encodeDrafts(remaining))
-                .putString(SessionPrefix + sessionId, NewSessionSnapshotCodec.encodeConfiguration(snapshot.copy()))
+                .putString(SessionPrefix + sessionId, NewSessionSnapshotCodec.encodeConfiguration(snapshot.deepCopy()))
                 .commit()
         ) { "Unable to promote new-session draft" }
     }
@@ -85,13 +89,14 @@ object NewSessionSnapshotCodec {
             configuration.openingMessage,
             configuration.learnerImageRef.orEmpty(),
             configuration.storyImageRef.orEmpty(),
-            configuration.builtInPresetId.orEmpty()
+            configuration.builtInPresetId.orEmpty(),
+            pack(configuration.customColumns.map(::encodeCustomColumn))
         )
     )
 
     fun decodeConfiguration(value: String): NewSessionConfiguration {
         val fields = unpack(value)
-        require(fields.size == 13) { "Unexpected new-session configuration field count" }
+        require(fields.size == 13 || fields.size == 14) { "Unexpected new-session configuration field count" }
         val customValues = unpack(fields[8])
         return NewSessionConfiguration(
             title = fields[0],
@@ -108,7 +113,33 @@ object NewSessionSnapshotCodec {
             openingMessage = fields[9],
             learnerImageRef = fields[10].ifEmpty { null },
             storyImageRef = fields[11].ifEmpty { null },
-            builtInPresetId = fields[12].ifEmpty { null }
+            builtInPresetId = fields[12].ifEmpty { null },
+            customColumns = fields.getOrNull(13)?.let(::unpack).orEmpty().map(::decodeCustomColumn)
+        )
+    }
+
+    private fun encodeCustomColumn(column: CustomColumn): String = pack(
+        listOf(
+            column.id,
+            column.name,
+            column.content,
+            pack(column.tags.values.flatMap { listOf(it.tagId.orEmpty(), it.text) })
+        )
+    )
+
+    private fun decodeCustomColumn(value: String): CustomColumn {
+        val fields = unpack(value)
+        require(fields.size == 4) { "Unexpected custom-column field count" }
+        val selections = unpack(fields[3]).chunked(2).mapNotNull { pair ->
+            pair.takeIf { it.size == 2 }?.let {
+                TagSelectionValue(tagId = it[0].ifEmpty { null }, text = it[1])
+            }
+        }
+        return CustomColumn(
+            id = fields[0],
+            name = fields[1],
+            content = fields[2],
+            tags = TagFieldSelection(selections)
         )
     }
 

@@ -790,6 +790,7 @@ private fun DestinationContent(
             Task2B1NewSessionRoute(
                 createPort = hybridAppGraph.frontend.newSessionCreatePort,
                 persistence = hybridAppGraph.frontend.newSessionPersistence,
+                tagLibraryPersistence = hybridAppGraph.frontend.tagLibraryPersistence,
                 onCreated = onSessionCreated,
                 onBack = onOpenSessions
             )

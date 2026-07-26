@@ -79,6 +79,7 @@ import java.util.Date
 fun Task2B1NewSessionRoute(
     createPort: NewSessionCreatePort,
     persistence: NewSessionPersistence,
+    tagLibraryPersistence: TagLibraryPersistence = InMemoryTagLibraryPersistence(),
     onCreated: (SessionListItem) -> Unit,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -91,6 +92,8 @@ fun Task2B1NewSessionRoute(
             nowEpochMillis = nowEpochMillis
         )
     }
+    val tagLibraryEditor = remember(tagLibraryPersistence) { TagLibraryEditor(tagLibraryPersistence) }
+    var tagLibraryState by remember { mutableStateOf(tagLibraryEditor.state) }
     var state by remember { mutableStateOf(coordinator.state) }
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -117,6 +120,10 @@ fun Task2B1NewSessionRoute(
     LaunchedEffect(coordinator) {
         coordinator.load()
         sync()
+    }
+    LaunchedEffect(tagLibraryEditor) {
+        tagLibraryEditor.load()
+        tagLibraryState = tagLibraryEditor.state
     }
 
     LaunchedEffect(state.currentDraft?.id, state.selectedSection) {
@@ -202,6 +209,9 @@ fun Task2B1NewSessionRoute(
                         coordinator.updateConfiguration { updated }
                         sync()
                     },
+                    tagLibraryState = tagLibraryState,
+                    tagLibraryEditor = tagLibraryEditor,
+                    onTagLibraryStateChange = { tagLibraryState = it },
                     onBack = ::handleBack
                 )
             }
@@ -743,10 +753,24 @@ private fun CustomSectionEditor(
     configuration: NewSessionConfiguration,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onConfigurationChange: (NewSessionConfiguration) -> Unit,
+    tagLibraryState: TagLibraryEditorState,
+    tagLibraryEditor: TagLibraryEditor,
+    onTagLibraryStateChange: (TagLibraryEditorState) -> Unit,
     onBack: () -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
         FormalTopBar(title = section.label, onBack = onBack, trailingText = configuration.sectionSummary(section))
+        if (section == NewSessionSection.CustomFields) {
+            CustomColumnEditorScreen(
+                columns = configuration.effectiveCustomColumns(),
+                tagLibraryState = tagLibraryState,
+                tagLibraryEditor = tagLibraryEditor,
+                onTagLibraryStateChange = onTagLibraryStateChange,
+                onColumnsChange = { onConfigurationChange(configuration.withCustomColumns(it)) },
+                modifier = Modifier.weight(1f)
+            )
+            return@Column
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -775,11 +799,7 @@ private fun CustomSectionEditor(
                         onConfigurationChange(configuration.copy(sourceSelections = it.lines().map(String::trim).filter(String::isNotEmpty)))
                     }
                 }
-                NewSessionSection.CustomFields -> item {
-                    ConfigField("自定义栏目（每行 名称=内容）", configuration.customFields.entries.joinToString("\n") { "${it.key}=${it.value}" }) {
-                        onConfigurationChange(configuration.copy(customFields = parseCustomFields(it)))
-                    }
-                }
+                NewSessionSection.CustomFields -> Unit
             }
         }
     }
@@ -802,11 +822,12 @@ private fun ConfigField(
     )
 }
 
-private fun parseCustomFields(text: String): Map<String, String> = buildMap {
-    text.lines().forEach { line ->
-        val key = line.substringBefore('=').trim()
-        val value = line.substringAfter('=', missingDelimiterValue = "").trim()
-        if (key.isNotEmpty()) put(key, value)
+private class InMemoryTagLibraryPersistence : TagLibraryPersistence {
+    private var snapshot: TagLibrarySnapshot? = null
+
+    override fun loadTagLibrary(): TagLibrarySnapshot? = snapshot?.deepCopy()
+    override fun saveTagLibrary(snapshot: TagLibrarySnapshot) {
+        this.snapshot = snapshot.deepCopy()
     }
 }
 

@@ -1,10 +1,13 @@
 package com.reversetutor.preview.wiring
 
 import com.reversetutor.feature.chat.EditorScrollPosition
+import com.reversetutor.feature.chat.CustomColumn
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
 import com.reversetutor.feature.chat.NewSessionSection
+import com.reversetutor.feature.chat.TagFieldSelection
+import com.reversetutor.feature.chat.TagSelectionValue
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -21,6 +24,14 @@ class NewSessionSnapshotCodecTest {
             story = "校园数学社=第一幕",
             sourceSelections = listOf("试卷:A", "笔记\n第二章"),
             customFields = linkedMapOf("情绪" to "紧张:但愿意尝试", "能力" to "推导"),
+            customColumns = listOf(
+                CustomColumn(
+                    id = "column:1",
+                    name = "情绪",
+                    content = "紧张:但愿意尝试",
+                    tags = TagFieldSelection(listOf(TagSelectionValue("tag:1", "紧张")))
+                )
+            ),
             openingMessage = "老师，请先讲定义。",
             learnerImageRef = "content://learner/1",
             storyImageRef = "content://story/1",
@@ -45,6 +56,23 @@ class NewSessionSnapshotCodecTest {
         assertEquals(configuration, NewSessionSnapshotCodec.decodeConfiguration(NewSessionSnapshotCodec.encodeConfiguration(configuration)))
         assertEquals(listOf(draft), NewSessionSnapshotCodec.decodeDrafts(NewSessionSnapshotCodec.encodeDrafts(listOf(draft))))
         assertEquals(listOf(favorite), NewSessionSnapshotCodec.decodeFavorites(NewSessionSnapshotCodec.encodeFavorites(listOf(favorite))))
+    }
+
+    @Test
+    fun legacyThirteenFieldConfigurationStillDecodesWithEffectiveColumns() {
+        val legacyCustomFields = pack(listOf("旧栏目", "旧内容"))
+        val legacy = pack(
+            listOf("", "", "", "", "", "", "", "", legacyCustomFields, "", "", "", "")
+        )
+
+        val decoded = NewSessionSnapshotCodec.decodeConfiguration(legacy)
+
+        assertEquals(emptyList<CustomColumn>(), decoded.customColumns)
+        assertEquals("旧内容", decoded.effectiveCustomColumns().single().content)
+    }
+
+    private fun pack(values: List<String>): String = buildString {
+        values.forEach { value -> append(value.length).append(':').append(value) }
     }
 
     @Test

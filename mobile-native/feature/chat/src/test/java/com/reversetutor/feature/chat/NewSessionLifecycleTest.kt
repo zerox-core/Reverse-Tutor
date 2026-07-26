@@ -129,7 +129,8 @@ class NewSessionLifecycleTest {
         coordinator.startBlankDraft()
         val original = validConfiguration("Favorite").copy(
             sourceSelections = listOf("source-a"),
-            customFields = mapOf("level" to "beginner")
+            customFields = mapOf("level" to "beginner"),
+            customColumns = listOf(CustomColumn("level", "level", "beginner"))
         )
         coordinator.updateConfiguration { original }
         coordinator.requestFavoriteCurrent()
@@ -144,6 +145,7 @@ class NewSessionLifecycleTest {
 
         coordinator.confirmFavoriteUpdate()
         assertEquals("updated goal", coordinator.state.favorites.single().configuration.goal)
+        assertEquals("beginner", coordinator.state.favorites.single().configuration.customColumns.single().content)
         assertEquals(original, persistence.loadSessionSnapshot("session-existing"))
 
         coordinator.removeFavorite(favorite.id)
