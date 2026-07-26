@@ -32,23 +32,22 @@ class FormalSettingsScreenModelTest {
     }
 
     @Test
-    fun sectionsFollowFigmaOrderAndOnlyPrototypeHotspotsAreInteractive() {
+    fun sectionsFollowGlobalSettingsWorkspaceOrderAndKeepExistingActionsScoped() {
         val sections = formalSettingsSections(FormalSettingsUiState())
 
         assertEquals(
-            listOf("学习与内容", "模型与连接", "使用体验", "数据与安全"),
+            listOf("外观与布局", "模型与连接", "数据与资料", "权限与系统", "关于与版本"),
             sections.map { it.title }
         )
         assertEquals(
             listOf(
-                "挑战任务提醒",
-                "资料自动下载",
-                "LLM API 配置",
                 "默认布局大小",
                 "触感反馈",
+                "LLM API 配置",
                 "同步与备份",
                 "存储空间",
                 "导入与导出",
+                "挑战任务提醒",
                 "隐私与权限",
                 "帮助与关于"
             ),
@@ -56,13 +55,27 @@ class FormalSettingsScreenModelTest {
         )
         assertEquals(
             listOf(
+                FormalSettingsAction.ToggleHapticFeedback,
                 FormalSettingsAction.OpenLlmConfiguration,
                 FormalSettingsAction.OpenStorage,
                 FormalSettingsAction.OpenImportExport,
+                FormalSettingsAction.ToggleChallengeReminder,
                 FormalSettingsAction.OpenAbout
             ),
             sections.flatMap { it.rows }.mapNotNull { it.action }
         )
+    }
+
+    @Test
+    fun settingsStateIncludesPersistedToggleValues() {
+        val state = FormalSettingsUiState.from(
+            llmProfileState = llmState(emptyList()),
+            challengeReminderEnabled = false,
+            hapticFeedbackEnabled = false
+        )
+
+        assertEquals(false, state.challengeReminderEnabled)
+        assertEquals(false, state.hapticFeedbackEnabled)
     }
 
     private fun llmState(

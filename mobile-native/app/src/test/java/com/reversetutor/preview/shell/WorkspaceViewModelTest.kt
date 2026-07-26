@@ -15,7 +15,8 @@ class WorkspaceViewModelTest {
                 WorkspacePage.WeeklyDashboard,
                 WorkspacePage.SessionHome,
                 WorkspacePage.GlobalGraph,
-                WorkspacePage.Community
+                WorkspacePage.Community,
+                WorkspacePage.Settings
             ),
             viewModel.uiState.value.pages
         )
@@ -38,6 +39,10 @@ class WorkspaceViewModelTest {
         assertFalse(viewModel.uiState.value.horizontalPagingEnabled)
 
         viewModel.onAction(WorkspaceUiAction.SetFullscreenGraphActive(false))
+        viewModel.onAction(WorkspaceUiAction.SetInnerHorizontalControlActive(true))
+        assertFalse(viewModel.uiState.value.horizontalPagingEnabled)
+
+        viewModel.onAction(WorkspaceUiAction.SetInnerHorizontalControlActive(false))
         assertTrue(viewModel.uiState.value.horizontalPagingEnabled)
     }
 
@@ -89,6 +94,7 @@ class WorkspaceViewModelTest {
         assertEquals(WorkspacePage.WeeklyDashboard, AppDestination.WeeklyDashboard.workspacePage)
         assertEquals(WorkspacePage.GlobalGraph, AppDestination.GlobalGraph.workspacePage)
         assertEquals(WorkspacePage.Community, AppDestination.Community.workspacePage)
+        assertEquals(WorkspacePage.Settings, AppDestination.Settings.workspacePage)
     }
 
     @Test
@@ -107,7 +113,8 @@ class WorkspaceViewModelTest {
                 WorkspacePage.WeeklyDashboard,
                 WorkspacePage.SessionHome,
                 WorkspacePage.GlobalGraph,
-                WorkspacePage.Community
+                WorkspacePage.Community,
+                WorkspacePage.Settings
             ),
             WorkspacePage.FixedOrder
         )
@@ -126,6 +133,18 @@ class WorkspaceViewModelTest {
     }
 
     @Test
+    fun graphCanvasModeAloneLocksWorkspacePaging() {
+        val viewModel = WorkspaceViewModel()
+        viewModel.onAction(WorkspaceUiAction.SelectPage(WorkspacePage.GlobalGraph))
+
+        assertTrue(viewModel.uiState.value.horizontalPagingEnabled)
+        viewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(true))
+        assertFalse(viewModel.uiState.value.horizontalPagingEnabled)
+        viewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(false))
+        assertTrue(viewModel.uiState.value.horizontalPagingEnabled)
+    }
+
+    @Test
     fun selectingChallengeKeepsHorizontalWorkspaceOnHome() {
         val viewModel = WorkspaceViewModel()
 
@@ -133,6 +152,23 @@ class WorkspaceViewModelTest {
 
         assertEquals(WorkspacePage.SessionHome, viewModel.uiState.value.currentPage)
         assertEquals(WorkspaceVerticalPage.Challenge, viewModel.uiState.value.verticalPage)
+        assertFalse(viewModel.uiState.value.challengeCanReturnHome)
+    }
+
+    @Test
+    fun challengeReturnUnlocksOnlyAfterContentReachesBottom() {
+        val viewModel = WorkspaceViewModel()
+
+        assertFalse(viewModel.uiState.value.challengeCanReturnHome)
+        viewModel.onAction(WorkspaceUiAction.SelectVerticalPage(WorkspaceVerticalPage.Challenge))
+        assertFalse(viewModel.uiState.value.challengeCanReturnHome)
+
+        viewModel.onAction(WorkspaceUiAction.SetChallengeExitBoundary(true))
+        assertTrue(viewModel.uiState.value.challengeCanReturnHome)
+
+        viewModel.onAction(WorkspaceUiAction.SelectVerticalPage(WorkspaceVerticalPage.SessionHome))
+        viewModel.onAction(WorkspaceUiAction.SelectVerticalPage(WorkspaceVerticalPage.Challenge))
+        assertFalse(viewModel.uiState.value.challengeCanReturnHome)
     }
 
     @Test
@@ -263,6 +299,90 @@ class WorkspaceViewModelTest {
 
         assertEquals(288f, thresholds.distancePx)
         assertEquals(2_700f, thresholds.velocityPxPerSecond)
+    }
+
+    @Test
+    fun transientIndicatorsAndChallengePagingUseRealDeviceTuning() {
+        assertEquals(700L, TransientIndicatorSpec.HoldMillis)
+        assertEquals(240, TransientIndicatorSpec.FadeMillis)
+        assertEquals(0.65f, HomeChallengePagingSpec.PositionalThreshold, 0.001f)
+    }
+
+    @Test
+    fun loopingPagerKeepsTheFixedOrderInBothDirectionsWithoutAnEdge() {
+        val pages = WorkspacePage.FixedOrder
+        val homeIndex = WorkspaceLoopingPager.initialIndex(pages, WorkspacePage.SessionHome)
+
+        assertEquals(WorkspacePage.WeeklyDashboard, WorkspaceLoopingPager.pageAt(pages, homeIndex - 1))
+        assertEquals(WorkspacePage.GlobalGraph, WorkspaceLoopingPager.pageAt(pages, homeIndex + 1))
+        assertEquals(WorkspacePage.Settings, WorkspaceLoopingPager.pageAt(pages, homeIndex - 2))
+        assertEquals(WorkspacePage.WeeklyDashboard, WorkspaceLoopingPager.pageAt(pages, homeIndex + 4))
+        assertTrue(WorkspaceLoopingPager.virtualPageCount(pages) > pages.size)
+    }
+
+    @Test
+    fun programmaticWorkspaceSelectionUsesTheClosestLoopedCopy() {
+        val pages = WorkspacePage.FixedOrder
+        val index = WorkspaceLoopingPager.initialIndex(pages, WorkspacePage.SessionHome)
+
+        assertEquals(index - 2, WorkspaceLoopingPager.nearestIndexFor(pages, WorkspacePage.Settings, index))
+        assertEquals(index + 1, WorkspaceLoopingPager.nearestIndexFor(pages, WorkspacePage.GlobalGraph, index))
+    }
+
+    @Test
+    fun dominantAxisAndInnerControlsKeepWorkspacePagerFromStealingGestures() {
+        assertEquals(
+            WorkspaceGestureOwner.InnerVerticalContent,
+            workspaceGestureOwner(18f, 72f, false, false, true)
+        )
+        assertEquals(
+            WorkspaceGestureOwner.InnerHorizontalControl,
+            workspaceGestureOwner(72f, 18f, true, false, true)
+        )
+        assertEquals(
+            WorkspaceGestureOwner.GraphCanvas,
+            workspaceGestureOwner(72f, 18f, false, true, true)
+        )
+        assertEquals(
+            WorkspaceGestureOwner.Locked,
+            workspaceGestureOwner(72f, 18f, false, false, false)
+        )
+    }
+
+    @Test
+    fun backgroundReleasePreservesRouteButClearsHeavyGraphInteractionState() {
+        val viewModel = WorkspaceViewModel(
+            WorkspaceUiState(currentPage = WorkspacePage.GlobalGraph)
+        )
+        viewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(true))
+        viewModel.onAction(WorkspaceUiAction.SetFullscreenGraphActive(true))
+        viewModel.onAction(WorkspaceUiAction.ReleaseHeavyResources)
+
+        assertEquals(WorkspacePage.GlobalGraph, viewModel.uiState.value.currentPage)
+        assertFalse(viewModel.uiState.value.interactionLocks.graphCanvasModeActive)
+        assertFalse(viewModel.uiState.value.interactionLocks.fullscreenGraphActive)
+        assertEquals(1L, viewModel.uiState.value.resourceReleaseGeneration)
+    }
+
+    @Test
+    fun graphCanvasBackYieldsToTopSurfacesBeforeLeavingCanvasMode() {
+        val canvasState = WorkspaceUiState(
+            interactionLocks = WorkspaceInteractionLocks(graphCanvasModeActive = true)
+        )
+
+        assertTrue(shouldExitGraphCanvasBeforeNavigation(AppNavigationState(), canvasState))
+        assertFalse(
+            shouldExitGraphCanvasBeforeNavigation(
+                AppNavigationState(modal = AppModal.Status),
+                canvasState
+            )
+        )
+        assertFalse(
+            shouldExitGraphCanvasBeforeNavigation(
+                AppNavigationState(drawerOpen = true),
+                canvasState
+            )
+        )
     }
 
 }

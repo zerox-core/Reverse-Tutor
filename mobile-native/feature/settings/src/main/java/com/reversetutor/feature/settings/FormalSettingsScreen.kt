@@ -46,13 +46,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
+import com.reversetutor.core.design.FormalElevations
 import com.reversetutor.core.design.FormalShapes
+import com.reversetutor.core.design.FormalTypography
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
 
@@ -69,8 +71,14 @@ data class FormalSettingsUiState(
     val storageLabel: String = "1.8 GB"
 ) {
     companion object {
-        fun from(llmProfileState: LlmProfileSettingsUiState): FormalSettingsUiState =
+        fun from(
+            llmProfileState: LlmProfileSettingsUiState,
+            challengeReminderEnabled: Boolean = true,
+            hapticFeedbackEnabled: Boolean = true
+        ): FormalSettingsUiState =
             FormalSettingsUiState(
+                challengeReminderEnabled = challengeReminderEnabled,
+                hapticFeedbackEnabled = hapticFeedbackEnabled,
                 llmConfigurationLabel = if (llmProfileState.profileItems.isEmpty()) {
                     "未配置"
                 } else {
@@ -88,15 +96,25 @@ fun FormalSettingsScreen(
     onOpenStorage: () -> Unit,
     onOpenImportExport: () -> Unit,
     onOpenAbout: () -> Unit,
+    challengeReminderEnabled: Boolean = true,
+    hapticFeedbackEnabled: Boolean = true,
+    onChallengeReminderChanged: (Boolean) -> Unit = {},
+    onHapticFeedbackChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     FormalSettingsScreen(
-        state = FormalSettingsUiState.from(llmProfileState),
+        state = FormalSettingsUiState.from(
+            llmProfileState = llmProfileState,
+            challengeReminderEnabled = challengeReminderEnabled,
+            hapticFeedbackEnabled = hapticFeedbackEnabled
+        ),
         onBack = onBack,
         onOpenLlmConfiguration = onOpenLlmConfiguration,
         onOpenStorage = onOpenStorage,
         onOpenImportExport = onOpenImportExport,
         onOpenAbout = onOpenAbout,
+        onChallengeReminderChanged = onChallengeReminderChanged,
+        onHapticFeedbackChanged = onHapticFeedbackChanged,
         modifier = modifier
     )
 }
@@ -109,12 +127,20 @@ fun FormalSettingsScreen(
     onOpenStorage: () -> Unit,
     onOpenImportExport: () -> Unit,
     onOpenAbout: () -> Unit,
+    onChallengeReminderChanged: (Boolean) -> Unit = {},
+    onHapticFeedbackChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = formalSettingsColors()
     val sections = formalSettingsSections(state)
     val callbacks = mapOf(
+        FormalSettingsAction.ToggleChallengeReminder to {
+            onChallengeReminderChanged(!state.challengeReminderEnabled)
+        },
         FormalSettingsAction.OpenLlmConfiguration to onOpenLlmConfiguration,
+        FormalSettingsAction.ToggleHapticFeedback to {
+            onHapticFeedbackChanged(!state.hapticFeedbackEnabled)
+        },
         FormalSettingsAction.OpenStorage to onOpenStorage,
         FormalSettingsAction.OpenImportExport to onOpenImportExport,
         FormalSettingsAction.OpenAbout to onOpenAbout
@@ -208,7 +234,8 @@ private fun AccountAndSyncCard(
             .height(86.dp),
         color = colors.surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, colors.border)
+        border = BorderStroke(1.dp, colors.border),
+        shadowElevation = FormalElevations.Panel
     ) {
         Row(
             modifier = Modifier
@@ -232,16 +259,12 @@ private fun AccountAndSyncCard(
                 Text(
                     text = state.accountTitle,
                     color = colors.ink,
-                    style = typeScale.style(
-                        sizeSp = 14f,
-                        lineHeightSp = 21f,
-                        weight = FontWeight.Medium
-                    )
+                    style = FormalTypography.cardTitle(typeScale, colors.ink)
                 )
                 Text(
                     text = state.accountStatus,
                     color = colors.muted,
-                    style = typeScale.style(sizeSp = 9f, lineHeightSp = 15f)
+                    style = FormalTypography.status(typeScale, colors.muted)
                 )
             }
             Box(
@@ -279,18 +302,15 @@ private fun SettingsSection(
     Text(
         text = section.title,
         color = colors.sectionLabel,
-        style = typeScale.style(
-            sizeSp = 11f,
-            lineHeightSp = 17f,
-            weight = FontWeight.Medium
-        )
+        style = FormalTypography.status(typeScale, colors.sectionLabel)
     )
     Spacer(Modifier.height(7.dp))
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = colors.surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, colors.border)
+        border = BorderStroke(1.dp, colors.border),
+        shadowElevation = FormalElevations.Panel
     ) {
         Column {
             section.rows.forEachIndexed { index, row ->
@@ -325,7 +345,7 @@ private fun FormalSettingsRow(
     val typeScale = LocalFormalTypeScale.current
     val interaction = row.action?.let { action ->
         Modifier.clickable(
-            role = Role.Button,
+            role = if (row.toggleEnabled != null) Role.Switch else Role.Button,
             onClickLabel = row.label,
             onClick = { onAction(action) }
         )
@@ -348,19 +368,19 @@ private fun FormalSettingsRow(
         Text(
             text = row.label,
             color = colors.rowLabel,
-            style = typeScale.style(sizeSp = 11f, lineHeightSp = 17f),
+            style = FormalTypography.metadata(typeScale, colors.rowLabel),
             modifier = Modifier.weight(1f)
         )
         row.value?.let { value ->
             Text(
                 text = value,
                 color = colors.value,
-                style = typeScale.style(sizeSp = 10f, lineHeightSp = 17f)
+                style = typeScale.style(sizeSp = 11f, lineHeightSp = 17f)
             )
             Spacer(Modifier.width(8.dp))
         }
         row.toggleEnabled?.let { enabled ->
-            StaticSettingsToggle(label = row.label, enabled = enabled, colors = colors)
+            SettingsToggle(label = row.label, enabled = enabled, colors = colors)
         }
         if (row.hasChevron) {
             Icon(
@@ -374,7 +394,7 @@ private fun FormalSettingsRow(
 }
 
 @Composable
-private fun StaticSettingsToggle(
+private fun SettingsToggle(
     label: String,
     enabled: Boolean,
     colors: FormalSettingsColors
@@ -383,7 +403,7 @@ private fun StaticSettingsToggle(
         modifier = Modifier
             .width(42.dp)
             .height(24.dp)
-            .clearAndSetSemantics {
+            .semantics {
                 contentDescription = "$label：${if (enabled) "开启" else "关闭"}"
             }
             .background(
@@ -442,18 +462,19 @@ internal fun formalSettingsSections(
     state: FormalSettingsUiState
 ): List<FormalSettingsSectionSpec> = listOf(
     FormalSettingsSectionSpec(
-        title = "学习与内容",
+        title = "外观与布局",
         rows = listOf(
             FormalSettingsRowSpec(
-                label = "挑战任务提醒",
-                icon = FormalSettingsIcon.Challenge,
-                toggleEnabled = state.challengeReminderEnabled
+                label = "默认布局大小",
+                icon = FormalSettingsIcon.Layout,
+                value = state.layoutSizeLabel,
+                hasChevron = true
             ),
             FormalSettingsRowSpec(
-                label = "资料自动下载",
-                icon = FormalSettingsIcon.Download,
-                value = state.automaticDownloadLabel,
-                hasChevron = true
+                label = "触感反馈",
+                icon = FormalSettingsIcon.Haptics,
+                toggleEnabled = state.hapticFeedbackEnabled,
+                action = FormalSettingsAction.ToggleHapticFeedback
             )
         )
     ),
@@ -470,23 +491,7 @@ internal fun formalSettingsSections(
         )
     ),
     FormalSettingsSectionSpec(
-        title = "使用体验",
-        rows = listOf(
-            FormalSettingsRowSpec(
-                label = "默认布局大小",
-                icon = FormalSettingsIcon.Layout,
-                value = state.layoutSizeLabel,
-                hasChevron = true
-            ),
-            FormalSettingsRowSpec(
-                label = "触感反馈",
-                icon = FormalSettingsIcon.Haptics,
-                toggleEnabled = state.hapticFeedbackEnabled
-            )
-        )
-    ),
-    FormalSettingsSectionSpec(
-        title = "数据与安全",
+        title = "数据与资料",
         rows = listOf(
             FormalSettingsRowSpec(
                 label = "同步与备份",
@@ -506,18 +511,34 @@ internal fun formalSettingsSections(
                 icon = FormalSettingsIcon.ImportExport,
                 hasChevron = true,
                 action = FormalSettingsAction.OpenImportExport
+            )
+        )
+    ),
+    FormalSettingsSectionSpec(
+        title = "权限与系统",
+        rows = listOf(
+            FormalSettingsRowSpec(
+                label = "挑战任务提醒",
+                icon = FormalSettingsIcon.Challenge,
+                toggleEnabled = state.challengeReminderEnabled,
+                action = FormalSettingsAction.ToggleChallengeReminder
             ),
             FormalSettingsRowSpec(
                 label = "隐私与权限",
                 icon = FormalSettingsIcon.Privacy,
                 hasChevron = true
-            ),
+            )
+        )
+    ),
+    FormalSettingsSectionSpec(
+        title = "关于与版本",
+        rows = listOf(
             FormalSettingsRowSpec(
                 label = "帮助与关于",
                 icon = FormalSettingsIcon.About,
                 hasChevron = true,
                 action = FormalSettingsAction.OpenAbout
-            )
+            ),
         )
     )
 )
@@ -537,7 +558,9 @@ internal data class FormalSettingsRowSpec(
 )
 
 internal enum class FormalSettingsAction {
+    ToggleChallengeReminder,
     OpenLlmConfiguration,
+    ToggleHapticFeedback,
     OpenStorage,
     OpenImportExport,
     OpenAbout
@@ -611,7 +634,7 @@ private fun formalSettingsColors(): FormalSettingsColors {
             sectionLabel = Color(0xFF454F61),
             muted = FormalColors.Muted,
             value = Color(0xFF667082),
-            border = FormalColors.Border.copy(alpha = 0.75f),
+            border = FormalColors.BorderStrong,
             divider = FormalColors.Divider,
             primary = FormalColors.Primary,
             success = FormalColors.Success,

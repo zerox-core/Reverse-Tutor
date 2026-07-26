@@ -28,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -40,6 +41,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.llm.ChatGenerationRepository
@@ -57,6 +61,7 @@ import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.feature.chat.ChatRoute
 import com.reversetutor.feature.chat.ChatImageDraft
 import com.reversetutor.feature.chat.FigmaNewSessionRoute
+import com.reversetutor.feature.chat.NewSessionLaunchRequest
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
@@ -104,6 +109,7 @@ fun AppShell(
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var activeSessionTitle by remember { mutableStateOf<String?>(null) }
     var activeArticleSlug by remember { mutableStateOf("") }
+    var newSessionLaunchRequest by remember { mutableStateOf<NewSessionLaunchRequest?>(null) }
     var figmaUiState by remember { mutableStateOf(FigmaAppUiState()) }
     var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
     var showFirstLaunchImportPrompt by remember(firstLaunchImportPromptState) {
@@ -126,12 +132,29 @@ fun AppShell(
     val workspaceInteractions = remember(workspaceViewModel) {
         WorkspaceInteractionBindings(workspaceViewModel::onAction)
     }
+    val lifecycleOwner = LocalContext.current as? LifecycleOwner
+
+    DisposableEffect(lifecycleOwner, workspaceViewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                workspaceViewModel.onAction(WorkspaceUiAction.ReleaseHeavyResources)
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose {
+            lifecycleOwner?.lifecycle?.removeObserver(observer)
+        }
+    }
 
     LaunchedEffect(challengeRuntimeCoordinator) {
         challengeRuntimeCoordinator.load()
     }
 
     BackHandler {
+        if (shouldExitGraphCanvasBeforeNavigation(navigationState, workspaceState)) {
+            workspaceViewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(false))
+            return@BackHandler
+        }
         val transition = navigationState.handleSystemBack()
         if (transition.result == BackResult.AllowSystemExit) {
             onExitRequested()
@@ -248,6 +271,9 @@ fun AppShell(
                         activeSessionTitle = activeSessionTitle,
                         activeArticleSlug = activeArticleSlug,
                         challengeRuntimeState = challengeRuntimeState,
+                        challengePageActive = navigationState.current == AppDestination.Challenge &&
+                            workspaceState.verticalPage == WorkspaceVerticalPage.Challenge,
+                        newSessionLaunchRequest = newSessionLaunchRequest,
                         challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
                             ?: figmaUiState.challengeProgress,
                         challengeTotal = figmaUiState.challengeTotal,
@@ -255,6 +281,8 @@ fun AppShell(
                         onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
                         onGraphInteractionChanged =
                             workspaceInteractions::onFullscreenGraphInteractionChanged,
+                        graphCanvasModeActive = workspaceState.interactionLocks.graphCanvasModeActive,
+                        onGraphCanvasModeChanged = workspaceInteractions::onGraphCanvasModeChanged,
                         onChallengeExitBoundaryChanged = { canReturnHome ->
                             workspaceViewModel.onAction(
                                 WorkspaceUiAction.SetChallengeExitBoundary(canReturnHome)
@@ -295,6 +323,9 @@ fun AppShell(
                             appScope.launch {
                                 challengeRuntimeCoordinator.join()
                                 if (challengeRuntimeCoordinator.state.value.joined) {
+                                    newSessionLaunchRequest = NewSessionLaunchRequest.challenge(
+                                        System.currentTimeMillis()
+                                    )
                                     workspaceViewModel.onAction(
                                         WorkspaceUiAction.SelectVerticalPage(
                                             WorkspaceVerticalPage.SessionHome
@@ -605,11 +636,15 @@ private fun DestinationContent(
     activeSessionTitle: String?,
     activeArticleSlug: String,
     challengeRuntimeState: ChallengeRuntimeState,
+    challengePageActive: Boolean,
+    newSessionLaunchRequest: NewSessionLaunchRequest?,
     challengeProgress: Int,
     challengeTotal: Int,
     weeklyDashboardState: WeeklyDashboardUiState,
     onComposerFocusChanged: (Boolean) -> Unit,
     onGraphInteractionChanged: (Boolean) -> Unit,
+    graphCanvasModeActive: Boolean,
+    onGraphCanvasModeChanged: (Boolean) -> Unit,
     onChallengeExitBoundaryChanged: (Boolean) -> Unit,
     onWorkspaceChromeObscuredChanged: (WorkspacePage, Boolean) -> Unit,
     onOpenChat: () -> Unit,
@@ -722,6 +757,7 @@ private fun DestinationContent(
                 challengeJoined = challengeRuntimeState.joined,
                 challengeProgress = challengeProgress,
                 challengeTotal = challengeTotal,
+                newSessionLaunchRequest = newSessionLaunchRequest,
                 onOpenSession = onOpenSession,
                 onNewSession = onOpenNewSession,
                 onOpenChallenge = onOpenChallenge,
@@ -753,6 +789,7 @@ private fun DestinationContent(
                 onJoin = onChallengeJoined,
                 runtimeState = challengeRuntimeState,
                 onRetry = onChallengeRetry,
+                active = challengePageActive,
                 onExitBoundaryChanged = onChallengeExitBoundaryChanged
             )
             return@ReverseTutorScreenSurface
@@ -779,6 +816,10 @@ private fun DestinationContent(
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,
+                onOpenSessionSettings = {
+                    onNavigateDestination(AppDestination.SessionSettingsLibrary)
+                },
+                onOpenSources = onOpenSources,
                 onBack = onOpenSessions
             )
             return@ReverseTutorScreenSurface
@@ -841,6 +882,9 @@ private fun DestinationContent(
                 onOpenChat = onOpenChat,
                 onOpenSources = onOpenSources,
                 onOpenSettings = onOpenSettings,
+                onBack = onOpenSessions,
+                canvasModeActive = graphCanvasModeActive,
+                onCanvasModeChange = onGraphCanvasModeChanged,
                 onGraphInteractionChanged = onGraphInteractionChanged,
                 onWorkspaceChromeObscuredChanged = { obscured ->
                     onWorkspaceChromeObscuredChanged(WorkspacePage.GlobalGraph, obscured)
@@ -896,7 +940,21 @@ private fun DestinationContent(
                 },
                 onOpenStorage = onOpenAbout,
                 onOpenImportExport = onOpenImportExport,
-                onOpenAbout = onOpenAbout
+                onOpenAbout = onOpenAbout,
+                challengeReminderEnabled = appPreferences.challengeReminderEnabled,
+                hapticFeedbackEnabled = appPreferences.hapticFeedbackEnabled,
+                onChallengeReminderChanged = { enabled ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setChallengeReminderEnabled(enabled)
+                    }
+                },
+                onHapticFeedbackChanged = { enabled ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setHapticFeedbackEnabled(enabled)
+                    }
+                }
             )
             return@ReverseTutorScreenSurface
         }
@@ -907,6 +965,12 @@ private fun DestinationContent(
                 onActivateProfile = { profileId ->
                     scope.launch {
                         llmProfileRepository.activateProfile(profileId, System.currentTimeMillis())
+                        llmProfiles = llmProfileRepository.listProfiles()
+                    }
+                },
+                onSaveProfile = { input ->
+                    scope.launch {
+                        llmProfileRepository.saveProfile(input, System.currentTimeMillis())
                         llmProfiles = llmProfileRepository.listProfiles()
                     }
                 },

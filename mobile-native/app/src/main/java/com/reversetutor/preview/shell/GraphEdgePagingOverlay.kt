@@ -97,6 +97,7 @@ internal fun graphEdgeTarget(
 internal fun GraphEdgePagingOverlay(
     pagerState: PagerState,
     pages: List<WorkspacePage>,
+    pageIndexFor: (WorkspacePage, Int) -> Int,
     interactions: WorkspaceInteractionBindings,
     modifier: Modifier = Modifier
 ) {
@@ -105,6 +106,7 @@ internal fun GraphEdgePagingOverlay(
             edge = GraphEdge.Left,
             pagerState = pagerState,
             pages = pages,
+            pageIndexFor = pageIndexFor,
             interactions = interactions,
             modifier = Modifier.align(Alignment.CenterStart)
         )
@@ -112,6 +114,7 @@ internal fun GraphEdgePagingOverlay(
             edge = GraphEdge.Right,
             pagerState = pagerState,
             pages = pages,
+            pageIndexFor = pageIndexFor,
             interactions = interactions,
             modifier = Modifier.align(Alignment.CenterEnd)
         )
@@ -124,6 +127,7 @@ private fun GraphEdgeDragZone(
     edge: GraphEdge,
     pagerState: PagerState,
     pages: List<WorkspacePage>,
+    pageIndexFor: (WorkspacePage, Int) -> Int,
     interactions: WorkspaceInteractionBindings,
     modifier: Modifier = Modifier
 ) {
@@ -192,10 +196,9 @@ private fun GraphEdgeDragZone(
                             distanceThresholdPx = thresholds.distancePx,
                             velocityThresholdPx = thresholds.velocityPxPerSecond
                         ) ?: WorkspacePage.GlobalGraph
-                        val targetIndex = pages.indexOf(targetPage)
-                        if (targetIndex >= 0) {
-                            pagerState.animateScrollToPage(targetIndex)
-                        }
+                        pagerState.animateScrollToPage(
+                            pageIndexFor(targetPage, pagerState.currentPage)
+                        )
                     } finally {
                         deltaChannel = null
                         scrollJob = null

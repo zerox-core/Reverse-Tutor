@@ -25,6 +25,11 @@ class WorkspaceViewModel(
                     state.verticalPage
                 } else {
                     WorkspaceVerticalPage.SessionHome
+                },
+                interactionLocks = if (action.page == WorkspacePage.GlobalGraph) {
+                    state.interactionLocks
+                } else {
+                    state.interactionLocks.copy(graphCanvasModeActive = false)
                 }
             )
             is WorkspaceUiAction.SetComposerInputActive -> state.copy(
@@ -42,9 +47,24 @@ class WorkspaceViewModel(
                     fullscreenGraphActive = action.active
                 )
             )
+            is WorkspaceUiAction.SetGraphCanvasModeActive -> state.copy(
+                interactionLocks = state.interactionLocks.copy(
+                    graphCanvasModeActive = action.active
+                )
+            )
+            is WorkspaceUiAction.SetInnerHorizontalControlActive -> state.copy(
+                interactionLocks = state.interactionLocks.copy(
+                    innerHorizontalControlActive = action.active
+                )
+            )
             is WorkspaceUiAction.SelectVerticalPage -> state.copy(
                 currentPage = WorkspacePage.SessionHome,
-                verticalPage = action.page
+                verticalPage = action.page,
+                challengeCanReturnHome = if (action.page == WorkspaceVerticalPage.Challenge) {
+                    false
+                } else {
+                    state.challengeCanReturnHome
+                }
             )
             is WorkspaceUiAction.SetChallengeExitBoundary -> state.copy(
                 challengeCanReturnHome = action.canReturnHome
@@ -62,6 +82,14 @@ class WorkspaceViewModel(
             is WorkspaceUiAction.RecordVerticalScroll -> state.copy(
                 verticalScrollOffsets = state.verticalScrollOffsets +
                     (action.page to action.offset.coerceAtLeast(0))
+            )
+            WorkspaceUiAction.ReleaseHeavyResources -> state.copy(
+                interactionLocks = state.interactionLocks.copy(
+                    fullscreenGraphActive = false,
+                    graphCanvasModeActive = false,
+                    graphEdgePagingActive = false
+                ),
+                resourceReleaseGeneration = state.resourceReleaseGeneration + 1
             )
         }
 }

@@ -1,25 +1,47 @@
 package com.reversetutor.preview.shell
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+
+internal object TransientIndicatorSpec {
+    const val HoldMillis = 700L
+    const val FadeMillis = 240
+}
 
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
@@ -32,14 +54,53 @@ internal fun WorkspacePagerHost(
     challengeContent: @Composable () -> Unit = {},
     pageContent: @Composable (WorkspacePage) -> Unit
 ) {
-    val initialPage = state.pages.indexOf(state.currentPage).coerceAtLeast(0)
+    val initialPage = remember(state.pages) {
+        WorkspaceLoopingPager.initialIndex(state.pages, state.currentPage)
+    }
     val pagerState = rememberPagerState(initialPage = initialPage) {
-        state.pages.size
+        WorkspaceLoopingPager.virtualPageCount(state.pages)
+    }
+    val gestureSlopPx = with(LocalDensity.current) { 12.dp.toPx() }
+    var gestureOwner by remember { mutableStateOf(WorkspaceGestureOwner.WorkspacePager) }
+    val workspaceGestureGuard = Modifier.pointerInput(
+        state.horizontalPagingEnabled,
+        state.interactionLocks.graphCanvasModeActive,
+        gestureSlopPx
+    ) {
+        awaitEachGesture {
+            val firstDown = awaitFirstDown(requireUnconsumed = false)
+            var horizontalDistancePx = 0f
+            var verticalDistancePx = 0f
+            do {
+                val event = awaitPointerEvent()
+                event.changes.firstOrNull { it.id == firstDown.id }?.let { change ->
+                    horizontalDistancePx += change.position.x - change.previousPosition.x
+                    verticalDistancePx += change.position.y - change.previousPosition.y
+                }
+                if (kotlin.math.abs(horizontalDistancePx) >= gestureSlopPx ||
+                    kotlin.math.abs(verticalDistancePx) >= gestureSlopPx
+                ) {
+                    gestureOwner = workspaceGestureOwner(
+                        horizontalDeltaPx = horizontalDistancePx,
+                        verticalDeltaPx = verticalDistancePx,
+                        innerHorizontalControlActive = state.interactionLocks
+                            .innerHorizontalControlActive,
+                        graphCanvasModeActive = state.interactionLocks.graphCanvasModeActive,
+                        workspacePagingEnabled = state.horizontalPagingEnabled
+                    )
+                }
+            } while (event.changes.any { it.pressed })
+            gestureOwner = WorkspaceGestureOwner.WorkspacePager
+        }
     }
 
     LaunchedEffect(state.currentPage, state.pages) {
-        val targetPage = state.pages.indexOf(state.currentPage)
-        if (targetPage >= 0 && pagerState.currentPage != targetPage) {
+        val targetPage = WorkspaceLoopingPager.nearestIndexFor(
+            pages = state.pages,
+            page = state.currentPage,
+            fromIndex = pagerState.currentPage
+        )
+        if (pagerState.currentPage != targetPage) {
             pagerState.animateScrollToPage(targetPage)
         }
     }
@@ -52,7 +113,7 @@ internal fun WorkspacePagerHost(
         snapshotFlow { pagerState.settledPage }
             .distinctUntilChanged()
             .collect { pageIndex ->
-                state.pages.getOrNull(pageIndex)?.let(onPageSelected)
+                onPageSelected(WorkspaceLoopingPager.pageAt(state.pages, pageIndex))
             }
     }
 
@@ -60,46 +121,103 @@ internal fun WorkspacePagerHost(
         Box(modifier = Modifier.fillMaxSize()) {
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = state.horizontalPagingEnabled &&
-                    state.currentPage != WorkspacePage.GlobalGraph,
-                modifier = Modifier.fillMaxSize()
+                userScrollEnabled = state.horizontalPagingEnabled,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(workspaceGestureGuard)
             ) { pageIndex ->
-                val page = state.pages.getOrNull(pageIndex)
+                val page = WorkspaceLoopingPager.pageAt(state.pages, pageIndex)
                 when (page) {
                     WorkspacePage.SessionHome -> HomeChallengePagerHost(
                         selectedPage = state.verticalPage,
-                        userScrollEnabled = state.verticalPage != WorkspaceVerticalPage.Challenge ||
-                            state.challengeCanReturnHome,
+                        challengeCanReturnHome = state.challengeCanReturnHome,
                         onDragActiveChanged = interactions::onChallengeDragChanged,
                         onPageSelected = onVerticalPageSelected,
                         challengeContent = challengeContent,
                         homeContent = { pageContent(WorkspacePage.SessionHome) }
                     )
-                    null -> Unit
+                    WorkspacePage.GlobalGraph -> key(state.resourceReleaseGeneration) {
+                        pageContent(page)
+                    }
                     else -> pageContent(page)
                 }
             }
             if (
-                state.currentPage == WorkspacePage.GlobalGraph ||
+                (state.currentPage == WorkspacePage.GlobalGraph &&
+                    state.interactionLocks.graphCanvasModeActive) ||
                 state.interactionLocks.graphEdgePagingActive
             ) {
                 GraphEdgePagingOverlay(
                     pagerState = pagerState,
                     pages = state.pages,
+                    pageIndexFor = { page, currentIndex ->
+                        WorkspaceLoopingPager.nearestIndexFor(
+                            pages = state.pages,
+                            page = page,
+                            fromIndex = currentIndex
+                        )
+                    },
                     interactions = interactions
                 )
             }
+            val horizontalIndicatorActive = pagerState.isScrollInProgress ||
+                state.interactionLocks.graphEdgePagingActive
             if (showIndicator && state.verticalPage == WorkspaceVerticalPage.SessionHome) {
-                WorkspacePagerIndicator(
-                    pagerState = pagerState,
-                    pages = state.pages,
-                    homeSelected = state.currentPage == WorkspacePage.SessionHome,
+                TransientIndicator(
+                    visible = horizontalIndicatorActive,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 14.dp)
-                )
+                ) {
+                    WorkspacePagerIndicator(
+                        pagerState = pagerState,
+                        pages = state.pages,
+                        homeSelected = state.currentPage == WorkspacePage.SessionHome,
+                        modifier = Modifier
+                    )
+                }
+            }
+            if (state.currentPage == WorkspacePage.SessionHome) {
+                TransientIndicator(
+                    visible = state.interactionLocks.challengeDragActive,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 18.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(34.dp)
+                            .height(8.dp)
+                            .background(Color(0xFFC8CFDB), RoundedCornerShape(99.dp))
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun TransientIndicator(
+    visible: Boolean,
+    modifier: Modifier,
+    content: @Composable () -> Unit
+) {
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            shown = true
+        } else {
+            delay(TransientIndicatorSpec.HoldMillis)
+            shown = false
+        }
+    }
+    AnimatedVisibility(
+        visible = shown,
+        modifier = modifier,
+        enter = fadeIn(animationSpec = tween(160)),
+        exit = fadeOut(animationSpec = tween(TransientIndicatorSpec.FadeMillis))
+    ) {
+        content()
     }
 }
 
@@ -114,7 +232,7 @@ private fun WorkspacePagerIndicator(
     val position by remember(pagerState, pages.size) {
         derivedStateOf {
             workspaceIndicatorProgress(
-                page = pagerState.currentPage,
+                page = Math.floorMod(pagerState.currentPage, pages.size),
                 offsetFraction = pagerState.currentPageOffsetFraction,
                 pageCount = pages.size
             )
@@ -129,7 +247,13 @@ private fun WorkspacePagerIndicator(
         onClick = if (homeSelected && weeklyPageIndex >= 0) {
             {
                 scope.launch {
-                    pagerState.animateScrollToPage(weeklyPageIndex)
+                    pagerState.animateScrollToPage(
+                        WorkspaceLoopingPager.nearestIndexFor(
+                            pages = pages,
+                            page = WorkspacePage.WeeklyDashboard,
+                            fromIndex = pagerState.currentPage
+                        )
+                    )
                 }
             }
         } else {
