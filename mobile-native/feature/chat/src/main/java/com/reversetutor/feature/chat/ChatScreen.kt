@@ -94,6 +94,7 @@ fun ChatRoute(
     onBackgroundGenerationQueued: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
+    onOpenSessionSettings: () -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -271,6 +272,7 @@ fun ChatRoute(
         },
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
+        onOpenSessionSettings = onOpenSessionSettings,
         onBack = onBack,
         evidenceTargetMessageId = evidenceTargetMessageId,
         modifier = modifier
@@ -302,6 +304,7 @@ fun ChatScreen(
     onMessageAction: (ChatTimelineItem, ChatMessageAction) -> Unit,
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
+    onOpenSessionSettings: () -> Unit = {},
     onBack: () -> Unit = {},
     evidenceTargetMessageId: String? = null,
     modifier: Modifier = Modifier
@@ -316,6 +319,7 @@ fun ChatScreen(
         onMessageAction = onMessageAction,
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenSettings = onOpenContextHub,
+        onOpenSessionSettings = onOpenSessionSettings,
         onBack = onBack,
         evidenceTargetMessageId = evidenceTargetMessageId,
         modifier = modifier

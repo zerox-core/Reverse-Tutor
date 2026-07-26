@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -21,7 +22,7 @@ internal class DurableSessionDeletionCoordinator(
         revision: Long,
         idempotencyKey: String
     ) -> Boolean,
-    private val onConfirmedDeletion: (String) -> Unit,
+    private val completeConfirmedDeletion: (String) -> Unit,
     private val nowEpochMillis: () -> Long,
     private val scope: CoroutineScope,
     private val delayMillis: suspend (Long) -> Unit = { delay(it) }
@@ -58,6 +59,13 @@ internal class DurableSessionDeletionCoordinator(
     }
 
     suspend fun finalizeDirect(sessionId: String, nowEpochMillis: Long): Boolean {
+        val ownedFinalization = scope.async {
+            finalizeDirectOwned(sessionId, nowEpochMillis)
+        }
+        return ownedFinalization.await()
+    }
+
+    private suspend fun finalizeDirectOwned(sessionId: String, nowEpochMillis: Long): Boolean {
         val owner = ownerLock(sessionId)
         return owner.withLock {
             scheduledJobs.remove(sessionId)?.cancelAndJoin()
@@ -96,9 +104,7 @@ internal class DurableSessionDeletionCoordinator(
         )
         val confirmed = deleted || !sessionExists(sessionId)
         if (confirmed) {
-            persistence.clearPendingDelete(sessionId)
-            persistence.clearSessionMetadata(sessionId)
-            onConfirmedDeletion(sessionId)
+            completeConfirmedDeletion(sessionId)
         }
         return confirmed
     }

@@ -50,11 +50,16 @@ class SharedPreferencesSessionHomePersistence(
         editor.apply()
     }
 
-    override fun clearSessionMetadata(sessionId: String) {
-        preferences.edit()
-            .remove(AvatarPrefix + sessionId)
-            .remove(PinnedAtPrefix + sessionId)
-            .apply()
+    override fun completeConfirmedDeletion(sessionId: String, suppressWelcome: Boolean) {
+        val editor = preferences.edit()
+        if (suppressWelcome) editor.putBoolean(WelcomeSuppressedKey, true)
+        check(
+            editor
+                .remove(AvatarPrefix + sessionId)
+                .remove(PinnedAtPrefix + sessionId)
+                .remove(PendingDeletePrefix + sessionId)
+                .commit()
+        )
     }
 
     override fun pendingDeleteAt(sessionId: String): Long? {

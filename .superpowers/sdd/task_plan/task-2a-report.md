@@ -176,3 +176,52 @@ The authoritative clean committed-HEAD gate is recorded in the final handoff aft
 - Round 2 changes only Task 2A app/chat sources, app/chat tests, and this report. No core, PWA, backend, protocol, Room, SecretStore, signing, or build file changed.
 - The session-personalization switch is reachable when an active chat session opens its settings. It remains disabled in presentation-only settings entry with no active session.
 - Device-only Compose and real-Room adapter tests still require an attached emulator/device; this environment could compile but not execute them.
+
+## Round 3/5 review fixes (2026-07-26)
+
+### Status and commit
+
+- Round status: COMPLETE
+- Review base: `d514ba4eaef523f56c3d3490020dd77d4c4701fc`
+- Fix implementation commit: `8bfa47d9210ff328a44aef0297d836c4f3f4e7ff`
+- Clean implementation worktree: `F:\xw\reverse-tutor-task2a-r3-clean`
+
+### Findings addressed
+
+- The active chat header's visible overflow action is now a functional `会话设置` entry. Production `AppShell` routes it to `SessionSettingsPersonalization`, where the existing tabbed settings UI owns the active-session `SessionHomeViewModel` and persisted avatar switch. The focused Compose test begins on `ChatScreen`, clicks that header action, arrives at `SessionSettingsRoute`, and verifies the toggle reaches the persisted port action.
+- `finalizeDirect()` now transfers work to an adapter-scope `Deferred`; route callers only await its result. Adapter-owned finalization cancels and joins the scheduled job under the existing per-session owner lock, then completes repository deletion and cleanup even if the route caller is canceled. The cancellation test verifies one repository call and reuse of the persisted `DueAt` revision after the direct caller is canceled post-transfer.
+- Confirmed-deletion side effects are consolidated in `completeConfirmedDeletion()`. The production SharedPreferences adapter commits welcome suppression plus session-local avatar/pin removal, removes the durable pending marker last in the same synchronous transaction, and throws if persistence fails. The in-memory contract follows the same order. Recovery coverage injects interruption after repository deletion but before cleanup, proves the marker and metadata remain, then retries with explicit repository absence and the same persisted revision until idempotent cleanup succeeds.
+
+### Focused coverage and verification evidence
+
+Focused final-source compilation and tests:
+
+```text
+gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin
+BUILD SUCCESSFUL in 1m 8s
+194 actionable tasks: 194 executed
+feature:chat TESTS=35 FAILURES=0 ERRORS=0 SKIPPED=0
+app TESTS=90 FAILURES=0 ERRORS=0 SKIPPED=0
+```
+
+Full requested gate after the final source edit:
+
+```text
+gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :feature:chat:lintDebug :app:lintDebug :app:compileDebugAndroidTestKotlin :app:assembleDebug
+BUILD SUCCESSFUL in 1m 9s
+439 actionable tasks: 258 executed, 181 up-to-date
+```
+
+The same full gate at clean committed implementation HEAD `8bfa47d` also passed:
+
+```text
+BUILD SUCCESSFUL in 5s
+439 actionable tasks: 14 executed, 425 up-to-date
+```
+
+`adb devices` reported no attached devices, so the navigation Compose test and real-repository adapter instrumentation suite were compiled but not executed on-device.
+
+### Scope and remaining concerns
+
+- Round 3 changes only Task 2A files under `mobile-native/app/**`, `mobile-native/feature/chat/**`, and this report. No frozen core, PWA, backend, protocol, Room/schema, SecretStore, signing, or build file changed.
+- No implementation concern remains within the three reviewed findings. Device-only instrumentation execution remains unavailable without an attached emulator/device.

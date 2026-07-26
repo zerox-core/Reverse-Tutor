@@ -829,6 +829,9 @@ private fun DestinationContent(
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,
+                onOpenSessionSettings = {
+                    onNavigateDestination(AppDestination.SessionSettingsPersonalization)
+                },
                 onBack = onOpenSessions
             )
             return@ReverseTutorScreenSurface

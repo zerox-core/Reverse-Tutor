@@ -82,6 +82,7 @@ internal fun ReverseTeachingChatScreen(
     onOpenSettings: () -> Unit,
     onBack: () -> Unit,
     evidenceTargetMessageId: String?,
+    onOpenSessionSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedMessageId by remember(state.sessionTitle) { mutableStateOf<String?>(null) }
@@ -95,7 +96,8 @@ internal fun ReverseTeachingChatScreen(
         ReverseTeachingChatHeader(
             state = state,
             onBack = onBack,
-            onOpenSettings = onOpenSettings
+            onOpenSettings = onOpenSettings,
+            onOpenSessionSettings = onOpenSessionSettings
         )
         LazyColumn(
             modifier = Modifier
@@ -192,7 +194,8 @@ internal fun ReverseTeachingChatScreen(
 private fun ReverseTeachingChatHeader(
     state: ChatUiState,
     onBack: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenSessionSettings: () -> Unit
 ) {
     Surface(
         color = Color(0xFFFAFCFE),
@@ -245,8 +248,8 @@ private fun ReverseTeachingChatHeader(
             Spacer(Modifier.width(6.dp))
             FormalHeaderIconButton(
                 imageVector = Icons.Rounded.MoreHoriz,
-                contentDescription = "更多操作",
-                onClick = {},
+                contentDescription = "会话设置",
+                onClick = onOpenSessionSettings,
                 filled = true
             )
         }

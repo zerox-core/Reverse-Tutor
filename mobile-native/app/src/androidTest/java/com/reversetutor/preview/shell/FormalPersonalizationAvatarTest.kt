@@ -1,10 +1,17 @@
 package com.reversetutor.preview.shell
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import com.reversetutor.feature.chat.ChatComposerState
+import com.reversetutor.feature.chat.ChatScreen
+import com.reversetutor.feature.chat.ChatUiState
 import com.reversetutor.feature.chat.SessionHomePort
 import com.reversetutor.feature.chat.SessionListItem
 import org.junit.Assert.assertEquals
@@ -16,19 +23,44 @@ class FormalPersonalizationAvatarTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun avatarSwitchCallsSessionHomeViewModelAndPersistedPortPath() {
+    fun activeChatSettingsButtonNavigatesToPersistedAvatarToggle() {
         val port = FakeAvatarSessionHomePort()
+        var destination by mutableStateOf(AppDestination.Chat)
         composeRule.setContent {
-            SessionSettingsRoute(
-                destination = AppDestination.SessionSettingsPersonalization,
-                sessionId = SessionId,
-                sessionTitle = "Session",
-                sessionHomePort = port,
-                onSelectDestination = {},
-                onOpenBrain = {},
-                onBack = {},
-            )
+            if (destination == AppDestination.Chat) {
+                ChatScreen(
+                    state = ChatUiState(
+                        sessionTitle = "Session",
+                        learnerName = "Learner",
+                        learnerStatus = "Ready",
+                        contextPath = "Context",
+                        messages = emptyList(),
+                        composer = ChatComposerState(text = "")
+                    ),
+                    onComposerTextChange = {},
+                    onSendMessage = {},
+                    onCancelQuote = {},
+                    onCreateImageDraft = {},
+                    onCancelImageDraft = {},
+                    onMessageAction = { _, _ -> },
+                    onOpenSessionSettings = {
+                        destination = AppDestination.SessionSettingsPersonalization
+                    }
+                )
+            } else {
+                SessionSettingsRoute(
+                    destination = destination,
+                    sessionId = SessionId,
+                    sessionTitle = "Session",
+                    sessionHomePort = port,
+                    onSelectDestination = { destination = it },
+                    onOpenBrain = {},
+                    onBack = { destination = AppDestination.Chat }
+                )
+            }
         }
+
+        composeRule.onNodeWithContentDescription("会话设置").performClick()
         composeRule.waitUntil(2_000L) { port.loadCount > 0 }
         composeRule.waitForIdle()
 

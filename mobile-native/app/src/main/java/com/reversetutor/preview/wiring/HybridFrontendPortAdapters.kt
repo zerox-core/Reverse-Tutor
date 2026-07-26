@@ -60,10 +60,11 @@ class RepositorySessionHomePortAdapter(
                 idempotencyKey = idempotencyKey
             )
         },
-        onConfirmedDeletion = { sessionId ->
-            if (sessionId == WelcomeMockSessionId) {
-                persistence.setWelcomeDeletionSuppressed(true)
-            }
+        completeConfirmedDeletion = { sessionId ->
+            persistence.completeConfirmedDeletion(
+                sessionId = sessionId,
+                suppressWelcome = sessionId == WelcomeMockSessionId
+            )
         },
         nowEpochMillis = nowEpochMillis,
         scope = deletionScope

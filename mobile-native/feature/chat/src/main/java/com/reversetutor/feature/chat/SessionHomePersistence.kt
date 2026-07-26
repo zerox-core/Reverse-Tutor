@@ -11,7 +11,7 @@ interface SessionHomePersistence {
 
     fun pinnedAt(sessionId: String): Long?
     fun setPinnedAt(sessionId: String, pinnedAtEpochMillis: Long?)
-    fun clearSessionMetadata(sessionId: String)
+    fun completeConfirmedDeletion(sessionId: String, suppressWelcome: Boolean)
 
     fun pendingDeleteAt(sessionId: String): Long?
     fun pendingDeletes(): Map<String, Long>
@@ -54,9 +54,11 @@ class InMemorySessionHomePersistence : SessionHomePersistence {
         }
     }
 
-    override fun clearSessionMetadata(sessionId: String) {
+    override fun completeConfirmedDeletion(sessionId: String, suppressWelcome: Boolean) {
+        if (suppressWelcome) welcomeDeletionSuppressed = true
         avatarVisibility.remove(sessionId)
         pinnedAtBySession.remove(sessionId)
+        pendingDeletesBySession.remove(sessionId)
     }
 
     override fun pendingDeleteAt(sessionId: String): Long? = pendingDeletesBySession[sessionId]
