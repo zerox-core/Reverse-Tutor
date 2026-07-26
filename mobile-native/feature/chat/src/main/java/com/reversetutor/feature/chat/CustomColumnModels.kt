@@ -117,7 +117,8 @@ class CustomColumnEditor(
 fun NewSessionConfiguration.deepCopy(): NewSessionConfiguration = copy(
     sourceSelections = sourceSelections.toList(),
     customFields = LinkedHashMap(customFields),
-    customColumns = customColumns.map(CustomColumn::deepCopy)
+    customColumns = customColumns.map(CustomColumn::deepCopy),
+    quickTags = quickTags.mapValues { it.value.deepCopy() }
 )
 
 fun NewSessionConfiguration.withCustomColumns(columns: List<CustomColumn>): NewSessionConfiguration = copy(

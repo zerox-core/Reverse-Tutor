@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -47,6 +48,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +71,7 @@ import androidx.compose.ui.unit.sp
 import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 internal fun ReverseTeachingChatScreen(
@@ -83,9 +87,21 @@ internal fun ReverseTeachingChatScreen(
     onBack: () -> Unit,
     evidenceTargetMessageId: String?,
     onOpenSessionSettings: () -> Unit = {},
+    initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
+    onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedMessageId by remember(state.sessionTitle) { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialScrollPosition.index,
+        initialFirstVisibleItemScrollOffset = initialScrollPosition.offset
+    )
+
+    LaunchedEffect(listState) {
+        snapshotFlow { ChatScrollPosition(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+            .distinctUntilChanged()
+            .collect(onScrollPositionChanged)
+    }
 
     Column(
         modifier = modifier
@@ -100,6 +116,7 @@ internal fun ReverseTeachingChatScreen(
             onOpenSessionSettings = onOpenSessionSettings
         )
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -120,7 +137,9 @@ internal fun ReverseTeachingChatScreen(
                 item {
                     LearnerOpening(
                         learnerName = state.learnerName,
-                        learnerStatus = state.learnerStatus
+                        learnerStatus = state.learnerStatus,
+                        learnerAvatarReference = state.learnerAvatarReference,
+                        avatarVisible = state.avatarVisible
                     )
                 }
             } else {
@@ -135,6 +154,8 @@ internal fun ReverseTeachingChatScreen(
                         ReverseTeachingMessage(
                             item = item,
                             learnerName = state.learnerName,
+                            learnerAvatarReference = state.learnerAvatarReference,
+                            avatarVisible = state.avatarVisible,
                             selected = selectedMessageId == item.id,
                             onSelect = {
                                 selectedMessageId = if (selectedMessageId == item.id) null else item.id
@@ -151,6 +172,8 @@ internal fun ReverseTeachingChatScreen(
                 item {
                     GenerationRow(
                         learnerName = state.learnerName,
+                        learnerAvatarReference = state.learnerAvatarReference,
+                        avatarVisible = state.avatarVisible,
                         label = label,
                         onOpenSettings = onOpenSettings,
                         onRetry = state.messages.lastOrNull { it.role == MessageRole.Assistant }?.let { item ->
@@ -215,29 +238,42 @@ private fun ReverseTeachingChatHeader(
                 onClick = onBack,
                 filled = false
             )
-            Column(
+            Surface(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 3.dp, end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                onClick = onOpenSessionSettings,
+                color = Color.Transparent,
+                shape = RoundedCornerShape(10.dp)
             ) {
-                Text(
-                    text = state.sessionTitle,
-                    color = ChatInk,
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${state.learnerName} · ${state.learnerStatus}",
-                    color = ChatMuted,
-                    fontSize = 9.sp,
-                    lineHeight = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (state.avatarVisible) {
+                        LearnerAvatar(state.learnerName, state.learnerAvatarReference)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = state.sessionTitle,
+                            color = ChatInk,
+                            fontSize = 15.sp,
+                            lineHeight = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${state.learnerName} · ${state.learnerStatus}",
+                            color = ChatMuted,
+                            fontSize = 9.sp,
+                            lineHeight = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
             FormalHeaderIconButton(
                 imageVector = Icons.Rounded.AccountTree,
@@ -295,13 +331,18 @@ private fun FormalHeaderIconButton(
 }
 
 @Composable
-private fun LearnerOpening(learnerName: String, learnerStatus: String) {
+private fun LearnerOpening(
+    learnerName: String,
+    learnerStatus: String,
+    learnerAvatarReference: LearnerAvatarReference?,
+    avatarVisible: Boolean
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Top
     ) {
-        LearnerAvatar()
+        if (avatarVisible) LearnerAvatar(learnerName, learnerAvatarReference)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "$learnerName · $learnerStatus",
@@ -326,6 +367,8 @@ private fun LearnerOpening(learnerName: String, learnerStatus: String) {
 private fun ReverseTeachingMessage(
     item: ChatTimelineItem,
     learnerName: String,
+    learnerAvatarReference: LearnerAvatarReference?,
+    avatarVisible: Boolean,
     selected: Boolean,
     onSelect: () -> Unit,
     onAction: (ChatMessageAction) -> Unit
@@ -337,6 +380,8 @@ private fun ReverseTeachingMessage(
         MessageRole.Assistant -> LearnerTimelineMessage(
             item,
             learnerName,
+            learnerAvatarReference,
+            avatarVisible,
             selected,
             onSelect,
             onAction
@@ -403,6 +448,8 @@ private fun UserTimelineMessage(
 private fun LearnerTimelineMessage(
     item: ChatTimelineItem,
     learnerName: String,
+    learnerAvatarReference: LearnerAvatarReference?,
+    avatarVisible: Boolean,
     selected: Boolean,
     onSelect: () -> Unit,
     onAction: (ChatMessageAction) -> Unit
@@ -412,7 +459,7 @@ private fun LearnerTimelineMessage(
         horizontalArrangement = Arrangement.spacedBy(1.dp),
         verticalAlignment = Alignment.Top
     ) {
-        LearnerAvatar()
+        if (avatarVisible) LearnerAvatar(learnerName, learnerAvatarReference)
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = learnerName,
@@ -445,16 +492,50 @@ private fun LearnerTimelineMessage(
 }
 
 @Composable
-private fun LearnerAvatar() {
-    Image(
-        painter = painterResource(R.drawable.chat_learner_linche),
-        contentDescription = "学习者林澈",
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .size(30.dp)
-            .shadow(3.dp, CircleShape, ambientColor = Color(0x22000000), spotColor = Color(0x22000000))
-            .clip(CircleShape)
-    )
+private fun LearnerAvatar(learnerName: String, reference: LearnerAvatarReference?) {
+    val context = LocalContext.current
+    val contentUri = (reference as? LearnerAvatarReference.ContentUri)?.uri
+    val packagedDrawable = remember(reference, context) {
+        (reference as? LearnerAvatarReference.PackagedDrawable)?.resourceId?.takeIf { resourceId ->
+            runCatching { context.resources.getResourceTypeName(resourceId) == "drawable" }.getOrDefault(false)
+        }
+    }
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, contentUri) {
+        value = contentUri?.let { uri ->
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.openInputStream(Uri.parse(uri))?.use(BitmapFactory::decodeStream)?.asImageBitmap()
+                }.getOrNull()
+            }
+        }
+    }
+    val modifier = Modifier
+        .size(30.dp)
+        .shadow(3.dp, CircleShape, ambientColor = Color(0x22000000), spotColor = Color(0x22000000))
+        .clip(CircleShape)
+    val current = bitmap
+    if (packagedDrawable != null) {
+        Image(
+            painter = painterResource(packagedDrawable),
+            contentDescription = "学习者$learnerName",
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else if (current == null) {
+        Image(
+            painter = painterResource(R.drawable.chat_learner_linche),
+            contentDescription = "学习者$learnerName",
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    } else {
+        Image(
+            bitmap = current,
+            contentDescription = "学习者$learnerName",
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+        )
+    }
 }
 
 @Composable
@@ -648,6 +729,8 @@ private fun EvidenceTimelineMessage(text: String) {
 @Composable
 private fun GenerationRow(
     learnerName: String,
+    learnerAvatarReference: LearnerAvatarReference?,
+    avatarVisible: Boolean,
     label: String,
     onOpenSettings: () -> Unit,
     onRetry: (() -> Unit)?
@@ -657,7 +740,7 @@ private fun GenerationRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        LearnerAvatar()
+        if (avatarVisible) LearnerAvatar(learnerName, learnerAvatarReference)
         Text(
             text = "$learnerName · $label",
             modifier = Modifier.weight(1f),

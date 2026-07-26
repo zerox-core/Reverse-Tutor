@@ -72,6 +72,72 @@ class ChatContextEvidenceTest {
 
         assertTrue(evidence.isEmpty())
     }
+
+    @Test
+    fun chatRouteEvidenceUsesLatestSnapshotAndOnlyItsSelectedSources() = runBlocking {
+        val sourceRepository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+        listOf("selected" to "selected body", "unselected" to "unselected body").forEachIndexed { index, (id, body) ->
+            sourceRepository.importSource(
+                SourceImportInput(index.toLong(), "$id.md", text = body, sourceId = id),
+                nowEpochMillis = index.toLong()
+            )
+        }
+        val snapshot = NewSessionConfiguration(
+            learnerDisplayName = "小概",
+            sourceSelections = listOf("selected")
+        )
+
+        val evidence = buildChatContextEvidence(
+            userText = "body",
+            memoryRepository = null,
+            sourceRepository = sourceRepository,
+            sessionSnapshot = snapshot,
+            sessionId = "session-a"
+        )
+
+        assertEquals("session-settings-session-a", evidence.first().id)
+        assertTrue(evidence.first().body.contains("小概"))
+        assertTrue(evidence.any { it.id == "selected" })
+        assertTrue(evidence.none { it.id == "unselected" })
+    }
+
+    @Test
+    fun generationEvidenceRecordsOnlySelectedSourcesThatActuallyEnterContext() = runBlocking {
+        val sourceRepository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+        listOf("used" to "matching lesson", "not-used" to "other lesson").forEachIndexed { index, (id, body) ->
+            sourceRepository.importSource(
+                SourceImportInput(index.toLong(), "$id.md", text = body, sourceId = id),
+                nowEpochMillis = index.toLong()
+            )
+        }
+        val calls = mutableListOf<Triple<String, Set<String>, Long>>()
+        val usagePort = ChatSourceUsagePort { sessionId, sourceIds, usedAt ->
+            calls += Triple(sessionId, sourceIds, usedAt)
+        }
+        val snapshot = NewSessionConfiguration(sourceSelections = listOf("used", "not-used"))
+
+        val pureEvidence = buildChatContextEvidence(
+            userText = "matching",
+            memoryRepository = null,
+            sourceRepository = sourceRepository,
+            sessionSnapshot = snapshot,
+            sessionId = "session-a"
+        )
+        assertTrue(calls.isEmpty())
+
+        val generationEvidence = buildGenerationChatContextEvidence(
+            userText = "matching",
+            memoryRepository = null,
+            sourceRepository = sourceRepository,
+            sessionSnapshot = snapshot,
+            sessionId = "session-a",
+            sourceUsagePort = usagePort,
+            usedAtEpochMillis = 123L
+        )
+
+        assertEquals(pureEvidence, generationEvidence)
+        assertEquals(listOf(Triple("session-a", setOf("used"), 123L)), calls)
+    }
 }
 
 private class FakeMemoryDao : MemoryDao {

@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -52,6 +53,70 @@ import com.reversetutor.preview.ui.RtSliderRow
 import com.reversetutor.preview.ui.RtToggleRow
 import com.reversetutor.feature.chat.SessionHomePort
 import com.reversetutor.feature.chat.SessionHomeViewModel
+import com.reversetutor.feature.chat.NewSessionConfiguration
+import com.reversetutor.feature.chat.NewSessionPersistence
+import com.reversetutor.feature.chat.SessionSettingsCoordinator
+import com.reversetutor.feature.chat.SessionSettingsDocument
+import com.reversetutor.feature.chat.SessionSettingsScreen
+import com.reversetutor.feature.chat.SessionSettingsStore
+import com.reversetutor.feature.chat.SessionSource
+import com.reversetutor.feature.chat.SourceFileDeleteCapability
+import com.reversetutor.feature.chat.TagLibraryPersistence
+import com.reversetutor.feature.chat.Task2ADeletionDelegate
+
+fun interface SessionSettingsCoordinatorFactory {
+    fun create(
+        sessionId: String,
+        snapshot: NewSessionConfiguration,
+        sources: List<SessionSource>,
+        onSourcesChanged: () -> Unit
+    ): SessionSettingsCoordinator
+}
+
+class ProductionSessionSettingsCoordinatorFactory(
+    private val store: SessionSettingsStore,
+    private val persistence: NewSessionPersistence?,
+    private val deleteCapability: SourceFileDeleteCapability = SourceFileDeleteCapability.Unavailable
+) : SessionSettingsCoordinatorFactory {
+    override fun create(
+        sessionId: String,
+        snapshot: NewSessionConfiguration,
+        sources: List<SessionSource>,
+        onSourcesChanged: () -> Unit
+    ): SessionSettingsCoordinator = SessionSettingsCoordinator(
+        sessionId = sessionId,
+        initial = SessionSettingsDocument.fromSnapshot(snapshot),
+        initialSources = sources,
+        store = store,
+        deleteCapability = deleteCapability,
+        onSnapshotApplied = { applied ->
+            saveAppliedSessionSnapshot(persistence, sessionId, applied, onSourcesChanged)
+        },
+        onSourcesChanged = onSourcesChanged
+    )
+}
+
+internal fun createTask2ADeletionDelegate(
+    viewModel: SessionHomeViewModel,
+    sessionId: String,
+    onDeletionStaged: (Boolean) -> Unit
+): Task2ADeletionDelegate = Task2ADeletionDelegate(
+    request = { viewModel.requestDelete(sessionId) },
+    confirm = {
+        onDeletionStaged(true)
+        viewModel.confirmDelete()
+    },
+    dismiss = viewModel::dismissDelete,
+    undo = {
+        onDeletionStaged(false)
+        viewModel.undoDelete()
+    }
+)
+
+data class PickedSessionSource(
+    val source: SessionSource,
+    val replacingSourceId: String? = null
+)
 
 @Composable
 fun SessionSettingsRoute(
@@ -59,9 +124,23 @@ fun SessionSettingsRoute(
     sessionId: String?,
     sessionTitle: String,
     sessionHomePort: SessionHomePort,
+    newSessionPersistence: NewSessionPersistence? = null,
+    tagLibraryPersistence: TagLibraryPersistence? = null,
+    sessionSettingsStore: SessionSettingsStore? = null,
+    coordinatorFactory: SessionSettingsCoordinatorFactory? = null,
+    initialSources: List<SessionSource> = emptyList(),
+    pickedSource: PickedSessionSource? = null,
+    onPickedSourceConsumed: () -> Unit = {},
+    onSourcesChanged: () -> Unit = {},
+    onSessionTitleChanged: (String) -> Unit = {},
+    onSessionLearnerRoleChanged: (String) -> Unit = {},
+    onSessionDeleted: () -> Unit = {},
     onSelectDestination: (AppDestination) -> Unit,
     onOpenBrain: () -> Unit,
     onPickSource: () -> Unit = {},
+    onPickManagedSource: (String?) -> Unit = {},
+    externalImportError: String? = null,
+    onRetryImport: () -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -71,6 +150,90 @@ fun SessionSettingsRoute(
     }
     val sessionHomeState by sessionHomeViewModel.uiState.collectAsState()
     val activeSession = sessionHomeState.sessions.firstOrNull { it.id == sessionId }
+    if (destination == AppDestination.SessionSettings &&
+        sessionId != null &&
+        tagLibraryPersistence != null &&
+        sessionSettingsStore != null
+    ) {
+        val snapshot = remember(sessionId, newSessionPersistence) {
+            newSessionPersistence?.loadSessionSnapshot(sessionId) ?: NewSessionConfiguration(
+                title = sessionTitle,
+                learnerRole = activeSession?.learnerRole ?: "学习者",
+                learnerProfile = "未设置",
+                goal = "未设置",
+                dialogueStrategy = "未设置"
+            )
+        }
+        val productionCoordinatorFactory = remember(sessionSettingsStore, newSessionPersistence) {
+            ProductionSessionSettingsCoordinatorFactory(sessionSettingsStore, newSessionPersistence)
+        }
+        val resolvedCoordinatorFactory = coordinatorFactory ?: productionCoordinatorFactory
+        val coordinator = remember(sessionId, resolvedCoordinatorFactory) {
+            resolvedCoordinatorFactory.create(sessionId, snapshot, initialSources, onSourcesChanged)
+        }
+        LaunchedEffect(initialSources) {
+            refreshSessionSettingsSources(coordinator, initialSources)
+        }
+        LaunchedEffect(coordinator) {
+            saveAppliedSessionSnapshot(
+                newSessionPersistence,
+                sessionId,
+                coordinator.state.applied.snapshot,
+                onSourcesChanged
+            )
+        }
+        var deletionStaged by remember(sessionId) { mutableStateOf(false) }
+        LaunchedEffect(pickedSource?.source?.id, pickedSource?.replacingSourceId) {
+            val picked = pickedSource ?: return@LaunchedEffect
+            if (picked.replacingSourceId == null) {
+                coordinator.addSource(picked.source)
+            } else if (!coordinator.replaceSourceRevision(picked.replacingSourceId, picked.source)) {
+                coordinator.reportError("无法替换所选资料，请重试。")
+            }
+            onPickedSourceConsumed()
+        }
+        LaunchedEffect(deletionStaged, sessionHomeState.undo, sessionHomeState.sessions) {
+            if (deletionStaged &&
+                sessionHomeState.undo == null &&
+                sessionHomeState.sessions.none { it.id == sessionId }
+            ) {
+                sessionSettingsStore.remove(sessionId)
+                onSessionDeleted()
+            }
+        }
+        val deletionDelegate = createTask2ADeletionDelegate(sessionHomeViewModel, sessionId) {
+            deletionStaged = it
+        }
+        SessionSettingsScreen(
+            coordinator = coordinator,
+            tagLibraryPersistence = tagLibraryPersistence,
+            onBack = onBack,
+            onProfileBoundary = { profile ->
+                onSessionLearnerRoleChanged(profile.learnerRole)
+                activeSession?.let { session ->
+                    if (profile.title.isNotBlank() && profile.title != session.title) {
+                        sessionHomeViewModel.rename(sessionId, profile.title)
+                        onSessionTitleChanged(profile.title)
+                    }
+                    if (profile.avatarVisible != session.perSessionAvatarVisible) {
+                        sessionHomeViewModel.setAvatarVisible(sessionId, profile.avatarVisible)
+                    }
+                }
+            },
+            onPickSource = onPickManagedSource,
+            onRequestDeleteSession = deletionDelegate::request,
+            pendingSessionDeleteTitle = sessionHomeState.pendingDelete?.title,
+            externalErrorMessage = sessionHomeState.errorMessage,
+            externalImportError = externalImportError,
+            onRetryImport = onRetryImport,
+            onConfirmDeleteSession = deletionDelegate::confirm,
+            onDismissDeleteSession = deletionDelegate::dismiss,
+            canUndoSessionDelete = sessionHomeState.undo?.session?.id == sessionId,
+            onUndoSessionDelete = deletionDelegate::undo,
+            modifier = modifier
+        )
+        return
+    }
     if (destination == AppDestination.SessionSettingsLibrary) {
         SessionLibrarySettingsScreen(
             sessionTitle = sessionTitle,
@@ -121,6 +284,23 @@ fun SessionSettingsRoute(
             }
         }
     }
+}
+
+internal fun saveAppliedSessionSnapshot(
+    persistence: NewSessionPersistence?,
+    sessionId: String,
+    snapshot: NewSessionConfiguration,
+    onChanged: () -> Unit = {}
+) {
+    persistence?.saveSessionSnapshot(sessionId, snapshot)
+    onChanged()
+}
+
+internal fun refreshSessionSettingsSources(
+    coordinator: SessionSettingsCoordinator,
+    sources: List<SessionSource>
+) {
+    coordinator.refreshSources(sources)
 }
 
 @Composable

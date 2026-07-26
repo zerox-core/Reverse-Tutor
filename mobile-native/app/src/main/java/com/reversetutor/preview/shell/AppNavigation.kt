@@ -12,6 +12,7 @@ enum class AppDestination(
     GlobalGraph("global-graph", "全局图谱", "跨会话只读图谱"),
     Sources("sources", "资料", "本地资料库"),
     Community("community", "社区", "挑战、模板和公开学习树"),
+    SessionSettings("session-settings", "会话设置", "当前会话设置"),
     SessionSettingsLibrary("session-settings-library", "会话设置", "资料库"),
     SessionSettingsGraph("session-settings-graph", "会话设置", "图谱"),
     SessionSettingsPersona("session-settings-persona", "会话设置", "人格目标"),
@@ -92,6 +93,7 @@ data class AppNavigationState(
             AppDestination.NewSession,
             AppDestination.GlobalSearch,
             AppDestination.PublicArticle -> listOf(AppDestination.Sessions, destination)
+            AppDestination.SessionSettings,
             AppDestination.SessionSettingsLibrary,
             AppDestination.SessionSettingsGraph,
             AppDestination.SessionSettingsPersona,
@@ -131,7 +133,8 @@ data class AppNavigationState(
             return BackTransition(closeModal(), BackResult.Consumed)
         }
 
-        if (current == AppDestination.SessionSettingsLibrary ||
+        if (current == AppDestination.SessionSettings ||
+            current == AppDestination.SessionSettingsLibrary ||
             current == AppDestination.SessionSettingsGraph ||
             current == AppDestination.SessionSettingsPersona ||
             current == AppDestination.SessionSettingsPersonalization

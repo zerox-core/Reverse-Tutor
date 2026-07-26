@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -59,11 +61,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -779,23 +783,23 @@ private fun CustomSectionEditor(
         ) {
             when (section) {
                 NewSessionSection.Basic -> {
-                    item { ConfigField("会话名称 *", configuration.title, "new-session-title") { onConfigurationChange(configuration.copy(title = it)) } }
-                    item { ConfigField("学习者角色 *", configuration.learnerRole, "new-session-learner-role") { onConfigurationChange(configuration.copy(learnerRole = it)) } }
-                    item { ConfigField("学习者画像", configuration.learnerProfile) { onConfigurationChange(configuration.copy(learnerProfile = it)) } }
-                    item { ConfigField("开场消息", configuration.openingMessage) { onConfigurationChange(configuration.copy(openingMessage = it)) } }
+                    item { SessionConfigurationTextField("会话名称 *", configuration.title, "new-session-title") { onConfigurationChange(configuration.copy(title = it)) } }
+                    item { SessionConfigurationTextField("学习者角色 *", configuration.learnerRole, "new-session-learner-role") { onConfigurationChange(configuration.copy(learnerRole = it)) } }
+                    item { SessionConfigurationTextField("学习者画像", configuration.learnerProfile) { onConfigurationChange(configuration.copy(learnerProfile = it)) } }
+                    item { SessionConfigurationTextField("开场消息", configuration.openingMessage) { onConfigurationChange(configuration.copy(openingMessage = it)) } }
                 }
                 NewSessionSection.Goals -> {
-                    item { ConfigField("主要目标", configuration.goal) { onConfigurationChange(configuration.copy(goal = it)) } }
-                    item { ConfigField("学习计划", configuration.plan) { onConfigurationChange(configuration.copy(plan = it)) } }
+                    item { SessionConfigurationTextField("主要目标", configuration.goal) { onConfigurationChange(configuration.copy(goal = it)) } }
+                    item { SessionConfigurationTextField("学习计划", configuration.plan) { onConfigurationChange(configuration.copy(plan = it)) } }
                 }
                 NewSessionSection.Dialogue -> item {
-                    ConfigField("对话策略", configuration.dialogueStrategy) { onConfigurationChange(configuration.copy(dialogueStrategy = it)) }
+                    SessionConfigurationTextField("对话策略", configuration.dialogueStrategy) { onConfigurationChange(configuration.copy(dialogueStrategy = it)) }
                 }
                 NewSessionSection.WorldTree -> item {
-                    ConfigField("世界树与故事", configuration.story) { onConfigurationChange(configuration.copy(story = it)) }
+                    SessionConfigurationTextField("世界树与故事", configuration.story) { onConfigurationChange(configuration.copy(story = it)) }
                 }
                 NewSessionSection.Sources -> item {
-                    ConfigField("资料选择（每行一项）", configuration.sourceSelections.joinToString("\n")) {
+                    SessionConfigurationTextField("资料选择（每行一项）", configuration.sourceSelections.joinToString("\n")) {
                         onConfigurationChange(configuration.copy(sourceSelections = it.lines().map(String::trim).filter(String::isNotEmpty)))
                     }
                 }
@@ -806,19 +810,29 @@ private fun CustomSectionEditor(
 }
 
 @Composable
-private fun ConfigField(
+fun SessionConfigurationTextField(
     label: String,
     value: String,
     testTag: String? = null,
+    onBoundary: () -> Unit = {},
     onValueChange: (String) -> Unit
 ) {
+    var focused by remember { mutableStateOf(false) }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        modifier = Modifier.fillMaxWidth().then(if (testTag == null) Modifier else Modifier.testTag(testTag)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (testTag == null) Modifier else Modifier.testTag(testTag))
+            .onFocusChanged {
+                if (focused && !it.isFocused) onBoundary()
+                focused = it.isFocused
+            },
         minLines = 3,
-        maxLines = 8
+        maxLines = 8,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onBoundary() })
     )
 }
 

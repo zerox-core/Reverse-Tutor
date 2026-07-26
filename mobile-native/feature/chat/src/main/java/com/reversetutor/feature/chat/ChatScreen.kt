@@ -85,8 +85,11 @@ fun ChatRoute(
     backgroundGenerationRepository: BackgroundGenerationRepository? = null,
     memoryRepository: MemoryRepository? = null,
     sourceRepository: SourceRepository? = null,
+    sourceUsagePort: ChatSourceUsagePort = ChatSourceUsagePort.None,
     sessionId: String,
     sessionTitle: String,
+    learnerRole: String = "学习者",
+    sessionSnapshot: NewSessionConfiguration? = null,
     pendingImageDraft: ChatImageDraft? = null,
     evidenceTargetMessageId: String? = null,
     onPickImage: () -> Unit = {},
@@ -95,6 +98,8 @@ fun ChatRoute(
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
+    initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
+    onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -140,11 +145,13 @@ fun ChatRoute(
     }
 
     ChatScreen(
-        state = ChatUiState.from(
+        state = buildChatRouteUiState(
             sessionTitle = sessionTitle,
             records = records,
             composer = composer,
-            generation = generation
+            generation = generation,
+            learnerRoleFallback = learnerRole,
+            sessionSnapshot = sessionSnapshot
         ),
         onComposerTextChange = { composer = composer.copy(text = it) },
         onSendMessage = {
@@ -164,10 +171,14 @@ fun ChatRoute(
                     val token = LlmGenerationToken("${userMessage.id}-${System.currentTimeMillis()}")
                     activeGenerationToken = token
                     generation = ChatGenerationUiState.Pending
-                    val contextEvidence = buildChatContextEvidence(
+                    val contextEvidence = buildGenerationChatContextEvidence(
                         userText = userMessage.text,
                         memoryRepository = memoryRepository,
-                        sourceRepository = sourceRepository
+                        sourceRepository = sourceRepository,
+                        sessionSnapshot = sessionSnapshot,
+                        sessionId = sessionId,
+                        sourceUsagePort = sourceUsagePort,
+                        usedAtEpochMillis = System.currentTimeMillis()
                     )
                     val imageAttachments = sentComposer.toAttachmentDrafts()
                         .mapIndexed { index, attachment ->
@@ -273,6 +284,8 @@ fun ChatRoute(
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
         onOpenSessionSettings = onOpenSessionSettings,
+        initialScrollPosition = initialScrollPosition,
+        onScrollPositionChanged = onScrollPositionChanged,
         onBack = onBack,
         evidenceTargetMessageId = evidenceTargetMessageId,
         modifier = modifier
@@ -305,6 +318,8 @@ fun ChatScreen(
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
+    initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
+    onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     onBack: () -> Unit = {},
     evidenceTargetMessageId: String? = null,
     modifier: Modifier = Modifier
@@ -320,6 +335,8 @@ fun ChatScreen(
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenSettings = onOpenContextHub,
         onOpenSessionSettings = onOpenSessionSettings,
+        initialScrollPosition = initialScrollPosition,
+        onScrollPositionChanged = onScrollPositionChanged,
         onBack = onBack,
         evidenceTargetMessageId = evidenceTargetMessageId,
         modifier = modifier

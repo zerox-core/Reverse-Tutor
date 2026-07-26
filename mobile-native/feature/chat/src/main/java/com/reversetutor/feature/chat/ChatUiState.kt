@@ -12,10 +12,16 @@ data class ChatUiState(
     val contextPath: String,
     val messages: List<ChatTimelineItem>,
     val composer: ChatComposerState,
-    val generation: ChatGenerationUiState = ChatGenerationUiState.Idle
+    val generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
+    val learnerImageRef: String? = null,
+    val avatarVisible: Boolean = true
 ) {
     val generationStatusLabel: String?
         get() = generation.statusLabel
+    val learnerAvatarReference: LearnerAvatarReference?
+        get() = LearnerAvatarReference.parse(learnerImageRef)
+    val reserveAvatarSpace: Boolean
+        get() = avatarVisible
 
     companion object {
         fun from(
@@ -25,12 +31,15 @@ data class ChatUiState(
             generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
             learnerName: String = "林澈",
             learnerStatus: String = "正在理解函数",
-            contextPath: String = "基础语法 / 函数 / 参数与返回值"
-        ): ChatUiState =
-            ChatUiState(
+            contextPath: String = "基础语法 / 函数 / 参数与返回值",
+            sessionSnapshot: NewSessionConfiguration? = null
+        ): ChatUiState {
+            val resolvedName = sessionSnapshot?.learnerDisplayName?.takeIf(String::isNotBlank) ?: learnerName
+            val resolvedStatus = sessionSnapshot?.learnerRole?.takeIf(String::isNotBlank) ?: learnerStatus
+            return ChatUiState(
                 sessionTitle = sessionTitle,
-                learnerName = learnerName,
-                learnerStatus = learnerStatus,
+                learnerName = resolvedName,
+                learnerStatus = resolvedStatus,
                 contextPath = contextPath,
                 messages = records
                     .sortedBy { it.message.createdAtEpochMillis }
@@ -39,7 +48,7 @@ data class ChatUiState(
                             id = record.message.id,
                             spaceId = record.message.spaceId,
                             role = record.message.role,
-                            roleLabel = record.message.role.toChatLabel(learnerName),
+                            roleLabel = record.message.role.toChatLabel(resolvedName),
                             text = record.message.text,
                             createdAtEpochMillis = record.message.createdAtEpochMillis,
                             attachmentLabels = record.attachments.map { attachment ->
@@ -57,10 +66,29 @@ data class ChatUiState(
                         )
                     },
                 composer = composer,
-                generation = generation
+                generation = generation,
+                learnerImageRef = sessionSnapshot?.learnerImageRef,
+                avatarVisible = sessionSnapshot?.avatarVisible ?: true
             )
+        }
     }
 }
+
+fun buildChatRouteUiState(
+    sessionTitle: String,
+    records: List<MessageRecord>,
+    composer: ChatComposerState,
+    generation: ChatGenerationUiState,
+    learnerRoleFallback: String,
+    sessionSnapshot: NewSessionConfiguration?
+): ChatUiState = ChatUiState.from(
+    sessionTitle = sessionTitle,
+    records = records,
+    composer = composer,
+    generation = generation,
+    learnerStatus = learnerRoleFallback,
+    sessionSnapshot = sessionSnapshot
+)
 
 sealed interface ChatGenerationUiState {
     val statusLabel: String?

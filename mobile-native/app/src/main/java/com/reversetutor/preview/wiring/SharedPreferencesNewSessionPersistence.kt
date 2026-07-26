@@ -1,8 +1,10 @@
 package com.reversetutor.preview.wiring
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.reversetutor.feature.chat.EditorScrollPosition
 import com.reversetutor.feature.chat.CustomColumn
+import com.reversetutor.feature.chat.LearnerAvatarReference
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
@@ -12,8 +14,12 @@ import com.reversetutor.feature.chat.TagFieldSelection
 import com.reversetutor.feature.chat.TagSelectionValue
 import com.reversetutor.feature.chat.deepCopy
 
-class SharedPreferencesNewSessionPersistence(context: Context) : NewSessionPersistence {
-    private val preferences = context.getSharedPreferences("new_session_feature_state", Context.MODE_PRIVATE)
+class SharedPreferencesNewSessionPersistence internal constructor(
+    private val preferences: SharedPreferences
+) : NewSessionPersistence {
+    constructor(context: Context) : this(
+        context.getSharedPreferences("new_session_feature_state", Context.MODE_PRIVATE)
+    )
 
     override fun loadDrafts(): List<NewSessionDraftRecord> =
         preferences.getString(DraftsKey, null)
@@ -55,6 +61,14 @@ class SharedPreferencesNewSessionPersistence(context: Context) : NewSessionPersi
         preferences.getString(SessionPrefix + sessionId, null)
             ?.let(NewSessionSnapshotCodec::decodeConfiguration)
 
+    override fun saveSessionSnapshot(sessionId: String, snapshot: NewSessionConfiguration) {
+        check(
+            preferences.edit()
+                .putString(SessionPrefix + sessionId, NewSessionSnapshotCodec.encodeConfiguration(snapshot.deepCopy()))
+                .commit()
+        ) { "Unable to persist session snapshot" }
+    }
+
     private companion object {
         const val DraftsKey = "drafts_v1"
         const val FavoritesKey = "favorites_v1"
@@ -90,13 +104,32 @@ object NewSessionSnapshotCodec {
             configuration.learnerImageRef.orEmpty(),
             configuration.storyImageRef.orEmpty(),
             configuration.builtInPresetId.orEmpty(),
-            pack(configuration.customColumns.map(::encodeCustomColumn))
+            pack(configuration.customColumns.map(::encodeCustomColumn)),
+            configuration.learnerDisplayName,
+            configuration.avatarVisible.toString(),
+            configuration.deadline,
+            configuration.learningScope,
+            configuration.modules,
+            configuration.stageMilestones,
+            configuration.currentState,
+            configuration.feedbackIntensity.toString(),
+            configuration.probingIntensity.toString(),
+            configuration.scaffoldingIntensity.toString(),
+            configuration.correctionPersistence,
+            configuration.reviewFrequency,
+            configuration.speakingTone,
+            pack(configuration.quickTags.entries.flatMap { (field, selection) ->
+                selection.values.flatMap { value -> listOf(field, value.tagId.orEmpty(), value.text) }
+            })
         )
     )
 
     fun decodeConfiguration(value: String): NewSessionConfiguration {
         val fields = unpack(value)
-        require(fields.size == 13 || fields.size == 14) { "Unexpected new-session configuration field count" }
+        require(fields.size == 13 || fields.size == 14 || fields.size == 27 || fields.size == 28) {
+            "Unexpected new-session configuration field count"
+        }
+        val legacy = fields.size == 13 || fields.size == 14
         val customValues = unpack(fields[8])
         return NewSessionConfiguration(
             title = fields[0],
@@ -111,11 +144,59 @@ object NewSessionSnapshotCodec {
                 pair.takeIf { it.size == 2 }?.let { it[0] to it[1] }
             }.toMap(),
             openingMessage = fields[9],
-            learnerImageRef = fields[10].ifEmpty { null },
+            learnerImageRef = if (legacy) migrateLegacyLearnerImageRef(fields[10]) else fields[10].ifEmpty { null },
             storyImageRef = fields[11].ifEmpty { null },
             builtInPresetId = fields[12].ifEmpty { null },
-            customColumns = fields.getOrNull(13)?.let(::unpack).orEmpty().map(::decodeCustomColumn)
+            customColumns = fields.getOrNull(13)?.let(::unpack).orEmpty().map(::decodeCustomColumn),
+            learnerDisplayName = fields.getOrNull(14) ?: recoverLegacyLearnerDisplayName(
+                title = fields[0],
+                learnerRole = fields[1],
+                builtInPresetId = fields[12]
+            ),
+            avatarVisible = fields.getOrNull(15)?.toBooleanStrictOrNull() ?: true,
+            deadline = fields.getOrNull(16) ?: "未设置",
+            learningScope = fields.getOrNull(17) ?: "未设置",
+            modules = fields.getOrNull(18) ?: "未设置",
+            stageMilestones = fields.getOrNull(19) ?: "未设置",
+            currentState = fields.getOrNull(20) ?: "未设置",
+            feedbackIntensity = fields.getOrNull(21)?.toIntOrNull() ?: 3,
+            probingIntensity = fields.getOrNull(22)?.toIntOrNull() ?: 3,
+            scaffoldingIntensity = fields.getOrNull(23)?.toIntOrNull() ?: 3,
+            correctionPersistence = fields.getOrNull(24) ?: "适中",
+            reviewFrequency = fields.getOrNull(25) ?: "每周",
+            speakingTone = fields.getOrNull(26) ?: "自然",
+            quickTags = fields.getOrNull(27)?.let(::unpack).orEmpty()
+                .chunked(3)
+                .mapNotNull { triple ->
+                    triple.takeIf { it.size == 3 }?.let {
+                        it[0] to TagSelectionValue(it[1].ifEmpty { null }, it[2])
+                    }
+                }
+                .groupBy({ it.first }, { it.second })
+                .mapValues { TagFieldSelection(it.value) }
         )
+    }
+
+    private fun migrateLegacyLearnerImageRef(value: String): String? {
+        LearnerAvatarReference.parse(value)?.let { return it.persistedValue }
+        val resourceId = value.trim().toIntOrNull()?.takeIf { it != 0 } ?: return null
+        return LearnerAvatarReference.PackagedDrawable(resourceId).persistedValue
+    }
+
+    private fun recoverLegacyLearnerDisplayName(
+        title: String,
+        learnerRole: String,
+        builtInPresetId: String
+    ): String {
+        legacyPresetIdentities.firstOrNull { it.id == builtInPresetId }
+            ?.let { return it.learnerName }
+        legacyRoleName.find(learnerRole)?.groupValues?.getOrNull(1)
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?.let { return it }
+        return legacyPresetIdentities.firstOrNull { preset ->
+            preset.title == title && learnerRole.contains(preset.learnerName)
+        }?.learnerName ?: "学习者"
     }
 
     private fun encodeCustomColumn(column: CustomColumn): String = pack(
@@ -222,4 +303,23 @@ object NewSessionSnapshotCodec {
         }
         return result
     }
+
+    private data class LegacyPresetIdentity(
+        val id: String,
+        val title: String,
+        val learnerName: String
+    )
+
+    private val legacyRoleName = Regex("^\\s*AI\\s*学生\\s+(.+?)\\s*[：:]")
+
+    private val legacyPresetIdentities = listOf(
+        LegacyPresetIdentity("formal-math-sprint", "高三数学讲题冲刺", "小岚"),
+        LegacyPresetIdentity("formal-python-concepts", "Python 概念讲解", "小P"),
+        LegacyPresetIdentity("formal-ielts-speaking", "雅思口语表达", "Mia"),
+        LegacyPresetIdentity("formal-speech-expression", "演讲表达训练", "聆听者"),
+        LegacyPresetIdentity("formal-aptitude-reasoning", "行测推理讲解", "阿策"),
+        LegacyPresetIdentity("formal-frontend-explain", "前端代码讲解", "Nova"),
+        LegacyPresetIdentity("formal-chemistry-lab", "高中化学实验", "元素"),
+        LegacyPresetIdentity("formal-machine-learning", "机器学习概念", "Echo")
+    )
 }

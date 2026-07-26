@@ -22,9 +22,22 @@ data class NewSessionConfiguration(
     val title: String = "",
     val learnerRole: String = "",
     val learnerProfile: String = "",
+    val learnerDisplayName: String = "学习者",
+    val avatarVisible: Boolean = true,
     val goal: String = "",
     val plan: String = "",
+    val deadline: String = "未设置",
+    val learningScope: String = "未设置",
+    val modules: String = "未设置",
+    val stageMilestones: String = "未设置",
+    val currentState: String = "未设置",
     val dialogueStrategy: String = "",
+    val feedbackIntensity: Int = 3,
+    val probingIntensity: Int = 3,
+    val scaffoldingIntensity: Int = 3,
+    val correctionPersistence: String = "适中",
+    val reviewFrequency: String = "每周",
+    val speakingTone: String = "自然",
     val story: String = "",
     val sourceSelections: List<String> = emptyList(),
     val customFields: Map<String, String> = emptyMap(),
@@ -32,7 +45,8 @@ data class NewSessionConfiguration(
     val openingMessage: String = "准备好后，请开始讲给我听吧。",
     val learnerImageRef: String? = null,
     val storyImageRef: String? = null,
-    val builtInPresetId: String? = null
+    val builtInPresetId: String? = null,
+    val quickTags: Map<String, TagFieldSelection> = emptyMap()
 ) {
     fun validationErrors(): List<String> = buildList {
         if (title.isBlank()) add("请填写会话名称。")
@@ -94,6 +108,7 @@ data class NewSessionConfiguration(
                 title = preset.title,
                 learnerRole = "AI 学生 ${preset.learnerName}：${preset.learnerProfile}",
                 learnerProfile = preset.learnerProfile,
+                learnerDisplayName = preset.learnerName,
                 goal = preset.goal,
                 plan = preset.schedule,
                 dialogueStrategy = "用户作为老师负责讲解，学习者持续追问依据和推导。",
@@ -102,7 +117,7 @@ data class NewSessionConfiguration(
                     "${preset.sourceTitle} ${index + 1}"
                 },
                 openingMessage = "我是${preset.learnerName}。${preset.episodeBody}",
-                learnerImageRef = preset.avatarRes.toString(),
+                learnerImageRef = LearnerAvatarReference.PackagedDrawable(preset.avatarRes).persistedValue,
                 storyImageRef = preset.storyRes.toString(),
                 builtInPresetId = preset.id
             )
@@ -176,6 +191,7 @@ interface NewSessionPersistence {
     fun replaceFavorites(favorites: List<NewSessionFavorite>)
     fun promoteDraft(draftId: String, sessionId: String, snapshot: NewSessionConfiguration)
     fun loadSessionSnapshot(sessionId: String): NewSessionConfiguration?
+    fun saveSessionSnapshot(sessionId: String, snapshot: NewSessionConfiguration) = Unit
 }
 
 fun interface NewSessionRandomizer {

@@ -140,6 +140,50 @@ class ChatUiStateTest {
         assertEquals("未配置模型", state.generationStatusLabel)
     }
 
+    @Test
+    fun productionUiStateConsumesCurrentSessionLearnerIdentityAndAvatarLayout() {
+        val snapshot = NewSessionConfiguration(
+            learnerRole = "会追问的学生",
+            learnerDisplayName = "小概",
+            learnerImageRef = "content://avatar/current",
+            avatarVisible = false
+        )
+
+        val state = buildChatRouteUiState(
+            sessionTitle = "概率论",
+            records = listOf(MessageRecord(message("assistant-1", MessageRole.Assistant, "为什么？", 1L), quote = null)),
+            composer = ChatComposerState(""),
+            generation = ChatGenerationUiState.Idle,
+            learnerRoleFallback = "fallback",
+            sessionSnapshot = snapshot
+        )
+
+        assertEquals("小概", state.learnerName)
+        assertEquals("content://avatar/current", state.learnerImageRef)
+        assertFalse(state.avatarVisible)
+        assertFalse(state.reserveAvatarSpace)
+        assertEquals("小概", state.messages.single().roleLabel)
+    }
+
+    @Test
+    fun avatarReferenceParserAcceptsContentUrisAndRejectsBareResourceNumbers() {
+        val contentState = buildChatRouteUiState(
+            sessionTitle = "会话",
+            records = emptyList(),
+            composer = ChatComposerState(""),
+            generation = ChatGenerationUiState.Idle,
+            learnerRoleFallback = "fallback",
+            sessionSnapshot = NewSessionConfiguration(learnerImageRef = "content://avatar/current")
+        )
+        val bareNumberState = contentState.copy(learnerImageRef = "2131230890")
+
+        assertEquals(
+            LearnerAvatarReference.ContentUri("content://avatar/current"),
+            contentState.learnerAvatarReference
+        )
+        assertNull(bareNumberState.learnerAvatarReference)
+    }
+
     private fun message(
         id: String,
         role: MessageRole,

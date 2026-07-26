@@ -60,6 +60,8 @@ import com.reversetutor.core.model.SearchTarget
 import com.reversetutor.core.model.SearchTargetType
 import com.reversetutor.feature.chat.ChatRoute
 import com.reversetutor.feature.chat.ChatImageDraft
+import com.reversetutor.feature.chat.ChatScrollMemory
+import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.toSessionListItem
@@ -83,6 +85,8 @@ import com.reversetutor.preview.ui.ReverseTutorScreenSurface
 import com.reversetutor.preview.ui.ReverseTutorStatusStrip
 import com.reversetutor.preview.ui.ReverseTutorTopAppBar
 import com.reversetutor.preview.wiring.HybridAppGraph
+import com.reversetutor.preview.wiring.SharedPreferencesChatSourceUsagePort
+import com.reversetutor.preview.wiring.SharedPreferencesSessionSettingsStore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -107,7 +111,9 @@ fun AppShell(
     var navigationState by remember { mutableStateOf(AppNavigationState()) }
     var activeSessionId by remember { mutableStateOf<String?>(null) }
     var activeSessionTitle by remember { mutableStateOf<String?>(null) }
+    var activeSessionLearnerRole by remember { mutableStateOf("学习者") }
     var activeArticleSlug by remember { mutableStateOf("") }
+    val chatScrollMemory = remember { ChatScrollMemory() }
     var figmaUiState by remember { mutableStateOf(FigmaAppUiState()) }
     var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
     var pageLocalActionDismissers by remember {
@@ -284,7 +290,9 @@ fun AppShell(
                         initialImportFileName = initialImportFileName,
                         activeSessionId = activeSessionId,
                         activeSessionTitle = activeSessionTitle,
+                        activeSessionLearnerRole = activeSessionLearnerRole,
                         activeArticleSlug = activeArticleSlug,
+                        chatScrollMemory = chatScrollMemory,
                         challengeRuntimeState = challengeRuntimeState,
                         challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
                             ?: figmaUiState.challengeProgress,
@@ -320,6 +328,7 @@ fun AppShell(
                         onOpenSession = { session ->
                             activeSessionId = session.id
                             activeSessionTitle = session.title
+                            activeSessionLearnerRole = session.learnerRole
                             navigationState = navigationState.navigate(AppDestination.Chat)
                         },
                         onOpenContextHub = {
@@ -390,7 +399,16 @@ fun AppShell(
                         onSessionCreated = { session ->
                             activeSessionId = session.id
                             activeSessionTitle = session.title
+                            activeSessionLearnerRole = session.learnerRole
                             navigationState = navigationState.navigate(AppDestination.Chat)
+                        },
+                        onActiveSessionTitleChanged = { activeSessionTitle = it },
+                        onActiveSessionLearnerRoleChanged = { activeSessionLearnerRole = it },
+                        onActiveSessionDeleted = {
+                            activeSessionId = null
+                            activeSessionTitle = null
+                            activeSessionLearnerRole = "学习者"
+                            navigationState = navigationState.navigate(AppDestination.Sessions)
                         },
                         onOpenSettings = {
                             navigationState = navigationState.navigate(AppDestination.Settings)
@@ -628,6 +646,7 @@ private fun AppDestination.ownsInContentTopBar(): Boolean =
         this == AppDestination.About ||
         this == AppDestination.TokenUsage ||
         this == AppDestination.Update ||
+        this == AppDestination.SessionSettings ||
         this == AppDestination.SessionSettingsLibrary ||
         this == AppDestination.SessionSettingsGraph ||
         this == AppDestination.SessionSettingsPersona ||
@@ -650,7 +669,9 @@ private fun DestinationContent(
     initialImportFileName: String?,
     activeSessionId: String?,
     activeSessionTitle: String?,
+    activeSessionLearnerRole: String,
     activeArticleSlug: String,
+    chatScrollMemory: ChatScrollMemory,
     challengeRuntimeState: ChallengeRuntimeState,
     challengeProgress: Int,
     challengeTotal: Int,
@@ -675,6 +696,9 @@ private fun DestinationContent(
     onOpenPublicArticle: (String) -> Unit,
     onOpenSearchTarget: (SearchTarget) -> Unit,
     onSessionCreated: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
+    onActiveSessionTitleChanged: (String) -> Unit,
+    onActiveSessionLearnerRoleChanged: (String) -> Unit,
+    onActiveSessionDeleted: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImportExport: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -682,8 +706,19 @@ private fun DestinationContent(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val sessionSettingsStore = remember(context) { SharedPreferencesSessionSettingsStore(context) }
+    val chatSourceUsagePort = remember(sessionSettingsStore) {
+        SharedPreferencesChatSourceUsagePort(sessionSettingsStore)
+    }
     var llmProfiles by remember { mutableStateOf(emptyList<LlmProfile>()) }
     var pendingSourceImport by remember { mutableStateOf<SourceImportInput?>(null) }
+    var sessionSettingsSources by remember(activeSessionId) { mutableStateOf(emptyList<SessionSource>()) }
+    var pickedSessionSource by remember(activeSessionId) { mutableStateOf<PickedSessionSource?>(null) }
+    var sessionSettingsPickerActive by remember { mutableStateOf(false) }
+    var sessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
+    var failedSessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
+    var sessionSettingsImportError by remember { mutableStateOf<String?>(null) }
+    var sessionSettingsRefreshKey by remember { mutableStateOf(0) }
     var pendingChatImageDraft by remember { mutableStateOf<ChatImageDraft?>(null) }
     var pendingChatEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingSourceEvidenceTarget by remember { mutableStateOf<String?>(null) }
@@ -693,19 +728,57 @@ private fun DestinationContent(
     ) { uri ->
         if (uri != null) {
             scope.launch {
-                val mimeType = context.contentResolver.getType(uri)
-                pendingSourceImport = buildSourceImportInput(
-                    requestId = System.currentTimeMillis(),
-                    fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "selected-source",
-                    mimeType = mimeType,
-                    uri = uri.toString(),
-                    readText = {
-                        context.contentResolver.openInputStream(uri)
-                            ?.bufferedReader(Charsets.UTF_8)
-                            ?.use { readSourceTextWithinLimit(it) }
+                runCatching {
+                    val mimeType = context.contentResolver.getType(uri)
+                    val requestId = System.currentTimeMillis()
+                    val input = buildSourceImportInput(
+                        requestId = requestId,
+                        fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "selected-source",
+                        mimeType = mimeType,
+                        uri = uri.toString(),
+                        readText = {
+                            context.contentResolver.openInputStream(uri)
+                                ?.bufferedReader(Charsets.UTF_8)
+                                ?.use { readSourceTextWithinLimit(it) }
+                        }
+                    )
+                    if (sessionSettingsPickerActive) {
+                        context.tryPersistReadPermission(uri)
+                        val imported = sourceRepository.importSource(input, requestId)
+                        val sessionId = activeSessionId
+                        if (sessionId != null) {
+                            when (val outcome = mapSessionSettingsImport(
+                                result = imported,
+                                currentSessionId = sessionId,
+                                replacingSourceId = sessionSettingsReplaceTarget,
+                                lastUsedAtEpochMillis = requestId
+                            )) {
+                                is SessionSourceImportOutcome.Usable -> {
+                                    pickedSessionSource = outcome.picked
+                                    sessionSettingsImportError = null
+                                    failedSessionSettingsReplaceTarget = null
+                                }
+                                is SessionSourceImportOutcome.Rejected -> {
+                                    sessionSettingsImportError = outcome.message
+                                    failedSessionSettingsReplaceTarget = outcome.replacingSourceId
+                                }
+                            }
+                        }
+                    } else {
+                        pendingSourceImport = input
                     }
-                )
+                }.onFailure {
+                    if (sessionSettingsPickerActive) {
+                        sessionSettingsImportError = "资料导入失败，请重试。"
+                        failedSessionSettingsReplaceTarget = sessionSettingsReplaceTarget
+                    }
+                }
+                sessionSettingsPickerActive = false
+                sessionSettingsReplaceTarget = null
             }
+        } else {
+            sessionSettingsPickerActive = false
+            sessionSettingsReplaceTarget = null
         }
     }
     val chatImageLauncher = rememberLauncherForActivityResult(
@@ -749,6 +822,27 @@ private fun DestinationContent(
         if (destination == AppDestination.WeeklyDashboard) {
             weeklySessions = sessionRepository.listSessions().filterNot { it.archived }
         }
+    }
+    LaunchedEffect(destination, activeSessionId, sessionSettingsRefreshKey) {
+        val currentSessionId = activeSessionId
+        if (destination == AppDestination.SessionSettings && currentSessionId != null) {
+            val sessions = sessionRepository.listSessions()
+            val persistence = hybridAppGraph.frontend.newSessionPersistence
+            val snapshots = sessions.associate { it.id to persistence.loadSessionSnapshot(it.id) }
+            val favorites = persistence.loadFavorites()
+            sessionSettingsSources = buildSessionSettingsSourceCatalog(
+                currentSessionId = currentSessionId,
+                sessions = sessions,
+                sessionSnapshots = snapshots,
+                favorites = favorites,
+                sources = sourceRepository.listSourcesWithChunks(),
+                lastUsedAt = sessionSettingsStore.sourceLastUsedAt(currentSessionId)
+            )
+        }
+    }
+
+    val activeSessionSnapshot = remember(activeSessionId, sessionSettingsRefreshKey) {
+        activeSessionId?.let(hybridAppGraph.frontend.newSessionPersistence::loadSessionSnapshot)
     }
 
     val weeklySessionOptions = remember(weeklySessions) {
@@ -816,8 +910,11 @@ private fun DestinationContent(
                 backgroundGenerationRepository = backgroundGenerationRepository,
                 memoryRepository = memoryRepository,
                 sourceRepository = sourceRepository,
+                sourceUsagePort = chatSourceUsagePort,
                 sessionId = activeSessionId,
                 sessionTitle = activeSessionTitle,
+                learnerRole = activeSessionLearnerRole,
+                sessionSnapshot = activeSessionSnapshot,
                 pendingImageDraft = pendingChatImageDraft,
                 evidenceTargetMessageId = pendingChatEvidenceTarget,
                 onPickImage = {
@@ -832,8 +929,10 @@ private fun DestinationContent(
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,
                 onOpenSessionSettings = {
-                    onNavigateDestination(AppDestination.SessionSettingsPersonalization)
+                    onNavigateDestination(AppDestination.SessionSettings)
                 },
+                initialScrollPosition = chatScrollMemory.restore(activeSessionId),
+                onScrollPositionChanged = { chatScrollMemory.capture(activeSessionId, it) },
                 onBack = onOpenSessions
             )
             return@ReverseTutorScreenSurface
@@ -872,7 +971,8 @@ private fun DestinationContent(
             )
             return@ReverseTutorScreenSurface
         }
-        if (destination == AppDestination.SessionSettingsLibrary ||
+        if (destination == AppDestination.SessionSettings ||
+            destination == AppDestination.SessionSettingsLibrary ||
             destination == AppDestination.SessionSettingsPersona ||
             destination == AppDestination.SessionSettingsPersonalization
         ) {
@@ -881,6 +981,16 @@ private fun DestinationContent(
                 sessionId = activeSessionId,
                 sessionTitle = activeSessionTitle ?: "宏观经济学基础",
                 sessionHomePort = hybridAppGraph.frontend.sessionHomePort,
+                newSessionPersistence = hybridAppGraph.frontend.newSessionPersistence,
+                tagLibraryPersistence = hybridAppGraph.frontend.tagLibraryPersistence,
+                sessionSettingsStore = sessionSettingsStore,
+                initialSources = sessionSettingsSources,
+                pickedSource = pickedSessionSource,
+                onPickedSourceConsumed = { pickedSessionSource = null },
+                onSourcesChanged = { sessionSettingsRefreshKey += 1 },
+                onSessionTitleChanged = onActiveSessionTitleChanged,
+                onSessionLearnerRoleChanged = onActiveSessionLearnerRoleChanged,
+                onSessionDeleted = onActiveSessionDeleted,
                 onSelectDestination = onNavigateDestination,
                 onOpenBrain = { onNavigateDestination(AppDestination.GlobalGraph) },
                 onBack = onOpenChat,
@@ -888,6 +998,22 @@ private fun DestinationContent(
                     sourceFileLauncher.launch(
                         arrayOf("text/*", "application/pdf", "image/*", "*/*")
                     )
+                },
+                onPickManagedSource = { replacingSourceId ->
+                    sessionSettingsImportError = null
+                    failedSessionSettingsReplaceTarget = null
+                    sessionSettingsPickerActive = true
+                    sessionSettingsReplaceTarget = replacingSourceId
+                    sourceFileLauncher.launch(
+                        arrayOf("text/*", "application/pdf", "image/*", "*/*")
+                    )
+                },
+                externalImportError = sessionSettingsImportError,
+                onRetryImport = {
+                    sessionSettingsImportError = null
+                    sessionSettingsPickerActive = true
+                    sessionSettingsReplaceTarget = failedSessionSettingsReplaceTarget
+                    sourceFileLauncher.launch(arrayOf("text/*", "application/pdf", "image/*", "*/*"))
                 }
             )
             return@ReverseTutorScreenSurface
