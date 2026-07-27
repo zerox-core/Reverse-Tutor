@@ -8,7 +8,11 @@ import com.reversetutor.core.domain.ActivitySummary
 import com.reversetutor.core.domain.OnlineActivityPage
 import com.reversetutor.core.domain.OnlineData
 import com.reversetutor.core.remote.OnlineSessionIdentity
+import com.reversetutor.feature.chat.NewSessionConfiguration
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -119,6 +123,113 @@ class ChallengeRuntimeCoordinatorTest {
     }
 
     @Test
+    fun failedJoinRetryRunsSharedPostConfirmationAndReusesExistingSession() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                OnlineData.Content(participation(activityId = active.id))
+            )
+        )
+        val runtime = ChallengeRuntimeCoordinator(repository) { identity() }
+        runtime.load()
+        val flow = ChallengeJoinFlowCoordinator(runtime) {
+            listOf(
+                ChallengeSessionCandidate(
+                    sessionId = "existing",
+                    title = "Existing",
+                    learnerRole = "Learner",
+                    updatedAtEpochMillis = 10L,
+                    snapshot = NewSessionConfiguration(
+                        sourceSelections = listOf(" ACTIVITY : ACTIVE-2 ")
+                    )
+                )
+            )
+        }
+
+        assertNull(flow.join())
+        val decision = flow.retry() as ChallengeSessionLaunchDecision.Reuse
+
+        assertEquals("existing", decision.candidate.sessionId)
+        assertEquals(2, repository.joinCalls.size)
+    }
+
+    @Test
+    fun failedJoinRetryRunsSharedPostConfirmationAndOpensPrefill() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                OnlineData.Content(participation(activityId = active.id))
+            )
+        )
+        val runtime = ChallengeRuntimeCoordinator(repository) { identity() }
+        runtime.load()
+        val flow = ChallengeJoinFlowCoordinator(runtime) { emptyList() }
+
+        assertNull(flow.join())
+        val decision = flow.retry() as ChallengeSessionLaunchDecision.Create
+
+        assertEquals(
+            listOf("activity:active-2"),
+            decision.prefill.configuration.sourceSelections
+        )
+    }
+
+    @Test
+    fun loadRetryNeverRunsPostConfirmedJoinTransition() = runBlocking {
+        val active = activity(id = "active-2")
+        val repository = FakeActivityRepository(
+            listResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                page(active)
+            ),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard()))
+        )
+        val runtime = ChallengeRuntimeCoordinator(repository) { identity() }
+        var candidateLoads = 0
+        val flow = ChallengeJoinFlowCoordinator(runtime) {
+            candidateLoads += 1
+            emptyList()
+        }
+        runtime.load()
+
+        assertNull(flow.retry())
+
+        assertEquals(active, runtime.state.value.activity)
+        assertEquals(0, candidateLoads)
+        assertTrue(repository.joinCalls.isEmpty())
+    }
+
+    @Test
+    fun duplicateJoinTapIsDroppedWhileTheFirstRequestIsInFlight() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(OnlineData.Content(participation(activityId = active.id))),
+            joinGate = gate
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+
+        val first = async { coordinator.join() }
+        while (repository.joinCalls.isEmpty()) yield()
+        val duplicate = async { coordinator.join() }
+        duplicate.await()
+        gate.complete(Unit)
+        first.await()
+
+        assertEquals(1, repository.joinCalls.size)
+        assertTrue(coordinator.state.value.joined)
+    }
+
+    @Test
     fun loadFailurePreservesLastConfirmedParticipation() = runBlocking {
         val active = activity(id = "active-2")
         val confirmed = participation(activityId = active.id)
@@ -197,7 +308,8 @@ private data class JoinCall(
 private class FakeActivityRepository(
     listResults: List<OnlineData<OnlineActivityPage>> = emptyList(),
     leaderboardResults: List<OnlineData<ActivityLeaderboardPage>> = emptyList(),
-    joinResults: List<OnlineData<ActivityParticipation>> = emptyList()
+    joinResults: List<OnlineData<ActivityParticipation>> = emptyList(),
+    private val joinGate: CompletableDeferred<Unit>? = null
 ) : ActivityRepository {
     private val listResults = ArrayDeque(listResults)
     private val leaderboardResults = ArrayDeque(leaderboardResults)
@@ -229,6 +341,7 @@ private class FakeActivityRepository(
         idempotencyKey: String
     ): OnlineData<ActivityParticipation> {
         joinCalls += JoinCall(activityId, userId, deviceId, revision, idempotencyKey)
+        joinGate?.await()
         return joinResults.removeFirst()
     }
 

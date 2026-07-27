@@ -53,7 +53,8 @@ internal fun WorkspacePagerHost(
     onVerticalPageSelected: (WorkspaceVerticalPage) -> Unit = {},
     showIndicator: Boolean = true,
     challengeContent: @Composable () -> Unit = {},
-    pageContent: @Composable (WorkspacePage) -> Unit
+    pageContent: @Composable (WorkspacePage) -> Unit,
+    onChallengeEntryStarted: () -> Unit = {}
 ) {
     val initialPage = remember(state.pages) {
         WorkspaceLoopingPager.initialIndex(state.pages, state.currentPage)
@@ -156,7 +157,8 @@ internal fun WorkspacePagerHost(
                             interactions::onChallengeDragChanged,
                             onVerticalPageSelected,
                             challengeContent,
-                            { pageContent(WorkspacePage.SessionHome) }
+                            { pageContent(WorkspacePage.SessionHome) },
+                            onChallengeEntryStarted
                         )
                         WorkspacePage.GlobalGraph -> key(state.resourceReleaseGeneration) {
                             pageContent(page)
@@ -164,24 +166,6 @@ internal fun WorkspacePagerHost(
                         else -> pageContent(page)
                     }
                 }
-            }
-            if (
-                (state.currentPage == WorkspacePage.GlobalGraph &&
-                    state.interactionLocks.graphCanvasModeActive) ||
-                state.interactionLocks.graphEdgePagingActive
-            ) {
-                GraphEdgePagingOverlay(
-                    pagerState = pagerState,
-                    pages = state.pages,
-                    pageIndexFor = { page, currentIndex ->
-                        WorkspaceLoopingPager.nearestIndexFor(
-                            pages = state.pages,
-                            page = page,
-                            fromIndex = currentIndex
-                        )
-                    },
-                    interactions = interactions
-                )
             }
             val horizontalIndicatorActive = pagerState.isScrollInProgress ||
                 state.interactionLocks.graphEdgePagingActive

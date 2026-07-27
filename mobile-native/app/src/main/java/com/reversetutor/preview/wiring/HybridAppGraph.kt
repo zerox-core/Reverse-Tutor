@@ -43,6 +43,7 @@ import com.reversetutor.feature.chat.SessionHomePort
 import com.reversetutor.feature.chat.TagLibraryPersistence
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.WeeklyDashboardPortViewModelFactory
+import com.reversetutor.feature.memory.WeeklyTokenUsageEntry
 import com.reversetutor.feature.memory.WeeklyDashboardViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsPortViewModelFactory
 import com.reversetutor.feature.settings.ModelConnectionsViewModelFactory
@@ -241,14 +242,15 @@ class HybridAppGraph private constructor(
             val homePort = RepositoryHomePortAdapter {
                 sessionRepository.listSessions()
             }
+            val newSessionPersistence = SharedPreferencesNewSessionPersistence(context)
             val sessionHomePort = RepositorySessionHomePortAdapter(
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,
                 sessionDeletionRepository = sessionDeletionRepository,
                 conversationRunRepository = conversationRunRepository,
-                persistence = SharedPreferencesSessionHomePersistence(context)
+                persistence = SharedPreferencesSessionHomePersistence(context),
+                loadSessionSnapshot = newSessionPersistence::loadSessionSnapshot
             )
-            val newSessionPersistence = SharedPreferencesNewSessionPersistence(context)
             val tagLibraryPersistence = SharedPreferencesTagLibraryPersistence(context)
             val newSessionCreatePort = RepositoryNewSessionCreatePortAdapter(
                 createSession = { input, nowEpochMillis, sessionId ->
@@ -281,6 +283,21 @@ class HybridAppGraph private constructor(
                 },
                 listTasks = {
                     learningRepository.listTasks(SessionRepository.defaultSpaceId)
+                },
+                listTokenUsage = {
+                    val turnToSession = buildMap {
+                        sessionRepository.listSessions().forEach { session ->
+                            conversationRunRepository.listBySession(session.id).forEach { run ->
+                                put(run.turnId, session.id)
+                            }
+                        }
+                    }
+                    learningRepository.listTokenUsage(SessionRepository.defaultSpaceId).map { usage ->
+                        WeeklyTokenUsageEntry(usage, turnToSession[usage.turnId])
+                    }
+                },
+                saveTask = {
+                    learningRepository.saveTask(it)
                 }
             )
 
@@ -295,7 +312,10 @@ class HybridAppGraph private constructor(
                 modelConnectionsViewModelFactory =
                     ModelConnectionsPortViewModelFactory(modelConnectionsPort),
                 weeklyDashboardViewModelFactory =
-                    WeeklyDashboardPortViewModelFactory(weeklyDashboardPort)
+                    WeeklyDashboardPortViewModelFactory(
+                        port = weeklyDashboardPort,
+                        configurationStore = SharedPreferencesWeeklyDashboardConfigurationStore(context)
+                    )
             )
         }
     }

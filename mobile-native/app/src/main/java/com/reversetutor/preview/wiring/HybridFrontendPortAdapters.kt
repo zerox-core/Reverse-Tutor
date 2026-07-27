@@ -16,6 +16,7 @@ import com.reversetutor.core.model.TurnRunState
 import com.reversetutor.core.model.TutorSession
 import com.reversetutor.core.model.WeeklySummary
 import com.reversetutor.feature.chat.ChatRunsPort
+import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.HomePort
 import com.reversetutor.feature.chat.SessionHomePort
 import com.reversetutor.feature.chat.SessionHomePersistence
@@ -25,8 +26,10 @@ import com.reversetutor.feature.chat.WelcomeMockOpening
 import com.reversetutor.feature.chat.WelcomeMockSessionId
 import com.reversetutor.feature.chat.WelcomeMockTitle
 import com.reversetutor.feature.chat.shouldCreateWelcomeSession
+import com.reversetutor.feature.chat.challengeSessionProvenance
 import com.reversetutor.feature.memory.WeeklyDashboardPort
 import com.reversetutor.feature.memory.WeeklyDashboardSnapshot
+import com.reversetutor.feature.memory.WeeklyTokenUsageEntry
 import com.reversetutor.feature.settings.ModelConnectionsPort
 import com.reversetutor.feature.settings.ModelConnectionsSnapshot
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +49,7 @@ class RepositorySessionHomePortAdapter(
     private val sessionDeletionRepository: SessionDeletionRepository,
     private val conversationRunRepository: ConversationRunRepositoryImpl,
     private val persistence: SessionHomePersistence,
+    private val loadSessionSnapshot: (String) -> NewSessionConfiguration? = { null },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val deletionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : SessionHomePort {
@@ -109,7 +113,9 @@ class RepositorySessionHomePortAdapter(
                     } else {
                         null
                     },
-                    isWelcomeMock = session.id == WelcomeMockSessionId
+                    isWelcomeMock = session.id == WelcomeMockSessionId,
+                    challengeProvenance = loadSessionSnapshot(session.id)
+                        ?.challengeSessionProvenance()
                 )
             }
     }
@@ -295,7 +301,9 @@ class RepositoryModelConnectionsPortAdapter(
 
 class RepositoryWeeklyDashboardPortAdapter(
     private val listSummaries: suspend () -> List<WeeklySummary>,
-    private val listTasks: suspend () -> List<StudyPlanTask>
+    private val listTasks: suspend () -> List<StudyPlanTask>,
+    private val listTokenUsage: suspend () -> List<WeeklyTokenUsageEntry> = { emptyList() },
+    private val saveTask: suspend (StudyPlanTask) -> StudyPlanTask = { it }
 ) : WeeklyDashboardPort {
     override suspend fun loadLocalSnapshot(): WeeklyDashboardSnapshot =
         WeeklyDashboardSnapshot(
@@ -303,6 +311,9 @@ class RepositoryWeeklyDashboardPortAdapter(
                 compareBy<WeeklySummary> { it.weekStartEpochMillis }
                     .thenBy { it.generatedAtEpochMillis }
             ),
-            tasks = listTasks()
+            tasks = listTasks(),
+            tokenUsage = listTokenUsage()
         )
+
+    override suspend fun saveTask(task: StudyPlanTask): StudyPlanTask = saveTask.invoke(task)
 }

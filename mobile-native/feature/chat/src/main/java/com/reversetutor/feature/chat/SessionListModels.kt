@@ -19,7 +19,8 @@ data class SessionListItem(
     val latestMessageSummary: String = statusLabel,
     val perSessionAvatarVisible: Boolean = true,
     val pinnedAtEpochMillis: Long? = if (pinned) updatedAtEpochMillis else null,
-    val isWelcomeMock: Boolean = false
+    val isWelcomeMock: Boolean = false,
+    val challengeProvenance: ChallengeSessionProvenance? = null
 ) {
     val unreadLabel: String =
         if (unreadCount == 0) "无未读" else "$unreadCount 条未读"

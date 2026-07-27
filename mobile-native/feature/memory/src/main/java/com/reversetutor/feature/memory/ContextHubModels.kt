@@ -228,6 +228,7 @@ private fun KnowledgeGraphUiState.nextActions(): List<String> =
     when (status) {
         GraphRenderStatus.Loading -> listOf("等待图谱快照")
         GraphRenderStatus.Empty -> listOf("创建随笔或锚点", "导入可形成图谱的资料")
+        GraphRenderStatus.Error -> listOf("重试加载图谱")
         GraphRenderStatus.Ready -> listOf("选择节点查看详情", "拖动或缩放 native 图谱")
         GraphRenderStatus.Invalid -> listOf("检查无效关系", "选择有效节点查看证据")
         GraphRenderStatus.Large -> listOf("使用节点列表精确选择", "聚类和筛选后续补齐")

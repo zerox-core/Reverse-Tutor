@@ -203,13 +203,18 @@ fun GlobalGraphRoute(
     }
 
     LaunchedEffect(refreshKey) {
-        val snapshot = graphRepository.snapshot()
-        state = KnowledgeGraphUiState.from(
-            nodes = snapshot.nodes,
-            edges = snapshot.edges,
-            selectedNodeId = selectedNodeId,
-            scope = GraphScope.Global
-        )
+        state = KnowledgeGraphUiState.loading(GraphScope.Global)
+        state = try {
+            val snapshot = graphRepository.snapshot()
+            KnowledgeGraphUiState.from(
+                nodes = snapshot.nodes,
+                edges = snapshot.edges,
+                selectedNodeId = selectedNodeId,
+                scope = GraphScope.Global
+            )
+        } catch (_: Exception) {
+            KnowledgeGraphUiState.error(GraphScope.Global)
+        }
     }
 
     val selectedState = state.withSelection(selectedNodeId)
@@ -227,6 +232,7 @@ fun GlobalGraphRoute(
         onOpenSourceEvidence = { node -> node.sourceId?.let { onOpenSources() } },
         canvasModeActive = canvasModeActive,
         onCanvasModeChange = onCanvasModeChange,
+        onRetry = { refreshKey += 1 },
         onGraphInteractionChanged = onGraphInteractionChanged
     )
 }

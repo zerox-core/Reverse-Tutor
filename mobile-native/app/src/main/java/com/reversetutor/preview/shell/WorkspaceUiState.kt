@@ -65,8 +65,8 @@ internal fun workspaceGestureOwner(
     graphCanvasModeActive: Boolean,
     workspacePagingEnabled: Boolean
 ): WorkspaceGestureOwner = when {
-    !workspacePagingEnabled -> WorkspaceGestureOwner.Locked
     graphCanvasModeActive -> WorkspaceGestureOwner.GraphCanvas
+    !workspacePagingEnabled -> WorkspaceGestureOwner.Locked
     innerHorizontalControlActive -> WorkspaceGestureOwner.InnerHorizontalControl
     kotlin.math.abs(verticalDeltaPx) > kotlin.math.abs(horizontalDeltaPx) ->
         WorkspaceGestureOwner.InnerVerticalContent

@@ -9,6 +9,7 @@ import com.reversetutor.feature.chat.WelcomeMockLearner
 import com.reversetutor.feature.chat.WelcomeMockOpening
 import com.reversetutor.feature.chat.WelcomeMockSessionId
 import com.reversetutor.feature.chat.WelcomeMockTitle
+import com.reversetutor.feature.chat.NewSessionConfiguration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +31,7 @@ class RepositorySessionHomePortAdapterTest {
     private val deletionRepository = DataModule.sessionDeletionRepository(context)
     private val runRepository = DataModule.conversationRunRepository(context)
     private val persistence = SharedPreferencesSessionHomePersistence(context)
+    private val newSessionPersistence = SharedPreferencesNewSessionPersistence(context)
     private var now = 1_000L
 
     @Before
@@ -133,6 +135,29 @@ class RepositorySessionHomePortAdapterTest {
         assertEquals(false, sessionRepository.getSession(created.session.id)?.archived)
     }
 
+    @Test
+    fun challengeSnapshotReloadsAsBadgedSessionListItem() = runBlocking {
+        persistence.completeConfirmedDeletion(WelcomeMockSessionId, suppressWelcome = true)
+        val created = sessionRepository.createSession(
+            input = SessionCreationInput(
+                title = "Challenge session",
+                role = "Challenge learner",
+                goal = "Goal",
+                profileText = "Profile"
+            ),
+            nowEpochMillis = now,
+            sessionId = "challenge-session"
+        )
+        newSessionPersistence.saveSessionSnapshot(
+            created.session.id,
+            NewSessionConfiguration(sourceSelections = listOf(" ACTIVITY : ACTIVE-2 "))
+        )
+
+        val card = adapter().loadSessionCards().single()
+
+        assertEquals("active-2", card.challengeProvenance?.activityId)
+    }
+
     private fun adapter() = RepositorySessionHomePortAdapter(
         sessionRepository = sessionRepository,
         messageRepository = messageRepository,
@@ -140,11 +165,16 @@ class RepositorySessionHomePortAdapterTest {
         conversationRunRepository = runRepository,
         nowEpochMillis = { now },
         persistence = persistence,
+        loadSessionSnapshot = newSessionPersistence::loadSessionSnapshot,
         deletionScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     )
 
     private fun clearFeatureState() {
         context.getSharedPreferences("session_home_feature_state", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
+        context.getSharedPreferences("new_session_feature_state", Context.MODE_PRIVATE)
             .edit()
             .clear()
             .commit()

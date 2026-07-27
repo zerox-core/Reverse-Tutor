@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +62,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalGlossyIcon
@@ -70,6 +72,17 @@ import com.reversetutor.core.design.style
 import com.reversetutor.core.domain.ActivityLeaderboardPage
 import com.reversetutor.preview.R
 import kotlinx.coroutines.flow.distinctUntilChanged
+
+data class ChallengeListPosition(
+    val index: Int = 0,
+    val offset: Int = 0
+)
+
+data class ChallengeReturnContext(
+    val activityList: ChallengeListPosition = ChallengeListPosition(),
+    val detailList: ChallengeListPosition = ChallengeListPosition(),
+    val detailOpen: Boolean = false
+)
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -83,23 +96,84 @@ fun ChallengeRoute(
     runtimeState: ChallengeRuntimeState? = null,
     onRetry: () -> Unit = {},
     onExitBoundaryChanged: (Boolean) -> Unit = {},
-    initialShowDetails: Boolean = false
+    initialShowDetails: Boolean = false,
+    entryGeneration: Long = 0L,
+    restoreContext: ChallengeReturnContext? = null,
+    onRestoreConsumed: () -> Unit = {},
+    onReturnContextChanged: (ChallengeReturnContext) -> Unit = {}
 ) {
-    var showDetails by remember(initialShowDetails) { mutableStateOf(initialShowDetails) }
+    val initialReturnContext = remember { restoreContext }
+    var pendingRestoreContext by remember { mutableStateOf(initialReturnContext) }
+    val initialDetailOpen = initialReturnContext?.detailOpen ?: initialShowDetails
+    var showDetails by remember { mutableStateOf(initialDetailOpen) }
+    var verticalState by remember {
+        mutableStateOf(ChallengeVerticalState(detailOpen = initialDetailOpen))
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialReturnContext?.activityList?.index ?: 0,
+        initialFirstVisibleItemScrollOffset = initialReturnContext?.activityList?.offset ?: 0
+    )
+    val detailListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialReturnContext?.detailList?.index ?: 0,
+        initialFirstVisibleItemScrollOffset = initialReturnContext?.detailList?.offset ?: 0
+    )
     val confirmedJoined = runtimeState?.joined ?: joined
-    val loading = runtimeState?.loading == true
-    val retryableFailure = runtimeState?.failure?.retryable == true
+    val detailUiState = ChallengeDetailUiState.from(runtimeState, confirmedJoined)
 
-    LaunchedEffect(confirmedJoined) {
-        if (confirmedJoined) showDetails = false
+    fun setDetailOpen(open: Boolean) {
+        showDetails = open
+        verticalState = reduceChallengeVerticalState(
+            verticalState,
+            if (open) ChallengeVerticalEvent.DetailOpened else ChallengeVerticalEvent.DetailClosed
+        )
     }
 
-    LaunchedEffect(listState, showDetails) {
+    LaunchedEffect(entryGeneration) {
+        val contextToRestore = pendingRestoreContext
+        verticalState = reduceChallengeVerticalState(
+            verticalState,
+            ChallengeVerticalEvent.Entered
+        )
+        if (contextToRestore == null) {
+            setDetailOpen(initialShowDetails)
+            listState.scrollToItem(0)
+            detailListState.scrollToItem(0)
+        } else {
+            setDetailOpen(contextToRestore.detailOpen)
+            pendingRestoreContext = null
+            onRestoreConsumed()
+        }
+    }
+
+    LaunchedEffect(listState) {
         snapshotFlow {
-            !showDetails && listState.layoutInfo.totalItemsCount > 0 && !listState.canScrollForward
-        }.distinctUntilChanged().collect(onExitBoundaryChanged)
+            ChallengeVerticalEvent.ContentScrollChanged(
+                atBottom = listState.layoutInfo.totalItemsCount > 0 && !listState.canScrollForward,
+                gestureActive = listState.isScrollInProgress
+            )
+        }.distinctUntilChanged().collect { event ->
+            verticalState = reduceChallengeVerticalState(verticalState, event)
+        }
+    }
+
+    LaunchedEffect(verticalState.outerPagerEnabled) {
+        onExitBoundaryChanged(verticalState.outerPagerEnabled)
+    }
+    LaunchedEffect(listState, detailListState, showDetails) {
+        snapshotFlow {
+            ChallengeReturnContext(
+                activityList = ChallengeListPosition(
+                    listState.firstVisibleItemIndex,
+                    listState.firstVisibleItemScrollOffset
+                ),
+                detailList = ChallengeListPosition(
+                    detailListState.firstVisibleItemIndex,
+                    detailListState.firstVisibleItemScrollOffset
+                ),
+                detailOpen = showDetails
+            )
+        }.distinctUntilChanged().collect(onReturnContextChanged)
     }
 
     Box(
@@ -113,14 +187,16 @@ fun ChallengeRoute(
             progress = progress,
             total = total,
             leaderboard = runtimeState?.leaderboard,
+            detailUiState = detailUiState,
             onBack = onBack,
-            onOpenDetails = { showDetails = true },
+            onOpenDetails = { setDetailOpen(true) },
             listState = listState,
+            listScrollEnabled = verticalState.listScrollEnabled,
             modifier = if (showDetails) Modifier.blur(8.dp) else Modifier
         )
         if (showDetails) {
             ModalBottomSheet(
-                onDismissRequest = { showDetails = false },
+                onDismissRequest = { setDetailOpen(false) },
                 modifier = Modifier.widthIn(max = 390.dp),
                 sheetState = sheetState,
                 containerColor = FormalColors.Background,
@@ -130,12 +206,11 @@ fun ChallengeRoute(
                 dragHandle = null
             ) {
                 ChallengeDetailSheet(
-                    joined = confirmedJoined,
-                    loading = loading,
-                    retryableFailure = retryableFailure,
-                    onClose = { showDetails = false },
+                    state = detailUiState,
+                    onClose = { setDetailOpen(false) },
                     onJoin = onJoin,
                     onRetry = onRetry,
+                    listState = detailListState,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 520.dp, max = 650.dp)
@@ -152,9 +227,11 @@ private fun ChallengeContent(
     progress: Int,
     total: Int,
     leaderboard: ActivityLeaderboardPage?,
+    detailUiState: ChallengeDetailUiState,
     onBack: () -> Unit,
     onOpenDetails: () -> Unit,
     listState: LazyListState,
+    listScrollEnabled: Boolean,
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
@@ -165,13 +242,22 @@ private fun ChallengeContent(
         Box(Modifier.width(contentWidth).fillMaxHeight()) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = listScrollEnabled,
+                modifier = Modifier.fillMaxSize().testTag("challenge-activity-list"),
                 contentPadding = PaddingValues(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        StatusPill("线上活动", FormalColors.SuccessSoft, FormalColors.Success)
+                        StatusPill(
+                            if (detailUiState.availability == ChallengeAvailability.Available) {
+                                "线上活动"
+                            } else {
+                                "活动状态未确认"
+                            },
+                            FormalColors.SuccessSoft,
+                            FormalColors.Success
+                        )
                         Spacer(Modifier.width(8.dp))
                         StatusPill(
                             presentation.syncLabel,
@@ -190,7 +276,7 @@ private fun ChallengeContent(
                 item { Spacer(Modifier.height(18.dp)) }
                 item {
                     Box(Modifier.fillMaxWidth()) {
-                        MainChallengeCard(presentation, onOpenDetails)
+                        MainChallengeCard(presentation, detailUiState, onOpenDetails)
                         if (presentation.showFeedback) {
                             FeedbackPill(
                                 modifier = Modifier
@@ -202,10 +288,11 @@ private fun ChallengeContent(
                 }
                 item { Spacer(Modifier.height(if (presentation.showFeedback) 18.dp else 2.dp)) }
                 item {
-                    LeaderboardSection(
-                        showCurrentUser = joined,
-                        leaderboard = leaderboard
-                    )
+                    Box(Modifier.testTag("challenge-activity-bottom")) {
+                        LeaderboardSection(
+                            leaderboard = leaderboard
+                        )
+                    }
                 }
             }
             Surface(
@@ -225,47 +312,81 @@ private fun ChallengeContent(
 }
 
 @Composable
-private fun MainChallengeCard(presentation: ChallengePresentation, onOpenDetails: () -> Unit) {
+private fun MainChallengeCard(
+    presentation: ChallengePresentation,
+    detailState: ChallengeDetailUiState,
+    onOpenDetails: () -> Unit
+) {
     val type = LocalFormalTypeScale.current
     Surface(
         onClick = onOpenDetails,
-        modifier = Modifier.fillMaxWidth().height(411.dp),
+        modifier = Modifier.fillMaxWidth().height(411.dp).testTag("challenge-open-detail"),
         color = FormalColors.SurfaceElevated,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Border),
         shadowElevation = 4.dp
     ) {
         Box(Modifier.padding(28.dp)) {
-            StatusTag(presentation.statusLabel, presentation.showPersonalProgress, Modifier.align(Alignment.TopStart))
+            StatusTag(
+                if (detailState.availability == ChallengeAvailability.Available) {
+                    presentation.statusLabel
+                } else {
+                    detailState.stageLabel
+                },
+                presentation.showPersonalProgress,
+                Modifier.align(Alignment.TopStart)
+            )
             Text(
                 "点击查看挑战详情",
                 style = type.style(9f, 13f, color = FormalColors.Muted),
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp)
             )
             Column(Modifier.align(Alignment.CenterStart).offset(y = (-52).dp)) {
-                Text("21天", style = type.style(32f, 40f, FontWeight.Bold, FormalColors.Ink))
-                Text("Python\n学习挑战", style = type.style(19f, 26f, FontWeight.Bold, FormalColors.Ink))
+                Text(detailState.stageLabel, style = type.style(16f, 24f, FontWeight.Bold, FormalColors.Primary))
+                Text(
+                    detailState.title,
+                    style = type.style(19f, 26f, FontWeight.Bold, FormalColors.Ink),
+                    modifier = Modifier.width(136.dp),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Schedule, contentDescription = null, tint = FormalColors.Muted, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text(presentation.metaLabel, style = type.style(12f, 18f, color = FormalColors.Muted))
+                    Text(
+                        detailState.availabilityLabel,
+                        style = type.style(12f, 18f, color = FormalColors.Muted),
+                        modifier = Modifier.width(136.dp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
             ChallengeCourseArt(Modifier.align(Alignment.CenterEnd).offset(y = (-36).dp))
             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
-                Text(presentation.metricTitle, style = type.style(11f, 16f, color = FormalColors.Muted))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(presentation.metricValue, style = type.style(26f, 34f, FontWeight.Bold, FormalColors.Primary))
-                    Text(presentation.metricSuffix, style = type.style(13f, 22f, color = FormalColors.Muted), modifier = Modifier.padding(bottom = 2.dp))
-                }
-                Spacer(Modifier.height(8.dp))
-                if (presentation.showPersonalProgress) {
-                    ProgressBar(presentation.progressFraction)
-                    Spacer(Modifier.height(8.dp))
-                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = FormalColors.Muted, modifier = Modifier.size(17.dp))
+                if (detailState.availability != ChallengeAvailability.Available) {
+                    Text("活动状态", style = type.style(11f, 16f, color = FormalColors.Muted))
+                    Text(
+                        detailState.availabilityLabel,
+                        style = type.style(13f, 20f, FontWeight.Medium, FormalColors.Ink),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 } else {
-                    Text("每天约 25 分钟 · 支持离线完成", style = type.style(10f, 15f, color = FormalColors.Muted))
+                    Text(presentation.metricTitle, style = type.style(11f, 16f, color = FormalColors.Muted))
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(presentation.metricValue, style = type.style(26f, 34f, FontWeight.Bold, FormalColors.Primary))
+                        Text(presentation.metricSuffix, style = type.style(13f, 22f, color = FormalColors.Muted), modifier = Modifier.padding(bottom = 2.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    if (presentation.showPersonalProgress) {
+                        ProgressBar(presentation.progressFraction)
+                        Spacer(Modifier.height(8.dp))
+                        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = FormalColors.Muted, modifier = Modifier.size(17.dp))
+                    } else {
+                        Text("活动可用后可查看参与要求", style = type.style(10f, 15f, color = FormalColors.Muted))
+                    }
                 }
             }
         }
@@ -341,21 +462,21 @@ private fun FeedbackPill(modifier: Modifier = Modifier) {
 
 @Composable
 private fun LeaderboardSection(
-    showCurrentUser: Boolean,
     leaderboard: ActivityLeaderboardPage?
 ) {
     val type = LocalFormalTypeScale.current
-    val referenceRows = listOf(
-        LeaderboardRow(1, "小宇同学", 18, R.drawable.challenge_avatar_1, Color(0xFFF0CA31)),
-        LeaderboardRow(2, "编程小能手", 16, R.drawable.challenge_avatar_2, Color(0xFF8EC9EE)),
-        LeaderboardRow(3, "算法不秃头", 14, R.drawable.challenge_avatar_3, Color(0xFFF1B27A))
-    )
     val avatarResources = listOf(
         R.drawable.challenge_avatar_1,
         R.drawable.challenge_avatar_2,
-        R.drawable.challenge_avatar_3
+        R.drawable.challenge_avatar_3,
+        R.drawable.challenge_avatar_you
     )
-    val accents = listOf(Color(0xFFF0CA31), Color(0xFF8EC9EE), Color(0xFFF1B27A))
+    val accents = listOf(
+        Color(0xFFF0CA31),
+        Color(0xFF8EC9EE),
+        Color(0xFFF1B27A),
+        FormalColors.Primary
+    )
     val rows = leaderboard?.items?.mapIndexed { index, entry ->
         LeaderboardRow(
             rank = entry.rank.toInt(),
@@ -365,7 +486,7 @@ private fun LeaderboardSection(
             accent = accents[index % accents.size],
             highlighted = entry.isCurrentUser
         )
-    } ?: referenceRows
+    }.orEmpty()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = FormalColors.SurfaceElevated,
@@ -383,8 +504,8 @@ private fun LeaderboardSection(
                 }
             }
             rows.forEach { LeaderboardItem(it, highlighted = it.highlighted) }
-            if (leaderboard == null && showCurrentUser) {
-                LeaderboardItem(LeaderboardRow(12, "我", 12, R.drawable.challenge_avatar_you, FormalColors.Primary), highlighted = true)
+            if (rows.isEmpty()) {
+                Text("活动榜单暂不可用", style = type.style(11f, 17f, color = FormalColors.Muted))
             }
         }
     }
@@ -428,18 +549,18 @@ private fun LeaderboardItem(row: LeaderboardRow, highlighted: Boolean = false) {
 
 @Composable
 private fun ChallengeDetailSheet(
-    joined: Boolean,
-    loading: Boolean,
-    retryableFailure: Boolean,
+    state: ChallengeDetailUiState,
     onClose: () -> Unit,
     onJoin: () -> Unit,
     onRetry: () -> Unit,
+    listState: LazyListState,
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
     Box(modifier.background(FormalColors.Background)) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            modifier = Modifier.fillMaxSize().testTag("challenge-detail-list"),
             contentPadding = PaddingValues(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -460,11 +581,22 @@ private fun ChallengeDetailSheet(
                     }
                 }
             }
-            item { DetailHero() }
+            item { DetailHero(state.title, state.goal) }
+            item { DetailRuleRow("活动阶段", state.stageLabel, Icons.Filled.Schedule) }
+            item { DetailRuleRow("挑战目标", state.goal, Icons.Filled.EmojiEvents) }
             item { Text("挑战规则", style = type.style(17f, 24f, FontWeight.Bold, FormalColors.Ink), modifier = Modifier.padding(top = 10.dp)) }
-            item { DetailRuleRow("每日签到", "每天在挑战页完成打卡，记录学习时长。", Icons.Filled.CheckCircle) }
-            item { DetailRuleRow("任务完成", "完成后分配的 Python 基础课程与实践练习。", Icons.AutoMirrored.Filled.ListAlt) }
-            item { DetailRuleRow("数据回传", "回传自评、引用资料、Memory 与薄弱节点，用于展示活动效果。", Icons.Filled.Lightbulb) }
+            items(state.rules) { rule ->
+                val index = state.rules.indexOf(rule)
+                val icon = when (index) {
+                    0 -> Icons.Filled.CheckCircle
+                    1 -> Icons.AutoMirrored.Filled.ListAlt
+                    else -> Icons.Filled.Lightbulb
+                }
+                DetailRuleRow(rule.title, rule.body, icon)
+            }
+            item { DetailRuleRow("资料来源", state.sourcesLabel, Icons.Filled.Memory) }
+            item { DetailRuleRow("参与状态", state.participationLabel, Icons.Filled.Groups) }
+            item { DetailRuleRow("可用状态", state.availabilityLabel, Icons.Filled.Schedule) }
         }
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
@@ -472,9 +604,14 @@ private fun ChallengeDetailSheet(
             shadowElevation = 8.dp
         ) {
             Button(
-                enabled = !joined && !loading,
-                onClick = if (retryableFailure) onRetry else onJoin,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 20.dp).fillMaxWidth().height(64.dp),
+                enabled = state.joinAction == ChallengeJoinAction.Join ||
+                    state.joinAction == ChallengeJoinAction.Retry,
+                onClick = if (state.joinAction == ChallengeJoinAction.Retry) onRetry else onJoin,
+                modifier = Modifier
+                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 20.dp)
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .testTag("challenge-join-action"),
                 shape = RoundedCornerShape(FormalShapes.CardRadius),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = FormalColors.Primary,
@@ -483,9 +620,10 @@ private fun ChallengeDetailSheet(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     val label = when {
-                        joined -> "已加入挑战"
-                        loading -> "加载中"
-                        retryableFailure -> "重试"
+                        state.joinAction == ChallengeJoinAction.Joined -> "已加入挑战"
+                        state.joinAction == ChallengeJoinAction.Loading -> "加载中"
+                        state.joinAction == ChallengeJoinAction.Retry -> "重试"
+                        state.joinAction == ChallengeJoinAction.Unavailable -> "暂不可用"
                         else -> "加入挑战"
                     }
                     Text(label, style = type.style(14f, 19f, FontWeight.Medium, Color.White))
@@ -497,7 +635,7 @@ private fun ChallengeDetailSheet(
 }
 
 @Composable
-private fun DetailHero() {
+private fun DetailHero(title: String, goal: String) {
     val type = LocalFormalTypeScale.current
     Surface(
         modifier = Modifier.fillMaxWidth().height(226.dp),
@@ -512,9 +650,21 @@ private fun DetailHero() {
         ) {
             Icon(Icons.Filled.EmojiEvents, contentDescription = null, tint = FormalColors.Warning, modifier = Modifier.size(28.dp))
             Spacer(Modifier.height(10.dp))
-            Text("21天 Python\n学习挑战", style = type.style(26f, 34f, FontWeight.Bold, FormalColors.Ink), textAlign = TextAlign.Center)
+            Text(
+                title,
+                style = type.style(26f, 34f, FontWeight.Bold, FormalColors.Ink),
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
             Spacer(Modifier.height(12.dp))
-            Text("掌握核心语法，用每日挑战构建稳定的编程学习节奏。", style = type.style(12f, 19f, color = FormalColors.Muted), textAlign = TextAlign.Center)
+            Text(
+                goal,
+                style = type.style(12f, 19f, color = FormalColors.Muted),
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

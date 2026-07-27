@@ -79,7 +79,8 @@ data class FormalWeeklySessionOption(
     val id: String,
     val title: String,
     val detail: String,
-    val activeThisWeek: Boolean = true
+    val activeThisWeek: Boolean = true,
+    val pinned: Boolean = false
 )
 
 data class FormalWeeklyUiState(

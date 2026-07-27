@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -27,9 +28,11 @@ internal fun SessionWorldTreeRoute(
     val dataScope = remember(sessionId) { DataGraphScope.Session(sessionId ?: "missing-session") }
     var state by remember(sessionId) { mutableStateOf(KnowledgeGraphUiState.loading(GraphScope.Session)) }
     var selectedNodeId by remember(sessionId, highlightedNodeId) { mutableStateOf(highlightedNodeId) }
-    var showLockedNodes by remember(sessionId) { mutableStateOf(true) }
+    var showLockedNodes by remember(sessionId) { mutableStateOf(false) }
+    var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
 
-    LaunchedEffect(dataScope) {
+    LaunchedEffect(dataScope, refreshKey) {
+        state = KnowledgeGraphUiState.loading(GraphScope.Session)
         state = when (val result = graphRepository.snapshot(dataScope)) {
             is GraphSnapshotResult.Ready -> KnowledgeGraphUiState.from(
                 nodes = result.snapshot.nodes,
@@ -37,12 +40,15 @@ internal fun SessionWorldTreeRoute(
                 selectedNodeId = selectedNodeId,
                 scope = GraphScope.Session
             )
-            is GraphSnapshotResult.Empty,
-            is GraphSnapshotResult.Error -> KnowledgeGraphUiState.from(
+            is GraphSnapshotResult.Empty -> KnowledgeGraphUiState.from(
                 nodes = emptyList(),
                 edges = emptyList(),
                 selectedNodeId = null,
                 scope = GraphScope.Session
+            )
+            is GraphSnapshotResult.Error -> KnowledgeGraphUiState.error(
+                scope = GraphScope.Session,
+                message = result.error.safeMessage
             )
         }
     }
@@ -55,6 +61,7 @@ internal fun SessionWorldTreeRoute(
         onShowLockedNodesChange = { showLockedNodes = it },
         onBack = onBack,
         onSelectedNodeChange = { selectedNodeId = it },
+        onRetry = { refreshKey += 1 },
         onGraphInteractionChanged = onGraphInteractionChanged,
         modifier = modifier
     )

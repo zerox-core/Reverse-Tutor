@@ -331,6 +331,10 @@ class WorkspaceViewModelTest {
     @Test
     fun dominantAxisAndInnerControlsKeepWorkspacePagerFromStealingGestures() {
         assertEquals(
+            WorkspaceGestureOwner.WorkspacePager,
+            workspaceGestureOwner(72f, 18f, false, false, true)
+        )
+        assertEquals(
             WorkspaceGestureOwner.InnerVerticalContent,
             workspaceGestureOwner(18f, 72f, false, false, true)
         )
@@ -341,6 +345,10 @@ class WorkspaceViewModelTest {
         assertEquals(
             WorkspaceGestureOwner.GraphCanvas,
             workspaceGestureOwner(72f, 18f, false, true, true)
+        )
+        assertEquals(
+            WorkspaceGestureOwner.GraphCanvas,
+            workspaceGestureOwner(72f, 18f, false, true, false)
         )
         assertEquals(
             WorkspaceGestureOwner.Locked,

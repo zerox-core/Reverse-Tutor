@@ -62,29 +62,33 @@ import kotlin.math.roundToInt
 @Composable
 fun FormalWeeklyDashboardScreen(
     dashboardState: WeeklyDashboardUiState,
+    modifier: Modifier = Modifier,
     sessionOptions: List<FormalWeeklySessionOption> = emptyList(),
     selectedSessionIds: Set<String> = emptySet(),
     onApplySessionScope: (Set<String>) -> Unit = {},
     onOpenSession: (String) -> Unit = {},
+    onOpenWidget: (WeeklyWidgetKind) -> Unit = {},
     onOpenQuestion: (String) -> Unit = {},
     onAddSuggestion: (String) -> Unit = {},
     onQuickSwitchModel: () -> Unit = {},
     onEditWidgetLayout: () -> Unit = {},
-    showSpatialIndicator: Boolean = true,
-    modifier: Modifier = Modifier
+    onAction: (WeeklyDashboardUiAction) -> Unit = {},
+    isPageActive: Boolean = true,
+    onWidgetDragChanged: (Boolean) -> Unit = {},
+    onInnerHorizontalControlChanged: (Boolean) -> Unit = {},
+    onEditSurfaceChanged: (Boolean, () -> Unit) -> Unit = { _, _ -> },
+    showSpatialIndicator: Boolean = true
 ) {
-    FormalWeeklyScreen(
-        state = dashboardState.toFormalWeeklyUiState(
-            sessionOptions = sessionOptions,
-            selectedSessionIds = selectedSessionIds
-        ),
-        onApplySessionScope = onApplySessionScope,
+    WeeklyDashboardGridScreen(
+        state = dashboardState,
+        sessionOptions = sessionOptions,
+        onAction = onAction,
+        isPageActive = isPageActive,
+        onWidgetDragChanged = onWidgetDragChanged,
+        onInnerHorizontalControlChanged = onInnerHorizontalControlChanged,
+        onEditSurfaceChanged = onEditSurfaceChanged,
+        onOpenWidget = onOpenWidget,
         onOpenSession = onOpenSession,
-        onOpenQuestion = onOpenQuestion,
-        onAddSuggestion = onAddSuggestion,
-        onQuickSwitchModel = onQuickSwitchModel,
-        onEditWidgetLayout = onEditWidgetLayout,
-        showSpatialIndicator = showSpatialIndicator,
         modifier = modifier
     )
 }

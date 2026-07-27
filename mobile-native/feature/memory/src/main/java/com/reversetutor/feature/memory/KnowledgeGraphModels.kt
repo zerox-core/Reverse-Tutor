@@ -14,6 +14,7 @@ enum class GraphRenderStatus(
 ) {
     Loading("加载中"),
     Empty("空"),
+    Error("失败"),
     Ready("已渲染"),
     Invalid("需审核"),
     Large("大图谱")
@@ -148,6 +149,19 @@ data class KnowledgeGraphUiState(
                 invalidEdgeCount = 0
             )
 
+        fun error(
+            scope: GraphScope = GraphScope.Session,
+            message: String = "图谱加载失败，请重试。"
+        ): KnowledgeGraphUiState = KnowledgeGraphUiState(
+            scope = scope,
+            status = GraphRenderStatus.Error,
+            title = "图谱加载失败",
+            summary = message.ifBlank { "图谱加载失败，请重试。" },
+            nodes = emptyList(),
+            visibleEdges = emptyList(),
+            invalidEdgeCount = 0
+        )
+
         fun from(
             nodes: List<GraphNode>,
             edges: List<GraphEdge>,
@@ -223,7 +237,8 @@ data class KnowledgeGraphUiState(
 
         private fun GraphRenderStatus.titleFor(scope: GraphScope): String = when (this) {
             GraphRenderStatus.Loading -> "正在加载图谱"
-            GraphRenderStatus.Empty -> "还没有图谱节点"
+            GraphRenderStatus.Empty -> "当前会话信息过少，再多聊会天吧"
+            GraphRenderStatus.Error -> "图谱加载失败"
             GraphRenderStatus.Ready -> scope.label
             GraphRenderStatus.Invalid -> "图谱需要审核"
             GraphRenderStatus.Large -> "大型图谱"
@@ -236,7 +251,8 @@ data class KnowledgeGraphUiState(
             invalidEdges: Int
         ): String = when (this) {
             GraphRenderStatus.Loading -> "正在读取本地图谱数据。"
-            GraphRenderStatus.Empty -> "当前本地空间还没有图谱节点。"
+            GraphRenderStatus.Empty -> ""
+            GraphRenderStatus.Error -> "图谱加载失败，请重试。"
             GraphRenderStatus.Ready -> "${scope.label}：$nodes 个节点、$visibleEdges 条关系。支持拖动、缩放、选择与节点列表兜底。"
             GraphRenderStatus.Invalid -> "${scope.label}：$nodes 个节点、$visibleEdges 条有效关系，$invalidEdges 条关系需要修复。支持拖动、缩放、选择与节点列表兜底。"
             GraphRenderStatus.Large -> "${scope.label}：当前有 $nodes 个节点。"
@@ -266,7 +282,7 @@ data class GraphLayoutNode(
     val evidenceBody: String? = null
 ) {
     val hitRadius: Float
-        get() = (radius * 1.35f).coerceAtLeast(0.045f)
+        get() = radius * 1.35f
 
     val isLocked: Boolean
         get() = status == GraphNodeStatus.Hidden

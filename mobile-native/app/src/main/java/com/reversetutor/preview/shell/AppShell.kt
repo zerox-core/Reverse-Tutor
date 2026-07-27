@@ -8,8 +8,8 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +76,7 @@ import com.reversetutor.feature.chat.ChatQueryHighlight
 import com.reversetutor.feature.chat.ChatReferenceQueryRoute
 import com.reversetutor.feature.chat.ChatReferenceQueryState
 import com.reversetutor.feature.chat.ChatScrollMemory
+import com.reversetutor.feature.chat.NewSessionPrefillRequest
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
@@ -84,6 +85,10 @@ import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
 import com.reversetutor.feature.memory.FormalWeeklySessionOption
 import com.reversetutor.feature.memory.GlobalGraphRoute
 import com.reversetutor.feature.memory.WeeklyDashboardUiState
+import com.reversetutor.feature.memory.WeeklyDashboardUiAction
+import com.reversetutor.feature.memory.WeeklyWidgetDestination
+import com.reversetutor.feature.memory.WeeklyWidgetKind
+import com.reversetutor.feature.memory.normalDestination
 import com.reversetutor.feature.sources.SourcesRoute
 import com.reversetutor.feature.settings.FirstLaunchImportPromptUiState
 import com.reversetutor.feature.settings.FormalLlmConfigurationScreen
@@ -112,6 +117,33 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+internal fun shouldShowActivityAnnouncement(
+    destination: AppDestination,
+    dismissed: Boolean,
+    firstLaunchImportPromptVisible: Boolean,
+    challengeSessionPrefill: NewSessionPrefillRequest?
+): Boolean = destination == AppDestination.NewSession &&
+    !dismissed &&
+    !firstLaunchImportPromptVisible &&
+    challengeSessionPrefill == null
+
+internal sealed interface ChallengeNewSessionCloseDecision {
+    data object Sessions : ChallengeNewSessionCloseDecision
+    data class RestoreChallenge(
+        val context: ChallengeReturnContext
+    ) : ChallengeNewSessionCloseDecision
+}
+
+internal fun resolveChallengeNewSessionClose(
+    challengeSessionPrefill: NewSessionPrefillRequest?,
+    returnContext: ChallengeReturnContext?
+): ChallengeNewSessionCloseDecision =
+    if (challengeSessionPrefill != null && returnContext != null) {
+        ChallengeNewSessionCloseDecision.RestoreChallenge(returnContext)
+    } else {
+        ChallengeNewSessionCloseDecision.Sessions
+    }
+
 @Composable
 fun AppShell(
     hybridAppGraph: HybridAppGraph,
@@ -136,6 +168,11 @@ fun AppShell(
     var activeArticleSlug by remember { mutableStateOf("") }
     val chatScrollMemory = remember { ChatScrollMemory() }
     var figmaUiState by remember { mutableStateOf(FigmaAppUiState()) }
+    var challengeEntryGeneration by remember { mutableStateOf(0L) }
+    var challengeSessionPrefill by remember { mutableStateOf<NewSessionPrefillRequest?>(null) }
+    var challengeCurrentReturnContext by remember { mutableStateOf(ChallengeReturnContext()) }
+    var challengePrefillReturnContext by remember { mutableStateOf<ChallengeReturnContext?>(null) }
+    var challengeRestoreContext by remember { mutableStateOf<ChallengeReturnContext?>(null) }
     var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
     var pageLocalActionDismissers by remember {
         mutableStateOf(emptyMap<WorkspacePage, () -> Unit>())
@@ -152,6 +189,27 @@ fun AppShell(
     val workspaceState by workspaceViewModel.uiState.collectAsState()
     val challengeRuntimeCoordinator = hybridAppGraph.challengeRuntimeCoordinator
     val challengeRuntimeState by challengeRuntimeCoordinator.state.collectAsState()
+    val challengeJoinFlowCoordinator = remember(
+        challengeRuntimeCoordinator,
+        sessionRepository,
+        hybridAppGraph.frontend.newSessionPersistence
+    ) {
+        ChallengeJoinFlowCoordinator(challengeRuntimeCoordinator) {
+            sessionRepository.listSessions()
+                .filterNot { it.archived }
+                .map { session ->
+                    val snapshot = hybridAppGraph.frontend.newSessionPersistence
+                        .loadSessionSnapshot(session.id)
+                    ChallengeSessionCandidate(
+                        sessionId = session.id,
+                        title = session.title,
+                        learnerRole = snapshot?.learnerRole ?: "学习者",
+                        updatedAtEpochMillis = session.updatedAtEpochMillis,
+                        snapshot = snapshot
+                    )
+                }
+        }
+    }
     val weeklyDashboardViewModelFactory = hybridAppGraph.frontend.weeklyDashboardViewModelFactory
     val weeklyDashboardViewModel = remember(weeklyDashboardViewModelFactory) {
         weeklyDashboardViewModelFactory.create(appScope)
@@ -161,6 +219,39 @@ fun AppShell(
         WorkspaceInteractionBindings(workspaceViewModel::onAction)
     }
     val lifecycleOwner = LocalContext.current as? LifecycleOwner
+
+    fun openChallenge() {
+        challengeRestoreContext = null
+        challengeEntryGeneration += 1L
+        workspaceViewModel.onAction(WorkspaceUiAction.SetChallengeExitBoundary(false))
+        navigationState = navigationState.navigate(AppDestination.Challenge)
+    }
+
+    fun applyConfirmedChallengeJoin(
+        launch: ChallengeSessionLaunchDecision,
+        returnContext: ChallengeReturnContext
+    ) {
+        workspaceViewModel.onAction(
+            WorkspaceUiAction.SelectVerticalPage(WorkspaceVerticalPage.SessionHome)
+        )
+        when (launch) {
+            is ChallengeSessionLaunchDecision.Reuse -> {
+                challengeSessionPrefill = null
+                challengePrefillReturnContext = null
+                challengeRestoreContext = null
+                activeSessionId = launch.candidate.sessionId
+                activeSessionTitle = launch.candidate.title
+                activeSessionLearnerRole = launch.candidate.learnerRole
+                navigationState = navigationState.navigate(AppDestination.Chat)
+            }
+            is ChallengeSessionLaunchDecision.Create -> {
+                challengePrefillReturnContext = returnContext
+                challengeSessionPrefill = launch.prefill
+                figmaUiState = figmaUiState.dismissActivityAnnouncement()
+                navigationState = navigationState.navigate(AppDestination.NewSession)
+            }
+        }
+    }
 
     DisposableEffect(lifecycleOwner, workspaceViewModel) {
         val observer = LifecycleEventObserver { _, event ->
@@ -178,32 +269,20 @@ fun AppShell(
         challengeRuntimeCoordinator.load()
     }
 
-    BackHandler {
-        when (
-            workspaceBackTarget(
-                navigationState = navigationState,
-                workspaceState = workspaceState,
-                pageLocalActionSurfaceActive =
-                    pageLocalActionDismissers.containsKey(workspaceState.currentPage)
-            )
-        ) {
-            WorkspaceBackTarget.PageLocalActionSurface -> {
-                pageLocalActionDismissers[workspaceState.currentPage]?.invoke()
-            }
-            WorkspaceBackTarget.GraphCanvas -> {
-                workspaceViewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(false))
-            }
-            WorkspaceBackTarget.AppNavigationSurface,
-            WorkspaceBackTarget.Navigation -> {
-                val transition = navigationState.handleSystemBack()
-                if (transition.result == BackResult.AllowSystemExit) {
-                    onExitRequested()
-                } else {
-                    navigationState = transition.state
-                }
-            }
-        }
-    }
+    WorkspaceBackHandler(
+        navigationState = navigationState,
+        workspaceState = workspaceState,
+        pageLocalActionSurfaceActive =
+            pageLocalActionDismissers.containsKey(workspaceState.currentPage),
+        onDismissPageLocalActionSurface = {
+            pageLocalActionDismissers[workspaceState.currentPage]?.invoke()
+        },
+        onExitGraphCanvas = {
+            workspaceViewModel.onAction(WorkspaceUiAction.SetGraphCanvasModeActive(false))
+        },
+        onNavigationStateChange = { navigationState = it },
+        onExitRequested = onExitRequested
+    )
 
     LaunchedEffect(initialImportText, initialImportFileName) {
         if (!initialImportText.isNullOrBlank()) {
@@ -280,7 +359,7 @@ fun AppShell(
                             }
                         },
                         onChallengeClick = {
-                            navigationState = navigationState.navigate(AppDestination.Challenge)
+                            openChallenge()
                         },
                         onNewSessionClick = {
                             navigationState = navigationState.navigate(AppDestination.NewSession)
@@ -315,11 +394,18 @@ fun AppShell(
                         activeArticleSlug = activeArticleSlug,
                         chatScrollMemory = chatScrollMemory,
                         challengeRuntimeState = challengeRuntimeState,
+                        challengeEntryGeneration = challengeEntryGeneration,
+                        challengeSessionPrefill = challengeSessionPrefill,
+                        challengeRestoreContext = challengeRestoreContext,
                         challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
                             ?: figmaUiState.challengeProgress,
                         challengeTotal = figmaUiState.challengeTotal,
                         weeklyDashboardState = weeklyDashboardState,
+                        weeklyPageActive = workspaceState.currentPage == WorkspacePage.WeeklyDashboard,
+                        onWeeklyDashboardAction = weeklyDashboardViewModel::onAction,
                         onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
+                        onWidgetDragChanged = workspaceInteractions::onWidgetDragChanged,
+                        onInnerHorizontalControlChanged = workspaceInteractions::onInnerHorizontalControlChanged,
                         onGraphInteractionChanged =
                             workspaceInteractions::onFullscreenGraphInteractionChanged,
                         graphCanvasModeActive = workspaceState.interactionLocks.graphCanvasModeActive,
@@ -366,26 +452,34 @@ fun AppShell(
                             navigationState = navigationState.navigate(AppDestination.Sessions)
                         },
                         onOpenChallenge = {
-                            navigationState = navigationState.navigate(AppDestination.Challenge)
+                            openChallenge()
+                        },
+                        onChallengeReturnContextChanged = {
+                            challengeCurrentReturnContext = it
+                        },
+                        onChallengeRestoreConsumed = {
+                            challengeRestoreContext = null
                         },
                         onChallengeJoined = {
+                            val returnContext = challengeCurrentReturnContext.copy(detailOpen = true)
                             appScope.launch {
-                                challengeRuntimeCoordinator.join()
-                                if (challengeRuntimeCoordinator.state.value.joined) {
-                                    workspaceViewModel.onAction(
-                                        WorkspaceUiAction.SelectVerticalPage(
-                                            WorkspaceVerticalPage.SessionHome
-                                        )
-                                    )
-                                    navigationState =
-                                        navigationState.navigate(AppDestination.Sessions)
+                                challengeJoinFlowCoordinator.join()?.let { launch ->
+                                    applyConfirmedChallengeJoin(launch, returnContext)
                                 }
                             }
                         },
                         onChallengeRetry = {
-                            appScope.launch { challengeRuntimeCoordinator.retry() }
+                            val returnContext = challengeCurrentReturnContext.copy(detailOpen = true)
+                            appScope.launch {
+                                challengeJoinFlowCoordinator.retry()?.let { launch ->
+                                    applyConfirmedChallengeJoin(launch, returnContext)
+                                }
+                            }
                         },
                         onOpenNewSession = {
+                            challengeSessionPrefill = null
+                            challengePrefillReturnContext = null
+                            challengeRestoreContext = null
                             navigationState = navigationState.navigate(AppDestination.NewSession)
                         },
                         onOpenPublicArticle = { slug ->
@@ -418,6 +512,9 @@ fun AppShell(
                             }
                         },
                         onSessionCreated = { session ->
+                            challengeSessionPrefill = null
+                            challengePrefillReturnContext = null
+                            challengeRestoreContext = null
                             activeSessionId = session.id
                             activeSessionTitle = session.title
                             activeSessionLearnerRole = session.learnerRole
@@ -430,6 +527,31 @@ fun AppShell(
                             activeSessionTitle = null
                             activeSessionLearnerRole = "学习者"
                             navigationState = navigationState.navigate(AppDestination.Sessions)
+                        },
+                        onCloseNewSession = {
+                            val decision = resolveChallengeNewSessionClose(
+                                challengeSessionPrefill,
+                                challengePrefillReturnContext
+                            )
+                            challengeSessionPrefill = null
+                            challengePrefillReturnContext = null
+                            when (decision) {
+                                is ChallengeNewSessionCloseDecision.RestoreChallenge -> {
+                                    challengeRestoreContext = decision.context
+                                    workspaceViewModel.onAction(
+                                        WorkspaceUiAction.SelectVerticalPage(
+                                            WorkspaceVerticalPage.Challenge
+                                        )
+                                    )
+                                    navigationState = navigationState.navigate(
+                                        AppDestination.Challenge
+                                    )
+                                }
+                                ChallengeNewSessionCloseDecision.Sessions -> {
+                                    challengeRestoreContext = null
+                                    navigationState = navigationState.navigate(AppDestination.Sessions)
+                                }
+                            }
                         },
                         onOpenSettings = {
                             navigationState = navigationState.navigate(AppDestination.Settings)
@@ -466,6 +588,12 @@ fun AppShell(
                             }
                         },
                         showIndicator = workspaceChromeObscuredPages.isEmpty(),
+                        onChallengeEntryStarted = {
+                            challengeEntryGeneration += 1L
+                            workspaceViewModel.onAction(
+                                WorkspaceUiAction.SetChallengeExitBoundary(false)
+                            )
+                        },
                         challengeContent = {
                             renderDestination(AppDestination.Challenge)
                         },
@@ -500,9 +628,12 @@ fun AppShell(
         )
     }
 
-    if (navigationState.current == AppDestination.NewSession &&
-        !figmaUiState.activityAnnouncementDismissed &&
-        !showFirstLaunchImportPrompt
+    if (shouldShowActivityAnnouncement(
+            destination = navigationState.current,
+            dismissed = figmaUiState.activityAnnouncementDismissed,
+            firstLaunchImportPromptVisible = showFirstLaunchImportPrompt,
+            challengeSessionPrefill = challengeSessionPrefill
+        )
     ) {
         ActivityAnnouncementDialog(
             onDismiss = {
@@ -510,7 +641,7 @@ fun AppShell(
             },
             onViewChallenge = {
                 figmaUiState = figmaUiState.dismissActivityAnnouncement()
-                navigationState = navigationState.navigate(AppDestination.Challenge)
+                openChallenge()
             }
         )
     }
@@ -698,14 +829,23 @@ private fun DestinationContent(
     activeArticleSlug: String,
     chatScrollMemory: ChatScrollMemory,
     challengeRuntimeState: ChallengeRuntimeState,
+    challengeEntryGeneration: Long,
+    challengeSessionPrefill: NewSessionPrefillRequest?,
+    challengeRestoreContext: ChallengeReturnContext?,
     challengeProgress: Int,
     challengeTotal: Int,
     weeklyDashboardState: WeeklyDashboardUiState,
+    weeklyPageActive: Boolean,
+    onWeeklyDashboardAction: (WeeklyDashboardUiAction) -> Unit,
     onComposerFocusChanged: (Boolean) -> Unit,
+    onWidgetDragChanged: (Boolean) -> Unit,
+    onInnerHorizontalControlChanged: (Boolean) -> Unit,
     onGraphInteractionChanged: (Boolean) -> Unit,
     graphCanvasModeActive: Boolean,
     onGraphCanvasModeChanged: (Boolean) -> Unit,
     onChallengeExitBoundaryChanged: (Boolean) -> Unit,
+    onChallengeReturnContextChanged: (ChallengeReturnContext) -> Unit,
+    onChallengeRestoreConsumed: () -> Unit,
     onWorkspaceChromeObscuredChanged: (WorkspacePage, Boolean) -> Unit,
     onPageLocalActionSurfaceChanged: (WorkspacePage, Boolean, () -> Unit) -> Unit,
     onOpenChat: () -> Unit,
@@ -724,6 +864,7 @@ private fun DestinationContent(
     onActiveSessionTitleChanged: (String) -> Unit,
     onActiveSessionLearnerRoleChanged: (String) -> Unit,
     onActiveSessionDeleted: () -> Unit,
+    onCloseNewSession: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImportExport: () -> Unit,
     onOpenAbout: () -> Unit,
@@ -783,7 +924,7 @@ private fun DestinationContent(
         )
     }
     val destinationLifecycleOwner = context as? LifecycleOwner
-    DisposableEffect(destinationLifecycleOwner, context) {
+    DisposableEffect(destinationLifecycleOwner, context, destination) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 pendingDeletionSweepGeneration += 1
@@ -798,10 +939,34 @@ private fun DestinationContent(
                         cameraPermissionState
                     }
                 }
+                if (destination == AppDestination.WeeklyDashboard) {
+                    onWeeklyDashboardAction(
+                        WeeklyDashboardUiAction.ConnectivityChanged(context.hasNetworkConnection())
+                    )
+                }
             }
         }
         destinationLifecycleOwner?.lifecycle?.addObserver(observer)
         onDispose { destinationLifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
+    DisposableEffect(context) {
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                onWeeklyDashboardAction(WeeklyDashboardUiAction.ConnectivityChanged(true))
+            }
+
+            override fun onLost(network: android.net.Network) {
+                onWeeklyDashboardAction(
+                    WeeklyDashboardUiAction.ConnectivityChanged(context.hasNetworkConnection())
+                )
+            }
+        }
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        runCatching { connectivityManager?.registerNetworkCallback(request, callback) }
+        onDispose { runCatching { connectivityManager?.unregisterNetworkCallback(callback) } }
     }
     LaunchedEffect(chatPendingDeletionStore, messageRepository, pendingDeletionSweepGeneration) {
         val sweeper = ChatPendingDeletionSweeper(
@@ -1005,7 +1170,8 @@ private fun DestinationContent(
                 id = session.id,
                 title = session.title,
                 detail = if (session.pinned) "学习模式 · 已置顶" else "学习模式",
-                activeThisWeek = session.updatedAtEpochMillis >= activeThreshold
+                activeThisWeek = session.updatedAtEpochMillis >= activeThreshold,
+                pinned = session.pinned
             )
         }
     }
@@ -1039,7 +1205,8 @@ private fun DestinationContent(
                 persistence = hybridAppGraph.frontend.newSessionPersistence,
                 tagLibraryPersistence = hybridAppGraph.frontend.tagLibraryPersistence,
                 onCreated = onSessionCreated,
-                onBack = onOpenSessions
+                onBack = onCloseNewSession,
+                initialPrefill = challengeSessionPrefill
             )
             return@ReverseTutorScreenSurface
         }
@@ -1052,7 +1219,11 @@ private fun DestinationContent(
                 onJoin = onChallengeJoined,
                 runtimeState = challengeRuntimeState,
                 onRetry = onChallengeRetry,
-                onExitBoundaryChanged = onChallengeExitBoundaryChanged
+                onExitBoundaryChanged = onChallengeExitBoundaryChanged,
+                entryGeneration = challengeEntryGeneration,
+                restoreContext = challengeRestoreContext,
+                onRestoreConsumed = onChallengeRestoreConsumed,
+                onReturnContextChanged = onChallengeReturnContextChanged
             )
             return@ReverseTutorScreenSurface
         }
@@ -1239,8 +1410,26 @@ private fun DestinationContent(
                         ?.toSessionListItem(appPreferences.globalAvatarVisible)
                         ?.let(onOpenSession)
                 },
+                onOpenWidget = { kind ->
+                    when (kind.normalDestination()) {
+                        WeeklyWidgetDestination.LearningGraph -> onOpenGlobalGraph()
+                        WeeklyWidgetDestination.Challenge -> onOpenChallenge()
+                        else -> Unit
+                    }
+                },
                 onOpenQuestion = { onOpenGlobalGraph() },
                 onQuickSwitchModel = onOpenSettings,
+                onAction = onWeeklyDashboardAction,
+                isPageActive = weeklyPageActive,
+                onWidgetDragChanged = onWidgetDragChanged,
+                onInnerHorizontalControlChanged = onInnerHorizontalControlChanged,
+                onEditSurfaceChanged = { active, dismiss ->
+                    onPageLocalActionSurfaceChanged(
+                        WorkspacePage.WeeklyDashboard,
+                        active,
+                        dismiss
+                    )
+                },
                 showSpatialIndicator = false
             )
             return@ReverseTutorScreenSurface

@@ -8,6 +8,9 @@ import com.reversetutor.core.domain.PersistTurnRetryCommand
 import com.reversetutor.core.domain.PersistTurnRunCommand
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
+import com.reversetutor.core.model.StudyPlanTask
+import com.reversetutor.core.model.TokenUsageRecord
+import com.reversetutor.feature.memory.WeeklyTokenUsageEntry
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -60,6 +63,11 @@ class HybridFrontendPortAdaptersTest {
 
     @Test
     fun weeklyDashboardUsesLatestLocalSummary() = runBlocking {
+        val saved = mutableListOf<StudyPlanTask>()
+        val usage = WeeklyTokenUsageEntry(
+            TokenUsageRecord("usage", "space", "turn", 1, inputTokens = 1, totalTokens = 1),
+            "session"
+        )
         val adapter = RepositoryWeeklyDashboardPortAdapter(
             listSummaries = {
                 listOf(
@@ -75,13 +83,19 @@ class HybridFrontendPortAdaptersTest {
                     )
                 )
             },
-            listTasks = { emptyList() }
+            listTasks = { emptyList() },
+            listTokenUsage = { listOf(usage) },
+            saveTask = { task -> saved += task; task }
         )
 
         val snapshot = adapter.loadLocalSnapshot()
+        val task = StudyPlanTask("task", "space", "Read")
+        adapter.saveTask(task)
 
         assertEquals("latest", snapshot.summary?.id)
         assertTrue(snapshot.tasks.isEmpty())
+        assertEquals(listOf(usage), snapshot.tokenUsage)
+        assertEquals(listOf(task), saved)
     }
 
     private fun run(id: String, state: TurnRunState) =

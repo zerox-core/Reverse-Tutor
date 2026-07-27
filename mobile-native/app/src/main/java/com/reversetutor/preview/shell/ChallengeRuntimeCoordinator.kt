@@ -43,15 +43,26 @@ class ChallengeRuntimeCoordinator(
         loadLocked()
     }
 
-    suspend fun join() = mutex.withLock {
-        joinLocked()
+    suspend fun join(): Boolean {
+        if (!mutex.tryLock()) return false
+        try {
+            return joinLocked()
+        } finally {
+            mutex.unlock()
+        }
     }
 
-    suspend fun retry() = mutex.withLock {
-        val failure = mutableState.value.failure?.takeIf { it.retryable } ?: return@withLock
-        when (failure.operation) {
-            ChallengeRuntimeOperation.Load -> loadLocked()
-            ChallengeRuntimeOperation.Join -> joinLocked()
+    suspend fun retry(): ChallengeRuntimeOperation? {
+        if (!mutex.tryLock()) return null
+        try {
+            val failure = mutableState.value.failure?.takeIf { it.retryable } ?: return null
+            when (failure.operation) {
+                ChallengeRuntimeOperation.Load -> loadLocked()
+                ChallengeRuntimeOperation.Join -> joinLocked()
+            }
+            return failure.operation
+        } finally {
+            mutex.unlock()
         }
     }
 
@@ -92,9 +103,10 @@ class ChallengeRuntimeCoordinator(
         }
     }
 
-    private suspend fun joinLocked() {
-        val repository = activityRepository ?: return
-        val activity = mutableState.value.activity ?: return
+    private suspend fun joinLocked(): Boolean {
+        val repository = activityRepository ?: return false
+        if (mutableState.value.loading || mutableState.value.joined) return false
+        val activity = mutableState.value.activity ?: return false
         val previous = mutableState.value
         mutableState.value = previous.copy(loading = true, failure = null)
         val identity = identityProvider()
@@ -107,7 +119,7 @@ class ChallengeRuntimeCoordinator(
                     operation = ChallengeRuntimeOperation.Join
                 )
             )
-            return
+            return false
         }
         val idempotencyKey = "join:${activity.id}:${identity.accountId}:${activity.revision}"
         when (val result = repository.join(
@@ -126,6 +138,7 @@ class ChallengeRuntimeCoordinator(
                 )
             }
         }
+        return mutableState.value.joined
     }
 
     private fun fail(

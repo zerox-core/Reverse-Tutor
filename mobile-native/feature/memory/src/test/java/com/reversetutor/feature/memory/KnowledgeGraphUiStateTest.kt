@@ -22,8 +22,22 @@ class KnowledgeGraphUiStateTest {
         )
 
         assertEquals(GraphRenderStatus.Empty, state.status)
-        assertEquals("还没有图谱节点", state.title)
+        assertEquals("当前会话信息过少，再多聊会天吧", state.title)
+        assertEquals("", state.summary)
         assertTrue(state.visibleEdges.isEmpty())
+    }
+
+    @Test
+    fun errorGraphKeepsRetryablePresentationSeparateFromEmpty() {
+        val state = KnowledgeGraphUiState.error(
+            scope = GraphScope.Global,
+            message = "本地图谱暂时不可用"
+        )
+
+        assertEquals(GraphRenderStatus.Error, state.status)
+        assertEquals("图谱加载失败", state.title)
+        assertEquals("本地图谱暂时不可用", state.summary)
+        assertTrue(state.allNodes.isEmpty())
     }
 
     @Test

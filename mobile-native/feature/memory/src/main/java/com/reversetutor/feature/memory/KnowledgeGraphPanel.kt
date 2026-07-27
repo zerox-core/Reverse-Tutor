@@ -11,7 +11,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,12 +34,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -58,9 +55,9 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -74,9 +71,6 @@ import com.reversetutor.core.design.FormalShapes
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.model.GraphNodeKind
 import com.reversetutor.core.model.GraphNodeStatus
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 data class GraphViewportState(
@@ -176,20 +170,53 @@ fun FormalGraphCanvas(
     interactionEnabled: Boolean = true,
     onRequestInteraction: () -> Unit = {},
     onInteractionChanged: (Boolean) -> Unit = {},
-    onViewportChanged: (GraphViewportState) -> Unit = {}
+    onViewportChanged: (GraphViewportState) -> Unit = {},
+    onNodePositionChanged: (String, GraphPoint) -> Unit = { _, _ -> }
 ) {
-    var scale by remember(state.scope, initialScale) { mutableFloatStateOf(initialScale.coerceIn(0.72f, 3.2f)) }
-    var pan by remember(state.scope) { mutableStateOf(Offset.Zero) }
+    var gestureState by remember(state.scope, state.allNodes.map { it.id }, initialScale) {
+        mutableStateOf(GraphGestureState(scale = initialScale.coerceIn(0.55f, 3.2f)))
+    }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    var inertiaJob by remember { mutableStateOf<Job?>(null) }
-    val coroutineScope = rememberCoroutineScope()
+    var lastEmptyTap by remember(state.scope) { mutableStateOf<GraphTapRecord?>(null) }
     val typeMultiplier = LocalFormalTypeScale.current.multiplier
     val density = LocalDensity.current
+    val viewConfiguration = LocalViewConfiguration.current
     val renderSnapshot = state.renderSnapshot(showLockedNodes)
-    val semanticMode = graphSemanticMode(state.scope, scale)
+        .withNodePositions(gestureState.nodePositions)
+    val semanticMode = graphSemanticMode(state.scope, gestureState.scale)
+    val extent = graphCanvasExtent(renderSnapshot.nodes, semanticMode)
+    val currentSnapshot by rememberUpdatedState(renderSnapshot)
+    val currentSemanticMode by rememberUpdatedState(semanticMode)
+    val currentExtent by rememberUpdatedState(extent)
 
-    LaunchedEffect(scale, pan, semanticMode) {
-        onViewportChanged(GraphViewportState(scale, pan, semanticMode))
+    fun panBounds(scale: Float): GraphPanBounds = graphPanBounds(
+        extent = currentExtent,
+        viewportWidthPx = canvasSize.width.toFloat(),
+        viewportHeightPx = canvasSize.height.toFloat(),
+        scale = scale
+    )
+
+    fun fitCanvas() {
+        gestureState = reduceGraphGesture(
+            gestureState,
+            GraphGestureAction.Fit(
+                graphFitTransform(
+                    extent = currentExtent,
+                    viewportWidthPx = canvasSize.width.toFloat(),
+                    viewportHeightPx = canvasSize.height.toFloat()
+                )
+            )
+        )
+    }
+
+    LaunchedEffect(gestureState.scale, gestureState.pan, semanticMode) {
+        onViewportChanged(
+            GraphViewportState(
+                scale = gestureState.scale,
+                pan = Offset(gestureState.pan.x, gestureState.pan.y),
+                semanticMode = semanticMode
+            )
+        )
     }
 
     Box(
@@ -203,20 +230,37 @@ fun FormalGraphCanvas(
                 .fillMaxSize()
                 .onSizeChanged { canvasSize = it }
                 .then(if (interactionEnabled) Modifier.pointerInput(
-                    state.allNodes,
+                    state.scope,
+                    state.allNodes.map { it.id },
                     showLockedNodes,
                     onSelectedNodeChange,
-                    onInteractionChanged
+                    onInteractionChanged,
+                    onNodePositionChanged
                 ) {
                     awaitEachGesture {
-                        inertiaJob?.cancel()
                         val first = awaitFirstDown(requireUnconsumed = false)
-                        val tracker = VelocityTracker()
-                        tracker.addPosition(first.uptimeMillis, first.position)
                         val downPosition = first.position
                         var lastPosition = first.position
                         var movedDistance = 0f
                         var zoomed = false
+                        val downModel = screenToGraphModel(
+                            position = downPosition,
+                            canvasSize = canvasSize,
+                            scale = gestureState.scale,
+                            pan = gestureState.pan
+                        )
+                        val pressedNode = graphNodeAt(
+                            snapshot = currentSnapshot,
+                            point = downModel,
+                            semanticMode = currentSemanticMode,
+                            canvasSize = canvasSize,
+                            density = density.density,
+                            scale = gestureState.scale
+                        )
+                        gestureState = reduceGraphGesture(
+                            gestureState,
+                            GraphGestureAction.PressNode(pressedNode?.id)
+                        )
                         onInteractionChanged(true)
                         try {
                             do {
@@ -224,20 +268,62 @@ fun FormalGraphCanvas(
                                 val gesturePan = event.calculatePan()
                                 val gestureZoom = event.calculateZoom()
                                 if (gestureZoom.isFinite() && abs(gestureZoom - 1f) > 0.001f) {
-                                    scale = (scale * gestureZoom).coerceIn(0.72f, 3.2f)
+                                    gestureState = reduceGraphGesture(
+                                        gestureState,
+                                        GraphGestureAction.ZoomBy(gestureZoom, ::panBounds)
+                                    )
                                     zoomed = true
                                 }
-                                if (gesturePan != Offset.Zero) {
-                                    movedDistance += gesturePan.getDistance()
-                                    pan = clampPan(
-                                        value = pan + gesturePan,
-                                        canvasSize = canvasSize,
-                                        scale = scale
-                                    )
-                                }
-                                event.changes.firstOrNull()?.let { change ->
+                                event.changes.firstOrNull { it.id == first.id }?.let { change ->
                                     lastPosition = change.position
-                                    tracker.addPosition(change.uptimeMillis, change.position)
+                                    movedDistance += gesturePan.getDistance()
+                                    val heldLongEnough = change.uptimeMillis - first.uptimeMillis >=
+                                        viewConfiguration.longPressTimeoutMillis
+                                    if (!zoomed &&
+                                        gestureState.phase == GraphGesturePhase.Pressed &&
+                                        pressedNode != null &&
+                                        heldLongEnough
+                                    ) {
+                                        gestureState = reduceGraphGesture(
+                                            gestureState,
+                                            GraphGestureAction.BeginNodeDrag(pressedNode.id)
+                                        )
+                                    }
+                                    if (gestureState.draggingNodeId != null) {
+                                        val modelPosition = screenToGraphModel(
+                                            position = change.position,
+                                            canvasSize = canvasSize,
+                                            scale = gestureState.scale,
+                                            pan = gestureState.pan
+                                        )
+                                        gestureState = reduceGraphGesture(
+                                            gestureState,
+                                            GraphGestureAction.DragNodeTo(
+                                                nodeId = gestureState.draggingNodeId.orEmpty(),
+                                                position = modelPosition,
+                                                extent = currentExtent
+                                            )
+                                        )
+                                        gestureState.nodePositions[gestureState.draggingNodeId]
+                                            ?.let { position ->
+                                                onNodePositionChanged(
+                                                    gestureState.draggingNodeId.orEmpty(),
+                                                    position
+                                                )
+                                            }
+                                    } else if (!zoomed &&
+                                        gesturePan != Offset.Zero &&
+                                        movedDistance >= viewConfiguration.touchSlop
+                                    ) {
+                                        gestureState = reduceGraphGesture(
+                                            gestureState,
+                                            GraphGestureAction.PanBy(
+                                                delta = GraphPoint(gesturePan.x, gesturePan.y),
+                                                bounds = panBounds(gestureState.scale)
+                                            )
+                                        )
+                                    }
+                                    Unit
                                 }
                                 event.changes.forEach { change ->
                                     if (change.positionChanged()) change.consume()
@@ -247,50 +333,65 @@ fun FormalGraphCanvas(
                             onInteractionChanged(false)
                         }
 
-                        if (!zoomed && movedDistance < with(density) { 8.dp.toPx() }) {
-                            val width = canvasSize.width.toFloat().coerceAtLeast(1f)
-                            val height = canvasSize.height.toFloat().coerceAtLeast(1f)
-                            val tap = if ((lastPosition - downPosition).getDistance() < with(density) { 8.dp.toPx() }) {
-                                lastPosition
-                            } else {
-                                downPosition
-                            }
-                            val modelX = ((tap.x - pan.x) / scale) / width
-                            val modelY = ((tap.y - pan.y) / scale) / height
-                            val hit = state.hitTest(
-                                x = modelX,
-                                y = modelY,
-                                semanticMode = semanticMode,
-                                includeLockedNodes = showLockedNodes
+                        val wasDraggingNode = gestureState.draggingNodeId != null
+                        if (!zoomed && !wasDraggingNode && movedDistance < viewConfiguration.touchSlop) {
+                            val tapModel = screenToGraphModel(
+                                position = lastPosition,
+                                canvasSize = canvasSize,
+                                scale = gestureState.scale,
+                                pan = gestureState.pan
                             )
-                            onSelectedNodeChange(hit?.id)
-                        } else if (!zoomed) {
-                            val velocity = tracker.calculateVelocity()
-                            inertiaJob = coroutineScope.launch {
-                                var velocityX = velocity.x.coerceIn(-2800f, 2800f)
-                                var velocityY = velocity.y.coerceIn(-2800f, 2800f)
-                                repeat(36) {
-                                    if (abs(velocityX) + abs(velocityY) < 12f) return@launch
-                                    withFrameNanos { }
-                                    pan = clampPan(
-                                        value = pan + Offset(velocityX / 60f, velocityY / 60f),
-                                        canvasSize = canvasSize,
-                                        scale = scale
-                                    )
-                                    velocityX *= 0.88f
-                                    velocityY *= 0.88f
+                            val hit = graphNodeAt(
+                                snapshot = currentSnapshot,
+                                point = tapModel,
+                                semanticMode = currentSemanticMode,
+                                canvasSize = canvasSize,
+                                density = density.density,
+                                scale = gestureState.scale
+                            )
+                            if (hit != null) {
+                                lastEmptyTap = null
+                                onSelectedNodeChange(hit.id)
+                            } else {
+                                val previous = lastEmptyTap
+                                val isDoubleTap = previous != null &&
+                                    first.uptimeMillis - previous.uptimeMillis <=
+                                    viewConfiguration.doubleTapTimeoutMillis &&
+                                    (lastPosition - previous.position).getDistance() <=
+                                    with(density) { 32.dp.toPx() }
+                                onSelectedNodeChange(null)
+                                if (isDoubleTap) {
+                                    fitCanvas()
+                                    lastEmptyTap = null
+                                } else {
+                                    lastEmptyTap = GraphTapRecord(first.uptimeMillis, lastPosition)
                                 }
                             }
                         }
+                        gestureState = reduceGraphGesture(gestureState, GraphGestureAction.Release)
                     }
-                } else Modifier.pointerInput(onRequestInteraction) {
-                    detectTapGestures(onTap = { onRequestInteraction() })
+                } else Modifier.pointerInput(onRequestInteraction, viewConfiguration.touchSlop) {
+                    awaitEachGesture {
+                        val first = awaitFirstDown(requireUnconsumed = false)
+                        var distance = 0f
+                        do {
+                            val event = awaitPointerEvent()
+                            event.changes.firstOrNull { it.id == first.id }?.let { change ->
+                                distance += (change.position - change.previousPosition).getDistance()
+                            }
+                        } while (event.changes.any { it.pressed })
+                        if (distance < viewConfiguration.touchSlop) onRequestInteraction()
+                    }
                 })
         ) {
             drawGraphDotGrid()
             withTransform({
-                translate(left = pan.x, top = pan.y)
-                scale(scaleX = scale, scaleY = scale, pivot = Offset.Zero)
+                translate(left = gestureState.pan.x, top = gestureState.pan.y)
+                scale(
+                    scaleX = gestureState.scale,
+                    scaleY = gestureState.scale,
+                    pivot = center
+                )
             }) {
                 drawGraphEdges(renderSnapshot, state.selectedNodeId, showLockedNodes)
                 renderSnapshot.nodes.forEach { node ->
@@ -298,11 +399,13 @@ fun FormalGraphCanvas(
                         GraphSemanticMode.OverviewCircles -> drawCircleGraphNode(
                             node = node,
                             selected = node.id == state.selectedNodeId,
+                            interactionActive = node.id == gestureState.interactionNodeId,
                             typeMultiplier = typeMultiplier
                         )
                         GraphSemanticMode.DetailCards -> drawCardGraphNode(
                             node = node,
                             selected = node.id == state.selectedNodeId,
+                            interactionActive = node.id == gestureState.interactionNodeId,
                             scope = state.scope,
                             expandedSessionRoot = expandedSessionRoot,
                             typeMultiplier = typeMultiplier
@@ -314,13 +417,19 @@ fun FormalGraphCanvas(
 
         if (showToolbar) {
             GraphToolbar(
-                onCenter = {
-                    inertiaJob?.cancel()
-                    pan = Offset.Zero
-                    scale = initialScale.coerceIn(0.72f, 3.2f)
+                onCenter = ::fitCanvas,
+                onZoomOut = {
+                    gestureState = reduceGraphGesture(
+                        gestureState,
+                        GraphGestureAction.ZoomBy(1f / 1.22f, ::panBounds)
+                    )
                 },
-                onZoomOut = { scale = (scale / 1.22f).coerceIn(0.72f, 3.2f) },
-                onZoomIn = { scale = (scale * 1.22f).coerceIn(0.72f, 3.2f) },
+                onZoomIn = {
+                    gestureState = reduceGraphGesture(
+                        gestureState,
+                        GraphGestureAction.ZoomBy(1.22f, ::panBounds)
+                    )
+                },
                 onFilter = onFilterClick,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -330,21 +439,45 @@ fun FormalGraphCanvas(
     }
 }
 
-private fun clampPan(
-    value: Offset,
+private data class GraphTapRecord(
+    val uptimeMillis: Long,
+    val position: Offset
+)
+
+private fun screenToGraphModel(
+    position: Offset,
     canvasSize: IntSize,
-    scale: Float
-): Offset {
-    val horizontalLimit = canvasSize.width * (0.34f + (scale - 1f).coerceAtLeast(0f) * 0.62f)
-    val verticalLimit = canvasSize.height * (0.30f + (scale - 1f).coerceAtLeast(0f) * 0.62f)
-    return Offset(
-        x = value.x.coerceIn(-horizontalLimit, horizontalLimit),
-        y = value.y.coerceIn(-verticalLimit, verticalLimit)
+    scale: Float,
+    pan: GraphPoint
+): GraphPoint {
+    val width = canvasSize.width.toFloat().coerceAtLeast(1f)
+    val height = canvasSize.height.toFloat().coerceAtLeast(1f)
+    val safeScale = scale.coerceAtLeast(0.01f)
+    return GraphPoint(
+        x = (((position.x - pan.x - width / 2f) / safeScale) + width / 2f) / width,
+        y = (((position.y - pan.y - height / 2f) / safeScale) + height / 2f) / height
     )
 }
 
+private fun graphNodeAt(
+    snapshot: GraphRenderSnapshot,
+    point: GraphPoint,
+    semanticMode: GraphSemanticMode,
+    canvasSize: IntSize,
+    density: Float,
+    scale: Float
+): GraphLayoutNode? = graphHitTest(
+    nodes = snapshot.nodes,
+    target = point,
+    semanticMode = semanticMode,
+    viewportWidthPx = canvasSize.width.toFloat(),
+    viewportHeightPx = canvasSize.height.toFloat(),
+    density = density,
+    scale = scale
+)
+
 private fun DrawScope.drawGraphDotGrid() {
-    val dotColor = Color(0x244A6C9C)
+    val dotColor = Color(0x28758F92)
     val step = 24.dp.toPx()
     var x = step / 2f
     while (x < size.width) {
@@ -394,11 +527,19 @@ private fun DrawScope.drawGraphEdges(
 private fun DrawScope.drawCircleGraphNode(
     node: GraphLayoutNode,
     selected: Boolean,
+    interactionActive: Boolean,
     typeMultiplier: Float
 ) {
     val center = Offset(node.x * size.width, node.y * size.height)
     val radius = node.radius * size.minDimension
     val color = nodeColor(node)
+    if (interactionActive) {
+        drawCircle(
+            color = color.copy(alpha = 0.20f),
+            radius = radius + 12.dp.toPx(),
+            center = center
+        )
+    }
     if (selected) {
         drawCircle(
             color = FormalColors.Primary.copy(alpha = 0.16f),
@@ -479,6 +620,7 @@ internal fun graphOverviewLabelPlacement(
 private fun DrawScope.drawCardGraphNode(
     node: GraphLayoutNode,
     selected: Boolean,
+    interactionActive: Boolean,
     scope: GraphScope,
     expandedSessionRoot: Boolean,
     typeMultiplier: Float
@@ -520,6 +662,14 @@ private fun DrawScope.drawCardGraphNode(
         selected -> FormalColors.Primary
         isRoot -> Color(0xFFFDFFFF)
         else -> Color(0xFDFBFDFF)
+    }
+    if (interactionActive) {
+        drawRoundRect(
+            color = nodeColor(node).copy(alpha = 0.18f),
+            topLeft = Offset(rect.left - 8.dp.toPx(), rect.top - 8.dp.toPx()),
+            size = Size(rect.width + 16.dp.toPx(), rect.height + 16.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius + 7.dp.toPx())
+        )
     }
     drawRoundRect(
         color = Color(0x160D2748),
@@ -704,7 +854,12 @@ private fun GraphToolbar(
     }
 }
 
-private enum class GraphToolbarGlyph { Target, Minus, Plus, Filter }
+private enum class GraphToolbarGlyph(val description: String) {
+    Target("回到中心"),
+    Minus("缩小"),
+    Plus("放大"),
+    Filter("筛选")
+}
 
 @Composable
 private fun GraphToolbarButton(
@@ -716,6 +871,8 @@ private fun GraphToolbarButton(
         modifier = Modifier
             .size(44.dp)
             .background(if (selected) FormalColors.PrimarySoft else Color.Transparent, CircleShape)
+            .semantics { contentDescription = glyph.description }
+            .testTag("graph-toolbar-${glyph.name}")
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) {
@@ -758,6 +915,7 @@ private fun EmptyGraphPanel(state: KnowledgeGraphUiState) {
             .background(GraphCanvasBackground),
         contentAlignment = Alignment.Center
     ) {
+        Canvas(Modifier.fillMaxSize()) { drawGraphDotGrid() }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = state.title,
@@ -890,7 +1048,7 @@ private fun statusColor(node: GraphLayoutNode): Color = when (node.status) {
     GraphNodeStatus.Archived -> GraphMuted
 }
 
-private val GraphCanvasBackground = Color(0xFFF2F6FC)
+private val GraphCanvasBackground = Color.White
 private val GraphInk = Color(0xFF141C29)
 private val GraphMuted = Color(0xFF738099)
 private val GraphLocked = Color(0xFF8794A9)

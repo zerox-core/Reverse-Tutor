@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -131,7 +133,10 @@ fun FormalGlobalKnowledgeGraphScreen(
     onOpenSourceEvidence: ((GraphLayoutNode) -> Unit)? = null,
     canvasModeActive: Boolean = false,
     onCanvasModeChange: (Boolean) -> Unit = {},
-    onGraphInteractionChanged: (Boolean) -> Unit = {}
+    onRetry: (() -> Unit)? = null,
+    onGraphInteractionChanged: (Boolean) -> Unit = {},
+    onViewportChanged: (GraphViewportState) -> Unit = {},
+    onNodePositionChanged: (String, GraphPoint) -> Unit = { _, _ -> }
 ) {
     Box(
         modifier = modifier
@@ -153,41 +158,85 @@ fun FormalGlobalKnowledgeGraphScreen(
                 onSearch = onSearch,
                 onMore = onMore
             )
-            if (state.allNodeCount == 0) {
-                FormalGraphEmptyState(state, Modifier.weight(1f))
-            } else {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
                 FormalGraphCanvas(
                     state = state,
                     showLockedNodes = false,
                     onSelectedNodeChange = onSelectedNodeChange,
                     interactionEnabled = canvasModeActive,
                     onRequestInteraction = { onCanvasModeChange(true) },
+                    showToolbar = canvasModeActive && state.allNodeCount > 0,
                     onInteractionChanged = onGraphInteractionChanged,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                    onViewportChanged = onViewportChanged,
+                    onNodePositionChanged = onNodePositionChanged,
+                    modifier = Modifier.fillMaxSize()
                 )
+                if (state.status in setOf(
+                        GraphRenderStatus.Loading,
+                        GraphRenderStatus.Empty,
+                        GraphRenderStatus.Error
+                    )
+                ) {
+                    FormalGraphStateOverlay(
+                        state = state,
+                        onRetry = onRetry,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
-        Surface(
-            onClick = { onCanvasModeChange(!canvasModeActive) },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 70.dp),
-            color = if (canvasModeActive) FormalColors.Primary else FormalColors.Surface,
-            contentColor = if (canvasModeActive) Color.White else FormalColors.Muted,
-            shape = RoundedCornerShape(FormalShapes.PillRadius),
-            border = if (canvasModeActive) null else BorderStroke(1.dp, FormalColors.Border),
-            shadowElevation = 2.dp
-        ) {
-            Text(
-                text = if (canvasModeActive) "画布模式 · 退出" else "页面模式",
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                color = if (canvasModeActive) Color.White else FormalColors.Muted,
-                fontSize = LocalFormalTypeScale.current.size(11f),
-                lineHeight = LocalFormalTypeScale.current.size(16f),
-                fontWeight = FontWeight.Medium
-            )
+        if (canvasModeActive) {
+            Surface(
+                onClick = { onCanvasModeChange(false) },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 72.dp)
+                    .heightIn(min = 44.dp)
+                    .testTag("graph-canvas-mode-exit"),
+                color = FormalColors.Primary,
+                contentColor = Color.White,
+                shape = RoundedCornerShape(FormalShapes.PillRadius),
+                shadowElevation = 2.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "画布模式 · 退出",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = Color.White,
+                        fontSize = LocalFormalTypeScale.current.size(11f),
+                        lineHeight = LocalFormalTypeScale.current.size(16f),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 72.dp)
+                    .heightIn(min = 44.dp)
+                    .testTag("graph-page-mode-indicator"),
+                color = FormalColors.Surface,
+                contentColor = FormalColors.Muted,
+                shape = RoundedCornerShape(FormalShapes.PillRadius),
+                border = BorderStroke(1.dp, FormalColors.Border),
+                shadowElevation = 2.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "页面模式 · 点击画布进入",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = FormalColors.Muted,
+                        fontSize = LocalFormalTypeScale.current.size(11f),
+                        lineHeight = LocalFormalTypeScale.current.size(16f),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
         state.selectedNode?.let { node ->
             GraphScreenScrim(onClick = { onSelectedNodeChange(null) })
@@ -216,6 +265,7 @@ fun FormalSessionWorldTreeScreen(
     subtitle: String = "当前会话世界树",
     onSearch: (() -> Unit)? = null,
     onMore: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
     onGraphInteractionChanged: (Boolean) -> Unit = {}
 ) {
     Box(
@@ -230,23 +280,41 @@ fun FormalSessionWorldTreeScreen(
                 subtitle = subtitle,
                 onBack = onBack,
                 onSearch = onSearch,
-                showLockedNodes = showLockedNodes,
-                onShowLockedNodesChange = onShowLockedNodesChange,
                 onMore = onMore
             )
-            if (state.allNodeCount == 0) {
-                FormalGraphEmptyState(state, Modifier.weight(1f))
-            } else {
+            GraphLayerSelector(
+                selectedLayer = if (showLockedNodes) GraphLayer.FullRoute else GraphLayer.CurrentProgress,
+                onLayerSelected = { layer -> onShowLockedNodesChange(layer.showLockedNodes) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
                 FormalGraphCanvas(
                     state = state,
                     showLockedNodes = showLockedNodes,
                     onSelectedNodeChange = onSelectedNodeChange,
                     expandedSessionRoot = true,
+                    showToolbar = state.allNodeCount > 0,
                     onInteractionChanged = onGraphInteractionChanged,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                    modifier = Modifier.fillMaxSize()
                 )
+                if (state.status in setOf(
+                        GraphRenderStatus.Loading,
+                        GraphRenderStatus.Empty,
+                        GraphRenderStatus.Error
+                    )
+                ) {
+                    FormalGraphStateOverlay(
+                        state = state,
+                        onRetry = onRetry,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
         state.selectedNode?.takeIf { it.isLocked }?.let { node ->
@@ -257,6 +325,45 @@ fun FormalSessionWorldTreeScreen(
                 onDismiss = { onSelectedNodeChange(null) },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+        }
+    }
+}
+
+@Composable
+private fun GraphLayerSelector(
+    selectedLayer: GraphLayer,
+    onLayerSelected: (GraphLayer) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        graphLayersFor(GraphScope.Session).forEach { layer ->
+            val selected = layer == selectedLayer
+            Surface(
+                onClick = { onLayerSelected(layer) },
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 44.dp)
+                    .testTag("graph-layer-${layer.name}"),
+                color = if (selected) FormalColors.PrimarySoft else Color.White,
+                contentColor = if (selected) FormalColors.Primary else FormalColors.Muted,
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (selected) FormalColors.Primary.copy(alpha = 0.40f) else FormalColors.Border
+                )
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = layer.label,
+                        fontSize = LocalFormalTypeScale.current.size(11f),
+                        lineHeight = LocalFormalTypeScale.current.size(16f),
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
@@ -901,28 +1008,52 @@ private fun GraphSheetDivider() {
 }
 
 @Composable
-private fun FormalGraphEmptyState(
+private fun FormalGraphStateOverlay(
     state: KnowledgeGraphUiState,
+    onRetry: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
     Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier.padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (state.status == GraphRenderStatus.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    color = FormalColors.Primary,
+                    strokeWidth = 2.dp
+                )
+            }
             Text(
-                state.title,
+                text = state.title,
                 color = FormalColors.Ink,
-                fontSize = type.size(15f),
+                fontSize = type.size(if (state.status == GraphRenderStatus.Empty) 16f else 15f),
+                lineHeight = type.size(24f),
                 fontWeight = FontWeight.Medium
             )
-            Text(
-                state.summary,
-                modifier = Modifier.padding(top = 4.dp),
-                color = FormalColors.Muted,
-                fontSize = type.size(10f),
-                lineHeight = type.size(17f)
-            )
+            if (state.summary.isNotBlank()) {
+                Text(
+                    text = state.summary,
+                    color = FormalColors.Muted,
+                    fontSize = type.size(10f),
+                    lineHeight = type.size(17f)
+                )
+            }
+            if (state.status == GraphRenderStatus.Error && onRetry != null) {
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.heightIn(min = 44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = FormalColors.Primary),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("重试")
+                }
+            }
         }
     }
 }
 
-private val FormalGraphBackground = Color(0xFFF4F8FD)
+private val FormalGraphBackground = Color.White

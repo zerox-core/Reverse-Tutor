@@ -86,6 +86,7 @@ fun Task2B1NewSessionRoute(
     tagLibraryPersistence: TagLibraryPersistence = InMemoryTagLibraryPersistence(),
     onCreated: (SessionListItem) -> Unit,
     onBack: () -> Unit = {},
+    initialPrefill: NewSessionPrefillRequest? = null,
     modifier: Modifier = Modifier,
     nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
@@ -121,8 +122,9 @@ fun Task2B1NewSessionRoute(
         offset = editorListState.firstVisibleItemScrollOffset
     )
 
-    LaunchedEffect(coordinator) {
+    LaunchedEffect(coordinator, initialPrefill?.requestId) {
         coordinator.load()
+        initialPrefill?.let(coordinator::startPrefilledDraft)
         sync()
     }
     LaunchedEffect(tagLibraryEditor) {

@@ -290,6 +290,25 @@ class NewSessionLifecycleCoordinator(
         return true
     }
 
+    fun startPrefilledDraft(prefill: NewSessionPrefillRequest): Boolean {
+        if (state.currentDraft != null && !saveBoundary()) return false
+        val record = NewSessionDraftRecord(
+            id = "draft-${prefill.requestId}",
+            configuration = prefill.configuration.deepCopy(),
+            updatedAtEpochMillis = nowEpochMillis()
+        )
+        state = state.copy(
+            tab = NewSessionHubTab.Custom,
+            currentDraft = record,
+            selectedPresetId = null,
+            selectedSection = null,
+            createError = null,
+            persistenceError = null
+        )
+        createAttemptId = null
+        return true
+    }
+
     fun updateConfiguration(transform: (NewSessionConfiguration) -> NewSessionConfiguration) {
         val draft = state.currentDraft ?: return
         val transformed = transform(draft.configuration)
@@ -589,7 +608,13 @@ class NewSessionLifecycleCoordinator(
                                 createError = null
                             )
                             createAttemptId = null
-                            CreateSessionOutcome.Success(created)
+                            CreateSessionOutcome.Success(
+                                created.copy(
+                                    session = created.session.copy(
+                                        challengeProvenance = request.snapshot.challengeSessionProvenance()
+                                    )
+                                )
+                            )
                         },
                         onFailure = {
                             val message = "会话已准备好，但本地快照保存失败。请重试。"

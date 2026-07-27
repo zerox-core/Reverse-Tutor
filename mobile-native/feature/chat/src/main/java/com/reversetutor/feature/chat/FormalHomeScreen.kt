@@ -175,7 +175,8 @@ data class FormalHomeSessionUi(
     val pinned: Boolean,
     val learnerRole: String = "学习者",
     val avatarLabel: String? = null,
-    val pinnedAtEpochMillis: Long? = if (pinned) updatedAtEpochMillis else null
+    val pinnedAtEpochMillis: Long? = if (pinned) updatedAtEpochMillis else null,
+    val challengeProvenance: ChallengeSessionProvenance? = null
 )
 
 data class FormalJoinedChallengeUi(
@@ -235,7 +236,8 @@ fun SessionListUiState.toFormalHomeUiState(
             pinned = item.pinned,
             learnerRole = item.learnerRole,
             avatarLabel = item.avatarLabel.takeIf { it.isNotBlank() },
-            pinnedAtEpochMillis = item.pinnedAtEpochMillis
+            pinnedAtEpochMillis = item.pinnedAtEpochMillis,
+            challengeProvenance = item.challengeProvenance
         )
     },
     challenge = challenge,
@@ -363,7 +365,7 @@ private fun FormalHomeContent(
                 .padding(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            ChallengePullHandle(onOpenChallenge = onOpenChallenge)
+            ChallengePullHandle()
             Spacer(modifier = Modifier.height(headerSpacerHeight))
             PublicInterestCard(
                 content = state.publicContent,
@@ -412,28 +414,12 @@ private fun FormalHomeContent(
 }
 
 @Composable
-private fun ChallengePullHandle(onOpenChallenge: () -> Unit) {
+private fun ChallengePullHandle() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(28.dp)
-            .pointerInput(onOpenChallenge) {
-                var pullDistance = 0f
-                val threshold = 72.dp.toPx()
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        if (pullDistance >= threshold) onOpenChallenge()
-                        pullDistance = 0f
-                    },
-                    onDragCancel = { pullDistance = 0f },
-                    onVerticalDrag = { change, amount ->
-                        if (amount > 0f) {
-                            change.consume()
-                            pullDistance += amount
-                        }
-                    }
-                )
-            },
+            .testTag("formal-home-challenge-handle"),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -800,6 +786,24 @@ private fun SessionEntryCard(
                         text = "● 正在学习",
                         style = type.style(9f, 13f, FontWeight.Medium, FormalColors.Primary),
                         maxLines = 1
+                    )
+                }
+            }
+            if (session.challengeProvenance != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 7.dp, bottom = 6.dp)
+                        .height(18.dp)
+                        .background(Color(0xFFFFE6A7), RoundedCornerShape(9.dp))
+                        .padding(horizontal = 7.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "挑战",
+                        style = type.style(9f, 13f, FontWeight.Medium, Color(0xFF6B5200)),
+                        maxLines = 1,
+                        modifier = Modifier.testTag("challenge-session-badge-${session.id}")
                     )
                 }
             }
