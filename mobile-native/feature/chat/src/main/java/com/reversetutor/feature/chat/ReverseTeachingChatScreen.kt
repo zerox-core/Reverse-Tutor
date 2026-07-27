@@ -6,13 +6,21 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +47,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Description
@@ -47,8 +59,13 @@ import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,18 +81,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reversetutor.core.model.MessageRole
@@ -92,6 +118,22 @@ internal fun ReverseTeachingChatScreen(
     onCreateImageDraft: () -> Unit,
     onCancelImageDraft: () -> Unit,
     onMessageAction: (ChatTimelineItem, ChatMessageAction) -> Unit,
+    memoryDraft: ChatMemoryDraft? = null,
+    memoryError: String? = null,
+    onMemoryDraftChange: (ChatMemoryDraft) -> Unit = {},
+    onDismissMemory: () -> Unit = {},
+    onConfirmMemory: () -> Unit = {},
+    deleteConfirmation: ChatDeleteConfirmation? = null,
+    onDismissDelete: () -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    onUndoDelete: () -> Unit = {},
+    onRetryDelete: () -> Unit = {},
+    onCopyRichSource: (String) -> ChatClipboardResult = { ChatClipboardResult.Unavailable },
+    onSaveImage: (ChatAttachmentUi) -> Unit = {},
+    onShareImage: (ChatAttachmentUi) -> Unit = {},
+    onOpenSessionSource: (String?) -> Unit = {},
+    onReselectInvalidSource: (String, String) -> Unit = { _, _ -> },
+    onOpenExternalLink: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit,
     onOpenContextHub: () -> Unit,
     onOpenModelSettings: () -> Unit = {},
@@ -118,6 +160,9 @@ internal fun ReverseTeachingChatScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedMessageId by remember(state.sessionTitle) { mutableStateOf<String?>(null) }
+    var actionMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
+    var locateSourceMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
+    var viewerAttachment by remember(state.sessionTitle) { mutableStateOf<ChatAttachmentUi?>(null) }
     var showAttachmentActions by remember(state.sessionTitle) { mutableStateOf(false) }
     var showSourcePicker by remember(state.sessionTitle) { mutableStateOf(false) }
     val listState = rememberLazyListState(
@@ -141,6 +186,12 @@ internal fun ReverseTeachingChatScreen(
         }
     }
 
+    LaunchedEffect(selectedMessageId) {
+        val selected = selectedMessageId ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(3_000L)
+        if (selectedMessageId == selected) selectedMessageId = null
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -162,16 +213,6 @@ internal fun ReverseTeachingChatScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            item {
-                Text(
-                    text = "今天 14:30",
-                    modifier = Modifier.fillMaxWidth(),
-                    color = ChatMuted,
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
             if (state.messages.isEmpty()) {
                 item {
                     LearnerOpening(
@@ -182,7 +223,25 @@ internal fun ReverseTeachingChatScreen(
                     )
                 }
             } else {
-                items(state.messages, key = { it.id }) { item ->
+                val entries = buildChatTimelineEntries(state.messages)
+                items(entries, key = { entry ->
+                    when (entry) {
+                        is ChatTimelineEntry.DateSeparator -> "date-${entry.label}"
+                        is ChatTimelineEntry.Message -> entry.item.id
+                    }
+                }) { entry ->
+                    if (entry is ChatTimelineEntry.DateSeparator) {
+                        Text(
+                            text = entry.label,
+                            modifier = Modifier.fillMaxWidth(),
+                            color = ChatMuted,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        return@items
+                    }
+                    val item = (entry as ChatTimelineEntry.Message).item
                     val timelineSpacing = when (item.role) {
                         MessageRole.Assistant -> Modifier.padding(bottom = 28.dp)
                         MessageRole.User -> Modifier.heightIn(min = 63.dp)
@@ -195,14 +254,17 @@ internal fun ReverseTeachingChatScreen(
                             learnerName = state.learnerName,
                             learnerAvatarReference = state.learnerAvatarReference,
                             avatarVisible = state.avatarVisible,
+                            sources = state.sources,
                             selected = selectedMessageId == item.id,
-                            onSelect = {
+                            onTap = {
                                 selectedMessageId = if (selectedMessageId == item.id) null else item.id
                             },
-                            onAction = { action ->
-                                onMessageAction(item, action)
-                                selectedMessageId = null
-                            }
+                            onLongPress = { actionMessage = item },
+                            onOpenImage = { viewerAttachment = it },
+                            onOpenSource = onOpenSessionSource,
+                            onReselectInvalidSource = onReselectInvalidSource,
+                            onOpenExternalLink = onOpenExternalLink,
+                            onCopyRichSource = onCopyRichSource
                         )
                     }
                 }
@@ -215,9 +277,7 @@ internal fun ReverseTeachingChatScreen(
                         avatarVisible = state.avatarVisible,
                         label = label,
                         onOpenSettings = onOpenModelSettings,
-                        onRetry = state.messages.lastOrNull { it.role == MessageRole.Assistant }?.let { item ->
-                            { onMessageAction(item, ChatMessageAction.Regenerate) }
-                        }
+                        onRetry = null
                     )
                 }
             }
@@ -238,7 +298,7 @@ internal fun ReverseTeachingChatScreen(
             }
             state.composer.quoteTarget?.let { quote ->
                 ComposerPreview(
-                    label = "回复：${quote.excerpt}",
+                    label = "回复 ${quote.sourceIdentity}：${quote.excerpt}",
                     onDismiss = onCancelQuote
                 )
             }
@@ -262,6 +322,23 @@ internal fun ReverseTeachingChatScreen(
             }
             state.composer.notice?.let { notice ->
                 Text(notice, modifier = Modifier.padding(horizontal = 18.dp), color = Color(0xFF7A5B16), fontSize = 11.sp)
+            }
+            if (state.pendingDeletion != null) {
+                Snackbar(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    action = {
+                        TextButton(
+                            onClick = if (state.pendingDeletionRetryRequired) onRetryDelete else onUndoDelete
+                        ) {
+                            Text(if (state.pendingDeletionRetryRequired) "重试" else "撤销")
+                        }
+                    }
+                ) {
+                    Text(
+                        if (state.pendingDeletionRetryRequired) "删除未完成" else "消息已删除",
+                        fontSize = 13.sp
+                    )
+                }
             }
         }
     }
@@ -300,6 +377,56 @@ internal fun ReverseTeachingChatScreen(
             onSelect = {
                 showSourcePicker = false
                 onSelectSource(it)
+            }
+        )
+    }
+    actionMessage?.let { item ->
+        ChatMessageActionSheet(
+            item = item,
+            onDismiss = { actionMessage = null },
+            onAction = { action ->
+                actionMessage = null
+                if (action == ChatMessageAction.LocateSource && item.attachments.mapNotNull { it.sourceId }.distinct().size > 1) {
+                    locateSourceMessage = item
+                } else {
+                    onMessageAction(item, action)
+                }
+            }
+        )
+    }
+    memoryDraft?.let { draft ->
+        RememberMessageDialog(
+            draft = draft,
+            sources = state.sources.filter { it.id in state.currentSessionSourceIds },
+            error = memoryError,
+            onChange = onMemoryDraftChange,
+            onDismiss = onDismissMemory,
+            onConfirm = onConfirmMemory
+        )
+    }
+    deleteConfirmation?.let { confirmation ->
+        DeleteMessageDialog(
+            confirmation = confirmation,
+            onDismiss = onDismissDelete,
+            onConfirm = onConfirmDelete
+        )
+    }
+    viewerAttachment?.let { attachment ->
+        ChatImageViewer(
+            attachment = attachment,
+            onDismiss = { viewerAttachment = null },
+            onSave = { onSaveImage(attachment) },
+            onShare = { onShareImage(attachment) }
+        )
+    }
+    locateSourceMessage?.let { item ->
+        ChatLocateSourceSheet(
+            item = item,
+            sources = state.sources,
+            onDismiss = { locateSourceMessage = null },
+            onSelect = { sourceId ->
+                locateSourceMessage = null
+                onOpenSessionSource(sourceId)
             }
         )
     }
@@ -462,22 +589,36 @@ private fun ReverseTeachingMessage(
     learnerName: String,
     learnerAvatarReference: LearnerAvatarReference?,
     avatarVisible: Boolean,
+    sources: List<ChatSourceUi>,
     selected: Boolean,
-    onSelect: () -> Unit,
-    onAction: (ChatMessageAction) -> Unit
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onOpenImage: (ChatAttachmentUi) -> Unit,
+    onOpenSource: (String?) -> Unit,
+    onReselectInvalidSource: (String, String) -> Unit,
+    onOpenExternalLink: (String) -> Unit,
+    onCopyRichSource: (String) -> ChatClipboardResult
 ) {
     when (item.role) {
         MessageRole.System -> SystemTimelineMessage(item.text)
         MessageRole.Tool -> EvidenceTimelineMessage(item.text)
-        MessageRole.User -> UserTimelineMessage(item, selected, onSelect, onAction)
+        MessageRole.User -> UserTimelineMessage(
+            item, sources, selected, onTap, onLongPress, onOpenImage, onOpenSource, onReselectInvalidSource, onOpenExternalLink, onCopyRichSource
+        )
         MessageRole.Assistant -> LearnerTimelineMessage(
             item,
             learnerName,
             learnerAvatarReference,
             avatarVisible,
+            sources,
             selected,
-            onSelect,
-            onAction
+            onTap,
+            onLongPress,
+            onOpenImage,
+            onOpenSource,
+            onReselectInvalidSource,
+            onOpenExternalLink,
+            onCopyRichSource
         )
     }
 }
@@ -486,10 +627,18 @@ private fun ReverseTeachingMessage(
 @OptIn(ExperimentalFoundationApi::class)
 private fun UserTimelineMessage(
     item: ChatTimelineItem,
+    sources: List<ChatSourceUi>,
     selected: Boolean,
-    onSelect: () -> Unit,
-    onAction: (ChatMessageAction) -> Unit
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onOpenImage: (ChatAttachmentUi) -> Unit,
+    onOpenSource: (String?) -> Unit,
+    onReselectInvalidSource: (String, String) -> Unit,
+    onOpenExternalLink: (String) -> Unit,
+    onCopyRichSource: (String) -> ChatClipboardResult
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
         Row(
             modifier = Modifier
@@ -501,7 +650,16 @@ private fun UserTimelineMessage(
             Column(
                 modifier = Modifier
                     .widthIn(max = 286.dp)
-                    .combinedClickable(onClick = {}, onLongClick = onSelect),
+                    .graphicsLayer {
+                        scaleX = if (pressed) 0.99f else 1f
+                        scaleY = if (pressed) 0.99f else 1f
+                    }
+                    .combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onTap,
+                        onLongClick = onLongPress
+                    ),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
@@ -514,15 +672,18 @@ private fun UserTimelineMessage(
                         textAlign = TextAlign.End
                     )
                 }
-                Text(
-                    text = item.text,
-                    color = Color(0xFF11151D),
-                    fontSize = 14.sp,
-                    lineHeight = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.End
+                RichMessageContent(
+                    source = item.text,
+                    userAligned = true,
+                    onOpenExternalLink = onOpenExternalLink,
+                    onMessageTap = onTap,
+                    onMessageLongPress = onLongPress,
+                    onCopySource = onCopyRichSource
                 )
-                item.attachments.forEach { MessageAttachment(it) }
+                item.attachments.forEach {
+                    MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
+                }
+                if (item.remembered) RememberedMessageLabel()
             }
             Spacer(Modifier.width(10.dp))
             Box(
@@ -532,7 +693,7 @@ private fun UserTimelineMessage(
                     .background(Color(0xFF1A8C61), RoundedCornerShape(2.dp))
             )
         }
-        if (selected) MessageActionRow(onAction)
+        if (selected) MessageMetadataRow(item)
     }
 }
 
@@ -543,10 +704,18 @@ private fun LearnerTimelineMessage(
     learnerName: String,
     learnerAvatarReference: LearnerAvatarReference?,
     avatarVisible: Boolean,
+    sources: List<ChatSourceUi>,
     selected: Boolean,
-    onSelect: () -> Unit,
-    onAction: (ChatMessageAction) -> Unit
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onOpenImage: (ChatAttachmentUi) -> Unit,
+    onOpenSource: (String?) -> Unit,
+    onReselectInvalidSource: (String, String) -> Unit,
+    onOpenExternalLink: (String) -> Unit,
+    onCopyRichSource: (String) -> ChatClipboardResult
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
@@ -565,21 +734,35 @@ private fun LearnerTimelineMessage(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .combinedClickable(onClick = {}, onLongClick = onSelect),
+                    .graphicsLayer {
+                        scaleX = if (pressed) 0.99f else 1f
+                        scaleY = if (pressed) 0.99f else 1f
+                    }
+                    .combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onTap,
+                        onLongClick = onLongPress
+                    ),
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 item.quoteLabel?.let { quote ->
                     Text(quote, color = ChatMuted, fontSize = 10.sp, lineHeight = 15.sp)
                 }
-                Text(
-                    text = item.text,
-                    color = Color(0xFF333D4D),
-                    fontSize = 13.sp,
-                    lineHeight = 21.sp
+                RichMessageContent(
+                    source = item.text,
+                    userAligned = false,
+                    onOpenExternalLink = onOpenExternalLink,
+                    onMessageTap = onTap,
+                    onMessageLongPress = onLongPress,
+                    onCopySource = onCopyRichSource
                 )
-                item.attachments.forEach { MessageAttachment(it) }
+                item.attachments.forEach {
+                    MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
+                }
+                if (item.remembered) RememberedMessageLabel()
             }
-            if (selected) MessageActionRow(onAction)
+            if (selected) MessageMetadataRow(item)
         }
     }
 }
@@ -662,31 +845,41 @@ private fun MessageBody(item: ChatTimelineItem) {
 }
 
 @Composable
-private fun MessageAttachment(attachment: ChatAttachmentUi) {
+private fun MessageAttachment(
+    attachment: ChatAttachmentUi,
+    sources: List<ChatSourceUi> = emptyList(),
+    onOpenImage: (ChatAttachmentUi) -> Unit = {},
+    onOpenSource: (String?) -> Unit = {},
+    onReselectInvalidSource: (String, String) -> Unit = { _, _ -> }
+) {
     if (attachment.isImage) {
-        MessageImageAttachment(attachment)
+        MessageImageAttachment(attachment, onOpenImage)
     } else {
-        AttachmentReference(attachment)
+        AttachmentReference(attachment, sources, onOpenSource, onReselectInvalidSource)
     }
 }
 
 @Composable
-private fun MessageImageAttachment(attachment: ChatAttachmentUi) {
+private fun MessageImageAttachment(
+    attachment: ChatAttachmentUi,
+    onOpen: (ChatAttachmentUi) -> Unit
+) {
     val context = LocalContext.current
+    var retryKey by remember(attachment.uri) { mutableStateOf(0) }
     val imageState by produceState<ChatImageLoadState>(
         initialValue = ChatImageLoadState.Loading,
-        key1 = attachment.uri
+        key1 = attachment.uri,
+        key2 = retryKey
     ) {
         val uri = attachment.uri
         value = if (uri.isNullOrBlank()) {
             ChatImageLoadState.Failed
         } else {
             withContext(Dispatchers.IO) {
-                runCatching {
-                    context.contentResolver.openInputStream(Uri.parse(uri))?.use { input ->
-                        BitmapFactory.decodeStream(input)?.asImageBitmap()
-                    }
-                }.getOrNull()?.let(ChatImageLoadState::Ready) ?: ChatImageLoadState.Failed
+                runCatching { ChatImageLoader.load(context, Uri.parse(uri), ChatImageTargets.Thumbnail) }
+                    .getOrNull()
+                    ?.let(ChatImageLoadState::Ready)
+                    ?: ChatImageLoadState.Failed
             }
         }
     }
@@ -695,10 +888,12 @@ private fun MessageImageAttachment(attachment: ChatAttachmentUi) {
     }?.coerceIn(0.72f, 1.8f) ?: 1.35f
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 220.dp)
-            .aspectRatio(ratio),
+        onClick = { if (imageState is ChatImageLoadState.Ready) onOpen(attachment) },
+        modifier = if (imageState is ChatImageLoadState.Ready) {
+            Modifier.fillMaxWidth().heightIn(max = 220.dp).aspectRatio(ratio)
+        } else {
+            Modifier.fillMaxWidth().height(64.dp)
+        },
         color = Color(0xFFE8ECF3),
         contentColor = ChatMuted,
         shape = RoundedCornerShape(10.dp),
@@ -708,8 +903,12 @@ private fun MessageImageAttachment(attachment: ChatAttachmentUi) {
             ChatImageLoadState.Loading -> Box(contentAlignment = Alignment.Center) {
                 Text("正在读取图片…", fontSize = 11.sp)
             }
-            ChatImageLoadState.Failed -> Box(contentAlignment = Alignment.Center) {
-                Text("图片暂时无法显示 · ${attachment.name}", fontSize = 11.sp)
+            ChatImageLoadState.Failed -> Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("图片暂时无法显示 · ${attachment.name}", modifier = Modifier.weight(1f), fontSize = 11.sp)
+                TextButton(onClick = { retryKey += 1 }) { Text("重试") }
             }
             is ChatImageLoadState.Ready -> Image(
                 bitmap = current.bitmap,
@@ -722,23 +921,38 @@ private fun MessageImageAttachment(attachment: ChatAttachmentUi) {
 }
 
 @Composable
-private fun AttachmentReference(attachment: ChatAttachmentUi) {
-    Row(
+private fun AttachmentReference(
+    attachment: ChatAttachmentUi,
+    sources: List<ChatSourceUi>,
+    onOpenSource: (String?) -> Unit,
+    onReselectInvalidSource: (String, String) -> Unit
+) {
+    val source = resolveChatSourceAttachment(attachment, sources)
+    Surface(
+        onClick = {
+            if (source.valid) {
+                onOpenSource(source.sourceId)
+            } else {
+                source.sourceId?.let { onReselectInvalidSource(it, source.displayName) }
+            }
+        },
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-        verticalAlignment = Alignment.CenterVertically
+        color = Color(0xFFF4F6FA),
+        shape = RoundedCornerShape(7.dp),
+        border = BorderStroke(1.dp, if (source.valid) Color(0xFFD8DEE9) else Color(0xFFE2B8BE))
     ) {
-        Text("▤", color = Color(0xFF4D66A6), fontSize = 15.sp)
-        Text(
-            text = attachment.name,
-            modifier = Modifier.weight(1f),
-            color = Color(0xFF59647A),
-            fontSize = 11.sp,
-            lineHeight = 16.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text("›", color = ChatMuted, fontSize = 16.sp)
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Icons.Rounded.Description, contentDescription = null, tint = Color(0xFF4D66A6), modifier = Modifier.size(18.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(source.displayName, color = Color(0xFF3D4657), fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${source.typeLabel} · ${source.stateLabel}", color = if (source.valid) ChatMuted else Color(0xFF9D3340), fontSize = 10.sp)
+            }
+            Text(if (source.valid) "查看" else "重新选择", color = Color(0xFF4D66A6), fontSize = 10.sp)
+        }
     }
 }
 
@@ -749,22 +963,422 @@ private sealed interface ChatImageLoadState {
 }
 
 @Composable
-private fun MessageActionRow(onAction: (ChatMessageAction) -> Unit) {
-    Row(
-        modifier = Modifier.padding(top = 3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+private fun MessageMetadataRow(item: ChatTimelineItem) {
+    val metadata = chatMessageMetadata(item)
+    Text(
+        text = "${metadata.exactTime} · ${metadata.deliveryLabel}",
+        modifier = Modifier.padding(top = 5.dp),
+        color = ChatMuted,
+        fontSize = 10.sp,
+        lineHeight = 14.sp
+    )
+}
+
+@Composable
+private fun RememberedMessageLabel() {
+    Text("✓ 已记住", color = Color(0xFF2B7A57), fontSize = 10.sp, lineHeight = 14.sp)
+}
+
+@Composable
+private fun RichMessageContent(
+    source: String,
+    userAligned: Boolean,
+    onOpenExternalLink: (String) -> Unit,
+    onMessageTap: () -> Unit,
+    onMessageLongPress: () -> Unit,
+    onCopySource: (String) -> ChatClipboardResult
+) {
+    val blocks = remember(source) { ChatRichContentParser.parse(source) }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (userAligned) Alignment.End else Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
-        ChatMessageAction.entries.forEach { action ->
-            TextButton(
-                onClick = { onAction(action) },
-                contentPadding = PaddingValues(horizontal = 7.dp, vertical = 0.dp)
-            ) {
-                Text(
-                    text = action.label,
-                    color = if (action == ChatMessageAction.Delete) Color(0xFFB24B55) else ChatMuted,
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp
+        blocks.forEach { block ->
+            when (block) {
+                is ChatRichBlock.Heading -> Text(
+                    block.text,
+                    color = ChatInk,
+                    fontSize = when (block.level) { 1 -> 20.sp; 2 -> 18.sp; else -> 16.sp },
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold
                 )
+                is ChatRichBlock.Paragraph -> RichInlineRow(
+                    inlines = block.inlines,
+                    onOpenExternalLink = onOpenExternalLink,
+                    onMessageTap = onMessageTap,
+                    onMessageLongPress = onMessageLongPress
+                )
+                is ChatRichBlock.ListItem -> Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(if (block.ordered) "${block.index ?: 1}." else "•", color = ChatMuted, fontSize = 16.sp)
+                    Text(block.text, modifier = Modifier.weight(1f), color = ChatInk, fontSize = 16.sp, lineHeight = 24.sp)
+                }
+                is ChatRichBlock.Quote -> Text(
+                    block.text,
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFFE9EDF4), RoundedCornerShape(4.dp)).padding(8.dp),
+                    color = Color(0xFF4C586B),
+                    fontSize = 16.sp,
+                    lineHeight = 24.sp
+                )
+                is ChatRichBlock.Code -> RichSourceBlock(
+                    label = block.language?.let { "代码 · $it" } ?: "代码",
+                    source = block.source,
+                    onCopySource = onCopySource
+                )
+                is ChatRichBlock.Formula -> RichSourceBlock("公式", block.source, onCopySource)
+                is ChatRichBlock.Table -> RichTable(block)
+                is ChatRichBlock.PlainText -> Text(block.source, color = ChatInk, fontSize = 16.sp, lineHeight = 24.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RichInlineRow(
+    inlines: List<ChatRichInline>,
+    onOpenExternalLink: (String) -> Unit,
+    onMessageTap: () -> Unit,
+    onMessageLongPress: () -> Unit
+) {
+    val text = remember(inlines) { buildRichInlineAnnotatedString(inlines) }
+    var layoutResult by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        text = text,
+        modifier = Modifier.pointerInput(text, onOpenExternalLink, onMessageTap, onMessageLongPress) {
+            detectTapGestures(
+                onTap = { position ->
+                    val target = layoutResult
+                        ?.getOffsetForPosition(position)
+                        ?.let { resolveChatRichInlineTapTarget(text, it) }
+                        ?: ChatRichInlineTapTarget.Message
+                    when (target) {
+                        is ChatRichInlineTapTarget.Link -> onOpenExternalLink(target.url)
+                        ChatRichInlineTapTarget.Message -> onMessageTap()
+                    }
+                },
+                onLongPress = { onMessageLongPress() }
+            )
+        },
+        color = ChatInk,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        onTextLayout = { layoutResult = it }
+    )
+}
+
+internal const val ChatRichInlineLinkTag = "chat-rich-link"
+
+internal sealed interface ChatRichInlineTapTarget {
+    data object Message : ChatRichInlineTapTarget
+    data class Link(val url: String) : ChatRichInlineTapTarget
+}
+
+internal fun resolveChatRichInlineTapTarget(
+    text: AnnotatedString,
+    offset: Int
+): ChatRichInlineTapTarget {
+    if (offset !in 0 until text.length) return ChatRichInlineTapTarget.Message
+    return text.getStringAnnotations(
+        tag = ChatRichInlineLinkTag,
+        start = offset,
+        end = offset + 1
+    ).firstOrNull()?.let { ChatRichInlineTapTarget.Link(it.item) }
+        ?: ChatRichInlineTapTarget.Message
+}
+
+internal fun buildRichInlineAnnotatedString(inlines: List<ChatRichInline>): AnnotatedString = buildAnnotatedString {
+    inlines.forEach { inline ->
+        when (inline) {
+            is ChatRichInline.Text -> append(inline.source)
+            is ChatRichInline.Code -> withStyle(
+                SpanStyle(
+                    color = Color(0xFF33415B),
+                    background = Color(0xFFE8EBF1),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 14.sp
+                )
+            ) { append(inline.source) }
+            is ChatRichInline.Formula -> withStyle(
+                SpanStyle(color = Color(0xFF334D7A), fontWeight = FontWeight.Medium)
+            ) { append(inline.source) }
+            is ChatRichInline.Link -> {
+                pushStringAnnotation(ChatRichInlineLinkTag, inline.url)
+                withStyle(
+                    SpanStyle(color = Color(0xFF315FA3), textDecoration = TextDecoration.Underline)
+                ) { append(inline.label) }
+                pop()
+            }
+        }
+    }
+}
+
+@Composable
+private fun RichSourceBlock(
+    label: String,
+    source: String,
+    onCopySource: (String) -> ChatClipboardResult
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFF202631),
+        contentColor = Color(0xFFF1F4F8),
+        shape = RoundedCornerShape(7.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(label, modifier = Modifier.weight(1f), color = Color(0xFFBBC5D4), fontSize = 11.sp)
+                IconButton(onClick = { onCopySource(source) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.ContentCopy, contentDescription = "复制$label", modifier = Modifier.size(18.dp))
+                }
+            }
+            Text(
+                source,
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 8.dp),
+                color = Color(0xFFF1F4F8),
+                fontSize = 14.sp,
+                lineHeight = 21.sp,
+                softWrap = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun RichTable(table: ChatRichBlock.Table) {
+    Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+        val columns = table.headers.indices
+        columns.forEach { column ->
+            Column(modifier = Modifier.widthIn(min = 104.dp).border(BorderStroke(1.dp, Color(0xFFD8DEE9)))) {
+                Text(table.headers[column], modifier = Modifier.padding(7.dp), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                table.rows.forEach { row ->
+                    Text(row.getOrElse(column) { "" }, modifier = Modifier.padding(7.dp), fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ChatMessageActionSheet(
+    item: ChatTimelineItem,
+    onDismiss: () -> Unit,
+    onAction: (ChatMessageAction) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text(item.roleLabel, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp), color = ChatMuted, fontSize = 12.sp)
+        ChatMessageAction.entries.forEach { action ->
+            Surface(onClick = { onAction(action) }, modifier = Modifier.fillMaxWidth(), color = Color.Transparent) {
+                Text(
+                    action.label,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 15.dp),
+                    color = if (action == ChatMessageAction.Delete) Color(0xFFB24B55) else ChatInk,
+                    fontSize = 16.sp
+                )
+            }
+        }
+        Spacer(Modifier.navigationBarsPadding().height(8.dp))
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun ChatLocateSourceSheet(
+    item: ChatTimelineItem,
+    sources: List<ChatSourceUi>,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Text("选择关联资料", modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp), fontWeight = FontWeight.Bold)
+        item.attachments.filter { it.sourceId != null }.distinctBy { it.sourceId }.forEach { attachment ->
+            val source = resolveChatSourceAttachment(attachment, sources)
+            Surface(onClick = { source.sourceId?.let(onSelect) }, modifier = Modifier.fillMaxWidth(), color = Color.Transparent) {
+                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                    Text(source.displayName, fontSize = 15.sp)
+                    Text("${source.typeLabel} · ${source.stateLabel}", color = if (source.valid) ChatMuted else Color(0xFF9D3340), fontSize = 11.sp)
+                }
+            }
+        }
+        Spacer(Modifier.navigationBarsPadding().height(8.dp))
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun RememberMessageDialog(
+    draft: ChatMemoryDraft,
+    sources: List<ChatSourceUi>,
+    error: String?,
+    onChange: (ChatMemoryDraft) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("记住这条") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = draft.text,
+                    onValueChange = { onChange(draft.copy(text = it)) },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 112.dp),
+                    label = { Text("记忆内容") }
+                )
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ChatMemoryCategory.entries.forEach { category ->
+                        Button(
+                            onClick = { onChange(draft.copy(category = category)) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (draft.category == category) Color(0xFF4169A1) else Color(0xFFE7EBF1),
+                                contentColor = if (draft.category == category) Color.White else ChatInk
+                            )
+                        ) {
+                            Text(
+                                if (category.capability is ChatMemoryCategoryCapability.Supported) {
+                                    category.label
+                                } else {
+                                    "${category.label}（不可用）"
+                                }
+                            )
+                        }
+                    }
+                }
+                Text(
+                    when (val capability = draft.category.capability) {
+                        ChatMemoryCategoryCapability.Supported -> "${draft.category.label}：可保存，并保留消息与资料出处。"
+                        is ChatMemoryCategoryCapability.Unavailable -> "不可用：${capability.reason}"
+                    },
+                    color = if (draft.category.capability is ChatMemoryCategoryCapability.Supported) {
+                        Color(0xFF2B7A57)
+                    } else {
+                        Color(0xFF9D3340)
+                    },
+                    fontSize = 12.sp
+                )
+                Text("关联资料", color = ChatMuted, fontSize = 12.sp)
+                Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    TextButton(onClick = { onChange(draft.copy(sourceId = null)) }) { Text("无") }
+                    sources.filter(ChatSourceUi::valid).forEach { source ->
+                        TextButton(onClick = { onChange(draft.copy(sourceId = source.id)) }) {
+                            Text(if (draft.sourceId == source.id) "✓ ${source.displayName}" else source.displayName)
+                        }
+                    }
+                }
+                error?.let { Text(it, color = Color(0xFF9D3340), fontSize = 12.sp) }
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = { Button(onClick = onConfirm, enabled = draft.text.isNotBlank()) { Text("保存") } }
+    )
+}
+
+@Composable
+private fun DeleteMessageDialog(
+    confirmation: ChatDeleteConfirmation,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("删除消息") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(confirmation.messagePreview, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                if (confirmation.impact.hasDerivatives) {
+                    Text("受影响的关联内容", fontWeight = FontWeight.Bold)
+                    (confirmation.impact.memories + confirmation.impact.graphItems).forEach { Text("• ${it.label}", fontSize = 13.sp) }
+                }
+                Text(
+                    confirmation.impact.deletionBoundary,
+                    color = if (confirmation.impact.canDeleteMessageOnly) ChatMuted else Color(0xFF9D3340),
+                    fontSize = 12.sp
+                )
+                Surface(color = Color(0xFFE8ECF3), shape = RoundedCornerShape(6.dp)) {
+                    Text("仅删除消息（默认）", modifier = Modifier.padding(10.dp), fontSize = 13.sp)
+                }
+                Text("同时删除关联内容（当前不可用）", color = ChatMuted.copy(alpha = 0.6f), fontSize = 13.sp)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = confirmation.impact.canDeleteMessageOnly,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB24B55))
+            ) { Text("删除") }
+        }
+    )
+}
+
+@Composable
+private fun ChatImageViewer(
+    attachment: ChatAttachmentUi,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit,
+    onShare: () -> Unit
+) {
+    val context = LocalContext.current
+    val viewerTarget = remember(context) {
+        context.resources.displayMetrics.let { metrics ->
+            ChatImageTarget(
+                widthPixels = metrics.widthPixels.coerceAtLeast(1),
+                heightPixels = metrics.heightPixels.coerceAtLeast(1)
+            )
+        }
+    }
+    var retryKey by remember(attachment.uri) { mutableStateOf(0) }
+    val imageState by produceState<ChatImageLoadState>(
+        ChatImageLoadState.Loading,
+        attachment.uri,
+        viewerTarget,
+        retryKey
+    ) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { ChatImageLoader.load(context, Uri.parse(attachment.uri), viewerTarget) }
+                .getOrNull()
+                ?.let(ChatImageLoadState::Ready)
+                ?: ChatImageLoadState.Failed
+        }
+    }
+    var scale by remember(attachment.uri) { mutableStateOf(1f) }
+    var offset by remember(attachment.uri) { mutableStateOf(Offset.Zero) }
+    val transform = rememberTransformableState { zoom, pan, _ ->
+        scale = (scale * zoom).coerceIn(1f, 5f)
+        offset = if (scale == 1f) Offset.Zero else offset + pan
+    }
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        when (val current = imageState) {
+            ChatImageLoadState.Loading -> Text("正在读取图片…", modifier = Modifier.align(Alignment.Center), color = Color.White)
+            ChatImageLoadState.Failed -> Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("图片暂时无法显示", color = Color.White)
+                TextButton(onClick = { retryKey += 1 }) { Icon(Icons.Filled.Refresh, contentDescription = null); Text("重试") }
+            }
+            is ChatImageLoadState.Ready -> Image(
+                bitmap = current.bitmap,
+                contentDescription = attachment.name,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
+                }.transformable(transform)
+            )
+        }
+        IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopStart).padding(12.dp).size(48.dp)) {
+            Icon(Icons.Filled.Close, contentDescription = "关闭图片", tint = Color.White)
+        }
+        Row(modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)) {
+            IconButton(onClick = onSave, enabled = imageState is ChatImageLoadState.Ready) {
+                Icon(Icons.Filled.Download, contentDescription = "保存图片", tint = Color.White)
+            }
+            IconButton(onClick = onShare, enabled = imageState is ChatImageLoadState.Ready) {
+                Icon(Icons.Filled.Share, contentDescription = "分享图片", tint = Color.White)
             }
         }
     }

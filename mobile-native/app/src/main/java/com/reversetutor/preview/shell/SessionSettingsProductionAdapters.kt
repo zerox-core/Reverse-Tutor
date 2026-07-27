@@ -6,6 +6,7 @@ import com.reversetutor.core.model.SourceParserStatus
 import com.reversetutor.core.model.TutorSession
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionFavorite
+import com.reversetutor.feature.chat.ChatInvalidSourceReselectRequest
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.SourceReadState
 import com.reversetutor.feature.chat.sourceOwnerIds
@@ -13,6 +14,26 @@ import com.reversetutor.feature.chat.sourceOwnerIds
 internal sealed interface SessionSourceImportOutcome {
     data class Usable(val picked: PickedSessionSource) : SessionSourceImportOutcome
     data class Rejected(val message: String, val replacingSourceId: String?) : SessionSourceImportOutcome
+}
+
+internal fun prepareInvalidChatSourceReplacement(
+    sources: List<SessionSource>,
+    request: ChatInvalidSourceReselectRequest,
+    nowEpochMillis: Long
+): List<SessionSource> {
+    if (sources.any { it.id == request.sourceId }) return sources
+    return sources + SessionSource(
+        id = request.sourceId,
+        displayName = request.originalDisplayName,
+        managedName = request.originalDisplayName,
+        typeLabel = request.originalDisplayName.substringAfterLast('.', "资料").uppercase(),
+        readState = SourceReadState.Invalid,
+        currentSessionReferenced = true,
+        referenceOwnerIds = listOf(request.sessionId),
+        lastUsedAtEpochMillis = nowEpochMillis,
+        preview = "资料已失效，请重新选择文件。",
+        bytesRetained = false
+    )
 }
 
 internal fun mapSessionSettingsImport(

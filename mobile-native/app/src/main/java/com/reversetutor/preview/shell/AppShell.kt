@@ -71,6 +71,7 @@ import com.reversetutor.feature.chat.ChatAttachmentKind
 import com.reversetutor.feature.chat.ChatAttachmentReadiness
 import com.reversetutor.feature.chat.ChatDraftAttachment
 import com.reversetutor.feature.chat.ChatPermissionState
+import com.reversetutor.feature.chat.ChatPendingDeletionSweeper
 import com.reversetutor.feature.chat.ChatQueryHighlight
 import com.reversetutor.feature.chat.ChatReferenceQueryRoute
 import com.reversetutor.feature.chat.ChatReferenceQueryState
@@ -102,6 +103,8 @@ import com.reversetutor.preview.wiring.HybridAppGraph
 import com.reversetutor.preview.wiring.SharedPreferencesChatSourceUsagePort
 import com.reversetutor.preview.wiring.SharedPreferencesChatAttachmentOrderStore
 import com.reversetutor.preview.wiring.SharedPreferencesChatDraftStore
+import com.reversetutor.preview.wiring.SharedPreferencesChatPendingDeletionStore
+import com.reversetutor.preview.wiring.SharedPreferencesChatRememberedMessageStore
 import com.reversetutor.preview.wiring.SharedPreferencesSessionSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -739,10 +742,24 @@ private fun DestinationContent(
     var sessionSettingsPickerActive by remember { mutableStateOf(false) }
     var sessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
     var failedSessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
+    var invalidChatSourceReselectRequest by remember {
+        mutableStateOf<com.reversetutor.feature.chat.ChatInvalidSourceReselectRequest?>(null)
+    }
     var sessionSettingsImportError by remember { mutableStateOf<String?>(null) }
     var sessionSettingsRefreshKey by remember { mutableStateOf(0) }
     val chatDraftStore = remember(context) { SharedPreferencesChatDraftStore(context) }
     val chatAttachmentOrderStore = remember(context) { SharedPreferencesChatAttachmentOrderStore(context) }
+    val chatPendingDeletionStore = remember(context) { SharedPreferencesChatPendingDeletionStore(context) }
+    val chatRememberedMessageStore = remember(context) { SharedPreferencesChatRememberedMessageStore(context) }
+    var pendingDeletionSweepGeneration by remember { mutableStateOf(0) }
+    val chatClipboardPort = remember(context) { AndroidChatClipboardPort(context) }
+    val chatImageMediaPort = remember(context) { AndroidChatImageMediaPort(context.applicationContext) }
+    val chatMessageActionPort = remember(memoryRepository, graphRepository) {
+        RepositoryChatMessageActionPort(memoryRepository, graphRepository)
+    }
+    val chatMessageDeletePort = remember(messageRepository) {
+        RepositoryChatMessageDeletePort(messageRepository)
+    }
     val chatPermissionPreferences = remember(context) {
         context.getSharedPreferences("reverse-tutor-chat-permissions", Context.MODE_PRIVATE)
     }
@@ -769,6 +786,7 @@ private fun DestinationContent(
     DisposableEffect(destinationLifecycleOwner, context) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                pendingDeletionSweepGeneration += 1
                 cameraPermissionState = if (
                     ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                 ) {
@@ -784,6 +802,19 @@ private fun DestinationContent(
         }
         destinationLifecycleOwner?.lifecycle?.addObserver(observer)
         onDispose { destinationLifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
+    LaunchedEffect(chatPendingDeletionStore, messageRepository, pendingDeletionSweepGeneration) {
+        val sweeper = ChatPendingDeletionSweeper(
+            chatPendingDeletionStore,
+            chatMessageDeletePort
+        )
+        while (true) {
+            val now = System.currentTimeMillis()
+            val result = sweeper.sweep(now)
+            val next = result.nextSweepAtEpochMillis ?: break
+            val remaining = next - System.currentTimeMillis()
+            if (remaining > 0L) kotlinx.coroutines.delay(remaining)
+        }
     }
     var weeklySessions by remember { mutableStateOf(emptyList<com.reversetutor.core.model.TutorSession>()) }
     val sourceFileLauncher = rememberLauncherForActivityResult(
@@ -913,7 +944,7 @@ private fun DestinationContent(
             val persistence = hybridAppGraph.frontend.newSessionPersistence
             val snapshots = sessions.associate { it.id to persistence.loadSessionSnapshot(it.id) }
             val favorites = persistence.loadFavorites()
-            sessionSettingsSources = buildSessionSettingsSourceCatalog(
+            val catalog = buildSessionSettingsSourceCatalog(
                 currentSessionId = currentSessionId,
                 sessions = sessions,
                 sessionSnapshots = snapshots,
@@ -921,6 +952,10 @@ private fun DestinationContent(
                 sources = sourceRepository.listSourcesWithChunks(),
                 lastUsedAt = sessionSettingsStore.sourceLastUsedAt(currentSessionId)
             )
+            sessionSettingsSources = invalidChatSourceReselectRequest
+                ?.takeIf { it.sessionId == currentSessionId }
+                ?.let { prepareInvalidChatSourceReplacement(catalog, it, System.currentTimeMillis()) }
+                ?: catalog
         }
     }
 
@@ -1029,6 +1064,12 @@ private fun DestinationContent(
                 memoryRepository = memoryRepository,
                 sourceRepository = sourceRepository,
                 sourceUsagePort = chatSourceUsagePort,
+                messageActionPort = chatMessageActionPort,
+                messageDeletePort = chatMessageDeletePort,
+                pendingDeletionStore = chatPendingDeletionStore,
+                clipboardPort = chatClipboardPort,
+                imageMediaPort = chatImageMediaPort,
+                rememberedMessageStore = chatRememberedMessageStore,
                 sessionId = activeSessionId,
                 sessionTitle = activeSessionTitle,
                 learnerRole = activeSessionLearnerRole,
@@ -1085,6 +1126,48 @@ private fun DestinationContent(
                 onOpenContextHub = onOpenContextHub,
                 onOpenSearch = { onNavigateDestination(AppDestination.ChatReferences) },
                 onOpenSessionSources = { onNavigateDestination(AppDestination.SessionSettingsSources) },
+                onOpenSessionSource = { sourceId ->
+                    if (sourceId == null) {
+                        onNavigateDestination(AppDestination.ChatReferences)
+                    } else {
+                        pendingSourceEvidenceTarget = sourceId
+                        onNavigateDestination(AppDestination.SessionSettingsSources)
+                    }
+                },
+                onReselectInvalidSource = { request ->
+                    if (request.sessionId == activeSessionId) {
+                        val now = System.currentTimeMillis()
+                        invalidChatSourceReselectRequest = request
+                        sessionSettingsSources = prepareInvalidChatSourceReplacement(
+                            sessionSettingsSources,
+                            request,
+                            now
+                        )
+                        pendingSourceEvidenceTarget = request.sourceId
+                        sessionSettingsImportError = null
+                        failedSessionSettingsReplaceTarget = null
+                        sessionSettingsPickerActive = true
+                        sessionSettingsReplaceTarget = request.sourceId
+                        onNavigateDestination(AppDestination.SessionSettingsSources)
+                        sourceFileLauncher.launch(
+                            arrayOf("text/*", "application/pdf", "image/*", "*/*")
+                        )
+                    }
+                },
+                onOpenExternalLink = { url ->
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    }
+                },
+                onOpenMediaSettings = {
+                    context.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                    )
+                },
+                onPendingDeletionChanged = { pendingDeletionSweepGeneration += 1 },
                 onOpenSources = onOpenSources,
                 onExport = {},
                 onOpenModelSettings = onOpenSettings,
@@ -1194,7 +1277,10 @@ private fun DestinationContent(
                 initialSources = sessionSettingsSources,
                 highlightedSourceId = pendingSourceEvidenceTarget,
                 pickedSource = pickedSessionSource,
-                onPickedSourceConsumed = { pickedSessionSource = null },
+                onPickedSourceConsumed = {
+                    pickedSessionSource = null
+                    invalidChatSourceReselectRequest = null
+                },
                 onSourcesChanged = { sessionSettingsRefreshKey += 1 },
                 onSessionTitleChanged = onActiveSessionTitleChanged,
                 onSessionLearnerRoleChanged = onActiveSessionLearnerRoleChanged,

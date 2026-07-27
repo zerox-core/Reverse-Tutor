@@ -133,7 +133,7 @@ object ChatAttachmentPolicy {
 }
 
 object ChatDraftCodec {
-    private const val Version = 1
+    private const val Version = 2
     private const val MaxStringBytes = 2 * 1024 * 1024
 
     fun encode(draft: ChatComposerDraft): String {
@@ -144,6 +144,7 @@ object ChatDraftCodec {
             data.writeString(draft.text)
             data.writeNullable(draft.quote?.messageId)
             data.writeNullable(draft.quote?.excerpt)
+            data.writeNullable(draft.quote?.sourceIdentity)
             data.writeInt(draft.attachments.size)
             draft.attachments.forEach { attachment ->
                 data.writeString(attachment.id)
@@ -170,11 +171,13 @@ object ChatDraftCodec {
     fun decode(encoded: String): ChatComposerDraft? = runCatching {
         val bytes = encoded.hexToByteArray()
         DataInputStream(ByteArrayInputStream(bytes)).use { data ->
-            require(data.readInt() == Version)
+            val version = data.readInt()
+            require(version in 1..Version)
             val requestId = data.readString()
             val text = data.readString()
             val quoteMessageId = data.readNullable()
             val quoteExcerpt = data.readNullable()
+            val quoteSourceIdentity = if (version >= 2) data.readNullable() else null
             val count = data.readInt()
             require(count in 0..ChatAttachmentPolicy.MaxAttachments)
             val attachments = List(count) {
@@ -200,7 +203,7 @@ object ChatDraftCodec {
                 clientRequestId = requestId,
                 text = text,
                 quote = if (quoteMessageId != null && quoteExcerpt != null) {
-                    ChatQuoteTarget(quoteMessageId, quoteExcerpt)
+                    ChatQuoteTarget(quoteMessageId, quoteExcerpt, quoteSourceIdentity ?: "消息")
                 } else {
                     null
                 },

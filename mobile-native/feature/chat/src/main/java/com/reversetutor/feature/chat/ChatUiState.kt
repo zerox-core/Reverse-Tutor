@@ -14,7 +14,11 @@ data class ChatUiState(
     val composer: ChatComposerState,
     val generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
     val learnerImageRef: String? = null,
-    val avatarVisible: Boolean = true
+    val avatarVisible: Boolean = true,
+    val sources: List<ChatSourceUi> = emptyList(),
+    val currentSessionSourceIds: Set<String> = emptySet(),
+    val pendingDeletion: PendingChatMessageDeletion? = null,
+    val pendingDeletionRetryRequired: Boolean = false
 ) {
     val generationStatusLabel: String?
         get() = generation.statusLabel
@@ -32,7 +36,12 @@ data class ChatUiState(
             learnerName: String = "林澈",
             learnerStatus: String = "正在理解函数",
             contextPath: String = "基础语法 / 函数 / 参数与返回值",
-            sessionSnapshot: NewSessionConfiguration? = null
+            sessionSnapshot: NewSessionConfiguration? = null,
+            sources: List<ChatSourceUi> = emptyList(),
+            currentSessionSourceIds: Set<String> = emptySet(),
+            rememberedMessageIds: Set<String> = emptySet(),
+            pendingDeletion: PendingChatMessageDeletion? = null,
+            pendingDeletionRetryRequired: Boolean = false
         ): ChatUiState {
             val resolvedName = sessionSnapshot?.learnerDisplayName?.takeIf(String::isNotBlank) ?: learnerName
             val resolvedStatus = sessionSnapshot?.learnerRole?.takeIf(String::isNotBlank) ?: learnerStatus
@@ -62,13 +71,18 @@ data class ChatUiState(
                                     sourceId = attachment.sourceId
                                 )
                             },
-                            quoteLabel = record.quote?.let { "正在回复：${it.excerpt}" }
+                            quoteLabel = record.quote?.let { "正在回复：${it.excerpt}" },
+                            remembered = record.message.id in rememberedMessageIds
                         )
                     },
                 composer = composer,
                 generation = generation,
                 learnerImageRef = sessionSnapshot?.learnerImageRef,
-                avatarVisible = sessionSnapshot?.avatarVisible ?: true
+                avatarVisible = sessionSnapshot?.avatarVisible ?: true,
+                sources = sources,
+                currentSessionSourceIds = currentSessionSourceIds,
+                pendingDeletion = pendingDeletion,
+                pendingDeletionRetryRequired = pendingDeletionRetryRequired
             )
         }
     }
@@ -80,14 +94,24 @@ fun buildChatRouteUiState(
     composer: ChatComposerState,
     generation: ChatGenerationUiState,
     learnerRoleFallback: String,
-    sessionSnapshot: NewSessionConfiguration?
+    sessionSnapshot: NewSessionConfiguration?,
+    sources: List<ChatSourceUi> = emptyList(),
+    currentSessionSourceIds: Set<String> = emptySet(),
+    rememberedMessageIds: Set<String> = emptySet(),
+    pendingDeletion: PendingChatMessageDeletion? = null,
+    pendingDeletionRetryRequired: Boolean = false
 ): ChatUiState = ChatUiState.from(
     sessionTitle = sessionTitle,
     records = records,
     composer = composer,
     generation = generation,
     learnerStatus = learnerRoleFallback,
-    sessionSnapshot = sessionSnapshot
+    sessionSnapshot = sessionSnapshot,
+    sources = sources,
+    currentSessionSourceIds = currentSessionSourceIds,
+    rememberedMessageIds = rememberedMessageIds,
+    pendingDeletion = pendingDeletion,
+    pendingDeletionRetryRequired = pendingDeletionRetryRequired
 )
 
 sealed interface ChatGenerationUiState {
@@ -119,7 +143,8 @@ data class ChatTimelineItem(
     val createdAtEpochMillis: Long,
     val attachmentLabels: List<String>,
     val attachments: List<ChatAttachmentUi>,
-    val quoteLabel: String?
+    val quoteLabel: String?,
+    val remembered: Boolean = false
 )
 
 data class ChatAttachmentUi(
@@ -226,17 +251,18 @@ data class ChatImageDraft(
 
 data class ChatQuoteTarget(
     val messageId: String,
-    val excerpt: String
+    val excerpt: String,
+    val sourceIdentity: String = "消息"
 )
 
 enum class ChatMessageAction(
-    val label: String,
-    val deferred: Boolean
+    val label: String
 ) {
-    Quote("引用", false),
-    Note("记为随笔", false),
-    Regenerate("重新生成", true),
-    Delete("删除", false)
+    Copy("复制"),
+    Quote("引用回复"),
+    Remember("记住这条"),
+    LocateSource("定位关联资料"),
+    Delete("删除消息")
 }
 
 private fun MessageRole.toChatLabel(learnerName: String): String =

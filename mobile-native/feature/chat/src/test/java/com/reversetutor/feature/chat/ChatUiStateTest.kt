@@ -109,14 +109,10 @@ class ChatUiStateTest {
     }
 
     @Test
-    fun actionModelKeepsOnlyRegenerateDeferredAfterNotePersistenceLands() {
+    fun actionModelMatchesTask3BLongPressContract() {
         assertEquals(
-            listOf("引用", "记为随笔", "重新生成", "删除"),
+            listOf("复制", "引用回复", "记住这条", "定位关联资料", "删除消息"),
             ChatMessageAction.entries.map { it.label }
-        )
-        assertEquals(
-            listOf(ChatMessageAction.Regenerate),
-            ChatMessageAction.entries.filter { it.deferred }
         )
     }
 

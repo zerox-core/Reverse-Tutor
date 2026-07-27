@@ -15,6 +15,23 @@ import org.junit.Test
 
 class SessionSettingsProductionAdaptersTest {
     @Test
+    fun invalidChatSourceRequestCreatesCurrentSessionReplacementPlaceholderWhenCatalogMissing() {
+        val request = com.reversetutor.feature.chat.ChatInvalidSourceReselectRequest(
+            sessionId = "session-1",
+            sourceId = "missing-source",
+            originalDisplayName = "原始讲义.pdf"
+        )
+
+        val prepared = prepareInvalidChatSourceReplacement(emptyList(), request, nowEpochMillis = 99L)
+
+        val placeholder = prepared.single()
+        assertEquals("missing-source", placeholder.id)
+        assertEquals("原始讲义.pdf", placeholder.displayName)
+        assertEquals(com.reversetutor.feature.chat.SourceReadState.Invalid, placeholder.readState)
+        assertEquals(listOf("session-1"), placeholder.referenceOwnerIds)
+        assertTrue(placeholder.currentSessionReferenced)
+    }
+    @Test
     fun importMapperRejectsUnsupportedFailedErrorsAndEmptyContentWithoutReplacingTarget() {
         val cases = listOf(
             importResult(SourceParserStatus.Unsupported),

@@ -68,13 +68,14 @@ import com.reversetutor.core.data.llm.ChatGenerationInput
 import com.reversetutor.core.data.llm.ChatGenerationOutcome
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.memory.MemoryRepository
-import com.reversetutor.core.data.memory.NoteInput
 import com.reversetutor.core.data.message.MessageRecord
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageRole
+import com.reversetutor.core.model.SourceParserStatus
+import com.reversetutor.core.model.SourceType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -86,6 +87,12 @@ fun ChatRoute(
     memoryRepository: MemoryRepository? = null,
     sourceRepository: SourceRepository? = null,
     sourceUsagePort: ChatSourceUsagePort = ChatSourceUsagePort.None,
+    messageActionPort: ChatMessageActionPort = ChatMessageActionPort.Unavailable,
+    messageDeletePort: ChatMessageDeletePort = ChatMessageDeletePort.Unavailable,
+    pendingDeletionStore: ChatPendingDeletionStore = ChatPendingDeletionStore.None,
+    clipboardPort: ChatClipboardPort = ChatClipboardPort.Unavailable,
+    imageMediaPort: ChatImageMediaPort = ChatImageMediaPort.Unavailable,
+    rememberedMessageStore: ChatRememberedMessageStore = ChatRememberedMessageStore.None,
     sessionId: String,
     sessionTitle: String,
     learnerRole: String = "学习者",
@@ -111,6 +118,11 @@ fun ChatRoute(
     onOpenContextHub: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenSessionSources: () -> Unit = {},
+    onOpenSessionSource: (String?) -> Unit = {},
+    onReselectInvalidSource: (ChatInvalidSourceReselectRequest) -> Unit = {},
+    onOpenExternalLink: (String) -> Unit = {},
+    onOpenMediaSettings: () -> Unit = {},
+    onPendingDeletionChanged: () -> Unit = {},
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
@@ -132,6 +144,24 @@ fun ChatRoute(
     var activeBackgroundJobId by remember(sessionId) { mutableStateOf<String?>(null) }
     var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
     var noticeText by remember { mutableStateOf<String?>(null) }
+    var noticeSettingsAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var sourceItems by remember(sessionId) { mutableStateOf(emptyList<ChatSourceUi>()) }
+    var rememberedMessageIds by remember(sessionId, rememberedMessageStore) {
+        mutableStateOf(rememberedMessageStore.loadRememberedMessageIds())
+    }
+    var pendingDeletion by remember(sessionId, pendingDeletionStore) {
+        mutableStateOf(pendingDeletionStore.load(sessionId))
+    }
+    var pendingDeletionRetryRequired by remember(sessionId) { mutableStateOf(false) }
+    var memoryDraft by remember(sessionId) { mutableStateOf<ChatMemoryDraft?>(null) }
+    var memoryError by remember(sessionId) { mutableStateOf<String?>(null) }
+    var deleteConfirmation by remember(sessionId) { mutableStateOf<ChatDeleteConfirmation?>(null) }
+    val deletionCoordinator = remember(sessionId, messageDeletePort, pendingDeletionStore) {
+        ChatMessageDeletionCoordinator(
+            store = pendingDeletionStore,
+            deletePort = messageDeletePort
+        )
+    }
     val sendCoordinator = remember(sessionId, messageRepository, draftStore, attachmentOrderStore) {
         ChatSendCoordinator(
             draftStore = draftStore,
@@ -181,10 +211,61 @@ fun ChatRoute(
     }
 
     LaunchedEffect(sessionId, refreshKey) {
-        records = applyStoredAttachmentOrder(
+        val loadedRecords = applyStoredAttachmentOrder(
             messageRepository.listMessageRecords(sessionId),
             attachmentOrderStore
         )
+        val restoredPending = pendingDeletionStore.load(sessionId)
+        if (restoredPending != null && System.currentTimeMillis() >= restoredPending.expiresAtEpochMillis) {
+            pendingDeletionRetryRequired = when (
+                deletionCoordinator.finalize(sessionId, System.currentTimeMillis())
+            ) {
+                ChatFinalizeDeletionResult.RetryableFailure -> true
+                else -> false
+            }
+            pendingDeletion = pendingDeletionStore.load(sessionId)
+            records = loadedRecords.filterNot { it.message.id == restoredPending.messageId }
+        } else {
+            pendingDeletion = restoredPending
+            pendingDeletionRetryRequired = false
+            records = loadedRecords.filterNot { it.message.id == restoredPending?.messageId }
+        }
+        sourceItems = sourceRepository?.listSourcesWithChunks()?.map { source ->
+            ChatSourceUi(
+                id = source.source.id,
+                displayName = source.source.title,
+                typeLabel = source.source.type.toChatTypeLabel(),
+                stateLabel = when (source.source.parserStatus) {
+                    SourceParserStatus.FullyLocal -> "可用"
+                    SourceParserStatus.PartiallyLocal -> "部分可用"
+                    SourceParserStatus.FutureAssisted -> "等待解析"
+                    SourceParserStatus.Unsupported -> "不支持解析"
+                    SourceParserStatus.Failed -> "解析失败"
+                },
+                valid = source.source.parserStatus != SourceParserStatus.Failed
+            )
+        }.orEmpty()
+        rememberedMessageIds = rememberedMessageStore.loadRememberedMessageIds()
+    }
+
+    LaunchedEffect(pendingDeletion?.messageId, pendingDeletion?.expiresAtEpochMillis) {
+        val current = pendingDeletion ?: return@LaunchedEffect
+        val remaining = current.expiresAtEpochMillis - System.currentTimeMillis()
+        if (remaining > 0L) delay(remaining)
+        when (deletionCoordinator.finalize(sessionId, System.currentTimeMillis())) {
+            ChatFinalizeDeletionResult.Success,
+            ChatFinalizeDeletionResult.AlreadyAbsent,
+            ChatFinalizeDeletionResult.NothingPending -> {
+                pendingDeletion = null
+                pendingDeletionRetryRequired = false
+                reload()
+            }
+            ChatFinalizeDeletionResult.RetryableFailure -> {
+                pendingDeletionRetryRequired = true
+                noticeText = "删除消息失败，请重试。"
+            }
+            ChatFinalizeDeletionResult.NotDue -> Unit
+        }
     }
 
     LaunchedEffect(pendingImageDraft?.requestId) {
@@ -242,7 +323,12 @@ fun ChatRoute(
             composer = composer,
             generation = generation,
             learnerRoleFallback = learnerRole,
-            sessionSnapshot = sessionSnapshot
+            sessionSnapshot = sessionSnapshot,
+            sources = sourceItems,
+            currentSessionSourceIds = availableSourceAttachments.mapNotNullTo(linkedSetOf()) { it.sourceId },
+            rememberedMessageIds = rememberedMessageIds,
+            pendingDeletion = pendingDeletion,
+            pendingDeletionRetryRequired = pendingDeletionRetryRequired
         ),
         onComposerTextChange = { updateComposer(composer.copy(text = it, sendFailure = null, notice = null)) },
         onSendMessage = {
@@ -347,48 +433,186 @@ fun ChatRoute(
         },
         onMessageAction = { item, action ->
             when (action) {
+                ChatMessageAction.Copy -> {
+                    noticeText = when (clipboardPort.copyPlainText(item.text)) {
+                        ChatClipboardResult.Copied -> "已复制消息正文。"
+                        ChatClipboardResult.Unavailable -> "当前设备不能使用剪贴板。"
+                        ChatClipboardResult.Failed -> "复制失败，请重试。"
+                    }
+                }
                 ChatMessageAction.Quote -> {
                     updateComposer(composer.copy(
                         quoteTarget = ChatQuoteTarget(
                             messageId = item.id,
-                            excerpt = item.text.toQuoteExcerpt()
+                            excerpt = item.text.toQuoteExcerpt(),
+                            sourceIdentity = item.roleLabel
                         )
                     ))
                 }
-                ChatMessageAction.Note -> {
-                    val repository = memoryRepository
-                    if (repository == null) {
-                        noticeText = "当前预览暂不能创建随笔。"
-                    } else {
-                        scope.launch {
-                            val note = repository.createNote(
-                                input = NoteInput(
-                                    title = item.text.toQuoteExcerpt(),
-                                    body = item.text,
-                                    sourceMessageId = item.id
-                                ),
-                                nowEpochMillis = System.currentTimeMillis(),
-                                spaceId = item.spaceId
-                            )
-                            noticeText = if (note == null) {
-                                "这条消息为空，未创建随笔。"
-                            } else {
-                                "随笔已保存到学习脉络。"
-                            }
-                        }
-                    }
+                ChatMessageAction.Remember -> {
+                    memoryError = null
+                    memoryDraft = ChatMemoryDraft(item.id, item.spaceId, item.text)
                 }
-                ChatMessageAction.Regenerate -> {
-                    noticeText = "重新生成会在 LLM 编排完成后启用。"
+                ChatMessageAction.LocateSource -> {
+                    val sourceIds = item.attachments.mapNotNull { it.sourceId }.distinct()
+                    when (sourceIds.size) {
+                        0 -> noticeText = "这条消息没有关联资料。"
+                        1 -> onOpenSessionSource(sourceIds.single())
+                        else -> onOpenSessionSource(null)
+                    }
                 }
                 ChatMessageAction.Delete -> {
                     scope.launch {
-                        messageRepository.deleteMessage(item.id)
-                        reload()
+                        deleteConfirmation = ChatDeleteConfirmation(
+                            messageId = item.id,
+                            spaceId = item.spaceId,
+                            messagePreview = item.text.toQuoteExcerpt(),
+                            impact = messageActionPort.loadDeleteImpact(item.id, item.spaceId)
+                        )
                     }
                 }
             }
         },
+        memoryDraft = memoryDraft,
+        memoryError = memoryError,
+        onMemoryDraftChange = {
+            memoryDraft = it
+            memoryError = null
+        },
+        onDismissMemory = {
+            memoryDraft = null
+            memoryError = null
+        },
+        onConfirmMemory = {
+            val current = memoryDraft ?: return@ChatScreen
+            scope.launch {
+                when (val result = messageActionPort.remember(current)) {
+                    ChatMemoryCommitResult.Saved -> {
+                        val saved = ChatRememberedMessageMetadata(
+                            messageId = current.messageId,
+                            category = current.category,
+                            rememberedAtEpochMillis = System.currentTimeMillis()
+                        )
+                        rememberedMessageStore.save(saved)
+                        rememberedMessageIds = rememberedMessageIds + current.messageId
+                        memoryDraft = null
+                        memoryError = null
+                        noticeText = "已保存到学习脉络。"
+                    }
+                    is ChatMemoryCommitResult.Unavailable -> memoryError = result.message
+                    is ChatMemoryCommitResult.Failed -> memoryError = result.message
+                }
+            }
+        },
+        deleteConfirmation = deleteConfirmation,
+        onDismissDelete = { deleteConfirmation = null },
+        onConfirmDelete = {
+            val current = deleteConfirmation ?: return@ChatScreen
+            if (!current.impact.canDeleteMessageOnly) {
+                noticeText = current.impact.deletionBoundary
+                return@ChatScreen
+            }
+            when (val result = deletionCoordinator.request(
+                sessionId = sessionId,
+                messageId = current.messageId,
+                nowEpochMillis = System.currentTimeMillis()
+            )) {
+                is ChatDeletionRequestResult.Accepted -> {
+                    pendingDeletion = result.pending
+                    pendingDeletionRetryRequired = false
+                    records = records.filterNot { it.message.id == current.messageId }
+                    onPendingDeletionChanged()
+                }
+                is ChatDeletionRequestResult.AlreadyPending -> {
+                    noticeText = "先处理当前撤销窗口，再删除其他消息。"
+                }
+            }
+            deleteConfirmation = null
+        },
+        onUndoDelete = {
+            when (deletionCoordinator.undo(sessionId, System.currentTimeMillis())) {
+                ChatUndoDeletionResult.Undone -> {
+                    pendingDeletion = null
+                    pendingDeletionRetryRequired = false
+                    reload()
+                }
+                ChatUndoDeletionResult.Expired -> scope.launch {
+                    when (deletionCoordinator.finalize(sessionId, System.currentTimeMillis())) {
+                        ChatFinalizeDeletionResult.Success,
+                        ChatFinalizeDeletionResult.AlreadyAbsent,
+                        ChatFinalizeDeletionResult.NothingPending -> {
+                            pendingDeletion = null
+                            pendingDeletionRetryRequired = false
+                            reload()
+                        }
+                        ChatFinalizeDeletionResult.RetryableFailure -> {
+                            pendingDeletionRetryRequired = true
+                            noticeText = "删除消息失败，请重试。"
+                        }
+                        ChatFinalizeDeletionResult.NotDue -> Unit
+                    }
+                }
+                ChatUndoDeletionResult.NothingPending -> Unit
+            }
+        },
+        onRetryDelete = {
+            scope.launch {
+                when (deletionCoordinator.finalize(sessionId, System.currentTimeMillis())) {
+                    ChatFinalizeDeletionResult.Success,
+                    ChatFinalizeDeletionResult.AlreadyAbsent,
+                    ChatFinalizeDeletionResult.NothingPending -> {
+                        pendingDeletion = null
+                        pendingDeletionRetryRequired = false
+                        reload()
+                    }
+                    ChatFinalizeDeletionResult.RetryableFailure -> {
+                        pendingDeletionRetryRequired = true
+                        noticeText = "删除消息失败，请重试。"
+                    }
+                    ChatFinalizeDeletionResult.NotDue -> Unit
+                }
+            }
+        },
+        onCopyRichSource = { source -> clipboardPort.copyPlainText(source) },
+        onSaveImage = { attachment ->
+            scope.launch {
+                val uri = attachment.uri
+                noticeText = if (uri == null) {
+                    "图片地址无效，无法保存。"
+                } else {
+                    when (val result = imageMediaPort.save(uri, attachment.name, attachment.mimeType)) {
+                        ChatMediaResult.Success -> "图片已保存。"
+                        is ChatMediaResult.PermissionDenied -> {
+                            noticeSettingsAction = onOpenMediaSettings
+                            result.message
+                        }
+                        is ChatMediaResult.Failure -> result.message
+                    }
+                }
+            }
+        },
+        onShareImage = { attachment ->
+            scope.launch {
+                val uri = attachment.uri
+                noticeText = if (uri == null) {
+                    "图片地址无效，无法分享。"
+                } else {
+                    when (val result = imageMediaPort.share(uri, attachment.name, attachment.mimeType)) {
+                        ChatMediaResult.Success -> "已打开系统分享。"
+                        is ChatMediaResult.PermissionDenied -> {
+                            noticeSettingsAction = onOpenMediaSettings
+                            result.message
+                        }
+                        is ChatMediaResult.Failure -> result.message
+                    }
+                }
+            }
+        },
+        onOpenSessionSource = onOpenSessionSource,
+        onReselectInvalidSource = { sourceId, originalName ->
+            onReselectInvalidSource(ChatInvalidSourceReselectRequest(sessionId, sourceId, originalName))
+        },
+        onOpenExternalLink = onOpenExternalLink,
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
         onOpenSearch = onOpenSearch,
@@ -439,16 +663,37 @@ fun ChatRoute(
     val currentNotice = noticeText
     if (currentNotice != null) {
         AlertDialog(
-            onDismissRequest = { noticeText = null },
-            title = { Text("延期待办") },
+            onDismissRequest = {
+                noticeText = null
+                noticeSettingsAction = null
+            },
+            title = { Text("提示") },
             text = { Text(currentNotice) },
             confirmButton = {
-                TextButton(onClick = { noticeText = null }) {
-                    Text("知道了")
+                TextButton(onClick = {
+                    val action = noticeSettingsAction
+                    noticeText = null
+                    noticeSettingsAction = null
+                    action?.invoke()
+                }) {
+                    Text(if (noticeSettingsAction == null) "知道了" else "打开设置")
                 }
             }
         )
     }
+}
+
+private fun SourceType.toChatTypeLabel(): String = when (this) {
+    SourceType.JsonExport -> "JSON"
+    SourceType.Pdf -> "PDF"
+    SourceType.Docx -> "Word"
+    SourceType.Text -> "文本"
+    SourceType.Markdown -> "Markdown"
+    SourceType.Html -> "网页"
+    SourceType.Pptx -> "演示文稿"
+    SourceType.Epub -> "电子书"
+    SourceType.Image -> "图片"
+    SourceType.Other -> "资料"
 }
 
 @Composable
@@ -460,6 +705,22 @@ fun ChatScreen(
     onCreateImageDraft: () -> Unit,
     onCancelImageDraft: () -> Unit,
     onMessageAction: (ChatTimelineItem, ChatMessageAction) -> Unit,
+    memoryDraft: ChatMemoryDraft? = null,
+    memoryError: String? = null,
+    onMemoryDraftChange: (ChatMemoryDraft) -> Unit = {},
+    onDismissMemory: () -> Unit = {},
+    onConfirmMemory: () -> Unit = {},
+    deleteConfirmation: ChatDeleteConfirmation? = null,
+    onDismissDelete: () -> Unit = {},
+    onConfirmDelete: () -> Unit = {},
+    onUndoDelete: () -> Unit = {},
+    onRetryDelete: () -> Unit = {},
+    onCopyRichSource: (String) -> ChatClipboardResult = { ChatClipboardResult.Unavailable },
+    onSaveImage: (ChatAttachmentUi) -> Unit = {},
+    onShareImage: (ChatAttachmentUi) -> Unit = {},
+    onOpenSessionSource: (String?) -> Unit = {},
+    onReselectInvalidSource: (String, String) -> Unit = { _, _ -> },
+    onOpenExternalLink: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
@@ -493,6 +754,22 @@ fun ChatScreen(
         onCreateImageDraft = onCreateImageDraft,
         onCancelImageDraft = onCancelImageDraft,
         onMessageAction = onMessageAction,
+        memoryDraft = memoryDraft,
+        memoryError = memoryError,
+        onMemoryDraftChange = onMemoryDraftChange,
+        onDismissMemory = onDismissMemory,
+        onConfirmMemory = onConfirmMemory,
+        deleteConfirmation = deleteConfirmation,
+        onDismissDelete = onDismissDelete,
+        onConfirmDelete = onConfirmDelete,
+        onUndoDelete = onUndoDelete,
+        onRetryDelete = onRetryDelete,
+        onCopyRichSource = onCopyRichSource,
+        onSaveImage = onSaveImage,
+        onShareImage = onShareImage,
+        onOpenSessionSource = onOpenSessionSource,
+        onReselectInvalidSource = onReselectInvalidSource,
+        onOpenExternalLink = onOpenExternalLink,
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
         onOpenModelSettings = onOpenModelSettings,
