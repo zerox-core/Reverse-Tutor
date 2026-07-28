@@ -1,0 +1,28 @@
+{
+  "task_id": "NATIVE-P5-008",
+  "status": "verified",
+  "done": [
+    "Activated P5-008 and refreshed context.",
+    "Updated graph parity checklist.",
+    "Updated source type status matrix.",
+    "Ran focused tests, instrumentation source compile, full native verification, package inspection, JSON validation, and codegraph rebuild."
+  ],
+  "changed_files": [
+    ".adworkflow/context_manifest.json",
+    ".adworkflow/context_raw.json",
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    ".adworkflow/worker_state.json",
+    ".adworkflow/review_findings.json",
+    ".codegraph/index.json",
+    "tasks/native-legacy-entry-inventory.md"
+  ],
+  "current_problem": "",
+  "remaining_risks": [
+    "No replacement readiness claim.",
+    "No fresh connected device run or screenshots in this turn.",
+    "Several Phase 5 parity gaps remain for Phase 6."
+  ],
+  "clarification_events": [],
+  "timeout_fallbacks": []
+}

@@ -17,12 +17,13 @@ This file defines the project-local operating boundary for AI-assisted engineeri
 - Add protocol fixtures and fixture validators required by the active task.
 - Add Python tests only when the task explicitly covers shared protocol compatibility, import/export validation, or reference behavior.
 - Run local deterministic build/test commands.
+- Install native debug/preview APKs on explicitly connected local devices for task validation, screenshot capture, or smoke testing.
 - Update `.adworkflow/worker_state.json`, `.adworkflow/verification_result.json`, and task-specific artifacts.
 
 ## Require User Confirmation
 
 - Building signed APKs.
-- Installing APKs on a device.
+- Installing signed, release, or official replacement APKs on a device.
 - Changing official package identity behavior.
 - Modifying existing `mobile/` release packaging.
 - Modifying signing files or release aliases.

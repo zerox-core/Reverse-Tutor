@@ -1,0 +1,40 @@
+{
+  "task_id": "NATIVE-P3-001",
+  "status": "approved",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "notifications",
+      "finding": "Background completion/failure notifications are not implemented in this slice.",
+      "recommendation": "Implement user-visible notification behavior and notification settings in NATIVE-P3-002 before reducing LEG-017 risk."
+    },
+    {
+      "severity": "medium",
+      "area": "device_evidence",
+      "finding": "The new Room migration instrumentation test compiles, but no device was attached for connected execution.",
+      "recommendation": "Run the migration test and a background generation smoke on a device/emulator during Phase 3 validation."
+    },
+    {
+      "severity": "medium",
+      "area": "provider_runtime",
+      "finding": "The preview app still uses FakeLlmGenerationRuntime; WorkManager execution does not call live providers.",
+      "recommendation": "Keep LEG-028/LEG-042 open until live provider execution, retry diagnostics, and redaction behavior are validated in an explicit provider task."
+    },
+    {
+      "severity": "low",
+      "area": "ui_refresh",
+      "finding": "ChatRoute polls terminal job state to refresh the timeline after WorkManager writes the assistant message.",
+      "recommendation": "Consider replacing polling with observable job/message flows when ViewModel or repository Flow infrastructure lands."
+    }
+  ],
+  "review_basis": [
+    ".adworkflow/task_spec.json",
+    ".adworkflow/verification_result.json",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/background/BackgroundGenerationRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/background/BackgroundGenerationRepositoryTest.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationWorker.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "tasks/native-legacy-coverage-registry.md"
+  ]
+}

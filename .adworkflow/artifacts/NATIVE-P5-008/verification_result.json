@@ -1,0 +1,19 @@
+{
+  "task_id": "NATIVE-P5-008",
+  "passed": [
+    "prepare_context.py for P5-008 passed.",
+    "Focused UX-005 JVM tests passed after implementation.",
+    ":app:compileDebugAndroidTestKotlin passed.",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace passed.",
+    "aapt badging inspection confirmed com.reversetutor.preview.",
+    "ADworkflo JSON validation passed.",
+    "Codegraph rebuild passed."
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build.",
+    "No real LLM provider call.",
+    "No connectedDebugAndroidTest rerun.",
+    "No fresh screenshots."
+  ]
+}

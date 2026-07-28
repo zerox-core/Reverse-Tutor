@@ -1,0 +1,65 @@
+{
+  "schema": "ADworkflo.task_spec.v2",
+  "configured": true,
+  "task_id": "RT-FIGMA-FORMAL-REMEDIATION-001",
+  "task_type": "code",
+  "goal": "Replace the obsolete native preview UI with a node-traceable Jetpack Compose implementation of all 56 formal Figma phone boards under 714:10.",
+  "non_goals": [
+    "Do not change Room entities, DAOs, schema exports, migrations, preferences or SecretStore behavior.",
+    "Do not change frozen protocol wire values or upload core learning data to FastAPI/PostgreSQL.",
+    "Do not implement community content, review mode, companion mode, TTS or undesigned actions.",
+    "Do not modify or retire the PWA/Capacitor line.",
+    "Do not build a signed or release APK."
+  ],
+  "acceptance_criteria": [
+    "Every one of the 56 formal phone boards has an explicit Figma node ID to Compose route/state mapping.",
+    "The formal workspace order is Weekly, Home, Global Graph, Community with Home initially selected and Challenge vertically above Home.",
+    "No formal route renders Learning Brain, obsolete preview seed copy, fabricated community modules or the global four-dot overlay.",
+    "Formal Home, Weekly, Community and Settings pass node-specific screenshot comparison before Batch 1 is complete.",
+    "AI role and template copy consistently present the AI as the student and the user as the teacher.",
+    "Graph layout uses hierarchical anchors, attraction/repulsion, collision and inertia with semantic zoom from circular overview to card close-up.",
+    "Frozen local-first data, protocol and security boundaries remain unchanged.",
+    "No signed/release APK is assembled and physical Mate 60 validation is recorded separately from emulator evidence."
+  ],
+  "risk_level": "high",
+  "execution_mode": "fanout_workers",
+  "allowed_actions": ["read", "edit", "test", "shell"],
+  "required_outputs": [
+    "patch",
+    "worker_state.json",
+    "verification_result.json",
+    "review_findings.json",
+    "node-level screenshot evidence"
+  ],
+  "do_not_touch": [
+    "mobile/android/app/release.jks",
+    "mobile/android/app/build.gradle",
+    "mobile/capacitor.config.json",
+    "mobile/package.json",
+    "static/app/index.html",
+    "static/app/sw.js",
+    "mobile-native/core/data/local",
+    "mobile-native/core/data/preferences",
+    "mobile-native/core/data/llm/SecretStore.kt",
+    "mobile-native/core/protocol",
+    "Native Room entities, DAOs, schema exports and migrations"
+  ],
+  "entrypoints": [
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/AppShell.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell/WorkspacePagerHost.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/SessionsScreen.kt",
+    "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/WeeklyDashboardViewModel.kt",
+    "mobile-native/feature/settings/src/main/java/com/reversetutor/feature/settings/FigmaSettingsScreen.kt"
+  ],
+  "context_sources": [
+    ".adworkflow/artifacts/RT-FIGMA-FORMAL-AUDIT-001/requirements.md",
+    "docs/superpowers/plans/2026-07-17-formal-figma-remediation.md",
+    "docs/mobile-ui-design-language.md",
+    "tasks/native-backend-protocol-data-contract-freeze.md",
+    "Figma VPV0vclAhALpF8QIGvxYlo node 714:10"
+  ],
+  "notes": [
+    "Visual truth comes from current Figma 714:10, while the user-confirmed spatial order overrides stale prototype links.",
+    "The shared checkout is dirty; workers must edit only assigned files and must not revert unrelated changes."
+  ]
+}

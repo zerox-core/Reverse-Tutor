@@ -1,0 +1,33 @@
+{
+  "schema": "ADworkflo.task_spec.v2",
+  "configured": true,
+  "task_id": "ANDROID-BASELINE-CLOSEOUT-001",
+  "goal": "Close, verify, commit and publish the current Android baseline, then synchronize it into the Feishu frontend design branch.",
+  "branch": "Android",
+  "scope": [
+    "Remove the unused NewSessionLaunchRequest path and retain NewSessionPrefillRequest as the challenge creation path.",
+    "Connect chat composer and overflow presentation contracts to production Compose UI.",
+    "Split the mixed working tree into intentional product, backend preference, test and workflow commits.",
+    "Run Android unit tests, lint and assembleDebug.",
+    "Push Android and merge it into feat/ux-polish-2026-07-27 without changing main."
+  ],
+  "non_goals": [
+    "Do not modify main.",
+    "Do not modify Room schema, DAOs, protocol schemas, import/export payloads or SecretStore behavior.",
+    "Do not open production PostgreSQL writes.",
+    "Do not build or sign a release APK."
+  ],
+  "acceptance_criteria": [
+    "Only NewSessionPrefillRequest remains in the challenge-to-new-session production flow.",
+    "ChatComposerLayout and ChatOverflowAction are consumed by production UI.",
+    "Android working tree is clean and pushed after passing unit tests, lint and assembleDebug.",
+    "Design-only assets are committed on feat/ux-polish-2026-07-27, not Android.",
+    "main remains at its original commit."
+  ],
+  "risk_level": "medium",
+  "verification": [
+    ".\\gradlew.bat :core:design:testDebugUnitTest :core:data:testDebugUnitTest :feature:chat:testDebugUnitTest :feature:memory:testDebugUnitTest :feature:settings:testDebugUnitTest :app:testDebugUnitTest --no-daemon --max-workers=1 -Pkotlin.incremental=false",
+    ".\\gradlew.bat :app:lintDebug --no-daemon --max-workers=1 -Pkotlin.incremental=false",
+    ".\\gradlew.bat :app:assembleDebug --no-daemon --max-workers=1 -Pkotlin.incremental=false"
+  ]
+}
