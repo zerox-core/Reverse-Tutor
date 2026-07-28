@@ -14,6 +14,10 @@ class AppPreferencesRepository(
             theme = stored[AppPreferenceKeys.theme]?.let(::parseTheme) ?: AppPreferences.defaults.theme,
             globalAvatarVisible = stored[AppPreferenceKeys.globalAvatarVisible]
                 ?: AppPreferences.defaults.globalAvatarVisible,
+            challengeReminderEnabled = stored[AppPreferenceKeys.challengeReminderEnabled]
+                ?: AppPreferences.defaults.challengeReminderEnabled,
+            hapticFeedbackEnabled = stored[AppPreferenceKeys.hapticFeedbackEnabled]
+                ?: AppPreferences.defaults.hapticFeedbackEnabled,
             primaryMemo = stored[AppPreferenceKeys.primaryMemo] ?: AppPreferences.defaults.primaryMemo,
             secondaryMemo = stored[AppPreferenceKeys.secondaryMemo]
                 ?: AppPreferences.defaults.secondaryMemo,
@@ -30,6 +34,18 @@ class AppPreferencesRepository(
     suspend fun setGlobalAvatarVisible(visible: Boolean) {
         dataStore.edit { preferences ->
             preferences[AppPreferenceKeys.globalAvatarVisible] = visible
+        }
+    }
+
+    suspend fun setChallengeReminderEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.challengeReminderEnabled] = enabled
+        }
+    }
+
+    suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.hapticFeedbackEnabled] = enabled
         }
     }
 

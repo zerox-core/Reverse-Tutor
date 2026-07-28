@@ -1,5 +1,6 @@
 package com.reversetutor.feature.settings
 
+import com.reversetutor.core.model.LlmProviderKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -73,5 +74,23 @@ class FormalProviderPresetUiModelTest {
         )
         assertNull(formalProviderPresetCatalog.first { it.title == "百炼 / Qwen" }.destination)
         assertNull(formalProviderPresetCatalog.first { it.title == "OpenAI" }.destination)
+    }
+
+    @Test
+    fun editorDraftUsesProviderDefaultsAndProducesRepositoryInput() {
+        val deepSeek = FormalLlmProfileDraft.forProvider(FormalLlmProvider.DeepSeek)
+        val kimi = FormalLlmProfileDraft.forProvider(FormalLlmProvider.Kimi)
+
+        assertEquals("DeepSeek", deepSeek.name)
+        assertEquals("deepseek-chat", deepSeek.model)
+        assertEquals("https://api.deepseek.com", deepSeek.baseUrl)
+        assertEquals(LlmProviderKind.DeepSeek, deepSeek.providerKind)
+        assertEquals("moonshot-v1-8k", kimi.model)
+        assertEquals("https://api.moonshot.cn/v1", kimi.baseUrl)
+        assertEquals(LlmProviderKind.OpenAiCompatible, kimi.providerKind)
+
+        val input = deepSeek.copy(apiKey = " secret-key ").toInput()
+        assertEquals(" secret-key ", input.apiKey)
+        assertEquals(LlmProviderKind.DeepSeek, input.provider)
     }
 }

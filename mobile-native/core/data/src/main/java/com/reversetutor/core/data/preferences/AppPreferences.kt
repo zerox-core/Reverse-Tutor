@@ -3,6 +3,8 @@ package com.reversetutor.core.data.preferences
 data class AppPreferences(
     val theme: ThemePreference = ThemePreference.System,
     val globalAvatarVisible: Boolean = true,
+    val challengeReminderEnabled: Boolean = true,
+    val hapticFeedbackEnabled: Boolean = true,
     val primaryMemo: String = "",
     val secondaryMemo: String = "",
     val scratchMemo: String = ""

@@ -2,6 +2,7 @@ package com.reversetutor.core.data.preferences
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AppPreferencesPolicyTest {
@@ -14,6 +15,8 @@ class AppPreferencesPolicyTest {
         assertEquals("", defaults.primaryMemo)
         assertEquals("", defaults.secondaryMemo)
         assertEquals("", defaults.scratchMemo)
+        assertEquals(true, defaults.challengeReminderEnabled)
+        assertEquals(true, defaults.hapticFeedbackEnabled)
     }
 
     @Test
@@ -23,5 +26,11 @@ class AppPreferencesPolicyTest {
         AppPreferenceKeys.persistedNames.forEach { name ->
             assertFalse("Preference key must not store secrets: $name", forbidden.containsMatchIn(name))
         }
+    }
+
+    @Test
+    fun settingsToggleKeysArePartOfThePersistedPreferenceContract() {
+        assertTrue(AppPreferenceKeys.challengeReminderEnabled.name in AppPreferenceKeys.persistedNames)
+        assertTrue(AppPreferenceKeys.hapticFeedbackEnabled.name in AppPreferenceKeys.persistedNames)
     }
 }

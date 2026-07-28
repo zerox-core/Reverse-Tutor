@@ -394,6 +394,8 @@ fun AppShell(
                         activeArticleSlug = activeArticleSlug,
                         chatScrollMemory = chatScrollMemory,
                         challengeRuntimeState = challengeRuntimeState,
+                        challengePageActive = navigationState.current == AppDestination.Challenge &&
+                            workspaceState.verticalPage == WorkspaceVerticalPage.Challenge,
                         challengeEntryGeneration = challengeEntryGeneration,
                         challengeSessionPrefill = challengeSessionPrefill,
                         challengeRestoreContext = challengeRestoreContext,
@@ -829,6 +831,7 @@ private fun DestinationContent(
     activeArticleSlug: String,
     chatScrollMemory: ChatScrollMemory,
     challengeRuntimeState: ChallengeRuntimeState,
+    challengePageActive: Boolean,
     challengeEntryGeneration: Long,
     challengeSessionPrefill: NewSessionPrefillRequest?,
     challengeRestoreContext: ChallengeReturnContext?,
@@ -1219,6 +1222,7 @@ private fun DestinationContent(
                 onJoin = onChallengeJoined,
                 runtimeState = challengeRuntimeState,
                 onRetry = onChallengeRetry,
+                active = challengePageActive,
                 onExitBoundaryChanged = onChallengeExitBoundaryChanged,
                 entryGeneration = challengeEntryGeneration,
                 restoreContext = challengeRestoreContext,
@@ -1572,7 +1576,21 @@ private fun DestinationContent(
                 },
                 onOpenStorage = onOpenAbout,
                 onOpenImportExport = onOpenImportExport,
-                onOpenAbout = onOpenAbout
+                onOpenAbout = onOpenAbout,
+                challengeReminderEnabled = appPreferences.challengeReminderEnabled,
+                hapticFeedbackEnabled = appPreferences.hapticFeedbackEnabled,
+                onChallengeReminderChanged = { enabled ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setChallengeReminderEnabled(enabled)
+                    }
+                },
+                onHapticFeedbackChanged = { enabled ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setHapticFeedbackEnabled(enabled)
+                    }
+                }
             )
             return@ReverseTutorScreenSurface
         }
@@ -1583,6 +1601,12 @@ private fun DestinationContent(
                 onActivateProfile = { profileId ->
                     scope.launch {
                         llmProfileRepository.activateProfile(profileId, System.currentTimeMillis())
+                        llmProfiles = llmProfileRepository.listProfiles()
+                    }
+                },
+                onSaveProfile = { input ->
+                    scope.launch {
+                        llmProfileRepository.saveProfile(input, System.currentTimeMillis())
                         llmProfiles = llmProfileRepository.listProfiles()
                     }
                 },

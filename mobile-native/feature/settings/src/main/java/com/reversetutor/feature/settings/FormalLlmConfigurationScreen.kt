@@ -18,17 +18,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +58,8 @@ import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalShapes
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
+import com.reversetutor.core.data.llm.LlmProfileInput
+import com.reversetutor.core.model.LlmProviderKind
 
 enum class FormalLlmProvider(val label: String, val shortLabel: String) {
     DeepSeek("DeepSeek", "鲸"),
@@ -57,6 +68,66 @@ enum class FormalLlmProvider(val label: String, val shortLabel: String) {
     Glm("GLM", "智"),
     OpenAi("OpenAI", "◎"),
     Custom("自定义", "▦")
+}
+
+internal data class FormalLlmProfileDraft(
+    val name: String,
+    val providerKind: LlmProviderKind,
+    val model: String,
+    val baseUrl: String,
+    val apiKey: String = ""
+) {
+    val canSave: Boolean
+        get() = name.isNotBlank() && model.isNotBlank()
+
+    fun toInput(): LlmProfileInput = LlmProfileInput(
+        name = name,
+        provider = providerKind,
+        model = model,
+        baseUrl = baseUrl,
+        apiKey = apiKey
+    )
+
+    companion object {
+        fun forProvider(provider: FormalLlmProvider): FormalLlmProfileDraft = when (provider) {
+            FormalLlmProvider.DeepSeek -> FormalLlmProfileDraft(
+                name = "DeepSeek",
+                providerKind = LlmProviderKind.DeepSeek,
+                model = "deepseek-chat",
+                baseUrl = "https://api.deepseek.com"
+            )
+            FormalLlmProvider.Kimi -> FormalLlmProfileDraft(
+                name = "Kimi",
+                providerKind = LlmProviderKind.OpenAiCompatible,
+                model = "moonshot-v1-8k",
+                baseUrl = "https://api.moonshot.cn/v1"
+            )
+            FormalLlmProvider.Qwen -> FormalLlmProfileDraft(
+                name = "百炼",
+                providerKind = LlmProviderKind.OpenAiCompatible,
+                model = "qwen-plus",
+                baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            )
+            FormalLlmProvider.Glm -> FormalLlmProfileDraft(
+                name = "GLM",
+                providerKind = LlmProviderKind.OpenAiCompatible,
+                model = "glm-4-flash",
+                baseUrl = "https://open.bigmodel.cn/api/paas/v4"
+            )
+            FormalLlmProvider.OpenAi -> FormalLlmProfileDraft(
+                name = "OpenAI",
+                providerKind = LlmProviderKind.OpenAiCompatible,
+                model = "gpt-4.1-mini",
+                baseUrl = "https://api.openai.com/v1"
+            )
+            FormalLlmProvider.Custom -> FormalLlmProfileDraft(
+                name = "",
+                providerKind = LlmProviderKind.Custom,
+                model = "",
+                baseUrl = ""
+            )
+        }
+    }
 }
 
 internal enum class FormalProviderPresetFilter(val label: String) {
@@ -230,17 +301,27 @@ internal fun formalProviderPresetRows(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun FormalLlmConfigurationScreen(
     state: LlmProfileSettingsUiState,
     onBack: () -> Unit,
     onActivateProfile: (String) -> Unit,
     onTestProfile: (String) -> Unit,
+    onSaveProfile: (LlmProfileInput) -> Unit = {},
     modifier: Modifier = Modifier,
     initialProvider: FormalLlmProvider = FormalLlmProvider.DeepSeek,
     initialShowPresets: Boolean = false
 ) {
     var provider by remember(initialProvider) { mutableStateOf(initialProvider) }
     var showPresets by remember(initialShowPresets) { mutableStateOf(initialShowPresets) }
+    var showEditor by remember { mutableStateOf(false) }
+    var editorDraft by remember(provider) {
+        mutableStateOf(FormalLlmProfileDraft.forProvider(provider))
+    }
+    val openEditor = {
+        editorDraft = FormalLlmProfileDraft.forProvider(provider)
+        showEditor = true
+    }
 
     if (showPresets) {
         FormalProviderPresetScreen(
@@ -297,7 +378,7 @@ fun FormalLlmConfigurationScreen(
                         Text("${profiles.size} 个已保存配置", style = type.style(10f, 15f, color = FormalColors.Muted))
                     }
                     Surface(
-                        onClick = {},
+                        onClick = openEditor,
                         modifier = Modifier.size(44.dp),
                         color = FormalColors.PrimarySoft,
                         contentColor = FormalColors.Primary,
@@ -326,7 +407,7 @@ fun FormalLlmConfigurationScreen(
             }
             item {
                 Surface(
-                    onClick = {},
+                    onClick = openEditor,
                     modifier = Modifier.fillMaxWidth().height(50.dp),
                     color = FormalColors.Surface,
                     shape = RoundedCornerShape(FormalShapes.CardRadius),
@@ -349,6 +430,90 @@ fun FormalLlmConfigurationScreen(
                     modifier = Modifier.padding(top = 8.dp),
                     style = type.style(9f, 15f, color = FormalColors.Muted)
                 )
+            }
+        }
+    }
+
+    if (showEditor) {
+        LlmProfileEditorSheet(
+            provider = provider,
+            draft = editorDraft,
+            onDraftChange = { editorDraft = it },
+            onDismiss = { showEditor = false },
+            onSave = {
+                onSaveProfile(editorDraft.toInput())
+                showEditor = false
+            }
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun LlmProfileEditorSheet(
+    provider: FormalLlmProvider,
+    draft: FormalLlmProfileDraft,
+    onDraftChange: (FormalLlmProfileDraft) -> Unit,
+    onDismiss: () -> Unit,
+    onSave: () -> Unit
+) {
+    val type = LocalFormalTypeScale.current
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = FormalColors.SurfaceElevated,
+        contentColor = FormalColors.Ink,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = FormalColors.BorderStrong) },
+        modifier = Modifier.testTag("formal-llm-profile-editor")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("新增 ${provider.label} 配置", style = type.style(20f, 28f, FontWeight.Bold, FormalColors.Ink))
+            Text(
+                "密钥仅写入本机加密存储。",
+                style = type.style(11f, 17f, color = FormalColors.Muted)
+            )
+            OutlinedTextField(
+                value = draft.name,
+                onValueChange = { onDraftChange(draft.copy(name = it)) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("配置名称") },
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = draft.model,
+                onValueChange = { onDraftChange(draft.copy(model = it)) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("模型") },
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = draft.baseUrl,
+                onValueChange = { onDraftChange(draft.copy(baseUrl = it)) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Base URL") },
+                singleLine = true
+            )
+            OutlinedTextField(
+                value = draft.apiKey,
+                onValueChange = { onDraftChange(draft.copy(apiKey = it)) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("API Key") },
+                visualTransformation = PasswordVisualTransformation(),
+                singleLine = true
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextButton(onClick = onDismiss) { Text("取消") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = onSave, enabled = draft.canSave) { Text("保存配置") }
             }
         }
     }
