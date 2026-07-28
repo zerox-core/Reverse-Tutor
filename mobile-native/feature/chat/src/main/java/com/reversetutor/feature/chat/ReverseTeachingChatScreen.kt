@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -56,12 +57,15 @@ import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -109,6 +113,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.distinctUntilChanged
 
+internal object ChatComposerLayout {
+    val Height = 54.dp
+    val SendSize = 40.dp
+    val TrailingInset = 7.dp
+}
+
+enum class ChatOverflowAction(val label: String) {
+    SessionSettings("会话设置"),
+    Sources("资料库"),
+    Export("导出会话")
+}
+
 @Composable
 internal fun ReverseTeachingChatScreen(
     state: ChatUiState,
@@ -137,8 +153,8 @@ internal fun ReverseTeachingChatScreen(
     onComposerFocusChanged: (Boolean) -> Unit,
     onOpenContextHub: () -> Unit,
     onOpenModelSettings: () -> Unit = {},
-    @Suppress("UNUSED_PARAMETER") onOpenSources: () -> Unit = {},
-    @Suppress("UNUSED_PARAMETER") onExport: () -> Unit = {},
+    onOpenSources: () -> Unit = {},
+    onExport: () -> Unit = {},
     onBack: () -> Unit,
     evidenceTargetMessageId: String?,
     availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
@@ -203,7 +219,14 @@ internal fun ReverseTeachingChatScreen(
             onBack = onBack,
             onOpenSettings = onOpenContextHub,
             onOpenSearch = onOpenSearch,
-            onOpenSessionSettings = onOpenSessionSettings
+            onOpenSessionSettings = onOpenSessionSettings,
+            onOverflowAction = { action ->
+                when (action) {
+                    ChatOverflowAction.SessionSettings -> onOpenSessionSettings()
+                    ChatOverflowAction.Sources -> onOpenSources()
+                    ChatOverflowAction.Export -> onExport()
+                }
+            }
         )
         LazyColumn(
             state = listState,
@@ -438,8 +461,10 @@ private fun ReverseTeachingChatHeader(
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSearch: () -> Unit,
-    onOpenSessionSettings: () -> Unit
+    onOpenSessionSettings: () -> Unit,
+    onOverflowAction: (ChatOverflowAction) -> Unit
 ) {
+    var overflowExpanded by remember { mutableStateOf(false) }
     Surface(
         color = Color(0xFFFAFCFE),
         contentColor = ChatInk,
@@ -508,6 +533,29 @@ private fun ReverseTeachingChatHeader(
                 onClick = onOpenSettings,
                 filled = true
             )
+            Spacer(Modifier.width(6.dp))
+            Box {
+                FormalHeaderIconButton(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = "更多会话操作",
+                    onClick = { overflowExpanded = true },
+                    filled = false
+                )
+                DropdownMenu(
+                    expanded = overflowExpanded,
+                    onDismissRequest = { overflowExpanded = false }
+                ) {
+                    ChatOverflowAction.entries.forEach { action ->
+                        DropdownMenuItem(
+                            text = { Text(action.label) },
+                            onClick = {
+                                overflowExpanded = false
+                                onOverflowAction(action)
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1691,7 +1739,7 @@ private fun ReverseTeachingComposer(
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp)
-            .heightIn(min = 56.dp, max = 136.dp),
+            .heightIn(min = ChatComposerLayout.Height, max = 136.dp),
         color = Color(0xFFF2F6FC),
         shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, Color(0xFFC7D8EA))
@@ -1699,7 +1747,7 @@ private fun ReverseTeachingComposer(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 8.dp, end = 5.dp),
+                .padding(start = 8.dp, end = ChatComposerLayout.TrailingInset),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
@@ -1739,7 +1787,7 @@ private fun ReverseTeachingComposer(
                 onClick = onSend,
                 enabled = canSend,
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(ChatComposerLayout.SendSize)
                     .shadow(4.dp, CircleShape),
                 color = if (canSend) Color(0xFF4287E8) else Color(0xFFAFB9C8),
                 contentColor = Color.White,
