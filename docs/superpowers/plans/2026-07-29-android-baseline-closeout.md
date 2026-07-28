@@ -8,6 +8,8 @@
 
 **Tech Stack:** Kotlin 1.9.22, Jetpack Compose, JUnit 4, Gradle 8.2.1, Git/GitHub.
 
+**Status:** Completed on 2026-07-29. `Android` passed 451 JVM tests, lint and `assembleDebug`; the verified baseline and design assets were synchronized to `feat/ux-polish-2026-07-27` while `main` remained unchanged.
+
 ---
 
 ### Task 1: Remove the unused new-session launch request

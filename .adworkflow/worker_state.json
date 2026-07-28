@@ -1,6 +1,6 @@
 {
   "task_id": "ANDROID-BASELINE-CLOSEOUT-001",
-  "status": "completed_pending_publish",
+  "status": "completed_and_published",
   "done": [
     "Removed NewSessionLaunchRequest and NewSessionLaunchContext from the home flow.",
     "Kept NewSessionPrefillRequest as the challenge-to-new-session production path.",
@@ -25,7 +25,7 @@
     "apk_sha256": "2DA581D3879F573BE74FA1FA213F2463DA1F0E7908964D8F55896ED621657243"
   },
   "current_problem": null,
-  "next_action": "Commit workflow evidence, push Android, then merge Android into feat/ux-polish-2026-07-27 and commit the stashed design assets there.",
+  "next_action": "Continue product frontend design on feat/ux-polish-2026-07-27; merge only accepted frontend work back into Android.",
   "must_keep_context": [
     "main must remain unchanged.",
     "Room schema, DAO, protocol and SecretStore boundaries remain frozen.",
