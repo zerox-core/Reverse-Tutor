@@ -2,6 +2,13 @@ package com.reversetutor.feature.chat
 
 import androidx.annotation.DrawableRes
 
+data class FormalPresetEpisode(
+    val number: Int,
+    val title: String,
+    val body: String,
+    @DrawableRes val storyRes: Int
+)
+
 data class FormalLearningPreset(
     val id: String,
     val figmaNodeId: String,
@@ -36,6 +43,27 @@ data class FormalScopeModule(
     val title: String,
     val count: String,
     val progress: Float
+)
+
+fun FormalLearningPreset.presentationEpisodes(): List<FormalPresetEpisode> = listOf(
+    FormalPresetEpisode(
+        number = 1,
+        title = episodeTitle,
+        body = episodeBody,
+        storyRes = storyRes
+    ),
+    FormalPresetEpisode(
+        number = 2,
+        title = "$episodeTitle · 追问",
+        body = "AI 学生会抓住刚才讲解中最容易跳过的步骤，继续追问依据和边界。",
+        storyRes = storyRes
+    ),
+    FormalPresetEpisode(
+        number = 3,
+        title = "$episodeTitle · 迁移",
+        body = "完成复述后，把同一套方法迁移到新的情境，检验是否真正理解。",
+        storyRes = storyRes
+    )
 )
 
 object FormalLearningPresets {

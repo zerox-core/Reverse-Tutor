@@ -2,6 +2,7 @@ package com.reversetutor.feature.chat
 
 import com.reversetutor.core.domain.OnlineContentPage
 import com.reversetutor.core.domain.OnlineContentSummary
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -113,6 +114,67 @@ class FormalHomeUiStateTest {
         assertFalse(FormalPublicContentUi.loading().canOpen)
         assertFalse(FormalPublicContentUi.offline().canOpen)
         assertFalse(FormalPublicContentUi.unavailable().canOpen)
+    }
+
+    @Test
+    fun newSessionModesExposeOnlyTheApprovedLearningFlow() {
+        val modes = formalNewSessionModes()
+
+        assertEquals(
+            listOf(NewSessionMode.Learning, NewSessionMode.Review, NewSessionMode.Companion),
+            modes.map { it.mode }
+        )
+        assertTrue(modes.single { it.mode == NewSessionMode.Learning }.enabled)
+        assertFalse(modes.single { it.mode == NewSessionMode.Review }.enabled)
+        assertFalse(modes.single { it.mode == NewSessionMode.Companion }.enabled)
+    }
+
+    @Test
+    fun homeSessionRowsUseStableExpandedSpacingWithoutCardShadow() {
+        assertEquals(80.dp, HomeSessionLayout.RegularHeight)
+        assertEquals(92.dp, HomeSessionLayout.PinnedHeight)
+        assertEquals(14.dp, HomeSessionLayout.HorizontalPadding)
+        assertEquals(34.dp, HomeSessionLayout.AvatarSize)
+        assertEquals(10.dp, HomeSessionLayout.AvatarGap)
+        assertEquals(82.dp, HomeSessionLayout.TrailingReserve)
+        assertEquals(0.dp, HomeSessionLayout.Elevation)
+        assertEquals(112.dp, HomeSessionLayout.ChallengePullThreshold)
+    }
+
+    @Test
+    fun homeSessionRowsExposeStableAvatarAndLongPressActions() {
+        val source = SessionListUiState(
+            visibleSessions = listOf(
+                SessionListItem(
+                    id = "session-1",
+                    title = "高三数学讲题冲刺",
+                    updatedAtEpochMillis = 10L,
+                    pinned = false,
+                    statusLabel = "继续讲解",
+                    unreadCount = 0,
+                    avatarLabel = "高"
+                )
+            ),
+            query = "",
+            filter = SessionListFilter.All,
+            summary = "1 个会话",
+            emptyStateTitle = ""
+        )
+
+        val row = source.toFormalHomeUiState(publicContent(), nowEpochMillis = 10L)
+            .visibleSessions
+            .single()
+
+        assertEquals("高", row.avatarLabel)
+        assertEquals(
+            listOf(
+                HomeSessionAction.Rename,
+                HomeSessionAction.Pin,
+                HomeSessionAction.Export,
+                HomeSessionAction.Delete
+            ),
+            HomeSessionAction.entries
+        )
     }
 
     private fun publicContent() = FormalPublicContentUi(

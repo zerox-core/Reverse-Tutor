@@ -8,6 +8,7 @@ package com.reversetutor.feature.chat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -64,7 +65,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
+import com.reversetutor.core.design.FormalElevations
 import com.reversetutor.core.design.FormalShapes
+import com.reversetutor.core.design.FormalTypography
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
 import com.reversetutor.core.domain.OnlineContentPage
@@ -79,6 +82,26 @@ enum class FormalHomeVariant {
     JoinedChallenge
 }
 
+enum class NewSessionMode {
+    Learning,
+    Review,
+    Companion
+}
+
+internal data class NewSessionModeSpec(
+    val mode: NewSessionMode,
+    val title: String,
+    val description: String,
+    val enabled: Boolean,
+    val selected: Boolean
+)
+
+internal fun formalNewSessionModes(): List<NewSessionModeSpec> = listOf(
+    NewSessionModeSpec(NewSessionMode.Learning, "学习模式", "构建路径", enabled = true, selected = true),
+    NewSessionModeSpec(NewSessionMode.Review, "复盘模式", "暂未开放", enabled = false, selected = false),
+    NewSessionModeSpec(NewSessionMode.Companion, "陪伴模式", "暂未开放", enabled = false, selected = false)
+)
+
 internal object HomeSessionLayout {
     val RegularHeight = 80.dp
     val PinnedHeight = 92.dp
@@ -86,6 +109,8 @@ internal object HomeSessionLayout {
     val AvatarSize = 34.dp
     val AvatarGap = 10.dp
     val TrailingReserve = 82.dp
+    val Elevation = 0.dp
+    val ChallengePullThreshold = 112.dp
 }
 
 enum class HomeSessionAction {
@@ -444,7 +469,7 @@ private fun HomeTitle(modifier: Modifier = Modifier) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
             text = "会话",
-            style = type.style(26f, 34f, FontWeight.Bold, FormalColors.Ink)
+            style = FormalTypography.pageTitle(type, FormalColors.Ink)
         )
         Text(
             text = "用讲解检验真正的理解",
@@ -496,21 +521,21 @@ private fun PublicInterestCard(
     onClick: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
+    val available = content.canOpen
     Surface(
-        onClick = onClick,
-        enabled = content.canOpen,
+        onClick = { if (content.canOpen) onClick() },
         modifier = Modifier
             .fillMaxWidth()
             .height(118.dp)
             .shadow(
-                elevation = 6.dp,
+                elevation = if (available) FormalElevations.Raised else FormalElevations.Panel,
                 shape = RoundedCornerShape(FormalShapes.CardRadius),
-                ambientColor = Color(0x122E3B54),
-                spotColor = Color(0x122E3B54)
+                ambientColor = FormalColors.Shadow,
+                spotColor = FormalColors.Shadow
             ),
-        color = FormalColors.Surface.copy(alpha = 0.94f),
+        color = if (available) FormalColors.SurfaceElevated else FormalColors.SurfaceSubtle,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, FormalColors.Border.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, if (available) FormalColors.BorderStrong else FormalColors.Border)
     ) {
         Row(
             modifier = Modifier
@@ -528,13 +553,21 @@ private fun PublicInterestCard(
             ) {
                 Text(
                     text = "●  ${content.eyebrow}",
-                    style = type.style(10f, 15f, FontWeight.Medium, FormalColors.Primary),
+                    style = type.style(
+                        10f,
+                        15f,
+                        FontWeight.Medium,
+                        if (available) FormalColors.Primary else FormalColors.Muted
+                    ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = content.title,
-                    style = type.style(14f, 20f, FontWeight.Bold, FormalColors.Ink),
+                    style = FormalTypography.body(
+                        type,
+                        if (available) FormalColors.Ink else Color(0xFF536077)
+                    ).copy(fontWeight = FontWeight.SemiBold),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -689,7 +722,7 @@ private fun SessionEntryCard(
     val scale by animateFloatAsState(if (pressed) 0.985f else 1f, label = "session-card-press")
     val height = if (session.pinned) HomeSessionLayout.PinnedHeight else HomeSessionLayout.RegularHeight
     val background = if (session.pinned) Color(0xFFFFF3E2) else FormalColors.SurfaceElevated.copy(alpha = 0.78f)
-    val border = if (session.pinned) Color(0xADE7C88F) else FormalColors.Border.copy(alpha = 0.45f)
+    val border = if (session.pinned) Color(0x80E7C88F) else FormalColors.Divider
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -706,7 +739,8 @@ private fun SessionEntryCard(
             ),
         color = background,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, border)
+        border = BorderStroke(1.dp, border),
+        shadowElevation = HomeSessionLayout.Elevation
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             val avatarStart = if (session.avatarLabel == null) {
@@ -767,9 +801,15 @@ private fun SessionEntryCard(
                 text = "${session.timeLabel}  ›",
                 style = type.style(10f, 16f, color = Color(0xFF616E85)),
                 maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = HomeSessionLayout.HorizontalPadding)
+                modifier = if (session.pinned) {
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = HomeSessionLayout.HorizontalPadding, bottom = 6.dp)
+                } else {
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = HomeSessionLayout.HorizontalPadding)
+                }
             )
             if (session.pinned) {
                 PinnedRibbon(modifier = Modifier.align(Alignment.TopStart))
@@ -857,8 +897,7 @@ private fun HomeSessionActionSheet(
         ) {
             Text(
                 text = session.title,
-                color = FormalColors.Ink,
-                fontWeight = FontWeight.SemiBold,
+                style = FormalTypography.cardTitle(LocalFormalTypeScale.current, FormalColors.Ink),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -1182,6 +1221,7 @@ private fun NewSessionSheetContent(
     onStartLearningSetup: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
+    val modes = formalNewSessionModes()
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -1236,21 +1276,18 @@ private fun NewSessionSheetContent(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             NewSessionModeCard(
-                title = "学习模式",
-                description = "构建路径",
-                selected = true,
+                spec = modes[0],
+                onClick = onStartLearningSetup,
                 modifier = Modifier.weight(1f)
             )
             NewSessionModeCard(
-                title = "复盘模式",
-                description = "定位薄弱点",
-                selected = false,
+                spec = modes[1],
+                onClick = onStartLearningSetup,
                 modifier = Modifier.weight(1f)
             )
             NewSessionModeCard(
-                title = "陪伴模式",
-                description = "长期交流",
-                selected = false,
+                spec = modes[2],
+                onClick = onStartLearningSetup,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -1291,20 +1328,30 @@ private fun NewSessionSheetContent(
 
 @Composable
 private fun NewSessionModeCard(
-    title: String,
-    description: String,
-    selected: Boolean,
+    spec: NewSessionModeSpec,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
-    val container = if (selected) FormalColors.Primary else Color(0xFFEBF0FA)
-    val titleColor = if (selected) Color.White else Color(0xFF2E384D)
-    val detailColor = if (selected) Color(0xFFD1DEFF) else Color(0xFF758094)
+    val container = when {
+        spec.selected -> FormalColors.Primary
+        spec.enabled -> FormalColors.SurfaceElevated
+        else -> Color(0xFFE7EAF0)
+    }
+    val titleColor = when {
+        spec.selected -> Color.White
+        spec.enabled -> FormalColors.Ink
+        else -> Color(0xFF7D8798)
+    }
+    val detailColor = if (spec.selected) Color(0xFFD1DEFF) else Color(0xFF8A94A5)
     Surface(
+        onClick = onClick,
+        enabled = spec.enabled,
         modifier = modifier.height(78.dp),
         color = container,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = if (selected) null else BorderStroke(1.dp, FormalColors.Border.copy(alpha = 0.6f))
+        border = if (spec.selected) null else BorderStroke(1.dp, FormalColors.BorderStrong),
+        shadowElevation = if (spec.selected) FormalElevations.Raised else 0.dp
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1312,12 +1359,12 @@ private fun NewSessionModeCard(
             modifier = Modifier.fillMaxSize()
         ) {
             Text(
-                text = title,
+                text = spec.title,
                 style = type.style(12f, 18f, FontWeight.Medium, titleColor),
                 maxLines = 1
             )
             Text(
-                text = description,
+                text = spec.description,
                 style = type.style(9f, 13f, color = detailColor),
                 maxLines = 1
             )

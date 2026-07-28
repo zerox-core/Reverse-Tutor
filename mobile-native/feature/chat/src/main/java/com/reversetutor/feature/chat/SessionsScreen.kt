@@ -104,6 +104,7 @@ fun SessionsRoute(
             showNewSessionSheet || homeState.pendingDelete != null || sessionActionOverlayVisible
         )
     }
+
     DisposableEffect(Unit) {
         onDispose { onWorkspaceChromeObscuredChanged(false) }
     }

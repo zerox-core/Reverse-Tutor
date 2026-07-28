@@ -43,4 +43,31 @@ class FormalPresetModelsTest {
         assertEquals(presets.size, presets.map { it.id }.distinct().size)
         assertEquals(presets.size, presets.map { it.figmaNodeId }.distinct().size)
     }
+
+    @Test
+    fun everyPresetProvidesThreeSwipeablePresentationEpisodes() {
+        FormalLearningPresets.all.forEach { preset ->
+            val episodes = preset.presentationEpisodes()
+
+            assertEquals(3, episodes.size)
+            assertEquals(listOf(1, 2, 3), episodes.map { it.number })
+            assertTrue(episodes.all { it.title.isNotBlank() && it.body.isNotBlank() })
+        }
+    }
+
+    @Test
+    fun sharedEditorStateUpdatesOnlyTheSelectedField() {
+        val state = FormalDraftEditorState.from(FormalLearningPresets.all.first())
+        val changed = state.update(FormalDraftField.Goal, "新的学习目标")
+
+        assertEquals("新的学习目标", changed.value(FormalDraftField.Goal))
+        assertEquals(
+            state.value(FormalDraftField.Identity),
+            changed.value(FormalDraftField.Identity)
+        )
+        assertEquals(
+            state.value(FormalDraftField.Story),
+            changed.value(FormalDraftField.Story)
+        )
+    }
 }

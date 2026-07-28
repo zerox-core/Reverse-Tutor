@@ -5,6 +5,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -80,7 +83,8 @@ import kotlinx.coroutines.launch
 private enum class FormalNewSessionPage {
     PresetLibrary,
     CustomTree,
-    PresetDetail
+    PresetDetail,
+    DraftEditor
 }
 
 @Composable
@@ -93,6 +97,9 @@ fun FigmaNewSessionRoute(
     val scope = rememberCoroutineScope()
     var page by remember { mutableStateOf(FormalNewSessionPage.PresetLibrary) }
     var selectedPreset by remember { mutableStateOf(FormalLearningPresets.all.first()) }
+    var draftState by remember { mutableStateOf(FormalDraftEditorState.from(selectedPreset)) }
+    var editingField by remember { mutableStateOf<FormalDraftField?>(null) }
+    var editorReturnPage by remember { mutableStateOf(FormalNewSessionPage.PresetDetail) }
     var creating by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -126,6 +133,7 @@ fun FigmaNewSessionRoute(
             onCustom = { page = FormalNewSessionPage.CustomTree },
             onPreset = { preset ->
                 selectedPreset = preset
+                draftState = FormalDraftEditorState.from(preset)
                 page = FormalNewSessionPage.PresetDetail
             },
             modifier = modifier
@@ -133,6 +141,11 @@ fun FigmaNewSessionRoute(
 
         FormalNewSessionPage.CustomTree -> FormalCustomTreeScreen(
             onBack = { page = FormalNewSessionPage.PresetLibrary },
+            onEditField = { field ->
+                editingField = field
+                editorReturnPage = FormalNewSessionPage.CustomTree
+                page = FormalNewSessionPage.DraftEditor
+            },
             modifier = modifier
         )
 
@@ -145,8 +158,29 @@ fun FigmaNewSessionRoute(
                 error = null
             },
             onUsePreset = ::createFromPreset,
+            onEditField = { field ->
+                editingField = field
+                editorReturnPage = FormalNewSessionPage.PresetDetail
+                page = FormalNewSessionPage.DraftEditor
+            },
             modifier = modifier
         )
+
+        FormalNewSessionPage.DraftEditor -> {
+            val field = editingField ?: FormalDraftField.Goal
+            var draftValue by remember(field, draftState) { mutableStateOf(draftState.value(field)) }
+            FormalDraftEditorScreen(
+                field = field,
+                value = draftValue,
+                onValueChange = { draftValue = it },
+                onBack = { page = editorReturnPage },
+                onSave = {
+                    draftState = draftState.update(field, draftValue)
+                    page = editorReturnPage
+                },
+                modifier = modifier
+            )
+        }
     }
 }
 
@@ -362,6 +396,7 @@ fun FormalPresetDetailScreen(
     error: String?,
     onBack: () -> Unit,
     onUsePreset: () -> Unit,
+    onEditField: (FormalDraftField) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
@@ -375,24 +410,23 @@ fun FormalPresetDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item { FormalTopBar(title = "预设详情", onBack = onBack, trailingIcon = Icons.Filled.BookmarkBorder) }
-                item { PresetIdentityCard(preset) }
+                item { PresetIdentityCard(preset, onClick = { onEditField(FormalDraftField.Identity) }) }
                 item {
                     Column {
                         Text("学习剧本", style = type.style(14f, 20f, FontWeight.Bold, FormalColors.Ink))
                         Text("目标、范围和剧情会共同决定每次讲解任务", style = type.style(9f, 13f, color = FormalColors.Muted))
                     }
                 }
-                item { PresetGoalCard(preset) }
-                item { PresetScopeCard(preset) }
+                item { PresetGoalCard(preset, onClick = { onEditField(FormalDraftField.Goal) }) }
+                item { PresetScopeCard(preset, onClick = { onEditField(FormalDraftField.Portrait) }) }
                 item { PresetEpisodeCard(preset) }
-                item { EpisodeDots() }
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("资料库", style = type.style(14f, 20f, FontWeight.Bold, FormalColors.Ink))
                         Text("已连接 ${preset.connectedSources} 项", style = type.style(9f, 13f, color = FormalColors.Muted))
                     }
                 }
-                item { PresetSourceCard(preset) }
+                item { PresetSourceCard(preset, onClick = { onEditField(FormalDraftField.Sources) }) }
                 error?.let { message ->
                     item {
                         Text(message, style = type.style(10f, 15f, FontWeight.Medium, FormalColors.Danger))
@@ -427,10 +461,10 @@ fun FormalPresetDetailScreen(
 }
 
 @Composable
-private fun PresetIdentityCard(preset: FormalLearningPreset) {
+private fun PresetIdentityCard(preset: FormalLearningPreset, onClick: () -> Unit = {}) {
     val type = LocalFormalTypeScale.current
     Surface(
-        modifier = Modifier.fillMaxWidth().height(154.dp),
+        modifier = Modifier.fillMaxWidth().height(132.dp).clickable(onClick = onClick),
         color = FormalColors.PrimarySoft,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = .3f))
@@ -467,10 +501,10 @@ private fun PresetIdentityCard(preset: FormalLearningPreset) {
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun PresetGoalCard(preset: FormalLearningPreset) {
+private fun PresetGoalCard(preset: FormalLearningPreset, onClick: () -> Unit = {}) {
     val type = LocalFormalTypeScale.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Border)
@@ -500,10 +534,10 @@ private fun PresetGoalCard(preset: FormalLearningPreset) {
 }
 
 @Composable
-private fun PresetScopeCard(preset: FormalLearningPreset) {
+private fun PresetScopeCard(preset: FormalLearningPreset, onClick: () -> Unit = {}) {
     val type = LocalFormalTypeScale.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Border)
@@ -535,31 +569,37 @@ private fun PresetScopeCard(preset: FormalLearningPreset) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun PresetEpisodeCard(preset: FormalLearningPreset) {
     val type = LocalFormalTypeScale.current
+    val episodes = remember(preset.id) { preset.presentationEpisodes() }
+    val pagerState = rememberPagerState { episodes.size }
     Surface(
-        modifier = Modifier.fillMaxWidth().height(119.dp),
+        modifier = Modifier.fillMaxWidth().height(132.dp),
         color = FormalColors.PrimarySoft,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = .3f))
     ) {
-        Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Column(Modifier.weight(1f)) {
-                Surface(color = FormalColors.Primary, shape = RoundedCornerShape(FormalShapes.CompactRadius)) {
-                    Text("第 1 幕", style = type.style(8f, 12f, FontWeight.Bold, Color.White), modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+        HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+            val episode = episodes[page]
+            Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Surface(color = FormalColors.Primary, shape = RoundedCornerShape(FormalShapes.CompactRadius)) {
+                        Text("第 ${episode.number} 幕", style = type.style(10f, 14f, FontWeight.Bold, Color.White), modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(episode.title, style = type.style(14f, 19f, FontWeight.Bold, FormalColors.Ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(episode.body, style = type.style(11f, 16f, color = FormalColors.Muted), maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.weight(1f))
+                    Text("${episode.number} / ${episodes.size}", style = type.style(10f, 14f, FontWeight.Medium, FormalColors.Primary))
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(preset.episodeTitle, style = type.style(13f, 18f, FontWeight.Bold, FormalColors.Ink))
-                Text(preset.episodeBody, style = type.style(9f, 14f, color = FormalColors.Muted), maxLines = 3, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.weight(1f))
-                Text("1 / 3", style = type.style(8f, 12f, FontWeight.Medium, FormalColors.Primary))
+                Image(
+                    painter = painterResource(episode.storyRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.width(116.dp).fillMaxHeight().clip(RoundedCornerShape(FormalShapes.CardRadius))
+                )
             }
-            Image(
-                painter = painterResource(preset.storyRes),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.width(122.dp).fillMaxHeight().clip(RoundedCornerShape(FormalShapes.CardRadius))
-            )
         }
     }
 }
@@ -578,10 +618,10 @@ private fun EpisodeDots() {
 }
 
 @Composable
-private fun PresetSourceCard(preset: FormalLearningPreset) {
+private fun PresetSourceCard(preset: FormalLearningPreset, onClick: () -> Unit = {}) {
     val type = LocalFormalTypeScale.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Border)
@@ -626,15 +666,15 @@ private fun SourceTypeStack() {
 }
 
 @Composable
-fun FormalCustomTreeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun FormalCustomTreeScreen(onBack: () -> Unit, onEditField: (FormalDraftField) -> Unit = {}, modifier: Modifier = Modifier) {
     val type = LocalFormalTypeScale.current
     val fields = listOf(
-        CustomTreeField("学生角色", "头像、姓名、性格、认知与互动习惯", "未填写", Icons.Filled.Person, FormalColors.Primary),
-        CustomTreeField("学习目标", "用自己的话写下希望抵达的结果", "已填写", Icons.Filled.MyLocation, FormalColors.Warning),
-        CustomTreeField("学习计划时间", "周期、每周节奏与关键阶段节点", "未填写", Icons.Filled.Event, FormalColors.Success),
-        CustomTreeField("画像系统", "自由增加能力、习惯与情绪等维度", "1 项", Icons.Filled.Badge, Color(0xFF805CC7)),
-        CustomTreeField("故事剧情", "背景、人物关系与可自由增删的剧情阶段", "未填写", Icons.Filled.AutoStories, FormalColors.Danger),
-        CustomTreeField("资料文档", "上传教材、笔记、错题、图片或其他文件", "4 份", Icons.Filled.Description, Color(0xFF4C8EB5))
+        CustomTreeField(FormalDraftField.Identity, "学生角色", "头像、姓名、性格、认知与互动习惯", "未填写", Icons.Filled.Person, FormalColors.Primary),
+        CustomTreeField(FormalDraftField.Goal, "学习目标", "用自己的话写下希望抵达的结果", "已填写", Icons.Filled.MyLocation, FormalColors.Warning),
+        CustomTreeField(FormalDraftField.Schedule, "学习计划时间", "周期、每周节奏与关键阶段节点", "未填写", Icons.Filled.Event, FormalColors.Success),
+        CustomTreeField(FormalDraftField.Portrait, "画像系统", "自由增加能力、习惯与情绪等维度", "1 项", Icons.Filled.Badge, Color(0xFF805CC7)),
+        CustomTreeField(FormalDraftField.Story, "故事剧情", "背景、人物关系与可自由增删的剧情阶段", "未填写", Icons.Filled.AutoStories, FormalColors.Danger),
+        CustomTreeField(FormalDraftField.Sources, "资料文档", "上传教材、笔记、错题、图片或其他文件", "4 份", Icons.Filled.Description, Color(0xFF4C8EB5))
     )
 
     FormalPageFrame(modifier = modifier.testTag("formal-custom-tree-716-494")) {
@@ -661,7 +701,7 @@ fun FormalCustomTreeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                     Text("把你的世界写下来", style = type.style(22f, 30f, FontWeight.Bold, FormalColors.Ink))
                     Text("按你的方式填写，所有内容都可以随时修改或补充。", style = type.style(10f, 16f, color = FormalColors.Muted))
                 }
-                item { CustomTreeNameCard() }
+                item { CustomTreeNameCard(onClick = { onEditField(FormalDraftField.Name) }) }
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text("世界树内容", style = type.style(14f, 20f, FontWeight.Bold, FormalColors.Ink))
@@ -671,7 +711,7 @@ fun FormalCustomTreeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         }
                     }
                 }
-                items(fields.size) { index -> CustomTreeFieldRow(fields[index]) }
+                items(fields.size) { index -> CustomTreeFieldRow(fields[index], onClick = { onEditField(fields[index].field) }) }
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -717,6 +757,7 @@ fun FormalCustomTreeScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 private data class CustomTreeField(
+    val field: FormalDraftField,
     val title: String,
     val summary: String,
     val status: String,
@@ -725,10 +766,10 @@ private data class CustomTreeField(
 )
 
 @Composable
-private fun CustomTreeNameCard() {
+private fun CustomTreeNameCard(onClick: () -> Unit = {}) {
     val type = LocalFormalTypeScale.current
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Border)
@@ -752,10 +793,10 @@ private fun CustomTreeNameCard() {
 }
 
 @Composable
-private fun CustomTreeFieldRow(field: CustomTreeField) {
+private fun CustomTreeFieldRow(field: CustomTreeField, onClick: () -> Unit = {}) {
     val type = LocalFormalTypeScale.current
     Surface(
-        modifier = Modifier.fillMaxWidth().height(72.dp),
+        modifier = Modifier.fillMaxWidth().height(72.dp).clickable(onClick = onClick),
         color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
         border = BorderStroke(1.dp, FormalColors.Border)
