@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -26,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -36,6 +38,12 @@ import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalShapes
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
+
+internal object ActivityAnnouncementPresentation {
+    val DialogElevation = 0.dp
+    val HeroColors = listOf(Color(0xFFE7F8FF), Color(0xFFF1ECFF))
+    const val UsesOutlinedHero = false
+}
 
 @Composable
 fun ActivityAnnouncementDialog(
@@ -57,9 +65,8 @@ fun ActivityAnnouncementDialog(
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = FormalColors.SurfaceElevated,
-                shape = RoundedCornerShape(FormalShapes.CardRadius),
-                border = BorderStroke(1.dp, FormalColors.Border),
-                shadowElevation = 16.dp
+                shape = RoundedCornerShape(20.dp),
+                shadowElevation = ActivityAnnouncementPresentation.DialogElevation
             ) {
                 Column(
                     modifier = Modifier.padding(22.dp),
@@ -76,9 +83,8 @@ fun ActivityAnnouncementDialog(
                         Surface(
                             onClick = onDismiss,
                             modifier = Modifier.align(Alignment.TopEnd).size(30.dp),
-                            color = FormalColors.Surface,
-                            shape = CircleShape,
-                            border = BorderStroke(1.dp, FormalColors.Border)
+                            color = Color(0xFFEDEFF3),
+                            shape = CircleShape
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(Icons.Filled.Close, contentDescription = "关闭", tint = FormalColors.Muted, modifier = Modifier.size(16.dp))
@@ -87,12 +93,22 @@ fun ActivityAnnouncementDialog(
                     }
                     Surface(
                         modifier = Modifier.fillMaxWidth().height(150.dp),
-                        color = FormalColors.PrimarySoft,
+                        color = Color.Transparent,
                         shape = RoundedCornerShape(FormalShapes.CardRadius),
-                        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = .16f))
+                        border = if (ActivityAnnouncementPresentation.UsesOutlinedHero) {
+                            BorderStroke(1.dp, FormalColors.Primary.copy(alpha = .16f))
+                        } else {
+                            null
+                        }
                     ) {
                         Column(
-                            modifier = Modifier.padding(horizontal = 28.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    brush = Brush.linearGradient(ActivityAnnouncementPresentation.HeroColors),
+                                    shape = RoundedCornerShape(FormalShapes.CardRadius)
+                                )
+                                .padding(horizontal = 28.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -110,9 +126,8 @@ fun ActivityAnnouncementDialog(
                         }
                     }
                     Surface(
-                        color = FormalColors.Surface,
-                        shape = RoundedCornerShape(FormalShapes.CardRadius),
-                        border = BorderStroke(1.dp, FormalColors.Border)
+                        color = Color(0xFFF3F4F7),
+                        shape = RoundedCornerShape(FormalShapes.CardRadius)
                     ) {
                         Column(Modifier.padding(14.dp)) {
                             Text(

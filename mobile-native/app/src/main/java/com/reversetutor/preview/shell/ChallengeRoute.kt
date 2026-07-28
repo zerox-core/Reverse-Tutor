@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -57,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -67,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalGlossyIcon
 import com.reversetutor.core.design.FormalShapes
+import com.reversetutor.core.design.FormalTypography
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
 import com.reversetutor.core.domain.ActivityLeaderboardPage
@@ -84,6 +87,26 @@ data class ChallengeReturnContext(
     val detailOpen: Boolean = false
 )
 
+internal object ChallengeDetailLayout {
+    val FooterHeight = 92.dp
+    val FooterClearance = 20.dp
+    val ContentBottomPadding = 136.dp
+    val HeroColors = listOf(Color(0xFFE7F8FF), Color(0xFFF1ECFF))
+    val SheetBackground = Color(0xFFF6F7FA)
+    val SheetElevation = 0.dp
+    val HeroElevation = 0.dp
+    val RuleElevation = 0.dp
+    val FooterElevation = 0.dp
+    const val UsesOutlinedContentCards = false
+}
+
+internal fun challengeExitBoundaryAllowed(
+    active: Boolean,
+    showDetails: Boolean,
+    totalItemsCount: Int,
+    canScrollForward: Boolean
+): Boolean = active && !showDetails && totalItemsCount > 0 && !canScrollForward
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun ChallengeRoute(
@@ -96,6 +119,7 @@ fun ChallengeRoute(
     runtimeState: ChallengeRuntimeState? = null,
     onRetry: () -> Unit = {},
     onExitBoundaryChanged: (Boolean) -> Unit = {},
+    active: Boolean = true,
     initialShowDetails: Boolean = false,
     entryGeneration: Long = 0L,
     restoreContext: ChallengeReturnContext? = null,
@@ -157,8 +181,8 @@ fun ChallengeRoute(
         }
     }
 
-    LaunchedEffect(verticalState.outerPagerEnabled) {
-        onExitBoundaryChanged(verticalState.outerPagerEnabled)
+    LaunchedEffect(verticalState.outerPagerEnabled, active) {
+        onExitBoundaryChanged(active && verticalState.outerPagerEnabled)
     }
     LaunchedEffect(listState, detailListState, showDetails) {
         snapshotFlow {
@@ -199,11 +223,14 @@ fun ChallengeRoute(
                 onDismissRequest = { setDetailOpen(false) },
                 modifier = Modifier.widthIn(max = 390.dp),
                 sheetState = sheetState,
-                containerColor = FormalColors.Background,
+                containerColor = ChallengeDetailLayout.SheetBackground,
                 contentColor = FormalColors.Ink,
                 scrimColor = Color.Black.copy(alpha = .55f),
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                dragHandle = null
+                tonalElevation = ChallengeDetailLayout.SheetElevation,
+                dragHandle = {
+                    BottomSheetDefaults.DragHandle(color = FormalColors.BorderStrong)
+                }
             ) {
                 ChallengeDetailSheet(
                     state = detailUiState,
@@ -557,23 +584,31 @@ private fun ChallengeDetailSheet(
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
-    Box(modifier.background(FormalColors.Background)) {
+    Box(modifier.background(ChallengeDetailLayout.SheetBackground)) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().testTag("challenge-detail-list"),
-            contentPadding = PaddingValues(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 104.dp),
+            contentPadding = PaddingValues(
+                start = 20.dp,
+                top = 10.dp,
+                end = 20.dp,
+                bottom = ChallengeDetailLayout.ContentBottomPadding
+            ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("挑战详情", style = type.style(20f, 28f, FontWeight.Bold, FormalColors.Ink), modifier = Modifier.weight(1f))
+                    Text(
+                        "挑战详情",
+                        style = FormalTypography.sectionTitle(type, FormalColors.Ink),
+                        modifier = Modifier.weight(1f)
+                    )
                     Surface(
                         onClick = onClose,
                         modifier = Modifier.size(38.dp),
-                        color = FormalColors.Surface,
+                        color = Color(0xFFEDEFF3),
                         shape = CircleShape,
-                        border = BorderStroke(1.dp, FormalColors.Border),
-                        shadowElevation = 2.dp
+                        shadowElevation = ChallengeDetailLayout.HeroElevation
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Filled.Close, contentDescription = "关闭", tint = FormalColors.Ink, modifier = Modifier.size(18.dp))
@@ -584,7 +619,13 @@ private fun ChallengeDetailSheet(
             item { DetailHero(state.title, state.goal) }
             item { DetailRuleRow("活动阶段", state.stageLabel, Icons.Filled.Schedule) }
             item { DetailRuleRow("挑战目标", state.goal, Icons.Filled.EmojiEvents) }
-            item { Text("挑战规则", style = type.style(17f, 24f, FontWeight.Bold, FormalColors.Ink), modifier = Modifier.padding(top = 10.dp)) }
+            item {
+                Text(
+                    "挑战规则",
+                    style = FormalTypography.cardTitle(type, FormalColors.Ink),
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+            }
             items(state.rules) { rule ->
                 val index = state.rules.indexOf(rule)
                 val icon = when (index) {
@@ -600,17 +641,17 @@ private fun ChallengeDetailSheet(
         }
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
-            color = FormalColors.Background.copy(alpha = .97f),
-            shadowElevation = 8.dp
+            color = ChallengeDetailLayout.SheetBackground.copy(alpha = .98f),
+            shadowElevation = ChallengeDetailLayout.FooterElevation
         ) {
             Button(
                 enabled = state.joinAction == ChallengeJoinAction.Join ||
                     state.joinAction == ChallengeJoinAction.Retry,
                 onClick = if (state.joinAction == ChallengeJoinAction.Retry) onRetry else onJoin,
                 modifier = Modifier
-                    .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 20.dp)
+                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp)
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .height(52.dp)
                     .testTag("challenge-join-action"),
                 shape = RoundedCornerShape(FormalShapes.CardRadius),
                 colors = ButtonDefaults.buttonColors(
@@ -626,8 +667,15 @@ private fun ChallengeDetailSheet(
                         state.joinAction == ChallengeJoinAction.Unavailable -> "暂不可用"
                         else -> "加入挑战"
                     }
-                    Text(label, style = type.style(14f, 19f, FontWeight.Medium, Color.White))
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, style = FormalTypography.control(type, Color.White))
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
@@ -639,12 +687,23 @@ private fun DetailHero(title: String, goal: String) {
     val type = LocalFormalTypeScale.current
     Surface(
         modifier = Modifier.fillMaxWidth().height(226.dp),
-        color = FormalColors.PrimarySoft,
+        color = Color.Transparent,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = .18f))
+        border = if (ChallengeDetailLayout.UsesOutlinedContentCards) {
+            BorderStroke(1.dp, FormalColors.BorderStrong)
+        } else {
+            null
+        },
+        shadowElevation = ChallengeDetailLayout.HeroElevation
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.linearGradient(ChallengeDetailLayout.HeroColors),
+                    shape = RoundedCornerShape(FormalShapes.CardRadius)
+                )
+                .padding(horizontal = 32.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -660,7 +719,7 @@ private fun DetailHero(title: String, goal: String) {
             Spacer(Modifier.height(12.dp))
             Text(
                 goal,
-                style = type.style(12f, 19f, color = FormalColors.Muted),
+                style = FormalTypography.metadata(type, FormalColors.Muted),
                 textAlign = TextAlign.Center,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
@@ -678,14 +737,20 @@ private fun DetailRuleRow(
     val type = LocalFormalTypeScale.current
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = FormalColors.Surface,
+        color = FormalColors.SurfaceElevated,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, FormalColors.Border)
+        border = if (ChallengeDetailLayout.UsesOutlinedContentCards) {
+            BorderStroke(1.dp, FormalColors.BorderStrong)
+        } else {
+            null
+        },
+        shadowElevation = ChallengeDetailLayout.RuleElevation
     ) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = type.style(12f, 18f, FontWeight.Medium, FormalColors.Ink))
-                Text(body, style = type.style(10f, 16f, color = FormalColors.Muted))
+                Text(title, style = FormalTypography.metadata(type, FormalColors.Ink).copy(fontWeight = FontWeight.SemiBold))
+                Spacer(Modifier.height(2.dp))
+                Text(body, style = type.style(11f, 17f, color = FormalColors.Muted))
             }
             Spacer(Modifier.width(12.dp))
             FormalGlossyIcon(icon, null, size = 34.dp, glyphSize = 18.dp)

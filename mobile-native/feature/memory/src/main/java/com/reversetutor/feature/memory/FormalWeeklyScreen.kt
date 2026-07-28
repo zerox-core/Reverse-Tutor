@@ -57,6 +57,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reversetutor.core.design.FormalColors
+import com.reversetutor.core.design.FormalElevations
 import kotlin.math.roundToInt
 
 @Composable
@@ -1812,7 +1814,8 @@ private fun FormalWeeklyCard(
         color = WeeklyCard,
         contentColor = WeeklyInk,
         shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, WeeklyBorder),
+        border = BorderStroke(1.dp, FormalColors.BorderStrong),
+        shadowElevation = FormalElevations.Panel,
         content = content
     )
 }

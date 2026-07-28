@@ -182,7 +182,8 @@ class AppNavigationStateTest {
         val destinations = listOf(
             AppDestination.WeeklyDashboard,
             AppDestination.GlobalGraph,
-            AppDestination.Community
+            AppDestination.Community,
+            AppDestination.Settings
         )
 
         destinations.forEach { destination ->
@@ -196,6 +197,7 @@ class AppNavigationStateTest {
     @Test
     fun challengeUsesTheHomeWorkspaceSlot() {
         assertEquals(WorkspacePage.SessionHome, AppDestination.Challenge.workspacePage)
+        assertEquals(WorkspacePage.Settings, AppDestination.Settings.workspacePage)
         assertEquals(WorkspaceVerticalPage.Challenge, AppDestination.Challenge.workspaceVerticalPage)
         assertEquals(WorkspaceVerticalPage.SessionHome, AppDestination.Sessions.workspaceVerticalPage)
     }
