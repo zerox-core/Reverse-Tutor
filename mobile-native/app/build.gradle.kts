@@ -1,7 +1,28 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val debugLocalProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) {
+        file.inputStream().use(::load)
+    }
+}
+
+fun debugLocalProperty(name: String): String =
+    debugLocalProperties.getProperty(name).orEmpty()
+
+fun String.asBuildConfigString(): String =
+    replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+
+val debugLlmApiKey = debugLocalProperty("reverseTutorDebugLlmApiKey")
+val debugLlmBaseUrl = debugLocalProperty("reverseTutorDebugLlmBaseUrl")
+val debugLlmDefaultModel = debugLocalProperty("reverseTutorDebugLlmDefaultModel")
+val debugLlmFallbackModels = debugLocalProperty("reverseTutorDebugLlmFallbackModels")
 
 val onlineApiBaseUrl = providers.gradleProperty("reverseTutorOnlineBaseUrl")
     .orElse(providers.environmentVariable("REVERSE_TUTOR_ONLINE_BASE_URL"))
@@ -23,6 +44,21 @@ android {
         versionName = "0.1.0-native-preview"
         buildConfigField("String", "ONLINE_API_BASE_URL", "\"$escapedOnlineApiBaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "DEBUG_LLM_API_KEY", "\"${debugLlmApiKey.asBuildConfigString()}\"")
+            buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"${debugLlmBaseUrl.asBuildConfigString()}\"")
+            buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")
+            buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"${debugLlmFallbackModels.asBuildConfigString()}\"")
+        }
+        getByName("release") {
+            buildConfigField("String", "DEBUG_LLM_API_KEY", "\"\"")
+            buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"\"")
+            buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"\"")
+            buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"\"")
+        }
     }
 
     buildFeatures {
@@ -68,6 +104,7 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

@@ -11,11 +11,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import com.reversetutor.core.data.preferences.AppPreferences
 import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
+import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
+import com.reversetutor.preview.wiring.DebugLlmProfileBootstrapper
 import com.reversetutor.preview.wiring.HybridAppGraph
 import com.reversetutor.preview.wiring.HybridOnlineConfiguration
+import com.reversetutor.preview.wiring.RepositoryDebugLlmProfileStore
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var receivedImportPayload by mutableStateOf<ReceivedImportPayload?>(null)
@@ -33,6 +38,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         configureSystemBars()
         receivedImportPayload = readImportPayload(intent)
+        lifecycleScope.launch {
+            DebugLlmProfileBootstrapper(
+                store = RepositoryDebugLlmProfileStore(appGraph.llmProfileRepository)
+            ).ensureProfiles(
+                DebugLlmBootstrapConfig.from(
+                    apiKey = BuildConfig.DEBUG_LLM_API_KEY,
+                    baseUrl = BuildConfig.DEBUG_LLM_BASE_URL,
+                    defaultModel = BuildConfig.DEBUG_LLM_DEFAULT_MODEL,
+                    fallbackModels = BuildConfig.DEBUG_LLM_FALLBACK_MODELS
+                )
+            )
+        }
         setContent {
             val appPreferences by appGraph.appPreferencesRepository.preferences.collectAsState(
                 initial = AppPreferences.defaults
