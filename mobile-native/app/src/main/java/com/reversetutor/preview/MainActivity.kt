@@ -13,6 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.reversetutor.core.data.preferences.AppPreferences
+import com.reversetutor.preview.background.BackgroundGenerationStartupRecovery
+import com.reversetutor.preview.background.BackgroundGenerationWorker
 import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
 import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
@@ -49,6 +51,17 @@ class MainActivity : ComponentActivity() {
                     fallbackModels = BuildConfig.DEBUG_LLM_FALLBACK_MODELS
                 )
             )
+        }
+        lifecycleScope.launch {
+            val backgroundGenerationRepository = appGraph.backgroundGenerationRepository
+            BackgroundGenerationStartupRecovery(
+                recoverJobIds = { nowEpochMillis ->
+                    backgroundGenerationRepository
+                        .recoverInterruptedGenerationJobs(nowEpochMillis)
+                        .map { it.id }
+                },
+                enqueue = { jobId -> BackgroundGenerationWorker.enqueue(this@MainActivity, jobId) }
+            ).recoverAndSchedule(System.currentTimeMillis())
         }
         setContent {
             val appPreferences by appGraph.appPreferencesRepository.preferences.collectAsState(
