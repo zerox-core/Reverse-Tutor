@@ -43,6 +43,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -140,6 +141,20 @@ fun ChatRoute(
     var clientRequestId by remember(sessionId) { mutableStateOf(restoredDraft.clientRequestId) }
     var composer by remember(sessionId) { mutableStateOf(ChatComposerState.from(restoredDraft)) }
     var generation by remember(sessionId) { mutableStateOf<ChatGenerationUiState>(ChatGenerationUiState.Idle) }
+    val directGenerationCoordinator = remember(sessionId, chatGenerationRepository) {
+        ChatGenerationCoordinator(
+            executor = ChatGenerationExecutor { input, nowEpochMillis, isTokenCurrent ->
+                chatGenerationRepository?.generateReply(
+                    input = input,
+                    nowEpochMillis = nowEpochMillis,
+                    isTokenCurrent = isTokenCurrent
+                ) ?: ChatGenerationOutcome.NoModelConfigured
+            }
+        )
+    }
+    DisposableEffect(directGenerationCoordinator) {
+        onDispose { directGenerationCoordinator.invalidate() }
+    }
     var activeGenerationToken by remember(sessionId) { mutableStateOf<LlmGenerationToken?>(null) }
     var activeBackgroundJobId by remember(sessionId) { mutableStateOf<String?>(null) }
     var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
@@ -357,10 +372,7 @@ fun ChatRoute(
                     val userMessage = messageRepository.listMessages(sessionId)
                         .firstOrNull { it.id == attempt.messageId }
                         ?: return@launch
-                    val generator = chatGenerationRepository ?: return@launch
                     val token = LlmGenerationToken("${userMessage.id}-${System.currentTimeMillis()}")
-                    activeGenerationToken = token
-                    generation = ChatGenerationUiState.Pending
                     val contextEvidence = buildGenerationChatContextEvidence(
                         userText = userMessage.text,
                         memoryRepository = memoryRepository,
@@ -381,6 +393,8 @@ fun ChatRoute(
                         }
                     val backgroundRepository = backgroundGenerationRepository
                     if (backgroundRepository != null) {
+                        activeGenerationToken = token
+                        generation = ChatGenerationUiState.Pending
                         val job = backgroundRepository.enqueueGenerationJob(
                             input = BackgroundGenerationInput(
                                 spaceId = userMessage.spaceId,
@@ -398,7 +412,7 @@ fun ChatRoute(
                         onBackgroundGenerationQueued(job.id)
                         return@launch
                     }
-                    val outcome = generator.generateReply(
+                    directGenerationCoordinator.generate(
                         input = ChatGenerationInput(
                             sessionId = sessionId,
                             userMessageId = userMessage.id,
@@ -408,13 +422,8 @@ fun ChatRoute(
                             imageAttachments = imageAttachments,
                             contextEvidence = contextEvidence
                         ),
-                        nowEpochMillis = System.currentTimeMillis(),
-                        isTokenCurrent = { it == activeGenerationToken }
+                        onStateChanged = { generation = it }
                     )
-                    if (activeGenerationToken == token) {
-                        activeGenerationToken = null
-                    }
-                    generation = outcome.toUiState()
                     reload()
                 }
             }
@@ -1401,16 +1410,6 @@ private fun String.toQuoteExcerpt(): String {
     val compact = trim().replace(Regex("\\s+"), " ")
     return compact.take(96).ifEmpty { "消息" }
 }
-
-private fun ChatGenerationOutcome.toUiState(): ChatGenerationUiState =
-    when (this) {
-        is ChatGenerationOutcome.Generated -> ChatGenerationUiState.Idle
-        is ChatGenerationOutcome.ProviderFailed -> ChatGenerationUiState.Failure(message)
-        ChatGenerationOutcome.NoModelConfigured -> ChatGenerationUiState.NoModel
-        ChatGenerationOutcome.UnsupportedVision -> ChatGenerationUiState.Failure("图片输入暂不支持")
-        ChatGenerationOutcome.BlankPrompt -> ChatGenerationUiState.Failure("不能发送空内容")
-        ChatGenerationOutcome.Stale -> ChatGenerationUiState.Idle
-    }
 
 private val TerminalGenerationStatuses = setOf(
     BackgroundJobStatus.Completed,
