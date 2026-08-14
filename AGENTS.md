@@ -15,7 +15,7 @@
 本仓库当前是**三条线并存**：
 
 1. **Python 后端**（`server.py` / `engine.py` / `db.py` / `retrieval.py` / `websearch.py` / `kg_*.py`）—— FastAPI + SQLite，**测试覆盖在这里**（`tests/`，320+ 用例）。
-2. **客户端 PWA**（`static/app/index.html`，单文件 ~441KB）—— **内含一套独立的 JavaScript 引擎**（自己的 `chat_json`、评估/动作逻辑、知识图谱 canvas、直连 LLM）。**安卓 APK 打包的就是它**（经 Capacitor 包成 `mobile/`）。
+2. **客户端 PWA**（`static/app/index.html`，单文件 ~676KB / 692236 字节）—— **内含一套独立的 JavaScript 引擎**（自己的 `chat_json`、评估/动作逻辑、知识图谱 canvas、直连 LLM）。**安卓 APK 打包的就是它**（经 Capacitor 包成 `mobile/`）。
 3. **原生 Android 迁移线**（`mobile-native/`）—— 当前产品方向是继续开发 native Android。PWA/Capacitor 仍保留为迁移来源和行为参考，退出 PWA 必须等 Phase 6 并由用户明确批准。
 
 > ⚠️ **不要把三条线混成一条。** Python 后端、PWA/Capacitor、native Android 是不同实现面。修 bug 或做 UI 前先判断目标在后端、PWA，还是 `mobile-native/`。当前 native UI 重构不能改动旧 PWA/Capacitor 未提交内容，也不能宣布 PWA 已退出。
