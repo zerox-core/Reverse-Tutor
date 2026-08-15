@@ -81,6 +81,21 @@ data class GraphRenderSnapshot(
     val edges: List<GraphLayoutEdge>
 )
 
+enum class GraphRecoveryAction(
+    val label: String
+) {
+    CreateEvidence("去聊天中补充学习证据"),
+    Retry("重试加载图谱"),
+    Review("查看需要审核的关系"),
+    BrowseNodes("打开节点列表")
+}
+
+data class GraphPresentation(
+    val showCanvas: Boolean,
+    val showNodeList: Boolean,
+    val recoveryAction: GraphRecoveryAction?
+)
+
 data class KnowledgeGraphUiState(
     val scope: GraphScope,
     val status: GraphRenderStatus,
@@ -682,5 +697,53 @@ private object HierarchicalGraphLayout {
         GraphNodeKind.Concept -> 3
         GraphNodeKind.Source -> 4
         GraphNodeKind.Other -> 5
+    }
+}
+
+enum class GraphEvidenceDestination {
+    Chat,
+    Source
+}
+
+data class GraphEvidenceAction(
+    val label: String,
+    val destination: GraphEvidenceDestination,
+    val targetId: String
+)
+
+fun KnowledgeGraphUiState.presentation(): GraphPresentation = GraphPresentation(
+    showCanvas = allNodeCount > 0,
+    showNodeList = allNodeCount > 0,
+    recoveryAction = when (status) {
+        GraphRenderStatus.Loading,
+        GraphRenderStatus.Ready -> null
+        GraphRenderStatus.Empty -> GraphRecoveryAction.CreateEvidence
+        GraphRenderStatus.Error -> GraphRecoveryAction.Retry
+        GraphRenderStatus.Invalid -> GraphRecoveryAction.Review
+        GraphRenderStatus.Large -> GraphRecoveryAction.BrowseNodes
+    }
+)
+
+fun KnowledgeGraphUiState.accessibleNodes(): List<GraphLayoutNode> =
+    allNodes.sortedWith(compareBy<GraphLayoutNode> { it.label.lowercase() }.thenBy { it.id })
+
+fun GraphLayoutNode.evidenceActions(): List<GraphEvidenceAction> = buildList {
+    sourceMessageId?.let { targetId ->
+        add(
+            GraphEvidenceAction(
+                label = "查看会话引用",
+                destination = GraphEvidenceDestination.Chat,
+                targetId = targetId
+            )
+        )
+    }
+    sourceId?.let { targetId ->
+        add(
+            GraphEvidenceAction(
+                label = "查看资料引用",
+                destination = GraphEvidenceDestination.Source,
+                targetId = targetId
+            )
+        )
     }
 }

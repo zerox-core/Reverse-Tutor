@@ -143,6 +143,7 @@ fun ContextHubRoute(
         },
         onOpenGraphChatEvidence = onOpenChatEvidence,
         onOpenGraphSourceEvidence = onOpenSourceEvidence,
+        onGraphRetry = { refreshKey += 1 },
         onOpenChatEvidence = onOpenChatEvidence,
         onOpenSourceEvidence = onOpenSourceEvidence,
         modifier = modifier
@@ -252,6 +253,7 @@ fun ContextHubScreen(
     onGraphNodeReviewAction: (GraphLayoutNode, GraphNodeReviewAction) -> Unit = { _, _ -> },
     onOpenGraphChatEvidence: (String) -> Unit = {},
     onOpenGraphSourceEvidence: (String) -> Unit = {},
+    onGraphRetry: () -> Unit = {},
     onOpenChatEvidence: (String) -> Unit = {},
     onOpenSourceEvidence: (String) -> Unit = {},
     modifier: Modifier = Modifier
@@ -321,7 +323,9 @@ fun ContextHubScreen(
                 },
                 onOpenSourceEvidence = { node ->
                     node.sourceId?.let(onOpenGraphSourceEvidence)
-                }
+                },
+                onCreateEvidence = onOpenChat,
+                onRetry = onGraphRetry
             )
         } else {
             ContextHubSectionPanel(

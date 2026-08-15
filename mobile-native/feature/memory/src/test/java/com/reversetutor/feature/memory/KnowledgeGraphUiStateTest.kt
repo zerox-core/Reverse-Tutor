@@ -329,6 +329,77 @@ class KnowledgeGraphUiStateTest {
         assertEquals("locked", state.withSelection("locked").selectedNode?.id)
     }
 
+    @Test
+    fun `empty graph gives an honest creation next step`() {
+        val presentation = KnowledgeGraphUiState.from(
+            nodes = emptyList(),
+            edges = emptyList()
+        ).presentation()
+
+        assertFalse(presentation.showCanvas)
+        assertEquals(GraphRecoveryAction.CreateEvidence, presentation.recoveryAction)
+        assertFalse(presentation.showNodeList)
+    }
+
+    @Test
+    fun `error graph gives a retry action`() {
+        val presentation = KnowledgeGraphUiState.error().presentation()
+
+        assertFalse(presentation.showCanvas)
+        assertEquals(GraphRecoveryAction.Retry, presentation.recoveryAction)
+        assertFalse(presentation.showNodeList)
+    }
+
+    @Test
+    fun `invalid graph exposes review consequence`() {
+        val presentation = KnowledgeGraphUiState.from(
+            nodes = listOf(node("node-a", "Alpha")),
+            edges = listOf(edge("invalid-edge", "node-a", "missing"))
+        ).presentation()
+
+        assertTrue(presentation.showCanvas)
+        assertEquals(GraphRecoveryAction.Review, presentation.recoveryAction)
+        assertTrue(presentation.showNodeList)
+    }
+
+    @Test
+    fun `large graph exposes an accessible node list fallback`() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = (1..61).map { index -> node("node-$index", "Node $index") },
+            edges = emptyList()
+        )
+
+        assertEquals(GraphRenderStatus.Large, state.status)
+        assertTrue(state.presentation().showNodeList)
+        assertEquals(61, state.accessibleNodes().size)
+        assertEquals("Node 1", state.accessibleNodes().first().label)
+    }
+
+    @Test
+    fun `selected node exposes only available chat and source evidence actions`() {
+        val node = GraphLayoutNode(
+            id = "evidence-node",
+            label = "Evidence",
+            kind = GraphNodeKind.Concept,
+            status = GraphNodeStatus.Active,
+            x = 0.5f,
+            y = 0.5f,
+            radius = 0.04f,
+            sourceMessageId = "message-1"
+        )
+
+        assertEquals(
+            listOf(
+                GraphEvidenceAction(
+                    label = "查看会话引用",
+                    destination = GraphEvidenceDestination.Chat,
+                    targetId = "message-1"
+                )
+            ),
+            node.evidenceActions()
+        )
+    }
+
     private fun node(
         id: String,
         label: String,

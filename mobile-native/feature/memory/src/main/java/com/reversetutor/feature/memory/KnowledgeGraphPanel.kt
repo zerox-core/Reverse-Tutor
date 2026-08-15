@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -89,9 +90,15 @@ fun KnowledgeGraphPanel(
     onGraphInteractionChanged: (Boolean) -> Unit = {},
     onOpenChatEvidence: (GraphLayoutNode) -> Unit = {},
     onOpenSourceEvidence: (GraphLayoutNode) -> Unit = {},
+    onCreateEvidence: (() -> Unit)? = null,
+    onRetry: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showLockedNodes by remember(state.scope) { mutableStateOf(false) }
+    val presentation = state.presentation()
+    var showNodeList by remember(state.scope, state.status, state.allNodes) {
+        mutableStateOf(state.status in setOf(GraphRenderStatus.Invalid, GraphRenderStatus.Large))
+    }
     val selectedNode = state.selectedNode
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -121,22 +128,55 @@ fun KnowledgeGraphPanel(
                     )
                 }
                 if (state.scope == GraphScope.Session && state.lockedNodes.isNotEmpty()) {
-                    TextButton(onClick = { showLockedNodes = !showLockedNodes }) {
+                    TextButton(
+                        onClick = { showLockedNodes = !showLockedNodes },
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("graph-locked-nodes-toggle")
+                    ) {
                         Text(if (showLockedNodes) "隐藏未解锁" else "显示未解锁", fontSize = 10.sp)
                     }
                 }
             }
-            if (state.allNodeCount == 0) {
-                EmptyGraphPanel(state)
-            } else {
+            val recoveryAction = presentation.recoveryAction
+            val recoveryClick: (() -> Unit)? = when (recoveryAction) {
+                GraphRecoveryAction.CreateEvidence -> onCreateEvidence
+                GraphRecoveryAction.Retry -> onRetry
+                GraphRecoveryAction.Review,
+                GraphRecoveryAction.BrowseNodes -> { { showNodeList = true } }
+                null -> null
+            }
+            if (state.status != GraphRenderStatus.Ready) {
+                GraphStatusPanel(
+                    state = state,
+                    action = recoveryAction,
+                    onAction = recoveryClick,
+                    modifier = Modifier.padding(horizontal = 12.dp)
+                )
+            }
+            if (presentation.showCanvas) {
                 FormalGraphCanvas(
                     state = state,
                     showLockedNodes = showLockedNodes,
                     onSelectedNodeChange = onSelectedNodeChange,
                     onInteractionChanged = onGraphInteractionChanged,
+                    showToolbar = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(if (state.scope == GraphScope.Session) 520.dp else 430.dp)
+                )
+            }
+            if (presentation.showNodeList) {
+                GraphNodeListControl(
+                    open = showNodeList,
+                    onOpen = { showNodeList = true },
+                    onClose = { showNodeList = false },
+                    onSelectedNodeChange = {
+                        onSelectedNodeChange(it)
+                        showNodeList = false
+                    },
+                    nodes = state.accessibleNodes(),
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 )
             }
             if (selectedNode != null) {
@@ -153,6 +193,109 @@ fun KnowledgeGraphPanel(
                 )
             }
             Spacer(Modifier.height(2.dp))
+        }
+    }
+}
+
+@Composable
+private fun GraphStatusPanel(
+    state: KnowledgeGraphUiState,
+    action: GraphRecoveryAction?,
+    onAction: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("graph-status-${state.status.name.lowercase()}"),
+        color = FormalColors.PrimarySoft,
+        contentColor = FormalColors.Ink,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, FormalColors.Border)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(state.title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            if (state.summary.isNotBlank()) {
+                Text(state.summary, color = FormalColors.Muted, fontSize = 11.sp, lineHeight = 17.sp)
+            }
+            action?.let { recoveryAction ->
+                if (onAction != null) {
+                    Button(
+                        onClick = onAction,
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("graph-recovery-${recoveryAction.name.lowercase()}"),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(recoveryAction.label)
+                    }
+                } else {
+                    Text(
+                        text = "下一步：${recoveryAction.label}",
+                        color = FormalColors.Muted,
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GraphNodeListControl(
+    open: Boolean,
+    onOpen: () -> Unit,
+    onClose: () -> Unit,
+    onSelectedNodeChange: (String) -> Unit,
+    nodes: List<GraphLayoutNode>,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(
+            onClick = if (open) onClose else onOpen,
+            modifier = Modifier
+                .heightIn(min = 48.dp)
+                .testTag("graph-node-list")
+        ) {
+            Text(if (open) "收起节点列表" else "打开节点列表（${nodes.size}）")
+        }
+        if (open) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = FormalColors.Surface,
+                contentColor = FormalColors.Ink,
+                shape = RoundedCornerShape(FormalShapes.CardRadius),
+                border = BorderStroke(1.dp, FormalColors.Border)
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text("节点列表", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    nodes.forEach { node ->
+                        TextButton(
+                            onClick = { onSelectedNodeChange(node.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .testTag("graph-node-${node.id}")
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(node.label, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text(
+                                    "${node.kindLabel} · ${node.statusLabel}",
+                                    color = FormalColors.Muted,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -854,11 +997,14 @@ private fun GraphToolbar(
     }
 }
 
-private enum class GraphToolbarGlyph(val description: String) {
-    Target("回到中心"),
-    Minus("缩小"),
-    Plus("放大"),
-    Filter("筛选")
+private enum class GraphToolbarGlyph(
+    val description: String,
+    val tag: String
+) {
+    Target("适应图谱", "graph-fit"),
+    Minus("缩小", "graph-zoom-out"),
+    Plus("放大", "graph-zoom-in"),
+    Filter("筛选", "graph-filter")
 }
 
 @Composable
@@ -869,10 +1015,10 @@ private fun GraphToolbarButton(
 ) {
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(48.dp)
             .background(if (selected) FormalColors.PrimarySoft else Color.Transparent, CircleShape)
             .semantics { contentDescription = glyph.description }
-            .testTag("graph-toolbar-${glyph.name}")
+            .testTag(glyph.tag)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center
     ) {
@@ -1019,12 +1165,31 @@ private fun GraphNodeDetail(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (node.sourceMessageId != null) {
-                    TextButton(onClick = { onOpenChatEvidence(node) }) { Text("查看会话引用") }
-                }
-                if (node.sourceId != null) {
-                    TextButton(onClick = { onOpenSourceEvidence(node) }) { Text("查看资料引用") }
+            val evidenceActions = node.evidenceActions()
+            if (evidenceActions.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    evidenceActions.forEach { action ->
+                        val tag = when (action.destination) {
+                            GraphEvidenceDestination.Chat -> "graph-evidence-chat-${action.targetId}"
+                            GraphEvidenceDestination.Source -> "graph-evidence-source-${action.targetId}"
+                        }
+                        TextButton(
+                            onClick = {
+                                when (action.destination) {
+                                    GraphEvidenceDestination.Chat -> onOpenChatEvidence(node)
+                                    GraphEvidenceDestination.Source -> onOpenSourceEvidence(node)
+                                }
+                            },
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag(tag)
+                        ) {
+                            Text(action.label)
+                        }
+                    }
                 }
             }
         }
