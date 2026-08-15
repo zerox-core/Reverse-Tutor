@@ -6,8 +6,8 @@ import com.reversetutor.core.data.llm.ChatGenerationOutcome
 /**
  * Maps generation failures to fixed, export-safe diagnostics.
  *
- * This policy deliberately accepts no provider message, exception, request payload,
- * endpoint or credential. The persisted detail is therefore unable to leak them.
+ * It only maps known local outcome markers; it never persists a provider message,
+ * exception, request payload, endpoint or credential.
  */
 object GenerationDiagnosticPolicy {
 
@@ -25,7 +25,10 @@ object GenerationDiagnosticPolicy {
         ProviderFailure.takeIf { outcome is ChatGenerationOutcome.ProviderFailed }
 
     fun forBackgroundOutcome(outcome: BackgroundGenerationOutcome): Record? =
-        BackgroundFailure.takeIf { outcome is BackgroundGenerationOutcome.Failed }
+        BackgroundFailure.takeIf {
+            outcome is BackgroundGenerationOutcome.Failed &&
+                outcome.message !in controlledBackgroundFailures
+        }
 
     fun forCode(code: String?): Record = when (code) {
         ProviderFailure.code -> ProviderFailure
@@ -49,5 +52,11 @@ object GenerationDiagnosticPolicy {
         title = "生成任务失败",
         detail = "生成任务未完成，请打开应用后重试。",
         code = "generation_failed"
+    )
+
+    private val controlledBackgroundFailures = setOf(
+        "No model configured",
+        "Vision input unsupported",
+        "Blank prompt"
     )
 }

@@ -14,6 +14,7 @@ import com.reversetutor.feature.settings.FormalImportIssueSeverity
 import com.reversetutor.feature.settings.FormalImportMode
 import com.reversetutor.feature.settings.FormalSyncSource
 import com.reversetutor.feature.settings.FormalTokenPeriod
+import com.reversetutor.feature.settings.FormalDiagnosticReportUiState
 import java.util.zip.ZipInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -166,6 +167,27 @@ class FormalBatch6RuntimeStateTest {
         assertEquals("math-plan", overview.conflictItems.single().title)
         assertEquals(setOf(FormalSyncSource.Device, FormalSyncSource.Cloud), choice.options.map { it.source }.toSet())
         assertEquals(FormalSyncSource.Cloud, choice.selectedSource)
+    }
+
+    @Test
+    fun diagnosticReportPlainTextDoesNotExportModelName() {
+        val report = FormalDiagnosticReportUiState(
+            reportId = "RT-test",
+            createdAtLabel = "2026-08-15 12:00",
+            appVersionLabel = "0.1",
+            deviceLabel = "Android",
+            spaceLabel = "默认空间",
+            databaseLabel = "正常",
+            localDataLabel = "0 条消息",
+            parserLabel = "可用",
+            recentEvents = emptyList()
+        )
+
+        val text = report.toPlainText()
+
+        assertFalse(text.contains("默认模型"))
+        assertFalse(text.contains("DeepSeek"))
+        assertFalse(text.contains("model"))
     }
 
     private fun validExport(fileName: String, json: String): NativeExportResult =

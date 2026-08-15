@@ -1009,7 +1009,6 @@ internal object FormalBatch6RuntimeStateFactory {
             databaseLabel = state.systemRows.firstOrNull { it.id == "database" }?.statusLabel ?: "未知",
             localDataLabel = state.localUsageLabel,
             parserLabel = state.systemRows.firstOrNull { it.id == "parser" }?.subtitle ?: "未检查",
-            modelLabel = state.modelLabel,
             recentEvents = events.take(8)
         )
     }
@@ -1335,7 +1334,7 @@ private fun File.sizeRecursively(): Long =
 private fun File.clearChildren(): Boolean =
     listFiles()?.map { it.deleteRecursively() }?.all { it } ?: true
 
-private fun FormalDiagnosticReportUiState.toPlainText(): String = buildString {
+internal fun FormalDiagnosticReportUiState.toPlainText(): String = buildString {
     appendLine("Reverse Tutor 诊断报告")
     appendLine("报告编号：$reportId")
     appendLine("生成时间：$createdAtLabel")
@@ -1345,7 +1344,6 @@ private fun FormalDiagnosticReportUiState.toPlainText(): String = buildString {
     appendLine("数据库：$databaseLabel")
     appendLine("本地数据：$localDataLabel")
     appendLine("资料解析：$parserLabel")
-    appendLine("默认模型：$modelLabel")
     recentEvents.forEach { event ->
         appendLine("事件：${event.title} · ${event.statusLabel} · ${event.subtitle}")
     }

@@ -353,7 +353,6 @@ data class FormalDiagnosticReportUiState(
     val databaseLabel: String,
     val localDataLabel: String,
     val parserLabel: String,
-    val modelLabel: String,
     val recentEvents: List<FormalDiagnosticEvent>
 )
 
@@ -416,8 +415,6 @@ fun FormalDiagnosticReportScreen(
                         ReportValueRow("本地数据", state.localDataLabel, Icons.Rounded.FolderOpen)
                         DiagnosticsDivider()
                         ReportValueRow("资料解析", state.parserLabel, Icons.Rounded.Description)
-                        DiagnosticsDivider()
-                        ReportValueRow("默认模型", state.modelLabel, Icons.Rounded.Memory, true)
                     }
                 }
                 Spacer(Modifier.height(24.dp))

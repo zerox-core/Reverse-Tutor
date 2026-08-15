@@ -50,6 +50,22 @@ class GenerationDiagnosticPolicyTest {
     }
 
     @Test
+    fun controlledBackgroundFailuresDoNotProduceDiagnosticRecords() {
+        listOf(
+            "No model configured",
+            "Vision input unsupported",
+            "Blank prompt"
+        ).forEach { controlledFailure ->
+            assertNull(
+                "Controlled failure must not be recorded: $controlledFailure",
+                GenerationDiagnosticPolicy.forBackgroundOutcome(
+                    BackgroundGenerationOutcome.Failed(controlledFailure)
+                )
+            )
+        }
+    }
+
+    @Test
     fun unknownPersistedCodeFallsBackToFixedSafeCopy() {
         val diagnostic = GenerationDiagnosticPolicy.forCode(
             "Authorization: Bearer sk-test-secret https://provider.example?key=private"

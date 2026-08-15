@@ -160,7 +160,6 @@ object FormalBatch6PreviewFixtures {
         databaseLabel = "Room v4 · 迁移正常",
         localDataLabel = "12 会话 · 468 消息 · 7 资料",
         parserLabel = "PDF · Word · Markdown 可用",
-        modelLabel = "DeepSeek V3 · 已连接",
         recentEvents = listOf(
             FormalDiagnosticEvent("timeout", "模型连接超时", "2 小时前 · 自动重试后恢复", "已恢复", true),
             FormalDiagnosticEvent("migration", "数据库迁移 v3 → v4", "2026-07-14 22:08", "成功", false)
