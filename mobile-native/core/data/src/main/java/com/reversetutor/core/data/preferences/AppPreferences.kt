@@ -7,7 +7,8 @@ data class AppPreferences(
     val hapticFeedbackEnabled: Boolean = true,
     val primaryMemo: String = "",
     val secondaryMemo: String = "",
-    val scratchMemo: String = ""
+    val scratchMemo: String = "",
+    val backgroundGenerationNotificationEnabled: Boolean = false
 ) {
     companion object {
         val defaults = AppPreferences()

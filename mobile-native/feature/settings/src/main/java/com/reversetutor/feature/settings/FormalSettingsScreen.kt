@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.EmojiEvents
 import androidx.compose.material.icons.rounded.ImportExport
 import androidx.compose.material.icons.rounded.Key
+import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Storage
@@ -65,6 +66,8 @@ data class FormalSettingsUiState(
     val llmConfigurationLabel: String = "未配置",
     val layoutSizeLabel: String = "标准",
     val hapticFeedbackEnabled: Boolean = true,
+    val backgroundGenerationNotificationEnabled: Boolean = false,
+    val notificationPermissionGranted: Boolean = true,
     val syncStatusLabel: String = "已同步",
     val storageLabel: String = "1.8 GB"
 ) {
@@ -72,11 +75,15 @@ data class FormalSettingsUiState(
         fun from(
             llmProfileState: LlmProfileSettingsUiState,
             challengeReminderEnabled: Boolean = true,
-            hapticFeedbackEnabled: Boolean = true
+            hapticFeedbackEnabled: Boolean = true,
+            backgroundGenerationNotificationEnabled: Boolean = false,
+            notificationPermissionGranted: Boolean = true
         ): FormalSettingsUiState =
             FormalSettingsUiState(
                 challengeReminderEnabled = challengeReminderEnabled,
                 hapticFeedbackEnabled = hapticFeedbackEnabled,
+                backgroundGenerationNotificationEnabled = backgroundGenerationNotificationEnabled,
+                notificationPermissionGranted = notificationPermissionGranted,
                 llmConfigurationLabel = if (llmProfileState.profileItems.isEmpty()) {
                     "未配置"
                 } else {
@@ -98,13 +105,19 @@ fun FormalSettingsScreen(
     hapticFeedbackEnabled: Boolean = true,
     onChallengeReminderChanged: (Boolean) -> Unit = {},
     onHapticFeedbackChanged: (Boolean) -> Unit = {},
+    backgroundGenerationNotificationEnabled: Boolean = false,
+    notificationPermissionGranted: Boolean = true,
+    onBackgroundGenerationNotificationChanged: (Boolean) -> Unit = {},
+    onOpenNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     FormalSettingsScreen(
         state = FormalSettingsUiState.from(
             llmProfileState = llmProfileState,
             challengeReminderEnabled = challengeReminderEnabled,
-            hapticFeedbackEnabled = hapticFeedbackEnabled
+            hapticFeedbackEnabled = hapticFeedbackEnabled,
+            backgroundGenerationNotificationEnabled = backgroundGenerationNotificationEnabled,
+            notificationPermissionGranted = notificationPermissionGranted
         ),
         onBack = onBack,
         onOpenLlmConfiguration = onOpenLlmConfiguration,
@@ -113,6 +126,8 @@ fun FormalSettingsScreen(
         onOpenAbout = onOpenAbout,
         onChallengeReminderChanged = onChallengeReminderChanged,
         onHapticFeedbackChanged = onHapticFeedbackChanged,
+        onBackgroundGenerationNotificationChanged = onBackgroundGenerationNotificationChanged,
+        onOpenNotificationSettings = onOpenNotificationSettings,
         modifier = modifier
     )
 }
@@ -127,6 +142,8 @@ fun FormalSettingsScreen(
     onOpenAbout: () -> Unit,
     onChallengeReminderChanged: (Boolean) -> Unit = {},
     onHapticFeedbackChanged: (Boolean) -> Unit = {},
+    onBackgroundGenerationNotificationChanged: (Boolean) -> Unit = {},
+    onOpenNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val colors = formalSettingsColors()
@@ -139,6 +156,10 @@ fun FormalSettingsScreen(
         FormalSettingsAction.ToggleHapticFeedback to {
             onHapticFeedbackChanged(!state.hapticFeedbackEnabled)
         },
+        FormalSettingsAction.ToggleBackgroundGenerationNotification to {
+            onBackgroundGenerationNotificationChanged(!state.backgroundGenerationNotificationEnabled)
+        },
+        FormalSettingsAction.OpenNotificationSettings to onOpenNotificationSettings,
         FormalSettingsAction.OpenStorage to onOpenStorage,
         FormalSettingsAction.OpenImportExport to onOpenImportExport,
         FormalSettingsAction.OpenAbout to onOpenAbout
@@ -544,6 +565,19 @@ internal fun formalSettingsSections(
                 action = FormalSettingsAction.ToggleChallengeReminder
             ),
             FormalSettingsRowSpec(
+                label = "后台生成通知",
+                icon = FormalSettingsIcon.Notifications,
+                toggleEnabled = state.backgroundGenerationNotificationEnabled,
+                value = if (!state.notificationPermissionGranted) "未授权" else null,
+                action = FormalSettingsAction.ToggleBackgroundGenerationNotification
+            ),
+            FormalSettingsRowSpec(
+                label = "通知权限设置",
+                icon = FormalSettingsIcon.Notifications,
+                hasChevron = true,
+                action = FormalSettingsAction.OpenNotificationSettings
+            ),
+            FormalSettingsRowSpec(
                 label = "隐私与权限",
                 icon = FormalSettingsIcon.Privacy,
                 hasChevron = true
@@ -581,6 +615,8 @@ internal enum class FormalSettingsAction {
     ToggleChallengeReminder,
     OpenLlmConfiguration,
     ToggleHapticFeedback,
+    ToggleBackgroundGenerationNotification,
+    OpenNotificationSettings,
     OpenStorage,
     OpenImportExport,
     OpenAbout
@@ -595,6 +631,7 @@ internal enum class FormalSettingsIcon(
     ApiKey(Icons.Rounded.Key, Color(0xFF296EC2)),
     Layout(Icons.AutoMirrored.Rounded.FormatAlignLeft, Color(0xFF2E66C7)),
     Haptics(Icons.Rounded.Vibration, Color(0xFF21857A)),
+    Notifications(Icons.Rounded.Notifications, Color(0xFF6170B8)),
     Sync(Icons.Rounded.Sync, Color(0xFF178775)),
     Storage(Icons.Rounded.Storage, Color(0xFF386BC2)),
     ImportExport(Icons.Rounded.ImportExport, Color(0xFF6170B8)),

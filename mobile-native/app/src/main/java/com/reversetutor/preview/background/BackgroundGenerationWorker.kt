@@ -1,6 +1,7 @@
 package com.reversetutor.preview.background
 
 import android.content.Context
+import androidx.core.app.NotificationManagerCompat
 import androidx.work.CoroutineWorker
 import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
@@ -10,6 +11,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
+import kotlinx.coroutines.flow.first
 
 class BackgroundGenerationWorker(
     appContext: Context,
@@ -17,15 +19,40 @@ class BackgroundGenerationWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val jobId = inputData.getString(InputJobId) ?: return Result.failure()
-        return when (
-            DataModule.backgroundGenerationRepository(applicationContext)
-                .runGenerationJob(jobId, System.currentTimeMillis())
-        ) {
+        val outcome = DataModule.backgroundGenerationRepository(applicationContext)
+            .runGenerationJob(jobId, System.currentTimeMillis())
+        notifyIfNeeded(jobId, outcome)
+        return when (outcome) {
             is BackgroundGenerationOutcome.Completed,
             is BackgroundGenerationOutcome.Discarded,
             BackgroundGenerationOutcome.Cancelled -> Result.success()
             is BackgroundGenerationOutcome.Failed,
             BackgroundGenerationOutcome.MissingJob -> Result.failure()
+        }
+    }
+
+    private suspend fun notifyIfNeeded(
+        jobId: String,
+        outcome: BackgroundGenerationOutcome
+    ) {
+        val preferences = DataModule.appPreferencesRepository(applicationContext)
+            .preferences
+            .first()
+        val permissionGranted = NotificationManagerCompat
+            .from(applicationContext).areNotificationsEnabled()
+        val kind = BackgroundGenerationNotificationPolicy.resolve(
+            outcome = outcome,
+            notificationEnabled = preferences.backgroundGenerationNotificationEnabled,
+            notificationsPermissionGranted = permissionGranted
+        )
+        if (kind == BackgroundGenerationNotificationPolicy.NotificationKind.None) return
+        val notifier = AndroidBackgroundGenerationNotifier(applicationContext)
+        when (kind) {
+            BackgroundGenerationNotificationPolicy.NotificationKind.Completed ->
+                notifier.notifyCompleted(jobId)
+            BackgroundGenerationNotificationPolicy.NotificationKind.Failed ->
+                notifier.notifyFailed(jobId)
+            BackgroundGenerationNotificationPolicy.NotificationKind.None -> Unit
         }
     }
 

@@ -9,10 +9,12 @@ import android.net.Uri
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.core.app.NotificationManagerCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -1568,6 +1570,21 @@ private fun DestinationContent(
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.Settings) {
+            val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission()
+            ) { granted ->
+                scope.launch {
+                    hybridAppGraph.appPreferencesRepository
+                        .setBackgroundGenerationNotificationEnabled(granted)
+                }
+            }
+            val postNotificationsGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            val notificationsEnabled = postNotificationsGranted && NotificationManagerCompat
+                .from(context).areNotificationsEnabled()
             FormalSettingsScreen(
                 llmProfileState = llmProfileState,
                 onBack = onOpenSessions,
@@ -1590,6 +1607,43 @@ private fun DestinationContent(
                         hybridAppGraph.appPreferencesRepository
                             .setHapticFeedbackEnabled(enabled)
                     }
+                },
+                backgroundGenerationNotificationEnabled = appPreferences.backgroundGenerationNotificationEnabled,
+                notificationPermissionGranted = notificationsEnabled,
+                onBackgroundGenerationNotificationChanged = { enabled ->
+                    if (enabled) {
+                        when {
+                            Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
+                                scope.launch {
+                                    hybridAppGraph.appPreferencesRepository
+                                        .setBackgroundGenerationNotificationEnabled(true)
+                                }
+                            }
+                            postNotificationsGranted -> {
+                                scope.launch {
+                                    hybridAppGraph.appPreferencesRepository
+                                        .setBackgroundGenerationNotificationEnabled(true)
+                                }
+                            }
+                            (context as? Activity)?.shouldShowRequestPermissionRationale(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == true -> Unit
+                            else -> notificationPermissionLauncher.launch(
+                                Manifest.permission.POST_NOTIFICATIONS
+                            )
+                        }
+                    } else {
+                        scope.launch {
+                            hybridAppGraph.appPreferencesRepository
+                                .setBackgroundGenerationNotificationEnabled(false)
+                        }
+                    }
+                },
+                onOpenNotificationSettings = {
+                    val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    }
+                    context.startActivity(intent)
                 }
             )
             return@ReverseTutorScreenSurface

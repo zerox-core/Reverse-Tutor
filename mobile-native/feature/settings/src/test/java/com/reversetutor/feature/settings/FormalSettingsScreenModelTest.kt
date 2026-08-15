@@ -48,6 +48,8 @@ class FormalSettingsScreenModelTest {
                 "存储空间",
                 "导入与导出",
                 "挑战任务提醒",
+                "后台生成通知",
+                "通知权限设置",
                 "隐私与权限",
                 "帮助与关于"
             ),
@@ -60,6 +62,8 @@ class FormalSettingsScreenModelTest {
                 FormalSettingsAction.OpenStorage,
                 FormalSettingsAction.OpenImportExport,
                 FormalSettingsAction.ToggleChallengeReminder,
+                FormalSettingsAction.ToggleBackgroundGenerationNotification,
+                FormalSettingsAction.OpenNotificationSettings,
                 FormalSettingsAction.OpenAbout
             ),
             sections.flatMap { it.rows }.mapNotNull { it.action }
@@ -71,11 +75,22 @@ class FormalSettingsScreenModelTest {
         val state = FormalSettingsUiState.from(
             llmProfileState = llmState(emptyList()),
             challengeReminderEnabled = false,
-            hapticFeedbackEnabled = false
+            hapticFeedbackEnabled = false,
+            backgroundGenerationNotificationEnabled = true,
+            notificationPermissionGranted = false
         )
 
         assertEquals(false, state.challengeReminderEnabled)
         assertEquals(false, state.hapticFeedbackEnabled)
+        assertEquals(true, state.backgroundGenerationNotificationEnabled)
+        assertEquals(false, state.notificationPermissionGranted)
+        assertEquals(
+            "未授权",
+            formalSettingsSections(state)
+                .flatMap { it.rows }
+                .first { it.label == "后台生成通知" }
+                .value
+        )
     }
 
     private fun llmState(

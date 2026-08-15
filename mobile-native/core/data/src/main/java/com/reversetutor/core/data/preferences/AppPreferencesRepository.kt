@@ -21,7 +21,10 @@ class AppPreferencesRepository(
             primaryMemo = stored[AppPreferenceKeys.primaryMemo] ?: AppPreferences.defaults.primaryMemo,
             secondaryMemo = stored[AppPreferenceKeys.secondaryMemo]
                 ?: AppPreferences.defaults.secondaryMemo,
-            scratchMemo = stored[AppPreferenceKeys.scratchMemo] ?: AppPreferences.defaults.scratchMemo
+            scratchMemo = stored[AppPreferenceKeys.scratchMemo] ?: AppPreferences.defaults.scratchMemo,
+            backgroundGenerationNotificationEnabled =
+                stored[AppPreferenceKeys.backgroundGenerationNotificationEnabled]
+                    ?: AppPreferences.defaults.backgroundGenerationNotificationEnabled
         )
     }
 
@@ -46,6 +49,12 @@ class AppPreferencesRepository(
     suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[AppPreferenceKeys.hapticFeedbackEnabled] = enabled
+        }
+    }
+
+    suspend fun setBackgroundGenerationNotificationEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.backgroundGenerationNotificationEnabled] = enabled
         }
     }
 

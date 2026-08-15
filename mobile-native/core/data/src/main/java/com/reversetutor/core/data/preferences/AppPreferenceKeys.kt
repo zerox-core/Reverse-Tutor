@@ -11,6 +11,8 @@ object AppPreferenceKeys {
     val primaryMemo = stringPreferencesKey("memo_primary")
     val secondaryMemo = stringPreferencesKey("memo_secondary")
     val scratchMemo = stringPreferencesKey("memo_scratch")
+    val backgroundGenerationNotificationEnabled =
+        booleanPreferencesKey("background_generation_notification_enabled")
 
     val persistedNames = listOf(
         theme.name,
@@ -19,6 +21,7 @@ object AppPreferenceKeys {
         hapticFeedbackEnabled.name,
         primaryMemo.name,
         secondaryMemo.name,
-        scratchMemo.name
+        scratchMemo.name,
+        backgroundGenerationNotificationEnabled.name
     )
 }
