@@ -30,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.data.sources.SourceImportInput
@@ -128,7 +130,12 @@ fun SourcesScreen(
                     )
                 }
             }
-            Button(onClick = onPickSource) {
+            Button(
+                onClick = onPickSource,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("sources-add")
+            ) {
                 Text("添加资料")
             }
         }
@@ -145,7 +152,11 @@ fun SourcesScreen(
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 state.items.forEach { item ->
-                    SourceCard(item = item, onReprocess = { onReprocess(item.id) })
+                    SourceCard(
+                        item = item,
+                        highlighted = item.id == highlightedSourceId,
+                        onReprocess = { onReprocess(item.id) }
+                    )
                 }
             }
         }
@@ -153,6 +164,7 @@ fun SourcesScreen(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun ParserStatusLegend() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -169,6 +181,14 @@ private fun ParserStatusLegend() {
                 text = "TXT 和 Markdown 可本地解析，HTML 会做安全清洗后部分提取。PDF、DOCX、PPTX、EPUB 和图片会保留为等待能力的资料，不会被隐藏。",
                 style = MaterialTheme.typography.bodyMedium
             )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("已解析", "部分解析", "等待能力", "暂不支持", "失败").forEach { label ->
+                    Text(text = label, style = MaterialTheme.typography.labelMedium)
+                }
+            }
         }
     }
 }
@@ -224,7 +244,7 @@ private fun EmptySources(
                 text = "选择 TXT、Markdown、HTML、PDF、DOCX、PPTX、EPUB、图片或其他文件。暂不支持的文件也会保留并显示状态。",
                 style = MaterialTheme.typography.bodyMedium
             )
-            TextButton(onClick = onPickSource) {
+            TextButton(onClick = onPickSource, modifier = Modifier.heightIn(min = 48.dp)) {
                 Text("选择文件")
             }
         }
@@ -235,11 +255,33 @@ private fun EmptySources(
 @OptIn(ExperimentalLayoutApi::class)
 private fun SourceCard(
     item: SourceCardUiItem,
+    highlighted: Boolean,
     onReprocess: () -> Unit
 ) {
+    val statusContainerColor = when (item.statusTone) {
+        SourceStatusTone.Success -> MaterialTheme.colorScheme.secondaryContainer
+        SourceStatusTone.Warning -> MaterialTheme.colorScheme.tertiaryContainer
+        SourceStatusTone.Info -> MaterialTheme.colorScheme.primaryContainer
+        SourceStatusTone.Disabled -> MaterialTheme.colorScheme.surface
+        SourceStatusTone.Error -> MaterialTheme.colorScheme.errorContainer
+    }
+    val statusContentColor = when (item.statusTone) {
+        SourceStatusTone.Success -> MaterialTheme.colorScheme.onSecondaryContainer
+        SourceStatusTone.Warning -> MaterialTheme.colorScheme.onTertiaryContainer
+        SourceStatusTone.Info -> MaterialTheme.colorScheme.onPrimaryContainer
+        SourceStatusTone.Disabled -> MaterialTheme.colorScheme.onSurfaceVariant
+        SourceStatusTone.Error -> MaterialTheme.colorScheme.onErrorContainer
+    }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("source-card-${item.id}")
+            .semantics { selected = highlighted },
+        color = if (highlighted) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -262,8 +304,8 @@ private fun SourceCard(
                     Text(text = item.typeLabel, style = MaterialTheme.typography.bodyMedium)
                 }
                 Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = statusContainerColor,
+                    contentColor = statusContentColor,
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
@@ -275,7 +317,7 @@ private fun SourceCard(
                     )
                 }
             }
-            Text(text = item.statusDetail, style = MaterialTheme.typography.bodyMedium)
+            Text(text = item.impactMessage, style = MaterialTheme.typography.bodyMedium)
             Text(text = item.chunkCountLabel, style = MaterialTheme.typography.bodyMedium)
             if (item.snippets.isNotEmpty()) {
                 Text(
@@ -287,16 +329,34 @@ private fun SourceCard(
                 item.snippets.forEach { snippet ->
                     Text(text = snippet, style = MaterialTheme.typography.bodyMedium)
                 }
+            } else {
+                Text(
+                    text = "尚无可引用片段。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            Text(
+                text = item.evidenceSummary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            if (item.recoveryEnabled && item.recoveryLabel != null) {
                 TextButton(
                     onClick = onReprocess,
-                    modifier = Modifier.testTag("source-action-${item.id}")
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("source-action-${item.id}")
                 ) {
-                    Text(item.actionLabel)
+                    Text(item.recoveryLabel)
+                }
+            } else {
+                item.recoveryReason?.let { reason ->
+                    Text(
+                        text = reason,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
             }
         }

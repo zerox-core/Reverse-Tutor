@@ -38,9 +38,14 @@ data class SourceCardUiItem(
     val typeLabel: String,
     val statusLabel: String,
     val statusDetail: String,
+    val statusTone: SourceStatusTone,
+    val impactMessage: String,
     val chunkCountLabel: String,
     val snippets: List<String>,
-    val actionLabel: String
+    val recoveryLabel: String?,
+    val recoveryEnabled: Boolean,
+    val recoveryReason: String?,
+    val evidenceSummary: String
 ) {
     companion object {
         fun from(sourceWithChunks: SourceWithChunks): SourceCardUiItem {
@@ -51,13 +56,30 @@ data class SourceCardUiItem(
                 title = source.title,
                 typeLabel = source.type.typeLabel,
                 statusLabel = source.parserStatus.statusLabel,
-                statusDetail = source.parserStatus.statusDetail,
+                statusDetail = source.parserStatus.statusDetail(source.type),
+                statusTone = source.parserStatus.statusTone,
+                impactMessage = source.parserStatus.statusDetail(source.type),
                 chunkCountLabel = "${chunks.size} 个片段",
                 snippets = chunks.take(2).map { it.text.toSnippet() },
-                actionLabel = if (source.parserStatus == SourceParserStatus.Failed) "重试" else "重新解析"
+                recoveryLabel = source.parserStatus.recoveryLabel,
+                recoveryEnabled = source.parserStatus.canReprocess,
+                recoveryReason = source.parserStatus.recoveryReason,
+                evidenceSummary = if (chunks.isNotEmpty()) {
+                    "可从资料库片段定位引用。"
+                } else {
+                    "资料已保留在资料库，当前没有可引用片段。"
+                }
             )
         }
     }
+}
+
+enum class SourceStatusTone {
+    Success,
+    Warning,
+    Info,
+    Disabled,
+    Error
 }
 
 private fun SourceImportResult.toDetailLines(): List<String> =
@@ -93,13 +115,49 @@ private val SourceParserStatus.statusLabel: String
         SourceParserStatus.Failed -> "失败"
     }
 
-private val SourceParserStatus.statusDetail: String
-    get() = when (this) {
+private fun SourceParserStatus.statusDetail(type: SourceType): String =
+    when (this) {
         SourceParserStatus.FullyLocal -> "已在本地解析，可用于片段和上下文引用。"
         SourceParserStatus.PartiallyLocal -> "已完成部分本地提取，使用前请查看警告。"
-        SourceParserStatus.FutureAssisted -> "资料会继续保留并可恢复，等待辅助解析或视觉能力。"
+        SourceParserStatus.FutureAssisted -> if (type == SourceType.Image) {
+            "图片资料会继续保留，等待视觉解析能力。聊天附件能力由聊天页面单独说明。"
+        } else {
+            "资料会继续保留，等待当前设备具备辅助解析能力。"
+        }
         SourceParserStatus.Unsupported -> "当前版本暂不能处理这种文件，但资料会继续保留为参考。"
         SourceParserStatus.Failed -> "资料会继续保留。解析已尝试但失败，检查文件后可重试。"
+    }
+
+private val SourceParserStatus.statusTone: SourceStatusTone
+    get() = when (this) {
+        SourceParserStatus.FullyLocal -> SourceStatusTone.Success
+        SourceParserStatus.PartiallyLocal -> SourceStatusTone.Warning
+        SourceParserStatus.FutureAssisted -> SourceStatusTone.Info
+        SourceParserStatus.Unsupported -> SourceStatusTone.Disabled
+        SourceParserStatus.Failed -> SourceStatusTone.Error
+    }
+
+private val SourceParserStatus.canReprocess: Boolean
+    get() = this in setOf(
+        SourceParserStatus.FullyLocal,
+        SourceParserStatus.PartiallyLocal,
+        SourceParserStatus.Failed
+    )
+
+private val SourceParserStatus.recoveryLabel: String?
+    get() = when (this) {
+        SourceParserStatus.Failed -> "重试"
+        SourceParserStatus.FullyLocal,
+        SourceParserStatus.PartiallyLocal -> "重新解析"
+        SourceParserStatus.FutureAssisted,
+        SourceParserStatus.Unsupported -> null
+    }
+
+private val SourceParserStatus.recoveryReason: String?
+    get() = when (this) {
+        SourceParserStatus.FutureAssisted -> "当前设备还没有对应的解析能力，资料会继续保留。"
+        SourceParserStatus.Unsupported -> "当前版本不支持这种文件，资料会继续保留。"
+        else -> null
     }
 
 private fun String.toSnippet(): String {

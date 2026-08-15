@@ -73,7 +73,8 @@ class SourcesUiStateTest {
         )
 
         assertEquals("失败", state.items.single().statusLabel)
-        assertEquals("重试", state.items.single().actionLabel)
+        assertEquals("重试", state.items.single().recoveryLabel)
+        assertTrue(state.items.single().recoveryEnabled)
     }
 
     @Test
@@ -101,7 +102,8 @@ class SourcesUiStateTest {
         assertEquals("等待能力", item.statusLabel)
         assertEquals("0 个片段", item.chunkCountLabel)
         assertTrue(item.statusDetail.contains("视觉"))
-        assertEquals("重新解析", item.actionLabel)
+        assertFalse(item.recoveryEnabled)
+        assertEquals(null, item.recoveryLabel)
     }
 
     @Test
@@ -133,6 +135,93 @@ class SourcesUiStateTest {
         state.items.forEach { item ->
             assertTrue(item.statusDetail.contains("保留"))
         }
+    }
+
+    @Test
+    fun `supported source explains available snippets and link context`() {
+        val item = SourcesUiState.from(
+            sources = listOf(
+                source("supported", "guide.md", SourceType.Markdown, SourceParserStatus.FullyLocal)
+            ),
+            lastImport = null
+        ).items.single()
+
+        assertEquals(SourceStatusTone.Success, item.statusTone)
+        assertTrue(item.impactMessage.contains("片段"))
+        assertTrue(item.recoveryEnabled)
+        assertEquals("重新解析", item.recoveryLabel)
+        assertTrue(item.evidenceSummary.contains("资料库"))
+    }
+
+    @Test
+    fun `partial source preserves file and explains partial extraction`() {
+        val item = SourcesUiState.from(
+            sources = listOf(
+                source("partial", "page.html", SourceType.Html, SourceParserStatus.PartiallyLocal)
+            ),
+            lastImport = null
+        ).items.single()
+
+        assertEquals(SourceStatusTone.Warning, item.statusTone)
+        assertTrue(item.impactMessage.contains("部分"))
+        assertTrue(item.recoveryEnabled)
+    }
+
+    @Test
+    fun `deferred source preserves file and exposes current limitation`() {
+        val item = SourcesUiState.from(
+            sources = listOf(
+                source("deferred", "book.pdf", SourceType.Pdf, SourceParserStatus.FutureAssisted)
+            ),
+            lastImport = null
+        ).items.single()
+
+        assertEquals(SourceStatusTone.Info, item.statusTone)
+        assertFalse(item.recoveryEnabled)
+        assertEquals(null, item.recoveryLabel)
+        assertTrue(item.recoveryReason.orEmpty().contains("解析能力"))
+    }
+
+    @Test
+    fun `unsupported source stays visible and does not promise parsing`() {
+        val item = SourcesUiState.from(
+            sources = listOf(
+                source("unsupported", "archive.bin", SourceType.Other, SourceParserStatus.Unsupported)
+            ),
+            lastImport = null
+        ).items.single()
+
+        assertEquals(SourceStatusTone.Disabled, item.statusTone)
+        assertFalse(item.recoveryEnabled)
+        assertEquals(null, item.recoveryLabel)
+        assertTrue(item.impactMessage.contains("保留"))
+    }
+
+    @Test
+    fun `failed source stays visible and exposes retry`() {
+        val item = SourcesUiState.from(
+            sources = listOf(
+                source("failed", "empty.txt", SourceType.Text, SourceParserStatus.Failed)
+            ),
+            lastImport = null
+        ).items.single()
+
+        assertEquals(SourceStatusTone.Error, item.statusTone)
+        assertTrue(item.recoveryEnabled)
+        assertEquals("重试", item.recoveryLabel)
+    }
+
+    @Test
+    fun `image source and chat attachment capability are represented separately`() {
+        val item = SourcesUiState.from(
+            sources = listOf(
+                source("image", "question.png", SourceType.Image, SourceParserStatus.FutureAssisted)
+            ),
+            lastImport = null
+        ).items.single()
+
+        assertTrue(item.impactMessage.contains("图片资料"))
+        assertTrue(item.impactMessage.contains("聊天附件"))
     }
 
     private fun source(
