@@ -38,14 +38,18 @@ class AppNavigationStateTest {
     }
 
     @Test
-    fun brainBackReturnsToSessions() {
+    fun contextHubKeepsChatInBackStackAndReturnsToChat() {
         val state = AppNavigationState().navigate(AppDestination.ContextHub)
 
         val transition = state.handleSystemBack()
 
+        assertEquals(
+            listOf(AppDestination.Sessions, AppDestination.Chat, AppDestination.ContextHub),
+            state.backStack
+        )
         assertEquals(BackResult.Consumed, transition.result)
-        assertEquals(AppDestination.Sessions, transition.state.current)
-        assertEquals(listOf(AppDestination.Sessions), transition.state.backStack)
+        assertEquals(AppDestination.Chat, transition.state.current)
+        assertEquals(listOf(AppDestination.Sessions, AppDestination.Chat), transition.state.backStack)
     }
 
     @Test

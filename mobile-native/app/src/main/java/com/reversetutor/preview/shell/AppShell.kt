@@ -87,6 +87,7 @@ import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
 import com.reversetutor.feature.memory.FormalWeeklySessionOption
+import com.reversetutor.feature.memory.ContextHubRoute
 import com.reversetutor.feature.memory.GlobalGraphRoute
 import com.reversetutor.feature.memory.WeeklyDashboardUiState
 import com.reversetutor.feature.memory.WeeklyDashboardUiAction
@@ -447,7 +448,7 @@ fun AppShell(
                         },
                         onOpenContextHub = {
                             navigationState =
-                                navigationState.navigate(AppDestination.SessionSettingsGraph)
+                                navigationState.navigate(AppDestination.ContextHub)
                         },
                         onOpenGlobalGraph = {
                             navigationState = navigationState.navigate(AppDestination.GlobalGraph)
@@ -1461,6 +1462,27 @@ private fun DestinationContent(
         }
         if (destination == AppDestination.Community) {
             CommunityRoute(onBack = onOpenGlobalGraph)
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.ContextHub) {
+            ContextHubRoute(
+                memoryRepository = memoryRepository,
+                graphRepository = graphRepository,
+                sessionId = activeSessionId,
+                sessionTitle = activeSessionTitle,
+                onOpenChat = onOpenChat,
+                onOpenSources = onOpenSources,
+                onOpenChatEvidence = { messageId ->
+                    pendingChatEvidenceTarget = messageId
+                    onOpenChat()
+                },
+                onOpenSourceEvidence = { sourceId ->
+                    pendingSourceEvidenceTarget = sourceId
+                    onNavigateDestination(AppDestination.SessionSettingsSources)
+                },
+                onOpenSettings = onOpenSettings,
+                onOpenGlobalGraph = onOpenGlobalGraph
+            )
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.SessionSettingsGraph) {

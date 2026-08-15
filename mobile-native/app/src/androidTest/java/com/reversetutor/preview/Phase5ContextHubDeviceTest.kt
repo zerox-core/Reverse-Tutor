@@ -2,16 +2,24 @@ package com.reversetutor.preview
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.reversetutor.core.data.DataModule
+import com.reversetutor.feature.memory.ContextHubRoute
+import com.reversetutor.preview.theme.ReverseTutorTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -19,48 +27,63 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class Phase5ContextHubDeviceTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createComposeRule()
 
-    @Test
-    fun contextHubIsReachableFromActiveChatAndBackReturnsToChat() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+    private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @Before
+    fun resetLocalData() {
         runBlocking {
             DataModule.localDataWipeRepository(context).wipeLocalData(System.currentTimeMillis())
         }
-        composeRule.activityRule.scenario.recreate()
-        waitForText("Sessions")
-
-        composeRule.onNodeWithText("New session").performClick()
-        composeRule.onNodeWithText("Exam sprint").performClick()
-        composeRule.onNodeWithText("Create").performClick()
-        composeRule.onNodeWithText("OK", useUnmergedTree = true).performClick()
-        waitForText("Exam sprint")
-
-        composeRule.onAllNodesWithText("Open").onLast().performClick()
-        waitForText("No messages yet")
-        composeRule.onNodeWithText("Open context hub").performClick()
-        waitForText("Context hub")
-
-        composeRule.onNodeWithText("Session: Exam sprint").assertIsDisplayed()
-        composeRule.onNodeWithText("Graph").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Anchors").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Notes").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Errors").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Session settings").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Graph").performScrollTo().performClick()
-        waitForText("No graph nodes yet")
-        composeRule.onNodeWithText("Native graph canvas").performScrollTo().assertIsDisplayed()
-
-        composeRule.activityRule.scenario.onActivity {
-            it.onBackPressedDispatcher.onBackPressed()
-        }
-        waitForText("No messages yet")
-        composeRule.onNodeWithText("Open context hub").assertIsDisplayed()
     }
 
-    private fun waitForText(text: String, timeoutMillis: Long = 5_000) {
-        composeRule.waitUntil(timeoutMillis) {
-            composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+    @After
+    fun cleanUpLocalData() {
+        runBlocking {
+            DataModule.localDataWipeRepository(context).wipeLocalData(System.currentTimeMillis())
         }
+    }
+
+    @Test
+    fun contextHubShowsSessionEvidenceSectionsAndReturnsToChat() {
+        var chatOpened = false
+        composeRule.setContent {
+            ReverseTutorTheme {
+                ContextHubRoute(
+                    memoryRepository = DataModule.memoryRepository(context),
+                    graphRepository = DataModule.graphRepository(context),
+                    sessionId = "session-context",
+                    sessionTitle = "函数训练",
+                    onOpenChat = { chatOpened = true },
+                    onOpenSources = {},
+                    onOpenSettings = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("学习脉络").assertIsDisplayed()
+        composeRule.onNodeWithText("当前会话：函数训练").assertIsDisplayed()
+        listOf("概览", "图谱", "锚点", "随笔", "错因", "设置").forEach { label ->
+            assertTrue(
+                composeRule.onAllNodesWithText(label, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            )
+        }
+
+        composeRule.onAllNodesWithText("图谱")
+            .filterToOne(
+                SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
+            )
+            .performScrollTo()
+            .performClick()
+        assertTrue(
+            composeRule.onAllNodesWithText("当前会话信息过少，再多聊会天吧")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        )
+        composeRule.onNodeWithText("返回聊天").performScrollTo().performClick()
+        composeRule.runOnIdle { assertTrue(chatOpened) }
     }
 }

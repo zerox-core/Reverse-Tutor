@@ -83,6 +83,7 @@ data class AppNavigationState(
             AppDestination.Chat -> listOf(AppDestination.Sessions, AppDestination.Chat)
             AppDestination.ContextHub -> listOf(
                 AppDestination.Sessions,
+                AppDestination.Chat,
                 AppDestination.ContextHub
             )
             AppDestination.WeeklyDashboard,
@@ -159,8 +160,14 @@ data class AppNavigationState(
         }
 
 
-        if (current == AppDestination.ContextHub ||
-            current == AppDestination.WeeklyDashboard ||
+        if (current == AppDestination.ContextHub) {
+            return BackTransition(
+                copy(backStack = listOf(AppDestination.Sessions, AppDestination.Chat)),
+                BackResult.Consumed
+            )
+        }
+
+        if (current == AppDestination.WeeklyDashboard ||
             current == AppDestination.GlobalGraph ||
             current == AppDestination.Community ||
             current == AppDestination.Challenge
