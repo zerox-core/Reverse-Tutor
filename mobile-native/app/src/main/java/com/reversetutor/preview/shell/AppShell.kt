@@ -133,6 +133,13 @@ internal fun shouldShowActivityAnnouncement(
     !firstLaunchImportPromptVisible &&
     challengeSessionPrefill == null
 
+internal fun shouldClearChatEvidenceTarget(destination: AppDestination): Boolean =
+    destination != AppDestination.Chat
+
+internal fun shouldClearSourceEvidenceTarget(destination: AppDestination): Boolean =
+    destination != AppDestination.Sources &&
+        destination != AppDestination.SessionSettingsSources
+
 internal sealed interface ChallengeNewSessionCloseDecision {
     data object Sessions : ChallengeNewSessionCloseDecision
     data class RestoreChallenge(
@@ -921,10 +928,10 @@ private fun DestinationContent(
     LaunchedEffect(destination) {
         // Evidence targets are one-time: clear them once the consuming screen is left
         // so a stale id cannot re-highlight on a later visit. Navigation is unchanged.
-        if (destination != AppDestination.Chat) {
+        if (shouldClearChatEvidenceTarget(destination)) {
             pendingChatEvidenceTarget = null
         }
-        if (destination != AppDestination.Sources) {
+        if (shouldClearSourceEvidenceTarget(destination)) {
             pendingSourceEvidenceTarget = null
         }
     }

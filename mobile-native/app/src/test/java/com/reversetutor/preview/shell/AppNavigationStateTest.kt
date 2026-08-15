@@ -8,6 +8,21 @@ import org.junit.Test
 
 class AppNavigationStateTest {
     @Test
+    fun sourceEvidenceTargetSurvivesUntilItsActualConsumerScreen() {
+        assertFalse(shouldClearSourceEvidenceTarget(AppDestination.Sources))
+        assertFalse(shouldClearSourceEvidenceTarget(AppDestination.SessionSettingsSources))
+        assertTrue(shouldClearSourceEvidenceTarget(AppDestination.ContextHub))
+        assertTrue(shouldClearSourceEvidenceTarget(AppDestination.Chat))
+    }
+
+    @Test
+    fun chatEvidenceTargetSurvivesOnlyOnChat() {
+        assertFalse(shouldClearChatEvidenceTarget(AppDestination.Chat))
+        assertTrue(shouldClearChatEvidenceTarget(AppDestination.ContextHub))
+        assertTrue(shouldClearChatEvidenceTarget(AppDestination.SessionSettingsSources))
+    }
+
+    @Test
     fun chatQueryAndSourceManagementBackReturnToChat() {
         listOf(
             AppDestination.ChatReferences,
