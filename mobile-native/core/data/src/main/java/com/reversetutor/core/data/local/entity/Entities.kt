@@ -9,6 +9,7 @@ import com.reversetutor.core.model.MessageQuote
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.Anchor
 import com.reversetutor.core.model.ErrorLog
+import com.reversetutor.core.model.ErrorLogOrigin
 import com.reversetutor.core.model.GraphEdge
 import com.reversetutor.core.model.GraphNode
 import com.reversetutor.core.model.GraphNodeKind
@@ -131,7 +132,10 @@ data class NoteEntity(
     val sourceMessageId: String? = null
 )
 
-@Entity(tableName = "error_logs", indices = [Index("spaceId")])
+@Entity(
+    tableName = "error_logs",
+    indices = [Index("spaceId"), Index(value = ["spaceId", "origin", "createdAtEpochMillis"])]
+)
 data class ErrorLogEntity(
     @PrimaryKey val id: String,
     val spaceId: String,
@@ -139,7 +143,9 @@ data class ErrorLogEntity(
     val detail: String,
     val createdAtEpochMillis: Long,
     val sourceMessageId: String? = null,
-    val resolved: Boolean = false
+    val resolved: Boolean = false,
+    val origin: String = ErrorLogOrigin.Learning.name,
+    val code: String? = null
 )
 
 @Entity(tableName = "memory_items", indices = [Index("spaceId")])
@@ -440,7 +446,9 @@ fun ErrorLog.toEntity(): ErrorLogEntity = ErrorLogEntity(
     detail = detail,
     createdAtEpochMillis = createdAtEpochMillis,
     sourceMessageId = sourceMessageId,
-    resolved = resolved
+    resolved = resolved,
+    origin = origin.name,
+    code = code
 )
 
 fun ErrorLogEntity.toDomain(): ErrorLog = ErrorLog(
@@ -450,7 +458,9 @@ fun ErrorLogEntity.toDomain(): ErrorLog = ErrorLog(
     detail = detail,
     createdAtEpochMillis = createdAtEpochMillis,
     sourceMessageId = sourceMessageId,
-    resolved = resolved
+    resolved = resolved,
+    origin = runCatching { ErrorLogOrigin.valueOf(origin) }.getOrDefault(ErrorLogOrigin.Learning),
+    code = code
 )
 
 fun MemoryItem.toEntity(): MemoryItemEntity = MemoryItemEntity(

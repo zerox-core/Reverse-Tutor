@@ -33,12 +33,12 @@ import org.junit.Test
 
 class SchemaPolicyTest {
     @Test
-    fun databaseSchemaExportsVersionFourWithCompleteMigrationChain() {
-        assertEquals(4, DatabaseSchema.version)
+    fun databaseSchemaExportsVersionFiveWithCompleteMigrationChain() {
+        assertEquals(5, DatabaseSchema.version)
         assertTrue(DatabaseSchema.exportSchema)
-        assertEquals(3, DatabaseSchema.migrations.size)
-        assertEquals(listOf(1, 2, 3), DatabaseSchema.migrations.map { it.startVersion })
-        assertEquals(listOf(2, 3, 4), DatabaseSchema.migrations.map { it.endVersion })
+        assertEquals(4, DatabaseSchema.migrations.size)
+        assertEquals(listOf(1, 2, 3, 4), DatabaseSchema.migrations.map { it.startVersion })
+        assertEquals(listOf(2, 3, 4, 5), DatabaseSchema.migrations.map { it.endVersion })
     }
 
     @Test

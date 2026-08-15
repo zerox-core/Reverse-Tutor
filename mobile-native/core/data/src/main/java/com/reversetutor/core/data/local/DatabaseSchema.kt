@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 4
+    const val version = 5
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -41,7 +41,25 @@ object DatabaseSchema {
         }
     }
 
-    val migrations: Array<Migration> = arrayOf(migration1To2, migration2To3, migration3To4)
+    val migration4To5: Migration = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE error_logs ADD COLUMN origin TEXT NOT NULL DEFAULT 'Learning'"
+            )
+            db.execSQL("ALTER TABLE error_logs ADD COLUMN code TEXT")
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_error_logs_spaceId_origin_createdAtEpochMillis " +
+                    "ON error_logs(spaceId, origin, createdAtEpochMillis)"
+            )
+        }
+    }
+
+    val migrations: Array<Migration> = arrayOf(
+        migration1To2,
+        migration2To3,
+        migration3To4,
+        migration4To5
+    )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
         hybridTableSql.forEach(db::execSQL)

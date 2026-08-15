@@ -50,6 +50,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,6 +116,7 @@ fun ChatRoute(
     onAttachmentConsumed: () -> Unit = {},
     onAttachmentNoticeConsumed: () -> Unit = {},
     onBackgroundGenerationQueued: (String) -> Unit = {},
+    onProviderGenerationFailed: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
@@ -141,14 +143,19 @@ fun ChatRoute(
     var clientRequestId by remember(sessionId) { mutableStateOf(restoredDraft.clientRequestId) }
     var composer by remember(sessionId) { mutableStateOf(ChatComposerState.from(restoredDraft)) }
     var generation by remember(sessionId) { mutableStateOf<ChatGenerationUiState>(ChatGenerationUiState.Idle) }
+    val latestProviderGenerationFailed by rememberUpdatedState(onProviderGenerationFailed)
     val directGenerationCoordinator = remember(sessionId, chatGenerationRepository) {
         ChatGenerationCoordinator(
             executor = ChatGenerationExecutor { input, nowEpochMillis, isTokenCurrent ->
-                chatGenerationRepository?.generateReply(
+                val outcome = chatGenerationRepository?.generateReply(
                     input = input,
                     nowEpochMillis = nowEpochMillis,
                     isTokenCurrent = isTokenCurrent
                 ) ?: ChatGenerationOutcome.NoModelConfigured
+                if (outcome is ChatGenerationOutcome.ProviderFailed) {
+                    latestProviderGenerationFailed(input.userMessageId)
+                }
+                outcome
             }
         )
     }

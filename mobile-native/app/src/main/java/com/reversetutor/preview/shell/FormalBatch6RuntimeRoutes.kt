@@ -26,6 +26,7 @@ import com.reversetutor.core.data.migration.NativeImportStatus
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.domain.ReleaseMetadata
 import com.reversetutor.core.model.SourceParserStatus
+import com.reversetutor.core.model.ErrorLogOrigin
 import com.reversetutor.core.model.SyncConflict
 import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TutorSession
@@ -74,6 +75,7 @@ import com.reversetutor.feature.settings.FormalTransferStatus
 import com.reversetutor.feature.settings.FormalUpdateScreen
 import com.reversetutor.feature.settings.FormalUpdateUiState
 import com.reversetutor.preview.wiring.HybridAppGraph
+import com.reversetutor.preview.background.GenerationDiagnosticPolicy
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.text.SimpleDateFormat
@@ -86,6 +88,7 @@ import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.launch
 
 private const val DefaultSpaceId = SessionRepository.defaultSpaceId
+private const val GenerationDiagnosticEventPrefix = "generation-diagnostic-"
 
 private enum class ImportExportPage { Overview, ImportPreview, SessionSelection }
 private enum class DiagnosticsPage { Overview, Report }
@@ -325,7 +328,10 @@ fun FormalDiagnosticsRoute(
 
     fun refresh(addEvent: FormalDiagnosticEvent? = null) {
         scope.launch {
-            if (addEvent != null) events = listOf(addEvent) + events
+            val generatedEvents = coordinator.generationDiagnosticEvents()
+            events = listOfNotNull(addEvent) +
+                events.filterNot { it.id.startsWith(GenerationDiagnosticEventPrefix) } +
+                generatedEvents
             state = coordinator.diagnostics(context, showWipeConfirmation = false)
         }
     }
@@ -352,7 +358,7 @@ fun FormalDiagnosticsRoute(
                 statusLabel = "完成",
                 warning = false
             )
-        )
+        ) + coordinator.generationDiagnosticEvents()
     }
 
     when (page) {
@@ -385,6 +391,8 @@ fun FormalDiagnosticsRoute(
             onGenerateReport = {
                 scope.launch {
                     state = coordinator.diagnostics(context, showWipeConfirmation = false)
+                    events = events.filterNot { it.id.startsWith(GenerationDiagnosticEventPrefix) } +
+                        coordinator.generationDiagnosticEvents()
                     report = FormalBatch6RuntimeStateFactory.diagnosticReport(state, events)
                     page = DiagnosticsPage.Report
                 }
@@ -430,6 +438,8 @@ fun FormalDiagnosticsRoute(
                 onRegenerate = {
                     scope.launch {
                         state = coordinator.diagnostics(context, showWipeConfirmation = false)
+                        events = events.filterNot { it.id.startsWith(GenerationDiagnosticEventPrefix) } +
+                            coordinator.generationDiagnosticEvents()
                         report = FormalBatch6RuntimeStateFactory.diagnosticReport(state, events)
                     }
                 },
@@ -723,6 +733,23 @@ private class FormalBatch6RuntimeCoordinator(
             showWipeConfirmation = showWipeConfirmation
         )
     }
+
+    suspend fun generationDiagnosticEvents(): List<FormalDiagnosticEvent> = runCatching {
+        graph.memoryRepository.snapshot().errors
+            .asSequence()
+            .filter { it.origin == ErrorLogOrigin.Generation }
+            .map { error ->
+                val record = GenerationDiagnosticPolicy.forCode(error.code)
+                FormalDiagnosticEvent(
+                    id = "$GenerationDiagnosticEventPrefix${error.id}",
+                    title = record.title,
+                    subtitle = "${formatDateTime(error.createdAtEpochMillis)} · ${record.detail}",
+                    statusLabel = "需关注",
+                    warning = true
+                )
+            }
+            .toList()
+    }.getOrDefault(emptyList())
 
     suspend fun tokenSnapshot(period: FormalTokenPeriod, query: String): FormalTokenRuntimeSnapshot {
         val sessions = graph.sessionRepository.listSessions().filterNot { it.archived }

@@ -45,5 +45,12 @@ data class ErrorLog(
     val detail: String,
     val createdAtEpochMillis: Long,
     val sourceMessageId: String? = null,
-    val resolved: Boolean = false
+    val resolved: Boolean = false,
+    val origin: ErrorLogOrigin = ErrorLogOrigin.Learning,
+    val code: String? = null
 )
+
+enum class ErrorLogOrigin {
+    Learning,
+    Generation
+}

@@ -64,7 +64,9 @@ import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sources.SourceImportInput
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.preferences.AppPreferences
+import com.reversetutor.core.data.memory.ErrorLogInput
 import com.reversetutor.core.llm.LlmProviderPreset
+import com.reversetutor.core.model.ErrorLogOrigin
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.SearchTarget
 import com.reversetutor.core.model.SearchTargetType
@@ -96,6 +98,7 @@ import com.reversetutor.feature.settings.FirstLaunchImportPromptUiState
 import com.reversetutor.feature.settings.FormalLlmConfigurationScreen
 import com.reversetutor.feature.settings.LlmProfileSettingsUiState
 import com.reversetutor.feature.settings.FormalSettingsScreen
+import com.reversetutor.preview.background.GenerationDiagnosticPolicy
 import com.reversetutor.preview.background.BackgroundGenerationWorker
 import com.reversetutor.preview.theme.ReverseTutorDesign
 import com.reversetutor.preview.theme.ReverseTutorStatusTone
@@ -1298,6 +1301,22 @@ private fun DestinationContent(
                 },
                 onBackgroundGenerationQueued = { jobId ->
                     BackgroundGenerationWorker.enqueue(context, jobId)
+                },
+                onProviderGenerationFailed = { sourceMessageId ->
+                    val diagnostic = GenerationDiagnosticPolicy.providerFailure()
+                    scope.launch {
+                        memoryRepository.logError(
+                            input = ErrorLogInput(
+                                title = diagnostic.title,
+                                detail = diagnostic.detail,
+                                sourceMessageId = sourceMessageId
+                            ),
+                            nowEpochMillis = System.currentTimeMillis(),
+                            errorId = "diagnostic-provider-$sourceMessageId",
+                            origin = ErrorLogOrigin.Generation,
+                            code = diagnostic.code
+                        )
+                    }
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,

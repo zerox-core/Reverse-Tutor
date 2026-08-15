@@ -178,6 +178,12 @@ interface MemoryDao {
 
     @Query("UPDATE error_logs SET resolved = :resolved WHERE id = :id")
     suspend fun setErrorResolved(id: String, resolved: Boolean): Int
+
+    @Query("DELETE FROM error_logs WHERE id = :id")
+    suspend fun deleteError(id: String): Int
+
+    @Query("DELETE FROM memory_items WHERE id = :id")
+    suspend fun deleteMemoryItem(id: String): Int
 }
 
 @Dao

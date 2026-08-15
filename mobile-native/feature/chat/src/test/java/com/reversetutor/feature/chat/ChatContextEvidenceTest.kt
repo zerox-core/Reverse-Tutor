@@ -178,6 +178,8 @@ private class FakeMemoryDao : MemoryDao {
     override suspend fun deleteNote(id: String): Int = 0
     override suspend fun deleteAnchor(id: String): Int = 0
     override suspend fun setErrorResolved(id: String, resolved: Boolean): Int = 0
+    override suspend fun deleteError(id: String): Int = if (errors.remove(id) == null) 0 else 1
+    override suspend fun deleteMemoryItem(id: String): Int = if (memoryItems.remove(id) == null) 0 else 1
 }
 
 private class FakeSourceDao : SourceDao {

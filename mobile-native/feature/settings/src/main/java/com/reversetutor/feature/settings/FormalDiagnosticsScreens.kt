@@ -485,7 +485,11 @@ private fun DiagnosticEventRow(event: FormalDiagnosticEvent) {
             Text(event.title, color = colors.ink, style = type.style(9f, 14f, FontWeight.Medium))
             Text(event.subtitle, color = colors.faint, style = type.style(8f, 12f))
         }
-        Text(event.statusLabel, color = colors.success, style = type.style(8f, 13f))
+        Text(
+            event.statusLabel,
+            color = if (event.warning) colors.warning else colors.success,
+            style = type.style(8f, 13f)
+        )
     }
 }
 

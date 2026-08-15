@@ -11,6 +11,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
+import com.reversetutor.core.data.memory.ErrorLogInput
+import com.reversetutor.core.model.ErrorLogOrigin
 import kotlinx.coroutines.flow.first
 
 class BackgroundGenerationWorker(
@@ -19,8 +21,10 @@ class BackgroundGenerationWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val jobId = inputData.getString(InputJobId) ?: return Result.failure()
-        val outcome = DataModule.backgroundGenerationRepository(applicationContext)
+        val repository = DataModule.backgroundGenerationRepository(applicationContext)
+        val outcome = repository
             .runGenerationJob(jobId, System.currentTimeMillis())
+        recordDiagnosticIfNeeded(jobId, outcome, repository.getJob(jobId)?.userMessageId)
         notifyIfNeeded(jobId, outcome)
         return when (outcome) {
             is BackgroundGenerationOutcome.Completed,
@@ -29,6 +33,25 @@ class BackgroundGenerationWorker(
             is BackgroundGenerationOutcome.Failed,
             BackgroundGenerationOutcome.MissingJob -> Result.failure()
         }
+    }
+
+    private suspend fun recordDiagnosticIfNeeded(
+        jobId: String,
+        outcome: BackgroundGenerationOutcome,
+        sourceMessageId: String?
+    ) {
+        val diagnostic = GenerationDiagnosticPolicy.forBackgroundOutcome(outcome) ?: return
+        DataModule.memoryRepository(applicationContext).logError(
+            input = ErrorLogInput(
+                title = diagnostic.title,
+                detail = diagnostic.detail,
+                sourceMessageId = sourceMessageId
+            ),
+            nowEpochMillis = System.currentTimeMillis(),
+            errorId = "diagnostic-background-$jobId",
+            origin = ErrorLogOrigin.Generation,
+            code = diagnostic.code
+        )
     }
 
     private suspend fun notifyIfNeeded(
