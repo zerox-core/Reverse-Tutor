@@ -9,6 +9,7 @@ import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.runtime.getValue
@@ -24,6 +25,7 @@ import com.reversetutor.core.model.GraphEdge
 import com.reversetutor.core.model.GraphNode
 import com.reversetutor.core.model.GraphNodeKind
 import com.reversetutor.feature.memory.ContextHubRoute
+import com.reversetutor.feature.memory.GraphNodeReviewAction
 import com.reversetutor.feature.memory.KnowledgeGraphPanel
 import com.reversetutor.feature.memory.KnowledgeGraphUiState
 import com.reversetutor.preview.theme.ReverseTutorTheme
@@ -224,6 +226,43 @@ class Phase5GraphDeviceTest {
                 .fetchSemanticsNodes()
                 .isEmpty()
         )
+    }
+
+    @Test
+    fun archiveAndHideRequireConfirmationWhileApproveIsImmediate() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(graphNode("review-node", "审核节点")),
+            edges = emptyList()
+        )
+        val calls = mutableListOf<GraphNodeReviewAction>()
+        composeRule.setContent {
+            var selected by remember { mutableStateOf<String?>("review-node") }
+            ReverseTutorTheme {
+                KnowledgeGraphPanel(
+                    state = state.withSelection(selected),
+                    onSelectedNodeChange = { selected = it },
+                    onNodeReviewAction = { _, action -> calls += action }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("graph-review-archive").performClick()
+        composeRule.onNodeWithTag("graph-review-confirm-archive").assertIsDisplayed()
+        composeRule.onNodeWithText("节点：审核节点", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-review-cancel").performClick()
+        composeRule.runOnIdle { assertTrue(calls.isEmpty()) }
+
+        composeRule.onNodeWithTag("graph-review-hide").performClick()
+        composeRule.onNodeWithTag("graph-review-confirm-hide").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(GraphNodeReviewAction.Hide), calls) }
+
+        composeRule.onNodeWithTag("graph-review-approve").performClick()
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(GraphNodeReviewAction.Hide, GraphNodeReviewAction.Approve),
+                calls
+            )
+        }
     }
 
     private fun graphNode(id: String, label: String): GraphNode = GraphNode(

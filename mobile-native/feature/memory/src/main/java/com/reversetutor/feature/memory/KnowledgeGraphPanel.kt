@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
@@ -80,6 +81,11 @@ data class GraphViewportState(
     val semanticMode: GraphSemanticMode = GraphSemanticMode.OverviewCircles
 )
 
+private data class PendingGraphReviewAction(
+    val node: GraphLayoutNode,
+    val action: GraphNodeReviewAction
+)
+
 @Composable
 fun KnowledgeGraphPanel(
     state: KnowledgeGraphUiState,
@@ -95,6 +101,7 @@ fun KnowledgeGraphPanel(
     modifier: Modifier = Modifier
 ) {
     var showLockedNodes by remember(state.scope) { mutableStateOf(false) }
+    var pendingReviewAction by remember { mutableStateOf<PendingGraphReviewAction?>(null) }
     val presentation = state.presentation()
     var showNodeList by remember(state.scope, state.status, state.allNodes) {
         mutableStateOf(state.status in setOf(GraphRenderStatus.Invalid, GraphRenderStatus.Large))
@@ -185,11 +192,27 @@ fun KnowledgeGraphPanel(
                     relations = state.relatedEdges(selectedNode.id),
                     editable = editable,
                     onNodeLabelSave = onNodeLabelSave,
-                    onNodeReviewAction = onNodeReviewAction,
+                    onNodeReviewAction = { node, action ->
+                        if (action.requiresConfirmation) {
+                            pendingReviewAction = PendingGraphReviewAction(node, action)
+                        } else {
+                            onNodeReviewAction(node, action)
+                        }
+                    },
                     onOpenChatEvidence = onOpenChatEvidence,
                     onOpenSourceEvidence = onOpenSourceEvidence,
                     onClearSelection = { onSelectedNodeChange(null) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                )
+            }
+            pendingReviewAction?.let { pending ->
+                GraphReviewConfirmationDialog(
+                    pending = pending,
+                    onDismiss = { pendingReviewAction = null },
+                    onConfirm = {
+                        pendingReviewAction = null
+                        onNodeReviewAction(pending.node, pending.action)
+                    }
                 )
             }
             Spacer(Modifier.height(2.dp))
@@ -1080,6 +1103,46 @@ private fun EmptyGraphPanel(state: KnowledgeGraphUiState) {
 }
 
 @Composable
+private fun GraphReviewConfirmationDialog(
+    pending: PendingGraphReviewAction,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val impact = when (pending.action) {
+        GraphNodeReviewAction.Archive -> "该节点会退出活跃学习路径，但不会删除数据。"
+        GraphNodeReviewAction.Hide -> "该节点会从默认图谱视图移出，可从未解锁节点入口恢复。"
+        else -> error("Only destructive review actions may open this dialog.")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("确认${pending.action.label}") },
+        text = {
+            Text("节点：${pending.node.label}\n$impact")
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("graph-review-cancel")
+            ) {
+                Text("取消")
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("graph-review-confirm-${pending.action.name.lowercase()}")
+            ) {
+                Text("确认${pending.action.label}")
+            }
+        }
+    )
+}
+
+@Composable
 private fun GraphNodeDetail(
     node: GraphLayoutNode,
     relations: List<GraphLayoutEdge>,
@@ -1159,7 +1222,12 @@ private fun GraphNodeDetail(
                         Text("保存节点")
                     }
                     node.reviewActions.forEach { action ->
-                        TextButton(onClick = { onNodeReviewAction(node, action) }) {
+                        TextButton(
+                            onClick = { onNodeReviewAction(node, action) },
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("graph-review-${action.name.lowercase()}")
+                        ) {
                             Text(action.label)
                         }
                     }

@@ -97,6 +97,15 @@ class KnowledgeGraphUiStateTest {
     }
 
     @Test
+    fun `only archive and hide review actions require confirmation`() {
+        assertTrue(GraphNodeReviewAction.Archive.requiresConfirmation)
+        assertTrue(GraphNodeReviewAction.Hide.requiresConfirmation)
+        assertFalse(GraphNodeReviewAction.MarkNeedsReview.requiresConfirmation)
+        assertFalse(GraphNodeReviewAction.Approve.requiresConfirmation)
+        assertFalse(GraphNodeReviewAction.Restore.requiresConfirmation)
+    }
+
+    @Test
     fun graphNodesResolveMemoryEvidenceForReviewCardsAndJumpTargets() {
         val state = KnowledgeGraphUiState.from(
             nodes = listOf(

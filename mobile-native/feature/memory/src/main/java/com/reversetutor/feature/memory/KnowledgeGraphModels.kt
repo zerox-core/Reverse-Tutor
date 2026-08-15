@@ -52,6 +52,12 @@ enum class GraphNodeReviewAction(
     Hide("隐藏", GraphNodeStatus.Hidden)
 }
 
+val GraphNodeReviewAction.requiresConfirmation: Boolean
+    get() = this in setOf(
+        GraphNodeReviewAction.Archive,
+        GraphNodeReviewAction.Hide
+    )
+
 data class GraphPhysicsPolicy(
     val anchorStrength: Float = 0.052f,
     val springStrength: Float = 0.020f,
