@@ -31,6 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.data.graph.GraphRepository
@@ -142,6 +143,8 @@ fun ContextHubRoute(
         },
         onOpenGraphChatEvidence = onOpenChatEvidence,
         onOpenGraphSourceEvidence = onOpenSourceEvidence,
+        onOpenChatEvidence = onOpenChatEvidence,
+        onOpenSourceEvidence = onOpenSourceEvidence,
         modifier = modifier
     )
 }
@@ -249,6 +252,8 @@ fun ContextHubScreen(
     onGraphNodeReviewAction: (GraphLayoutNode, GraphNodeReviewAction) -> Unit = { _, _ -> },
     onOpenGraphChatEvidence: (String) -> Unit = {},
     onOpenGraphSourceEvidence: (String) -> Unit = {},
+    onOpenChatEvidence: (String) -> Unit = {},
+    onOpenSourceEvidence: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedSection by remember(state.sessionId) {
@@ -319,23 +324,41 @@ fun ContextHubScreen(
                 }
             )
         } else {
-            ContextHubSectionPanel(state = selectedState)
+            ContextHubSectionPanel(
+                state = selectedState,
+                onOpenChatEvidence = onOpenChatEvidence,
+                onOpenSourceEvidence = onOpenSourceEvidence
+            )
         }
         Spacer(modifier = Modifier.height(18.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = onOpenChat) {
+            Button(
+                onClick = onOpenChat,
+                modifier = Modifier
+                    .testTag("context-return-chat")
+                    .heightIn(min = 48.dp)
+            ) {
                 Text("返回聊天")
             }
-            TextButton(onClick = onOpenGlobalGraph) {
+            TextButton(
+                onClick = onOpenGlobalGraph,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
                 Text("全局图谱")
             }
-            TextButton(onClick = onOpenSources) {
+            TextButton(
+                onClick = onOpenSources,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
                 Text("资料")
             }
-            TextButton(onClick = onOpenSettings) {
+            TextButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
                 Text("设置")
             }
         }
@@ -397,9 +420,16 @@ private fun ContextHubOverview(lines: List<String>) {
 }
 
 @Composable
-private fun ContextHubSectionPanel(state: ContextHubSectionState) {
+@OptIn(ExperimentalLayoutApi::class)
+private fun ContextHubSectionPanel(
+    state: ContextHubSectionState,
+    onOpenChatEvidence: (String) -> Unit,
+    onOpenSourceEvidence: (String) -> Unit
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("context-section-${state.section.name.lowercase()}"),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(8.dp)
@@ -441,6 +471,13 @@ private fun ContextHubSectionPanel(state: ContextHubSectionState) {
                 }
             }
             Text(text = state.body, style = MaterialTheme.typography.bodyMedium)
+            if (state.evidenceItems.isNotEmpty()) {
+                ContextHubEvidenceList(
+                    items = state.evidenceItems,
+                    onOpenChatEvidence = onOpenChatEvidence,
+                    onOpenSourceEvidence = onOpenSourceEvidence
+                )
+            }
             Text(
                 text = "下一步",
                 color = MaterialTheme.colorScheme.onSurface,
@@ -449,6 +486,95 @@ private fun ContextHubSectionPanel(state: ContextHubSectionState) {
             )
             state.nextActions.forEach { action ->
                 Text(text = action, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun ContextHubEvidenceList(
+    items: List<ContextHubEvidenceItem>,
+    onOpenChatEvidence: (String) -> Unit,
+    onOpenSourceEvidence: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.forEach { item ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = item.title,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        item.statusLabel?.let { label ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier
+                                        .heightIn(min = 32.dp)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+                    if (item.body.isNotBlank()) {
+                        Text(
+                            text = item.body,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    if (item.actions.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item.actions.forEach { action ->
+                                val isChat =
+                                    action.destination == ContextEvidenceDestination.Chat
+                                val tag = if (isChat) {
+                                    "context-evidence-chat-${action.targetId}"
+                                } else {
+                                    "context-evidence-source-${action.targetId}"
+                                }
+                                TextButton(
+                                    onClick = {
+                                        if (isChat) {
+                                            onOpenChatEvidence(action.targetId)
+                                        } else {
+                                            onOpenSourceEvidence(action.targetId)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .testTag(tag)
+                                        .heightIn(min = 48.dp)
+                                ) {
+                                    Text(action.label)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

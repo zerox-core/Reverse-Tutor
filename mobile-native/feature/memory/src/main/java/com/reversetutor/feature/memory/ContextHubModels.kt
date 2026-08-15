@@ -11,6 +11,37 @@ enum class ContextHubSection(
     SessionSettings("设置")
 }
 
+/**
+ * Presentation-only destination for an evidence action. UI-only: does not alter any
+ * domain enum, protocol value or persisted field. Maps to the existing
+ * ContextHubRoute callbacks onOpenChatEvidence / onOpenSourceEvidence.
+ */
+enum class ContextEvidenceDestination { Chat, Source }
+
+/**
+ * A single user-facing evidence action. [targetId] is copied verbatim from the
+ * owning entry's sourceMessageId / sourceId; the UI never fabricates an id.
+ */
+data class ContextEvidenceAction(
+    val label: String,
+    val destination: ContextEvidenceDestination,
+    val targetId: String
+)
+
+/**
+ * Presentation-only view of one anchor / note / error entry rendered in a Context
+ * Hub section. [actions] is derived solely from the entry's existing
+ * sourceMessageId / sourceId; when both are absent it is empty so no dead evidence
+ * button can appear.
+ */
+data class ContextHubEvidenceItem(
+    val id: String,
+    val title: String,
+    val body: String,
+    val statusLabel: String? = null,
+    val actions: List<ContextEvidenceAction> = emptyList()
+)
+
 data class ContextHubUiState(
     val sessionId: String?,
     val sessionTitle: String,
@@ -108,7 +139,8 @@ data class ContextHubSectionState(
     val statusLabel: String,
     val title: String,
     val body: String,
-    val nextActions: List<String>
+    val nextActions: List<String>,
+    val evidenceItems: List<ContextHubEvidenceItem> = emptyList()
 )
 
 private fun ContextHubSection.toState(): ContextHubSectionState =
@@ -180,11 +212,8 @@ private fun ContextHubSection.toState(
                     statusLabel = snapshot.anchors.countLabel("个锚点"),
                     title = "锚点",
                     body = snapshot.anchors.joinToString("\n\n") { it.toBodyLine() },
-                    nextActions = listOf(
-                        "打开关联资料证据",
-                        "打开关联聊天证据",
-                        "后续把锚点接入图谱"
-                    )
+                    nextActions = listOf("后续把锚点接入图谱"),
+                    evidenceItems = snapshot.anchors.map { it.toEvidenceItem() }
                 )
             }
         }
@@ -197,10 +226,8 @@ private fun ContextHubSection.toState(
                     statusLabel = snapshot.notes.countLabel("篇随笔"),
                     title = "随笔",
                     body = snapshot.notes.joinToString("\n\n") { it.toBodyLine() },
-                    nextActions = listOf(
-                        "打开关联聊天证据",
-                        "后续可从记忆动作编辑或删除"
-                    )
+                    nextActions = listOf("后续可从记忆动作编辑或删除"),
+                    evidenceItems = snapshot.notes.map { it.toEvidenceItem() }
                 )
             }
         }
@@ -214,11 +241,8 @@ private fun ContextHubSection.toState(
                     statusLabel = "$openCount 个未解决",
                     title = "错因",
                     body = snapshot.errors.joinToString("\n\n") { it.toBodyLine() },
-                    nextActions = listOf(
-                        "打开关联聊天证据",
-                        "补充纠正证据后解决",
-                        "后续接入诊断复盘"
-                    )
+                    nextActions = listOf("补充纠正证据后解决", "后续接入诊断复盘"),
+                    evidenceItems = snapshot.errors.map { it.toEvidenceItem() }
                 )
             }
         }
@@ -235,6 +259,62 @@ private fun KnowledgeGraphUiState.nextActions(): List<String> =
     }
 
 private fun List<ContextMemoryEntry>.countLabel(unit: String): String = "$size $unit"
+
+/**
+ * Builds the presentation-only evidence actions for a memory entry. A Chat action is
+ * exposed only when [ContextMemoryEntry.sourceMessageId] is non-null, and a Source
+ * action only when [ContextMemoryEntry.sourceId] is non-null. The ids are passed
+ * through verbatim; none are invented by the UI.
+ */
+private fun ContextMemoryEntry.toEvidenceItem(): ContextHubEvidenceItem =
+    ContextHubEvidenceItem(
+        id = id,
+        title = title,
+        body = body,
+        statusLabel = null,
+        actions = buildList {
+            sourceMessageId?.let {
+                add(
+                    ContextEvidenceAction(
+                        label = "打开关联聊天证据",
+                        destination = ContextEvidenceDestination.Chat,
+                        targetId = it
+                    )
+                )
+            }
+            sourceId?.let {
+                add(
+                    ContextEvidenceAction(
+                        label = "打开关联资料证据",
+                        destination = ContextEvidenceDestination.Source,
+                        targetId = it
+                    )
+                )
+            }
+        }
+    )
+
+/**
+ * Builds the presentation-only evidence action for an error entry. Only
+ * [ContextErrorEntry.sourceMessageId] can carry a chat evidence link; errors never
+ * expose a source action because the domain model has no sourceId field.
+ */
+private fun ContextErrorEntry.toEvidenceItem(): ContextHubEvidenceItem =
+    ContextHubEvidenceItem(
+        id = id,
+        title = title,
+        body = detail,
+        statusLabel = if (resolved) "已解决" else "未解决",
+        actions = sourceMessageId?.let {
+            listOf(
+                ContextEvidenceAction(
+                    label = "打开关联聊天证据",
+                    destination = ContextEvidenceDestination.Chat,
+                    targetId = it
+                )
+            )
+        } ?: emptyList()
+    )
 
 private fun ContextMemoryEntry.toBodyLine(): String =
     buildString {

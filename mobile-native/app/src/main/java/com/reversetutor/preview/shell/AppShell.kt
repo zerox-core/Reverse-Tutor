@@ -918,6 +918,17 @@ private fun DestinationContent(
     var pendingChatEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingGraphEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingSourceEvidenceTarget by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(destination) {
+        // Evidence targets are one-time: clear them once the consuming screen is left
+        // so a stale id cannot re-highlight on a later visit. Navigation is unchanged.
+        if (destination != AppDestination.Chat) {
+            pendingChatEvidenceTarget = null
+        }
+        if (destination != AppDestination.Sources) {
+            pendingSourceEvidenceTarget = null
+        }
+    }
+
     var chatReferenceQueryState by remember(activeSessionId) { mutableStateOf(ChatReferenceQueryState()) }
     var cameraPermissionState by remember(context) {
         mutableStateOf(
