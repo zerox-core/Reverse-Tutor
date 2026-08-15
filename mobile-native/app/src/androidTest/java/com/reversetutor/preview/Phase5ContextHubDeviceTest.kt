@@ -134,6 +134,11 @@ class Phase5ContextHubDeviceTest {
             .performScrollTo()
             .performClick()
 
+        composeRule.onNodeWithTag("context-evidence-availability-note-evidence")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("可打开关联证据。")
+            .assertIsDisplayed()
         composeRule.onNodeWithTag("context-evidence-chat-msg-evidence")
             .performScrollTo()
             .assertIsDisplayed()
@@ -210,6 +215,11 @@ class Phase5ContextHubDeviceTest {
             .performScrollTo()
             .performClick()
 
+        composeRule.onNodeWithTag("context-evidence-availability-note-bare")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("当前没有可跳转的证据。")
+            .assertIsDisplayed()
         assertTrue(
             composeRule.onAllNodesWithText("打开关联聊天证据", useUnmergedTree = true)
                 .fetchSemanticsNodes()

@@ -322,6 +322,31 @@ class ContextHubModelsTest {
     }
 
     @Test
+    fun `entry without evidence explains that no jump is available`() {
+        val state = ContextHubUiState.fromMemorySnapshot(
+            sessionId = "session-1",
+            sessionTitle = "Algebra sprint",
+            snapshot = ContextMemorySnapshot(
+                notes = listOf(
+                    ContextMemoryEntry(
+                        id = "note-bare",
+                        title = "Freeform note",
+                        body = "A reminder without linked evidence."
+                    )
+                )
+            )
+        )
+
+        val item = state.sections
+            .first { it.section == ContextHubSection.Notes }
+            .evidenceItems
+            .single()
+
+        assertTrue(item.actions.isEmpty())
+        assertEquals("当前没有可跳转的证据。", item.evidenceAvailabilityLabel)
+    }
+
+    @Test
     fun `no active session keeps only safe recovery actions`() {
         val state = ContextHubUiState.fromActiveSession(
             sessionId = null,

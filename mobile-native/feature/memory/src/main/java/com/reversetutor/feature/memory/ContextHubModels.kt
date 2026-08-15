@@ -39,7 +39,8 @@ data class ContextHubEvidenceItem(
     val title: String,
     val body: String,
     val statusLabel: String? = null,
-    val actions: List<ContextEvidenceAction> = emptyList()
+    val actions: List<ContextEvidenceAction> = emptyList(),
+    val evidenceAvailabilityLabel: String = ""
 )
 
 data class ContextHubUiState(
@@ -266,55 +267,64 @@ private fun List<ContextMemoryEntry>.countLabel(unit: String): String = "$size $
  * action only when [ContextMemoryEntry.sourceId] is non-null. The ids are passed
  * through verbatim; none are invented by the UI.
  */
-private fun ContextMemoryEntry.toEvidenceItem(): ContextHubEvidenceItem =
-    ContextHubEvidenceItem(
-        id = id,
-        title = title,
-        body = body,
-        statusLabel = null,
-        actions = buildList {
-            sourceMessageId?.let {
-                add(
-                    ContextEvidenceAction(
-                        label = "打开关联聊天证据",
-                        destination = ContextEvidenceDestination.Chat,
-                        targetId = it
-                    )
-                )
-            }
-            sourceId?.let {
-                add(
-                    ContextEvidenceAction(
-                        label = "打开关联资料证据",
-                        destination = ContextEvidenceDestination.Source,
-                        targetId = it
-                    )
-                )
-            }
-        }
-    )
-
-/**
- * Builds the presentation-only evidence action for an error entry. Only
- * [ContextErrorEntry.sourceMessageId] can carry a chat evidence link; errors never
- * expose a source action because the domain model has no sourceId field.
- */
-private fun ContextErrorEntry.toEvidenceItem(): ContextHubEvidenceItem =
-    ContextHubEvidenceItem(
-        id = id,
-        title = title,
-        body = detail,
-        statusLabel = if (resolved) "已解决" else "未解决",
-        actions = sourceMessageId?.let {
-            listOf(
+private fun ContextMemoryEntry.toEvidenceItem(): ContextHubEvidenceItem {
+    val actions = buildList {
+        sourceMessageId?.let {
+            add(
                 ContextEvidenceAction(
                     label = "打开关联聊天证据",
                     destination = ContextEvidenceDestination.Chat,
                     targetId = it
                 )
             )
-        } ?: emptyList()
+        }
+        sourceId?.let {
+            add(
+                ContextEvidenceAction(
+                    label = "打开关联资料证据",
+                    destination = ContextEvidenceDestination.Source,
+                    targetId = it
+                )
+            )
+        }
+    }
+    return ContextHubEvidenceItem(
+        id = id,
+        title = title,
+        body = body,
+        statusLabel = null,
+        actions = actions,
+        evidenceAvailabilityLabel = actions.evidenceAvailabilityLabel()
     )
+}
+
+/**
+ * Builds the presentation-only evidence action for an error entry. Only
+ * [ContextErrorEntry.sourceMessageId] can carry a chat evidence link; errors never
+ * expose a source action because the domain model has no sourceId field.
+ */
+private fun ContextErrorEntry.toEvidenceItem(): ContextHubEvidenceItem {
+    val actions = sourceMessageId?.let {
+        listOf(
+            ContextEvidenceAction(
+                label = "打开关联聊天证据",
+                destination = ContextEvidenceDestination.Chat,
+                targetId = it
+            )
+        )
+    } ?: emptyList()
+    return ContextHubEvidenceItem(
+        id = id,
+        title = title,
+        body = detail,
+        statusLabel = if (resolved) "已解决" else "未解决",
+        actions = actions,
+        evidenceAvailabilityLabel = actions.evidenceAvailabilityLabel()
+    )
+}
+
+private fun List<ContextEvidenceAction>.evidenceAvailabilityLabel(): String =
+    if (isEmpty()) "当前没有可跳转的证据。" else "可打开关联证据。"
 
 private fun ContextMemoryEntry.toBodyLine(): String =
     buildString {

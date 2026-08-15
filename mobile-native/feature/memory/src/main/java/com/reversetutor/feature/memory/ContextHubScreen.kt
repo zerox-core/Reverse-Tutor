@@ -548,6 +548,16 @@ private fun ContextHubEvidenceList(
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
+                    if (item.evidenceAvailabilityLabel.isNotBlank()) {
+                        Text(
+                            text = item.evidenceAvailabilityLabel,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.testTag(
+                                "context-evidence-availability-${item.id}"
+                            )
+                        )
+                    }
                     if (item.actions.isNotEmpty()) {
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
