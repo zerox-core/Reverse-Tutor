@@ -312,6 +312,7 @@ private fun SourceCard(
                         text = item.statusLabel,
                         modifier = Modifier
                             .heightIn(min = 32.dp)
+                            .testTag("source-status-${item.id}")
                             .padding(horizontal = 10.dp, vertical = 7.dp),
                         style = MaterialTheme.typography.labelMedium
                     )

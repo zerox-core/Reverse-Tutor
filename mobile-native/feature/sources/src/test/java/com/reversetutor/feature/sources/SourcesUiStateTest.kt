@@ -165,6 +165,7 @@ class SourcesUiStateTest {
         assertEquals(SourceStatusTone.Warning, item.statusTone)
         assertTrue(item.impactMessage.contains("部分"))
         assertTrue(item.recoveryEnabled)
+        assertEquals("重新解析", item.recoveryLabel)
     }
 
     @Test
@@ -194,6 +195,7 @@ class SourcesUiStateTest {
         assertEquals(SourceStatusTone.Disabled, item.statusTone)
         assertFalse(item.recoveryEnabled)
         assertEquals(null, item.recoveryLabel)
+        assertTrue(item.recoveryReason.orEmpty().contains("不支持"))
         assertTrue(item.impactMessage.contains("保留"))
     }
 
