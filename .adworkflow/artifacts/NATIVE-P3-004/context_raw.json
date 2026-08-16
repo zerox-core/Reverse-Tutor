@@ -1,0 +1,105 @@
+{
+  "schema": "ADworkflo.context_raw.v1",
+  "task_id": "NATIVE-P3-004",
+  "source": "manual-context-gathering",
+  "matched_files": [
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/test/java/com/reversetutor/preview/background/BackgroundGenerationNotificationPolicyTest.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": true
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/test/java/com/reversetutor/preview/background/GenerationDiagnosticPolicyTest.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": true
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/test/java/com/reversetutor/preview/background/BackgroundGenerationWorkerTest.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": true
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/test/java/com/reversetutor/preview/background/BackgroundGenerationStartupRecoveryTest.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": true
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/background/BackgroundGenerationRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": true
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationNotificationPolicy.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationNotifier.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/background/GenerationDiagnosticPolicy.kt",
+      "language": "kotlin",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "tasks/change-requests/p3-002-background-generation-notification.md",
+      "language": "markdown",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "tasks/change-requests/p3-003-diagnostic-error-records.md",
+      "language": "markdown",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 4,
+      "path": "tasks/native-legacy-coverage-registry.md",
+      "language": "markdown",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "tasks/native-backend-protocol-data-contract-freeze.md",
+      "language": "markdown",
+      "loc": 0,
+      "is_test": false
+    },
+    {
+      "score": 3,
+      "path": "tests/test_error_log.py",
+      "language": "python",
+      "loc": 0,
+      "is_test": true
+    },
+    {
+      "score": 3,
+      "path": "tests/test_android_background_llm.py",
+      "language": "python",
+      "loc": 0,
+      "is_test": true
+    }
+  ]
+}

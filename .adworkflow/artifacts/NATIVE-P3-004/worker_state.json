@@ -1,0 +1,38 @@
+{
+  "task_id": "NATIVE-P3-004",
+  "status": "verified",
+  "done": [
+    "Read all task specs, freeze boundaries, change requests (P3-002, P3-003), and coverage registry.",
+    "Read all P3 source files: BackgroundGenerationNotificationPolicy.kt, BackgroundGenerationNotifier.kt, GenerationDiagnosticPolicy.kt.",
+    "Read all P3 test files: BackgroundGenerationNotificationPolicyTest.kt (10 tests), GenerationDiagnosticPolicyTest.kt (5 tests), BackgroundGenerationWorkerTest.kt (1 test), BackgroundGenerationStartupRecoveryTest.kt (2 tests), BackgroundGenerationRepositoryTest.kt (6 tests).",
+    "Verified notification text safety: all notification copy uses generic strings ('后台生成完成'/'后台生成失败') with no user message text, session titles, model names, provider identifiers, URLs, error originals, API keys or secrets.",
+    "Verified diagnostic text safety: fixed codes (provider_request_failed, background_generation_failed, generation_failed), generic detail strings, controlledBackgroundFailures set excludes NoModel/VisionInput/BlankPrompt from diagnostic mapping, no Authorization/sk-/https:// in any diagnostic record.",
+    "Ran :core:data:testDebugUnitTest — BUILD SUCCESSFUL (includes BackgroundGenerationRepositoryTest 6 tests covering queued/running/completed/failed/cancelled/discarded states, session isolation via archived-session discard, startup recovery, stale-token rejection).",
+    "Ran :app:testDebugUnitTest — BUILD SUCCESSFUL (includes BackgroundGenerationNotificationPolicyTest 10 tests, GenerationDiagnosticPolicyTest 5 tests, BackgroundGenerationWorkerTest 1 test, BackgroundGenerationStartupRecoveryTest 2 tests).",
+    "Ran :feature:settings:testDebugUnitTest — BUILD SUCCESSFUL.",
+    "Ran :core:llm:testDebugUnitTest — BUILD SUCCESSFUL.",
+    "Ran :feature:chat:testDebugUnitTest — BUILD SUCCESSFUL.",
+    "Ran :feature:memory:testDebugUnitTest — BUILD SUCCESSFUL.",
+    "Ran :app:assembleDebug — BUILD SUCCESSFUL (debug APK compiles).",
+    "Ran :app:lint — BUILD SUCCESSFUL (no lint errors).",
+    "Ran Python regression on 9 test files (81 tests total, all passed): test_error_log.py (9), test_android_background_llm.py (6), test_llm.py (26), test_settings_strategy.py (6), test_db.py (8), test_engine.py (10), test_adapters.py (7), test_server.py (9). Ran the full suite: 510 passed, 28 skipped in 333.28s.",
+    "Added BackgroundGenerationOutcomeHandler in the app layer and delegated BackgroundGenerationWorker post-processing to it; production Result mapping is unchanged.",
+    "Ran emulator-5554 instrumentation: BackgroundGenerationSessionDeletionDeviceTest, BackgroundGenerationStartupRecoveryDeviceTest, BackgroundGenerationNotificationDeviceTest, and FormalDiagnosticsDeviceTest — OK (4 tests). FormalDiagnosticsDeviceTest injects a failed outcome through the production handler and verifies ErrorLog → Diagnostics Route → clipboard only contains fixed safe text.",
+    "Confirmed no frozen-layer modifications. Current changes are app-layer handler/worker/test code plus validation artifacts and coverage-registry evidence.",
+    "Updated coverage registry LEG-016/017/023/028/029/030/044 rows with JVM and device evidence. Notification delivery and the deterministic failed-outcome diagnostic loop are verified on emulator-5554; external Provider connectivity remains later P6 scope, not a device-test blocker.",
+    "Created 4 ADworkflo artifacts: context_raw.json, context_manifest.json, worker_state.json, verification_result.json.",
+    "Wrote human-readable validation report: tasks/native-p3-phase3-validation.md."
+  ],
+  "changed_files": [
+    ".adworkflow/artifacts/NATIVE-P3-004/context_raw.json",
+    ".adworkflow/artifacts/NATIVE-P3-004/context_manifest.json",
+    ".adworkflow/artifacts/NATIVE-P3-004/worker_state.json",
+    ".adworkflow/artifacts/NATIVE-P3-004/verification_result.json",
+    "tasks/native-p3-phase3-validation.md",
+    "tasks/native-legacy-coverage-registry.md",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationOutcomeHandler.kt",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationWorker.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/background/BackgroundGenerationNotificationDeviceTest.kt",
+    "mobile-native/app/src/androidTest/java/com/reversetutor/preview/FormalDiagnosticsDeviceTest.kt"
+  ]
+}
