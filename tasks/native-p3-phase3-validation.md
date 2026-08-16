@@ -1,9 +1,9 @@
 # NATIVE-P3-004 · 第 3 阶段后台生成与可靠性集成验证报告
 
-**任务 ID**: NATIVE-P3-004  
-**验证日期**: 2026-08-16  
-**分支**: Android  
-**验证模式**: 受控修复 + 集成验证  
+**任务 ID**: NATIVE-P3-004
+**验证日期**: 2026-08-16
+**分支**: Android
+**验证模式**: 受控修复 + 集成验证
 **结论**: JVM 层与后台设备验证通过；失败诊断的确定性设备闭环已消除原阻塞
 
 ---
@@ -107,15 +107,15 @@
 
 ### 5.1 设备通知实际投递
 
-**状态**: 已通过  
-**证据**: `BackgroundGenerationNotificationDeviceTest` 在 `emulator-5554` 上直接调用生产 `AndroidBackgroundGenerationNotifier`，检查完成/失败两条通知的 active notification、channel、标题/正文和敏感字段排除；Worker 的开关/权限/终态决策由 `BackgroundGenerationNotificationPolicyTest` 覆盖。  
+**状态**: 已通过
+**证据**: `BackgroundGenerationNotificationDeviceTest` 在 `emulator-5554` 上直接调用生产 `AndroidBackgroundGenerationNotifier`，检查完成/失败两条通知的 active notification、channel、标题/正文和敏感字段排除；Worker 的开关/权限/终态决策由 `BackgroundGenerationNotificationPolicyTest` 覆盖。
 **范围限制**: 本测试不替代真实后台 Provider 执行；通知决策和投递已由策略 JVM 测试与设备测试共同覆盖。
 
 ### 5.2 设备诊断失败路径验证
 
-**状态**: 已通过（确定性设备闭环）  
-**实现**: 新增 app 层 `BackgroundGenerationOutcomeHandler`，由 `BackgroundGenerationWorker` 在持久化任务返回 outcome 后调用。它只将 `GenerationDiagnosticPolicy` 给出的固定安全记录写入现有 `MemoryRepository`，并保留原有通知策略。  
-**证据**: `FormalDiagnosticsDeviceTest` 在 `emulator-5554` 直接调用该生产处理器并注入 `BackgroundGenerationOutcome.Failed("Provider timeout with Authorization sk-test")`；测试确认写入 Generation `ErrorLog`（`background_generation_failed`），再验证真实诊断 Route 和剪贴板仅呈现固定安全文本，且不包含 `Authorization`、`sk-` 或 `https://`。4 项设备测试总结果为 `OK (4 tests)`。  
+**状态**: 已通过（确定性设备闭环）
+**实现**: 新增 app 层 `BackgroundGenerationOutcomeHandler`，由 `BackgroundGenerationWorker` 在持久化任务返回 outcome 后调用。它只将 `GenerationDiagnosticPolicy` 给出的固定安全记录写入现有 `MemoryRepository`，并保留原有通知策略。
+**证据**: `FormalDiagnosticsDeviceTest` 在 `emulator-5554` 直接调用该生产处理器并注入 `BackgroundGenerationOutcome.Failed("Provider timeout with Authorization sk-test")`；测试确认写入 Generation `ErrorLog`（`background_generation_failed`），再验证真实诊断 Route 和剪贴板仅呈现固定安全文本，且不包含 `Authorization`、`sk-` 或 `https://`。4 项设备测试总结果为 `OK (4 tests)`。
 **范围限制**: 未调用真实 Provider、URL 或 API Key；WorkManager 对 outcome 的 Result 映射保持不变。这是对外部网络执行的刻意隔离，不构成确定性设备验证阻塞。
 
 ## 6. 覆盖率注册表更新
