@@ -6,6 +6,7 @@ import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.llm.ChatGenerationRepository
+import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 import com.reversetutor.core.data.llm.LlmProfileRepository
 import com.reversetutor.core.data.memory.MemoryRepository
 import com.reversetutor.core.data.message.MessageRepository
@@ -166,14 +167,15 @@ class HybridAppGraph private constructor(
                 identityProvider = { httpRuntime?.authSessionManager?.identity() }
             )
 
+            val previewRuntime = FakeLlmGenerationRuntime()
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,
                 llmProfileRepository = DataModule.llmProfileRepository(appContext),
-                chatGenerationRepository = DataModule.chatGenerationRepository(appContext),
+                chatGenerationRepository = DataModule.chatGenerationRepository(appContext, runtime = previewRuntime),
                 backgroundGenerationRepository =
-                    DataModule.backgroundGenerationRepository(appContext),
+                    DataModule.backgroundGenerationRepository(appContext, runtime = previewRuntime),
                 sourceRepository = DataModule.sourceRepository(appContext),
                 memoryRepository = DataModule.memoryRepository(appContext),
                 graphRepository = DataModule.graphRepository(appContext),
