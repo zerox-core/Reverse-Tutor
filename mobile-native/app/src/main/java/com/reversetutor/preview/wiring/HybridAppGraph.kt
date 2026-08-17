@@ -65,6 +65,8 @@ data class HybridFrontendFactories(
     val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory
 )
 
+enum class HybridLlmRuntimeMode { Fake, Production }
+
 enum class HybridOnlineMode { LocalOnly, ContractMock, Http }
 
 sealed interface HybridOnlineConfiguration {
@@ -131,7 +133,8 @@ class HybridAppGraph private constructor(
     companion object {
         fun create(
             context: Context,
-            onlineConfiguration: HybridOnlineConfiguration = HybridOnlineConfiguration.LocalOnly
+            onlineConfiguration: HybridOnlineConfiguration = HybridOnlineConfiguration.LocalOnly,
+            llmRuntimeMode: HybridLlmRuntimeMode = HybridLlmRuntimeMode.Fake
         ): HybridAppGraph {
             val appContext = context.applicationContext
             val sessionRepository = DataModule.sessionRepository(appContext)
@@ -168,14 +171,25 @@ class HybridAppGraph private constructor(
             )
 
             val previewRuntime = FakeLlmGenerationRuntime()
+            val chatGenerationRepository = when (llmRuntimeMode) {
+                HybridLlmRuntimeMode.Fake ->
+                    DataModule.chatGenerationRepository(appContext, runtime = previewRuntime)
+                HybridLlmRuntimeMode.Production ->
+                    DataModule.chatGenerationRepository(appContext)
+            }
+            val backgroundGenerationRepository = when (llmRuntimeMode) {
+                HybridLlmRuntimeMode.Fake ->
+                    DataModule.backgroundGenerationRepository(appContext, runtime = previewRuntime)
+                HybridLlmRuntimeMode.Production ->
+                    DataModule.backgroundGenerationRepository(appContext)
+            }
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,
                 llmProfileRepository = DataModule.llmProfileRepository(appContext),
-                chatGenerationRepository = DataModule.chatGenerationRepository(appContext, runtime = previewRuntime),
-                backgroundGenerationRepository =
-                    DataModule.backgroundGenerationRepository(appContext, runtime = previewRuntime),
+                chatGenerationRepository = chatGenerationRepository,
+                backgroundGenerationRepository = backgroundGenerationRepository,
                 sourceRepository = DataModule.sourceRepository(appContext),
                 memoryRepository = DataModule.memoryRepository(appContext),
                 graphRepository = DataModule.graphRepository(appContext),

@@ -45,6 +45,9 @@ internal data class DebugLlmBootstrapConfig(
     }
 }
 
+internal fun DebugLlmBootstrapConfig.runtimeMode(): HybridLlmRuntimeMode =
+    if (isComplete) HybridLlmRuntimeMode.Production else HybridLlmRuntimeMode.Fake
+
 internal data class DebugLlmProfileSeed(
     val id: String,
     val name: String,
@@ -94,13 +97,9 @@ internal class DebugLlmProfileBootstrapper(
     suspend fun ensureProfiles(config: DebugLlmBootstrapConfig) {
         if (!config.isComplete) return
 
-        val existingIds = store.profileIds()
-        var createdDefault = false
+        val createdDefault = DebugLlmBootstrapConfig.DefaultProfileId !in store.profileIds()
         config.profiles().forEach { seed ->
-            if (seed.id !in existingIds) {
-                store.save(seed, config, nowEpochMillis())
-                createdDefault = createdDefault || seed.isDefault
-            }
+            store.save(seed, config, nowEpochMillis())
         }
         if (createdDefault) {
             store.activate(DebugLlmBootstrapConfig.DefaultProfileId, nowEpochMillis())

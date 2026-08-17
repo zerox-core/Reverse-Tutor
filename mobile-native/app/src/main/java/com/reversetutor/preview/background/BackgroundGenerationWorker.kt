@@ -11,6 +11,11 @@ import androidx.work.WorkerParameters
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
+import com.reversetutor.core.llm.LlmGenerationRuntime
+import com.reversetutor.preview.BuildConfig
+import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
+import com.reversetutor.preview.wiring.HybridLlmRuntimeMode
+import com.reversetutor.preview.wiring.runtimeMode
 
 class BackgroundGenerationWorker(
     appContext: Context,
@@ -18,13 +23,16 @@ class BackgroundGenerationWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val jobId = inputData.getString(InputJobId) ?: return Result.failure()
-        // Keep WorkManager execution on the same preview runtime as HybridAppGraph.
-        // Constructing the repository without an explicit runtime falls back to the
-        // production HTTP runtime, which makes local/device preview jobs diverge from
-        // foreground generation and can attempt a real provider call.
         val repository = DataModule.backgroundGenerationRepository(
             applicationContext,
-            runtime = FakeLlmGenerationRuntime()
+            runtime = backgroundGenerationRuntimeFor(
+                DebugLlmBootstrapConfig.from(
+                    apiKey = BuildConfig.DEBUG_LLM_API_KEY,
+                    baseUrl = BuildConfig.DEBUG_LLM_BASE_URL,
+                    defaultModel = BuildConfig.DEBUG_LLM_DEFAULT_MODEL,
+                    fallbackModels = BuildConfig.DEBUG_LLM_FALLBACK_MODELS
+                ).runtimeMode()
+            )
         )
         val outcome = repository
             .runGenerationJob(jobId, System.currentTimeMillis())
@@ -65,4 +73,11 @@ class BackgroundGenerationWorker(
                 )
         }
     }
+}
+
+internal fun backgroundGenerationRuntimeFor(
+    mode: HybridLlmRuntimeMode
+): LlmGenerationRuntime? = when (mode) {
+    HybridLlmRuntimeMode.Fake -> FakeLlmGenerationRuntime()
+    HybridLlmRuntimeMode.Production -> null
 }

@@ -7,7 +7,17 @@ import org.junit.Test
 
 class DebugLlmProfileBootstrapperTest {
     @Test
-    fun completeConfigurationCreatesDefaultAndFallbackProfilesOnce() = runTest {
+    fun completeDebugConfigurationUsesProductionRuntime() {
+        assertEquals(HybridLlmRuntimeMode.Production, config().runtimeMode())
+    }
+
+    @Test
+    fun incompleteDebugConfigurationUsesFakeRuntime() {
+        assertEquals(HybridLlmRuntimeMode.Fake, config(apiKey = "").runtimeMode())
+    }
+
+    @Test
+    fun completeConfigurationCreatesQwenFirstProfilesAndReconcilesLaterLaunches() = runTest {
         val store = FakeDebugLlmProfileStore()
         val bootstrapper = DebugLlmProfileBootstrapper(store, nowEpochMillis = { 100L })
         val config = config()
@@ -18,17 +28,15 @@ class DebugLlmProfileBootstrapperTest {
             listOf(
                 "debug-llm-default",
                 "debug-llm-fallback-1",
-                "debug-llm-fallback-2",
-                "debug-llm-fallback-3"
+                "debug-llm-fallback-2"
             ),
             store.saved.map { it.id }
         )
         assertEquals(
             listOf(
-                "deepseek-v4-flash-0731",
+                "qwen3.7-flash",
                 "qwen3.6-flash",
-                "deepseek-v4-flash",
-                "qwen3.7-flash"
+                "deepseek-v4-flash"
             ),
             store.saved.map { it.model }
         )
@@ -36,7 +44,7 @@ class DebugLlmProfileBootstrapperTest {
 
         bootstrapper.ensureProfiles(config)
 
-        assertEquals(4, store.saved.size)
+        assertEquals(6, store.saved.size)
         assertEquals(listOf("debug-llm-default"), store.activated)
     }
 
@@ -56,13 +64,13 @@ class DebugLlmProfileBootstrapperTest {
     private fun config(
         apiKey: String = "test-key",
         baseUrl: String = "https://example.test/v1",
-        defaultModel: String = "deepseek-v4-flash-0731"
+        defaultModel: String = "qwen3.7-flash"
     ): DebugLlmBootstrapConfig =
         DebugLlmBootstrapConfig.from(
             apiKey = apiKey,
             baseUrl = baseUrl,
             defaultModel = defaultModel,
-            fallbackModels = "qwen3.6-flash,deepseek-v4-flash,qwen3.7-flash"
+            fallbackModels = "qwen3.6-flash,deepseek-v4-flash"
         )
 }
 

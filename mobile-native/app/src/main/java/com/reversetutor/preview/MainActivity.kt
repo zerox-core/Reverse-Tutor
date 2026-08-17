@@ -22,17 +22,28 @@ import com.reversetutor.preview.wiring.DebugLlmProfileBootstrapper
 import com.reversetutor.preview.wiring.HybridAppGraph
 import com.reversetutor.preview.wiring.HybridOnlineConfiguration
 import com.reversetutor.preview.wiring.RepositoryDebugLlmProfileStore
+import com.reversetutor.preview.wiring.runtimeMode
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var receivedImportPayload by mutableStateOf<ReceivedImportPayload?>(null)
+
+    private val debugLlmConfig by lazy {
+        DebugLlmBootstrapConfig.from(
+            apiKey = BuildConfig.DEBUG_LLM_API_KEY,
+            baseUrl = BuildConfig.DEBUG_LLM_BASE_URL,
+            defaultModel = BuildConfig.DEBUG_LLM_DEFAULT_MODEL,
+            fallbackModels = BuildConfig.DEBUG_LLM_FALLBACK_MODELS
+        )
+    }
 
     private val appGraph by lazy {
         HybridAppGraph.create(
             context = this,
             onlineConfiguration = HybridOnlineConfiguration.fromBaseUrl(
                 BuildConfig.ONLINE_API_BASE_URL
-            )
+            ),
+            llmRuntimeMode = debugLlmConfig.runtimeMode()
         )
     }
 
@@ -43,14 +54,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             DebugLlmProfileBootstrapper(
                 store = RepositoryDebugLlmProfileStore(appGraph.llmProfileRepository)
-            ).ensureProfiles(
-                DebugLlmBootstrapConfig.from(
-                    apiKey = BuildConfig.DEBUG_LLM_API_KEY,
-                    baseUrl = BuildConfig.DEBUG_LLM_BASE_URL,
-                    defaultModel = BuildConfig.DEBUG_LLM_DEFAULT_MODEL,
-                    fallbackModels = BuildConfig.DEBUG_LLM_FALLBACK_MODELS
-                )
-            )
+            ).ensureProfiles(debugLlmConfig)
         }
         lifecycleScope.launch {
             val backgroundGenerationRepository = appGraph.backgroundGenerationRepository
