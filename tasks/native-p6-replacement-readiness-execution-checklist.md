@@ -218,7 +218,7 @@ adb -s $MainDeviceSerial shell am instrument -w -r `
 - Reference: `F:\xw\reverse-tutor\tasks\native-p6-003-device-regression-matrix.md`
 - Reference: `F:\xw\reverse-tutor\tasks\native-p6-004-migration-guide.md`
 
-决策表必须逐条列出 28 个 P0 LEG：
+决策表必须逐条列出 31 个 P0 LEG（3 条 verified、28 条 blocked）：
 
 - [ ] `verified`：有代码、JVM、设备、契约和回归证据。
 - [ ] `waived`：写明豁免原因、产品影响、补偿措施和用户批准记录。

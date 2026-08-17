@@ -44,50 +44,48 @@
 
 | 设备 | ADB Serial | 状态 | Android 版本 |
 |---|---|---|---|
-| 模拟器 | `emulator-5554` | **未运行** | Pixel_8_Pro AVD（未启动） |
-| 主力真机 | 未提供 | **未连接** | — |
+| 模拟器 | `emulator-5554` | 已连接 | Android 16（API 36），Pixel_8_Pro AVD |
+| 主力真机 | `9CN0223C27017326` | 已连接 | Android 12（API 31），BRA_AL00 |
 
 ---
 
 ## 2. 模拟器必测组
 
-设备固定：`emulator-5554`。本轮模拟器未运行，全部标记为 `not_run`。
+设备固定：`emulator-5554`。本轮使用本节列出的 APK 重新安装并执行。
 
-历史设备证据（2026-08-17 P6-001 补测，`emulator-5554` Pixel_8_Pro AVD）：
+| 测试类 | 测试数 | 本轮状态 | 备注 |
+|---|---:|---|---|
+| `Phase2CoreLoopDeviceTest` | 3 | pass | 核心闭环、会话隔离与返回导航。 |
+| `Phase5ContextHubDeviceTest` | 4 | pass | Context Hub、证据跳转与返回 Chat。 |
+| `Phase5GraphDeviceTest` | 5 | pass | Canvas、状态、选择、编辑及 Archive/Hide 确认。 |
+| `Phase5MemoryDeviceTest` | 1 | pass | Chat Note → Context Hub 持久化。 |
+| `Phase5SourcesDeviceTest` | 1 | pass | 五种解析状态及恢复动作。 |
+| `Phase4ImportExportDeviceTest` | 1 | fail | `resetLocalData()` 等待英文文案 `Sessions` 超时；现行应用使用中文导航文案，测试脚本需按当前 UI 契约修订后重测。未修改产品文案或放宽等待。 |
+| `BackgroundGenerationSessionDeletionDeviceTest` | 1 | pass | 删除会话不写入延迟消息。 |
+| `BackgroundGenerationStartupRecoveryDeviceTest` | 1 | pass | 重启恢复并重新交给 WorkManager。 |
+| `BackgroundGenerationNotificationDeviceTest` | 1 | pass | 完成/失败通知与安全文案。 |
+| `FormalDiagnosticsDeviceTest` | 1 | pass | 诊断记录和剪贴板脱敏。 |
 
-| 测试类 | 测试数 | 历史结果 | 本轮状态 | 备注 |
-|---|---|---|---|---|
-| `Phase2CoreLoopDeviceTest` | 3 | 3 passed, 0 failed | not_run | 核心闭环（会话创建→发送→Fake Runtime 回复→重启持久化→会话隔离→返回导航） |
-| `Phase5ContextHubDeviceTest` | 4 | 4 passed, 0 failed | not_run | Context Hub 入口、证据跳转、返回 Chat |
-| `Phase5GraphDeviceTest` | 5 | 5 passed, 0 failed | not_run | Canvas、空/大/错状态、选择、编辑、Archive/Hide |
-| `Phase5MemoryDeviceTest` | 1 | 1 passed, 0 failed | not_run | Chat Note → Context Hub 持久化 |
-| `Phase5SourcesDeviceTest` | 1 | 1 passed, 0 failed | not_run | FullyLocal/PartiallyLocal/Failed/FutureAssisted/Unsupported |
-| `Phase4ImportExportDeviceTest` | — | 无历史证据 | not_run | 导入 dry-run/append/overwrite/new-space/导出/wipe |
-| `BackgroundGenerationSessionDeletionDeviceTest` | — | 无历史证据 | not_run | 删除会话不写消息 |
-| `BackgroundGenerationStartupRecoveryDeviceTest` | — | 无历史证据 | not_run | 重启恢复与重新调度 |
-| `BackgroundGenerationNotificationDeviceTest` | — | 无历史证据 | not_run | 完成/失败通知和安全文案 |
-| `FormalDiagnosticsDeviceTest` | — | 无历史证据 | not_run | ErrorLog、诊断页和剪贴板脱敏 |
-
-历史汇总：14 tests passed, 0 failures（2026-08-17 P6-001 补测）。
+本轮汇总：19 tests run，18 passed，1 failed。
 
 ---
 
 ## 3. 主力真机必测组
 
-主力真机 serial 未提供，全部标记为 `not_run`。
+主力真机：`9CN0223C27017326`（BRA_AL00，Android 12）。已重新安装本节 APK 并执行规定的五个自动化测试类。
 
 | 测试项 | 状态 | 备注 |
 |---|---|---|
-| 核心闭环（Phase2CoreLoopDeviceTest） | not_run | 需主力真机 serial |
-| Context Hub | not_run | 需主力真机 serial |
-| Graph | not_run | 需主力真机 serial |
-| Memory | not_run | 需主力真机 serial |
-| Sources | not_run | 需主力真机 serial |
-| 深色模式（手工） | not_run | 需主力真机 |
-| 大字号/动态字体（手工） | not_run | 需主力真机 |
-| IME 键盘遮挡（手工） | not_run | 需主力真机 |
-| 48dp 触摸目标（手工） | not_run | 需主力真机 |
-| TalkBack 人工听测 | not_run | 只在主力真机进行；记录焦点顺序，不用 Compose 语义树冒充语音证据 |
+| 核心闭环（Phase2CoreLoopDeviceTest） | pass | 3 tests passed。 |
+| Context Hub | pass | 4 tests passed。 |
+| Graph | fail | 5 tests run，2 passed、3 failed；失败可稳定复现，见 §4.5。 |
+| Memory | pass | 1 test passed。 |
+| Sources | pass | 1 test passed。 |
+| 深色模式（手工） | not_run | 自动化不能替代人工视觉检查。 |
+| 大字号/动态字体（手工） | not_run | 自动化不能替代人工视觉检查。 |
+| IME 键盘遮挡（手工） | not_run | 自动化不能替代真实输入法检查。 |
+| 48dp 触摸目标（手工） | not_run | 尚未人工点检。 |
+| TalkBack 人工听测 | not_run | 只在主力真机进行；记录焦点顺序，不用 Compose 语义树冒充语音证据。 |
 
 ---
 
@@ -101,16 +99,16 @@
 
 | 测试类 | emulator-5554 | 主力真机 | 其他设备 |
 |---|---|---|---|
-| Phase2CoreLoopDeviceTest | not_run | not_run | not_available |
-| Phase5ContextHubDeviceTest | not_run | not_run | not_available |
-| Phase5GraphDeviceTest | not_run | not_run | not_available |
-| Phase5MemoryDeviceTest | not_run | not_run | not_available |
-| Phase5SourcesDeviceTest | not_run | not_run | not_available |
-| Phase4ImportExportDeviceTest | not_run | not_run | not_available |
-| BackgroundGenerationSessionDeletionDeviceTest | not_run | not_run | not_available |
-| BackgroundGenerationStartupRecoveryDeviceTest | not_run | not_run | not_available |
-| BackgroundGenerationNotificationDeviceTest | not_run | not_run | not_available |
-| FormalDiagnosticsDeviceTest | not_run | not_run | not_available |
+| Phase2CoreLoopDeviceTest | pass | pass | not_available |
+| Phase5ContextHubDeviceTest | pass | pass | not_available |
+| Phase5GraphDeviceTest | pass | fail | not_available |
+| Phase5MemoryDeviceTest | pass | pass | not_available |
+| Phase5SourcesDeviceTest | pass | pass | not_available |
+| Phase4ImportExportDeviceTest | fail | not_run | not_available |
+| BackgroundGenerationSessionDeletionDeviceTest | pass | not_run | not_available |
+| BackgroundGenerationStartupRecoveryDeviceTest | pass | not_run | not_available |
+| BackgroundGenerationNotificationDeviceTest | pass | not_run | not_available |
+| FormalDiagnosticsDeviceTest | pass | not_run | not_available |
 | 深色模式（手工） | not_run | not_run | not_available |
 | 大字号（手工） | not_run | not_run | not_available |
 | IME 键盘（手工） | not_run | not_run | not_available |
@@ -122,9 +120,9 @@
 | 统计项 | emulator-5554 | 主力真机 | 其他设备 |
 |---|---|---|---|
 | 测试总数 | 15 | 15 | 15 |
-| pass | 0 | 0 | 0 |
-| fail | 0 | 0 | 0 |
-| not_run | 15 | 15 | 0 |
+| pass | 9 | 4 | 0 |
+| fail | 1 | 1 | 0 |
+| not_run | 5 | 10 | 0 |
 | not_available | 0 | 0 | 15 |
 
 ### 4.4 记录规则
@@ -134,14 +132,20 @@
 - 每个失败附日志、测试方法、复现步骤和是否影响生产代码的判断
 - 设备测试失败不得通过删断言、放宽等待或改产品文案消除
 
-### 4.5 历史证据说明
+### 4.5 本轮失败记录（2026-08-17）
 
-2026-08-17 P6-001 补测在 `emulator-5554` 上执行了 5 个测试类共 14 个测试，全部通过。本轮模拟器未运行，无法重跑。历史证据可参考但不替代本轮矩阵——本轮矩阵状态以 `not_run` 为准。
+1. `emulator-5554` 的 `Phase4ImportExportDeviceTest.phase4ImportModesExportAndWipeWorkOnDevice` 在 `resetLocalData()` 失败：重建 Activity 后等待 `Sessions` 5 秒超时。该 AndroidTest 仍使用英文导航/迁移/设置断言，而现行 AppShell 使用中文文案（例如“会话”“导入与导出”）。这是测试与现行 UI 契约漂移，尚未以删断言、加长超时或修改产品文案处理。
+2. `9CN0223C27017326` 的 `Phase5GraphDeviceTest` 稳定复现 3/5 失败：
+   - `archiveAndHideRequireConfirmationWhileApproveIsImmediate`：`graph-review-confirm-archive` 未显示；
+   - `nativeCanvasKeepsFitControlAndOnlyShowsAvailableEvidenceActions`：期望聊天证据 `message-evidence`，实际回调为 `null`；
+   - `invalidAndLargeGraphsProvideAccessibleNodeListAndDetail`：选择节点后 `graph-node-detail` 未显示。
+
+   同一 APK 在 `emulator-5554` 的该类 5/5 通过，因此这是 Android 12 / 真机布局或状态传播差异，需单独定位并修复，不能据模拟器结果将真机标记为通过。
 
 ---
 
 ## 5. 待办
 
-1. 用户启动 `emulator-5554`（Android Studio → Device Manager → 启动 Pixel_8_Pro AVD）后重跑全部模拟器必测组
-2. 用户提供主力真机 ADB serial 后执行主力真机必测组和手工检查
-3. TalkBack 听测仅在主力真机执行
+1. 修复 `Phase4ImportExportDeviceTest` 的中文 UI 契约漂移，并在模拟器重跑导入/导出全流程。
+2. 定位并修复 Android 12 真机上图谱详情、确认对话框和聊天证据回调差异；修复后重跑真机图谱类。
+3. 在主力真机完成深色模式、大字号、IME、48dp 与 TalkBack 人工检查；未执行前保持 `not_run`。
