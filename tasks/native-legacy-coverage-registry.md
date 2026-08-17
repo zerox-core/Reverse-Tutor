@@ -1,7 +1,7 @@
 # Native Legacy Coverage Registry
 
-Task: `NATIVE-P5-007`
-Date: 2026-07-02
+Task: `NATIVE-P5-007`, `NATIVE-P6-001`
+Date: 2026-07-02 (P6-001 audit: 2026-08-17)
 Source of truth: `tasks/native-legacy-entry-inventory.md`
 
 ## Purpose
@@ -35,6 +35,23 @@ Release gate vocabulary:
 | waived | 0 |
 
 Current P0 replacement blockers: 28.
+
+## P6-001 Code Audit Summary (2026-08-17)
+
+Full legacy entry code audit completed via source review + JVM test verification. The audit snapshot below was created before the emulator session; the 2026-08-17 follow-up evidence is recorded immediately after it.
+
+**Audit findings:**
+- Code evidence: 28/28 P0 entries have native code implementations ✅
+- JVM test evidence: 28/28 P0 entries have corresponding JVM tests ✅ (71+ core data layer test methods, 400+ total, 0 failures)
+- Device evidence: 8/28 P0 entries have prior-phase device evidence; remaining 20 deferred to emulator session
+- Contract mapping: 28/28 P0 entries have native mapping (some deferred/reduced) ✅
+- Freeze layer: core/model, core/protocol, core/llm, core/data → zero modifications ✅
+- No new contract gaps found
+
+Full audit report: `tasks/native-p6-001-legacy-audit.md`
+
+**P6-001 device follow-up (2026-08-17):** `emulator-5554` ran the Phase 5 integration suite successfully: Context Hub 4 tests, Graph 5 tests, Memory 1 test, Sources 1 test (`11/11` passed), followed by `Phase2CoreLoopDeviceTest` (`3/3` passed). Remaining P0 device gaps are limited to the parity items listed in the audit report; this evidence does not mark replacement readiness.
+
 
 ## Coverage Matrix
 

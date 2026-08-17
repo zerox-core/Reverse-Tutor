@@ -15,6 +15,18 @@ Source inspected:
 - `static/app/index.html`
 - Current PRD: `tasks/prd-native-android-migration.md`
 
+## P6-001 Code Audit Notes (2026-08-17)
+
+Full legacy entry code audit completed. Key findings per gate:
+
+- **P0 (28 blockers)**: All have native code implementations and JVM test evidence. Device tests deferred.
+- **P1 (16 watch items)**: Code exists for most; several remain not_started (LEG-040) or placeholder-only (LEG-037).
+- **Freeze layer**: Zero modifications to core/model, core/protocol, core/llm, core/data.
+- **No new contract gaps**: All native implementations use Repository/Facade/Coordinator patterns.
+
+Audit report: `tasks/native-p6-001-legacy-audit.md`
+
+
 ## Release Gate Summary
 
 The first public native replacement release must cover:
@@ -132,6 +144,8 @@ Every phase APK should record:
 - What was tested
 - Pass/fail result
 - Screenshots or notes for failures
+
+2026-08-17 follow-up: `Pixel_8_Pro` AVD (`emulator-5554`) passed the Phase 5 integration suite (11 tests) and the Phase 2 core-loop suite (3 tests). This adds modern-emulator evidence only; main-phone, older-version/small-screen, and manual TalkBack coverage remain open.
 
 ## Next ARCH Inputs
 
