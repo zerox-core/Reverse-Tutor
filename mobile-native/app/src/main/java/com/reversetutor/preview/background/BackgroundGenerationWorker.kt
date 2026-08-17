@@ -10,6 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
+import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 
 class BackgroundGenerationWorker(
     appContext: Context,
@@ -17,7 +18,14 @@ class BackgroundGenerationWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val jobId = inputData.getString(InputJobId) ?: return Result.failure()
-        val repository = DataModule.backgroundGenerationRepository(applicationContext)
+        // Keep WorkManager execution on the same preview runtime as HybridAppGraph.
+        // Constructing the repository without an explicit runtime falls back to the
+        // production HTTP runtime, which makes local/device preview jobs diverge from
+        // foreground generation and can attempt a real provider call.
+        val repository = DataModule.backgroundGenerationRepository(
+            applicationContext,
+            runtime = FakeLlmGenerationRuntime()
+        )
         val outcome = repository
             .runGenerationJob(jobId, System.currentTimeMillis())
         BackgroundGenerationOutcomeHandler(applicationContext).handle(

@@ -142,3 +142,37 @@ git status --short --branch:
 1. **设备测试文本修复**: Phase2CoreLoopDeviceTest 需更新为中文文本以匹配应用 UI。文本映射: "Sessions"→"会话", "New session"→"新建会话"/"新建", "Exam sprint"→"考前冲刺", "Create"→"创建", "Open"→"打开", "No messages yet"→"还没有消息", "Send"→"发消息", "You"→"我", "No model configured"→"未配置模型", "Assistant"→"林澈", "OK"→"关闭"(ActivityAnnouncementDialog)
 2. **设备测试扩展**: 当前测试未覆盖会话隔离（切换/删除/归档）和返回导航场景
 3. **设备测试重建**: 修复文本后需 `assembleDebugAndroidTest` 重建测试 APK 并在 emulator-5554 上重跑
+
+---
+
+## 10. 2026-08-17 收尾复验与修复证据
+
+本轮在不触碰冻结层的前提下完成了 P2-006 设备验收收尾。
+
+### 修复项
+
+| 文件 | 修复 |
+|---|---|
+| `mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationWorker.kt` | Worker 显式使用 `FakeLlmGenerationRuntime`，与 `HybridAppGraph` 的预览装配一致，避免后台任务回退到生产 HTTP Runtime。 |
+| `mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase2CoreLoopDeviceTest.kt` | 使用中文真实 UI 契约与稳定 testTag；每个测试前清理本地数据；无模型分支清理 debug bootstrap Profiles；ContextHub 返回前等待导航提交；覆盖核心闭环、会话隔离、返回导航。 |
+| `mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/FormalHomeScreen.kt` | 为新建会话入口补充 `formal-home-new-session` 稳定 testTag。 |
+
+### emulator-5554 结果
+
+```text
+Phase2CoreLoopDeviceTest — 3 tests, 0 failures
+a_coreLoopPersistsNoModelAndMockReplyAfterRestart — PASS
+b_sessionIsolationDoesNotLeakAcrossSessions — PASS
+c_backNavigationPreservesChatState — PASS
+```
+
+### 回归结果
+
+```text
+:app:test :app:lint :app:assembleDebug — BUILD SUCCESSFUL
+594 actionable tasks: 59 executed, 535 up-to-date
+git diff --check — PASS
+冻结层路径 diff — 空（core:model / core:protocol / core:llm / core:data）
+```
+
+仍未调用真实 Provider、URL 或 API Key；设备测试只使用 `emulator-5554`。P2-006 本轮设备阻塞已解除，P6 更广泛设备矩阵仍按原计划保留为后续工作。

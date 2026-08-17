@@ -487,6 +487,7 @@ private fun NewSessionButton(
         onClick = onClick,
         modifier = modifier
             .size(44.dp)
+            .testTag("formal-home-new-session")
             .semantics { contentDescription = "新建会话" }
             .shadow(
                 elevation = 5.dp,
