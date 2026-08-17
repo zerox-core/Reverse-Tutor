@@ -60,13 +60,13 @@
 | `Phase5GraphDeviceTest` | 5 | pass | Canvas、状态、选择、编辑及 Archive/Hide 确认。 |
 | `Phase5MemoryDeviceTest` | 1 | pass | Chat Note → Context Hub 持久化。 |
 | `Phase5SourcesDeviceTest` | 1 | pass | 五种解析状态及恢复动作。 |
-| `Phase4ImportExportDeviceTest` | 1 | fail | `resetLocalData()` 等待英文文案 `Sessions` 超时；现行应用使用中文导航文案，测试脚本需按当前 UI 契约修订后重测。未修改产品文案或放宽等待。 |
+| `Phase4ImportExportDeviceTest` | 1 | pass | 已通过正式 `ACTION_SEND` 导入入口改为验证中文导入预览、三种模式、导入记录及会话/消息持久化；`emulator-5554` 重测 1/1 通过。 |
 | `BackgroundGenerationSessionDeletionDeviceTest` | 1 | pass | 删除会话不写入延迟消息。 |
 | `BackgroundGenerationStartupRecoveryDeviceTest` | 1 | pass | 重启恢复并重新交给 WorkManager。 |
 | `BackgroundGenerationNotificationDeviceTest` | 1 | pass | 完成/失败通知与安全文案。 |
 | `FormalDiagnosticsDeviceTest` | 1 | pass | 诊断记录和剪贴板脱敏。 |
 
-本轮汇总：19 tests run，18 passed，1 failed。
+本轮汇总：Phase4 修复并重测后，19 tests run，19 passed。
 
 ---
 
@@ -104,7 +104,7 @@
 | Phase5GraphDeviceTest | pass | fail | not_available |
 | Phase5MemoryDeviceTest | pass | pass | not_available |
 | Phase5SourcesDeviceTest | pass | pass | not_available |
-| Phase4ImportExportDeviceTest | fail | not_run | not_available |
+| Phase4ImportExportDeviceTest | pass | not_run | not_available |
 | BackgroundGenerationSessionDeletionDeviceTest | pass | not_run | not_available |
 | BackgroundGenerationStartupRecoveryDeviceTest | pass | not_run | not_available |
 | BackgroundGenerationNotificationDeviceTest | pass | not_run | not_available |
@@ -120,8 +120,8 @@
 | 统计项 | emulator-5554 | 主力真机 | 其他设备 |
 |---|---|---|---|
 | 测试总数 | 15 | 15 | 15 |
-| pass | 9 | 4 | 0 |
-| fail | 1 | 1 | 0 |
+| pass | 10 | 4 | 0 |
+| fail | 0 | 1 | 0 |
 | not_run | 5 | 10 | 0 |
 | not_available | 0 | 0 | 15 |
 
@@ -134,7 +134,7 @@
 
 ### 4.5 本轮失败记录（2026-08-17）
 
-1. `emulator-5554` 的 `Phase4ImportExportDeviceTest.phase4ImportModesExportAndWipeWorkOnDevice` 在 `resetLocalData()` 失败：重建 Activity 后等待 `Sessions` 5 秒超时。该 AndroidTest 仍使用英文导航/迁移/设置断言，而现行 AppShell 使用中文文案（例如“会话”“导入与导出”）。这是测试与现行 UI 契约漂移，尚未以删断言、加长超时或修改产品文案处理。
+1. `Phase4ImportExportDeviceTest` 原英文 UI 契约漂移已修复：测试现在在受管理的 `MainActivity` 上以正式 `ACTION_SEND` / `Intent.EXTRA_TEXT` 入口启动，保持 5 秒同步上限且不吞滚动失败；模拟器重测 1/1 通过。
 2. `9CN0223C27017326` 的 `Phase5GraphDeviceTest` 稳定复现 3/5 失败：
    - `archiveAndHideRequireConfirmationWhileApproveIsImmediate`：`graph-review-confirm-archive` 未显示；
    - `nativeCanvasKeepsFitControlAndOnlyShowsAvailableEvidenceActions`：期望聊天证据 `message-evidence`，实际回调为 `null`；
@@ -146,6 +146,5 @@
 
 ## 5. 待办
 
-1. 修复 `Phase4ImportExportDeviceTest` 的中文 UI 契约漂移，并在模拟器重跑导入/导出全流程。
-2. 定位并修复 Android 12 真机上图谱详情、确认对话框和聊天证据回调差异；修复后重跑真机图谱类。
-3. 在主力真机完成深色模式、大字号、IME、48dp 与 TalkBack 人工检查；未执行前保持 `not_run`。
+1. 定位并修复 Android 12 真机上图谱详情、确认对话框和聊天证据回调差异；修复后重跑真机图谱类。
+2. 在主力真机完成深色模式、大字号、IME、48dp 与 TalkBack 人工检查；未执行前保持 `not_run`。
