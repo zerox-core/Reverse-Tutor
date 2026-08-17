@@ -24,7 +24,7 @@
 
 | 任务 | 结果 | 备注 |
 |---|---|---|
-| `py -m pytest -q --ignore=tests/test_project_homepage.py` | 超时（MCP 30s 限制） | 树未变（无 Python 代码改动），基线 320 passed 仍有效 |
+| `py -m pytest -q --ignore=tests/test_project_homepage.py` | 本轮未完成 | MCP 30s 限制下未取得结果；不得以旧的“320 passed”作为本轮通过证据。最近已记录的完整基线见 P3-004：510 passed、28 skipped；如需 P6 发布证据必须重新执行并记录实际输出。 |
 
 ### 1.3 冻结层与代码检查
 

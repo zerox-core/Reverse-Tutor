@@ -1,9 +1,9 @@
 # NATIVE-P6-001 · 全量遗留功能代码审计报告
 
-> 审计时间：2026-08-17  
-> 审计方式：feishu_mcp 直连 F:\xw\reverse-tutor，源码审查 + JVM 测试证据 + 构建验证  
-> 分支：Android | 最新提交：b6c3307 | 工作树：干净（仅 .aily_tmp/ 未跟踪）  
-> 冻结层检查：core/model, core/protocol, core/llm, core/data → **空（零修改）**  
+> 审计时间：2026-08-17
+> 审计方式：feishu_mcp 直连 F:\xw\reverse-tutor，源码审查 + JVM 测试证据 + 构建验证
+> 分支：Android | 最新提交：b6c3307 | 工作树：干净（仅 .aily_tmp/ 未跟踪）
+> 冻结层检查：core/model, core/protocol, core/llm, core/data → **空（零修改）**
 > 设备测试：**本轮不执行**（模拟器未运行，用户后续启动后补测）
 
 ## 一、审计范围与方法
@@ -357,7 +357,7 @@ core/model, core/protocol, core/llm, core/data 零修改。所有功能实现均
    - P5-008 集成设备测试（Context Hub 入口→Chat 返回→Graph 选择/缩放/编辑→Sources 五类解析状态）
    - UX-010 无障碍验证（深色模式/大字号/48dp/TalkBack）
    - Phase2CoreLoopDeviceTest 修复后重跑（中文文案断言已修正）
-   
+
 2. **P6-002～P6-004 替换准备**：
    - 编写替换包 Runbook
    - 完成全量设备矩阵
