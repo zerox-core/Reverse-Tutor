@@ -39,6 +39,28 @@ class GraphCanvasPresentationTest {
         assertTrue(GraphCanvasPresentation.ControlTouchTargetDp >= 48f)
     }
 
+    @Test
+    fun selectedNodeVisualDoesNotChangeGraphTopology() {
+        val first = node(GraphNodeKind.Concept, GraphNodeStatus.Active).copy(id = "first")
+        val second = node(GraphNodeKind.Source, GraphNodeStatus.Active).copy(id = "second")
+        val edge = GraphLayoutEdge("edge", "first", "second", "supports")
+        val state = KnowledgeGraphUiState(
+            scope = GraphScope.Global,
+            status = GraphRenderStatus.Ready,
+            title = "Graph",
+            summary = "Summary",
+            nodes = listOf(first, second),
+            visibleEdges = listOf(edge),
+            invalidEdgeCount = 0
+        )
+
+        val selected = state.withSelection("first")
+
+        assertEquals(state.allNodes.map { it.id }, selected.allNodes.map { it.id })
+        assertEquals(state.visibleEdges, selected.visibleEdges)
+        assertEquals("first", selected.selectedNode?.id)
+    }
+
     private fun node(kind: GraphNodeKind, status: GraphNodeStatus) = GraphLayoutNode(
         id = "node",
         label = "Node",
@@ -49,4 +71,3 @@ class GraphCanvasPresentationTest {
         radius = 0.03f
     )
 }
-

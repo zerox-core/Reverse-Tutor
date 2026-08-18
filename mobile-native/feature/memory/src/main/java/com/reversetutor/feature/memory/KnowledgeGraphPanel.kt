@@ -697,8 +697,10 @@ private fun DrawScope.drawCircleGraphNode(
     typeMultiplier: Float
 ) {
     val center = Offset(node.x * size.width, node.y * size.height)
-    val radius = node.radius * size.minDimension
-    val color = nodeColor(node)
+    val visual = graphNodeStyle(node, selected)
+    val radius = node.radius * size.minDimension * visual.radiusMultiplier
+    val color = Color(visual.fillArgb)
+    val stroke = Color(visual.strokeArgb)
     if (interactionActive) {
         drawCircle(
             color = color.copy(alpha = 0.20f),
@@ -708,19 +710,19 @@ private fun DrawScope.drawCircleGraphNode(
     }
     if (selected) {
         drawCircle(
-            color = FormalColors.Primary.copy(alpha = 0.16f),
+            color = stroke.copy(alpha = 0.16f),
             radius = radius + 8.dp.toPx(),
             center = center
         )
         drawCircle(
-            color = FormalColors.Primary,
+            color = stroke,
             radius = radius + 4.dp.toPx(),
             center = center,
-            style = Stroke(width = 2.dp.toPx())
+            style = Stroke(width = visual.strokeWidthDp.dp.toPx())
         )
     }
     drawCircle(Color(0x18000000), radius = radius + 3.dp.toPx(), center = center + Offset(0f, 3.dp.toPx()))
-    drawCircle(color.copy(alpha = if (node.isLocked) 0.30f else 0.95f), radius = radius, center = center)
+    drawCircle(color.copy(alpha = visual.fillAlpha), radius = radius, center = center)
     drawCircle(Color.White.copy(alpha = 0.48f), radius = radius * 0.32f, center = center - Offset(radius * 0.24f, radius * 0.26f))
     val label = compactLabel(node.label, 9)
     val bold = radius >= 14.dp.toPx()
