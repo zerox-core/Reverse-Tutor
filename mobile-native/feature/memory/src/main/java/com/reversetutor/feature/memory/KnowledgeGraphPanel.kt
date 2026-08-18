@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -332,6 +333,10 @@ fun FormalGraphCanvas(
     initialScale: Float = 1f,
     expandedSessionRoot: Boolean = false,
     showToolbar: Boolean = false,
+    onSearch: (() -> Unit)? = null,
+    onHelpToggle: (() -> Unit)? = null,
+    toolbarAlignment: Alignment = Alignment.BottomCenter,
+    toolbarModifier: Modifier = Modifier.padding(bottom = 18.dp),
     onFilterClick: (() -> Unit)? = null,
     interactionEnabled: Boolean = true,
     onRequestInteraction: () -> Unit = {},
@@ -612,9 +617,12 @@ fun FormalGraphCanvas(
                     )
                 },
                 onFilter = onFilterClick,
+                onSearch = onSearch,
+                onInfo = onHelpToggle,
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 18.dp)
+                    .align(toolbarAlignment)
+                    .zIndex(2f)
+                    .then(toolbarModifier)
             )
         }
     }
@@ -1024,27 +1032,30 @@ private fun GraphToolbar(
     onZoomOut: () -> Unit,
     onZoomIn: () -> Unit,
     onFilter: (() -> Unit)?,
+    onSearch: (() -> Unit)?,
+    onInfo: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     Surface(
         modifier = modifier
-            .width(260.dp)
             .height(52.dp),
-        color = Color(0xF7FAFBFE),
+        color = Color.Transparent,
         contentColor = GraphInk,
-        shape = RoundedCornerShape(26.dp),
-        border = BorderStroke(1.dp, Color(0x1F576B94)),
-        shadowElevation = 8.dp
+        shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            GraphToolbarButton(GraphToolbarGlyph.Target, selected = true, onClick = onCenter)
-            GraphToolbarButton(GraphToolbarGlyph.Minus, onClick = onZoomOut)
-            GraphToolbarButton(GraphToolbarGlyph.Plus, onClick = onZoomIn)
-            GraphToolbarButton(GraphToolbarGlyph.Filter, onClick = onFilter)
+            if (onSearch != null) GraphToolbarButton(GraphToolbarGlyph.Search, onClickAction = onSearch)
+            GraphToolbarButton(GraphToolbarGlyph.Plus, onClickAction = onZoomIn)
+            GraphToolbarButton(GraphToolbarGlyph.Minus, onClickAction = onZoomOut)
+            GraphToolbarButton(GraphToolbarGlyph.Target, selected = true, onClickAction = onCenter)
+            if (onFilter != null || (onSearch == null && onInfo == null)) {
+                GraphToolbarButton(GraphToolbarGlyph.Filter, onClickAction = onFilter ?: {})
+            }
+            if (onInfo != null) GraphToolbarButton(GraphToolbarGlyph.Info, onClickAction = onInfo)
         }
     }
 }
@@ -1053,31 +1064,38 @@ private enum class GraphToolbarGlyph(
     val description: String,
     val tag: String
 ) {
-    Target("适应图谱", "graph-fit"),
+    Search("搜索", "graph-search"),
+    Target("回到中心", "graph-fit"),
     Minus("缩小", "graph-zoom-out"),
     Plus("放大", "graph-zoom-in"),
-    Filter("筛选", "graph-filter")
+    Filter("筛选", "graph-filter"),
+    Info("帮助", "graph-help")
 }
 
 @Composable
 private fun GraphToolbarButton(
     glyph: GraphToolbarGlyph,
     selected: Boolean = false,
-    onClick: (() -> Unit)?
+    onClickAction: (() -> Unit)?
 ) {
-    Box(
+    Surface(
+        onClick = onClickAction ?: {},
         modifier = Modifier
             .size(48.dp)
-            .background(if (selected) FormalColors.PrimarySoft else Color.Transparent, CircleShape)
             .semantics { contentDescription = glyph.description }
-            .testTag(glyph.tag)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
-        contentAlignment = Alignment.Center
+            .testTag(glyph.tag),
+        color = if (selected) FormalColors.PrimarySoft else Color(0xE6FFFFFF),
+        shape = RoundedCornerShape(10.dp)
     ) {
-        Canvas(Modifier.size(22.dp)) {
+        Box(contentAlignment = Alignment.Center) {
+            Canvas(Modifier.size(22.dp)) {
             val color = if (selected) FormalColors.Primary else Color(0xFF36527D)
             val stroke = 1.6.dp.toPx()
             when (glyph) {
+                GraphToolbarGlyph.Search -> {
+                    drawCircle(color, size.minDimension * 0.28f, Offset(size.width * 0.43f, size.height * 0.43f), style = Stroke(stroke))
+                    drawLine(color, Offset(size.width * 0.64f, size.height * 0.64f), Offset(size.width * 0.84f, size.height * 0.84f), stroke, StrokeCap.Round)
+                }
                 GraphToolbarGlyph.Target -> {
                     drawCircle(color, size.minDimension * 0.27f, center, style = Stroke(stroke))
                     drawCircle(color, 2.dp.toPx(), center)
@@ -1099,6 +1117,12 @@ private fun GraphToolbarButton(
                         drawCircle(color, 1.7.dp.toPx(), Offset(size.width * dotX, size.height * y))
                     }
                 }
+                GraphToolbarGlyph.Info -> {
+                    drawCircle(color, size.minDimension * 0.36f, center, style = Stroke(stroke))
+                    drawCircle(color, 1.4.dp.toPx(), Offset(center.x, size.height * 0.32f))
+                    drawLine(color, Offset(center.x, size.height * 0.46f), Offset(center.x, size.height * 0.73f), stroke, StrokeCap.Round)
+                }
+            }
             }
         }
     }
@@ -1293,14 +1317,7 @@ private fun GraphNodeDetail(
     }
 }
 
-private fun nodeColor(node: GraphLayoutNode): Color = when (node.kind) {
-    GraphNodeKind.Concept -> Color(0xFF63BFE3)
-    GraphNodeKind.Requirement -> Color(0xFFE3AF42)
-    GraphNodeKind.Source -> Color(0xFF4FC2AF)
-    GraphNodeKind.Session -> Color(0xFF7AA8ED)
-    GraphNodeKind.Person -> Color(0xFF9B7AD1)
-    GraphNodeKind.Other -> Color(0xFF8C73C5)
-}
+private fun nodeColor(node: GraphLayoutNode): Color = Color(graphKindFillArgb(node.kind))
 
 private fun statusColor(node: GraphLayoutNode): Color = when (node.status) {
     GraphNodeStatus.Active -> FormalColors.Primary

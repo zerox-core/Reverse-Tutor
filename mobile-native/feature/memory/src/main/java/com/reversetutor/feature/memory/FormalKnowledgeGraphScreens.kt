@@ -23,10 +23,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -35,12 +40,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
 import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalShapes
 import com.reversetutor.core.design.LocalFormalTypeScale
+import com.reversetutor.core.model.GraphNodeKind
 
 data class FormalBranchGraphHeader(
     val title: String,
@@ -138,6 +146,9 @@ fun FormalGlobalKnowledgeGraphScreen(
     onViewportChanged: (GraphViewportState) -> Unit = {},
     onNodePositionChanged: (String, GraphPoint) -> Unit = { _, _ -> }
 ) {
+    var showGraphHelp by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -155,7 +166,7 @@ fun FormalGlobalKnowledgeGraphScreen(
                 } else {
                     null
                 },
-                onSearch = onSearch,
+                onSearch = if (canvasModeActive) null else onSearch,
                 onMore = onMore
             )
             Box(
@@ -169,6 +180,17 @@ fun FormalGlobalKnowledgeGraphScreen(
                     onSelectedNodeChange = onSelectedNodeChange,
                     interactionEnabled = canvasModeActive,
                     onRequestInteraction = { onCanvasModeChange(true) },
+                    onSearch = if (canvasModeActive) {
+                        {
+                            searchOpen = !searchOpen
+                            onSearch?.invoke()
+                        }
+                    } else {
+                        null
+                    },
+                    onHelpToggle = { showGraphHelp = !showGraphHelp },
+                    toolbarAlignment = Alignment.TopEnd,
+                    toolbarModifier = Modifier.padding(top = 16.dp, end = 16.dp),
                     showToolbar = canvasModeActive && state.allNodeCount > 0,
                     onInteractionChanged = onGraphInteractionChanged,
                     onViewportChanged = onViewportChanged,
@@ -181,13 +203,42 @@ fun FormalGlobalKnowledgeGraphScreen(
                         GraphRenderStatus.Error
                     )
                 ) {
-                    FormalGraphStateOverlay(
+                FormalGraphStateOverlay(
                         state = state,
                         onRetry = onRetry,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
             }
+        }
+        if (canvasModeActive) {
+            GraphSourceLegend(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 16.dp, top = 16.dp)
+            )
+        }
+        if (showGraphHelp && canvasModeActive) {
+            GraphSourceHelpPanel(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 16.dp)
+            )
+        }
+        if (searchOpen && canvasModeActive) {
+            GraphSourceSearchPanel(
+                query = searchQuery,
+                nodes = state.allNodes,
+                onQueryChange = { searchQuery = it },
+                onSelectNode = { nodeId ->
+                    onSelectedNodeChange(nodeId)
+                    searchQuery = ""
+                    searchOpen = false
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 72.dp, end = 16.dp)
+            )
         }
         if (canvasModeActive) {
             Surface(
@@ -664,6 +715,190 @@ private fun GraphInfoChip(
 }
 
 @Composable
+private fun GraphSourceLegend(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.testTag("graph-source-legend"),
+        color = Color(0xE6F7F8FA),
+        contentColor = Color(0xFF64748B),
+        shape = RoundedCornerShape(10.dp),
+        shadowElevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Text(
+                text = "知识图谱",
+                fontSize = LocalFormalTypeScale.current.size(9f),
+                fontWeight = FontWeight.Medium
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GraphSourceLegendItem(GraphNodeKind.Concept, "核心概念")
+                GraphSourceLegendItem(GraphNodeKind.Other, "知识领域")
+                GraphSourceLegendItem(GraphNodeKind.Session, "技术项目")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GraphSourceLegendItem(GraphNodeKind.Source, "资源设施")
+                GraphSourceLegendItem(GraphNodeKind.Person, "知识图谱")
+                GraphSourceLegendItem(GraphNodeKind.Requirement, "产品设计")
+            }
+        }
+    }
+}
+
+@Composable
+private fun GraphSourceLegendItem(kind: GraphNodeKind, label: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(Color(graphKindFillArgb(kind)), CircleShape)
+        )
+        Text(label, fontSize = LocalFormalTypeScale.current.size(8f))
+    }
+}
+
+@Composable
+private fun GraphSourceHelpPanel(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier
+            .width(260.dp)
+            .testTag("graph-source-help"),
+        color = Color(0xF2FFFFFF),
+        contentColor = Color(0xFF475569),
+        shape = RoundedCornerShape(12.dp),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "交互指南",
+                color = Color(0xFF1E293B),
+                fontSize = LocalFormalTypeScale.current.size(11f),
+                fontWeight = FontWeight.SemiBold
+            )
+            GraphSourceHelpRow("双指缩放", "围绕触点缩放视图")
+            GraphSourceHelpRow("拖拽空白", "平移画布")
+            GraphSourceHelpRow("长按节点", "移动节点")
+            GraphSourceHelpRow("点击节点", "选中并查看详情")
+            GraphSourceHelpRow("点击空白", "取消选中")
+        }
+    }
+}
+
+@Composable
+private fun GraphSourceHelpRow(label: String, description: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = label,
+            modifier = Modifier.width(58.dp),
+            color = Color(0xFF94A3B8),
+            fontSize = LocalFormalTypeScale.current.size(8f)
+        )
+        Text(description, fontSize = LocalFormalTypeScale.current.size(8f))
+    }
+}
+
+@Composable
+private fun GraphSourceSearchPanel(
+    query: String,
+    nodes: List<GraphLayoutNode>,
+    onQueryChange: (String) -> Unit,
+    onSelectNode: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val matches = remember(query, nodes) {
+        val normalized = query.trim()
+        if (normalized.isEmpty()) emptyList()
+        else nodes.filter { node ->
+            node.label.contains(normalized, ignoreCase = true) ||
+                node.id.contains(normalized, ignoreCase = true)
+        }.take(5)
+    }
+    Surface(
+        modifier = modifier
+            .width(288.dp)
+            .testTag("graph-search-panel"),
+        color = Color(0xF2FFFFFF),
+        contentColor = Color(0xFF475569),
+        shape = RoundedCornerShape(12.dp),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("graph-search-input"),
+                singleLine = true,
+                placeholder = { Text("搜索节点…", fontSize = LocalFormalTypeScale.current.size(10f)) },
+                label = { Text("搜索", fontSize = LocalFormalTypeScale.current.size(9f)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search)
+            )
+            when {
+                query.isNotBlank() && matches.isEmpty() -> {
+                    Text(
+                        text = "未找到匹配的节点",
+                        modifier = Modifier.testTag("graph-search-empty"),
+                        color = Color(0xFF94A3B8),
+                        fontSize = LocalFormalTypeScale.current.size(9f)
+                    )
+                }
+                matches.isNotEmpty() -> {
+                    matches.forEach { node ->
+                        Surface(
+                            onClick = { onSelectNode(node.id) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .testTag("graph-search-result-${node.id}"),
+                            color = Color.Transparent,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(Color(graphKindFillArgb(node.kind)), CircleShape)
+                                )
+                                Column {
+                                    Text(
+                                        text = node.label,
+                                        color = Color(0xFF1E293B),
+                                        fontSize = LocalFormalTypeScale.current.size(10f),
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = node.kindLabel,
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = LocalFormalTypeScale.current.size(8f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GraphScreenScrim(onClick: () -> Unit) {
     Box(
         modifier = Modifier
@@ -759,6 +994,35 @@ private fun FormalGraphNodeSheet(
                     color = FormalColors.Primary,
                     fontSize = type.size(10f),
                     fontWeight = FontWeight.Medium
+                )
+            }
+            val importance = graphDisplayImportance(node, relations.size)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .testTag("graph-node-importance"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SheetLabel("重要度")
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(6.dp)
+                        .background(Color(0xFFE8EDF6), RoundedCornerShape(3.dp))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(importance / 100f)
+                            .fillMaxHeight()
+                            .background(Color(graphKindFillArgb(node.kind)), RoundedCornerShape(3.dp))
+                    )
+                }
+                Text(
+                    text = importance.toString(),
+                    color = FormalColors.Muted,
+                    fontSize = type.size(9f)
                 )
             }
             if (!node.evidenceTitle.isNullOrBlank()) {

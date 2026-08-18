@@ -4,14 +4,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.reversetutor.core.model.GraphNode
@@ -59,6 +63,41 @@ class GraphInteractionContractDeviceTest {
         composeRule.onNodeWithContentDescription("回到中心")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(44.dp)
+    }
+
+    @Test
+    fun globalCanvasExposesSourceFidelityOverlaysAndHelp() {
+        var searchCount = 0
+        var searchedNodeId: String? = null
+        composeRule.setContent {
+            FormalGlobalKnowledgeGraphScreen(
+                state = KnowledgeGraphUiState.from(
+                    nodes = listOf(node("topic", GraphNodeStatus.Active)),
+                    edges = emptyList(),
+                    scope = GraphScope.Global
+                ),
+                onSelectedNodeChange = { searchedNodeId = it },
+                canvasModeActive = true,
+                onSearch = { searchCount += 1 }
+            )
+        }
+
+        composeRule.onNodeWithTag("graph-source-legend").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-search").assertIsDisplayed().assertHeightIsAtLeast(48.dp).assertHasClickAction()
+        composeRule.onNodeWithTag("graph-zoom-in").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("graph-zoom-out").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("graph-fit").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag("graph-search").performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("graph-search-panel").assertExists()
+        composeRule.runOnIdle { check(searchCount == 1) }
+        composeRule.onNodeWithTag("graph-search-input").performTextInput("topic")
+        composeRule.onNodeWithTag("graph-search-result-topic")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { check(searchedNodeId == "topic") }
+        composeRule.onNodeWithTag("graph-help").performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("graph-source-help").assertIsDisplayed()
     }
 
     @Test
