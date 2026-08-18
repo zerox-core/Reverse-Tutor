@@ -216,6 +216,9 @@ class Phase5GraphDeviceTest {
 
         composeRule.onNodeWithTag("knowledge-graph-canvas").assertIsDisplayed()
         composeRule.onNodeWithTag("graph-fit").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-zoom-in").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-zoom-out").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-filter").assertIsDisplayed()
         composeRule.onNodeWithTag("graph-node-list").performClick()
         composeRule.onNodeWithTag("graph-node-evidence-node").performClick()
         composeRule.runOnIdle { assertEquals("evidence-node", selectedNodeId) }
