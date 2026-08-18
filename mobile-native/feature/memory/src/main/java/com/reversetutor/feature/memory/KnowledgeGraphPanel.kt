@@ -354,6 +354,16 @@ fun FormalGraphCanvas(
     val currentSnapshot by rememberUpdatedState(renderSnapshot)
     val currentSemanticMode by rememberUpdatedState(semanticMode)
     val currentExtent by rememberUpdatedState(extent)
+    val selectedNeighborIds = remember(renderSnapshot.edges, state.selectedNodeId) {
+        state.selectedNodeId?.let { selectedId ->
+            renderSnapshot.edges
+                .asSequence()
+                .filter { it.fromNodeId == selectedId || it.toNodeId == selectedId }
+                .flatMap { sequenceOf(it.fromNodeId, it.toNodeId) }
+                .filter { it != selectedId }
+                .toSet()
+        }.orEmpty()
+    }
 
     fun panBounds(scale: Float): GraphPanBounds = graphPanBounds(
         extent = currentExtent,
@@ -550,7 +560,7 @@ fun FormalGraphCanvas(
                     }
                 })
         ) {
-            drawGraphDotGrid()
+            drawGraphSourceStars()
             withTransform({
                 translate(left = gestureState.pan.x, top = gestureState.pan.y)
                 scale(
@@ -565,8 +575,13 @@ fun FormalGraphCanvas(
                         GraphSemanticMode.OverviewCircles -> drawCircleGraphNode(
                             node = node,
                             selected = node.id == state.selectedNodeId,
+                            neighbor = node.id in selectedNeighborIds,
+                            hasSelection = state.selectedNodeId != null,
                             interactionActive = node.id == gestureState.interactionNodeId,
-                            typeMultiplier = typeMultiplier
+                            typeMultiplier = typeMultiplier,
+                            showLabel = state.selectedNodeId != null ||
+                                gestureState.scale >= GraphCanvasPresentation.SemanticZoomLabel ||
+                                (gestureState.scale >= GraphCanvasPresentation.SemanticZoomHubSecondary && node.depth == 0)
                         )
                         GraphSemanticMode.DetailCards -> drawCardGraphNode(
                             node = node,
@@ -642,17 +657,19 @@ private fun graphNodeAt(
     scale = scale
 )
 
-private fun DrawScope.drawGraphDotGrid() {
-    val dotColor = Color(0x28758F92)
-    val step = 24.dp.toPx()
-    var x = step / 2f
-    while (x < size.width) {
-        var y = step / 2f
-        while (y < size.height) {
-            drawCircle(dotColor, radius = 0.7.dp.toPx(), center = Offset(x, y))
-            y += step
-        }
-        x += step
+private fun DrawScope.drawGraphSourceStars() {
+    val starColor = Color(0xFF64748B)
+    var seed = (size.width.toInt() * 31 + size.height.toInt() * 17) xor 0x45D9F3B
+    repeat(150) {
+        seed = seed * 1664525 + 1013904223
+        val x = ((seed ushr 1) % 10000) / 10000f * size.width
+        seed = seed * 1664525 + 1013904223
+        val y = ((seed ushr 1) % 10000) / 10000f * size.height
+        seed = seed * 1664525 + 1013904223
+        val radius = (0.5f + ((seed ushr 1) % 1000) / 1000f).dp.toPx()
+        seed = seed * 1664525 + 1013904223
+        val alpha = 0.02f + ((seed ushr 1) % 1000) / 1000f * 0.04f
+        drawCircle(starColor.copy(alpha = alpha), radius = radius, center = Offset(x, y))
     }
 }
 
@@ -678,11 +695,12 @@ private fun DrawScope.drawGraphEdges(
             path = path,
             color = when {
                 locked -> GraphLocked.copy(alpha = 0.38f)
-                selected -> FormalColors.Primary.copy(alpha = 0.82f)
-                else -> nodeColor(from).copy(alpha = 0.50f)
+                selected -> Color(GraphCanvasPresentation.EdgeArgb).copy(alpha = GraphCanvasPresentation.EdgeHighlightAlpha)
+                selectedNodeId != null -> Color(GraphCanvasPresentation.EdgeArgb).copy(alpha = 0.06f)
+                else -> Color(GraphCanvasPresentation.EdgeArgb).copy(alpha = GraphCanvasPresentation.EdgeAlpha)
             },
             style = Stroke(
-                width = if (selected) 1.8.dp.toPx() else 1.dp.toPx(),
+                width = if (selected) 1.2.dp.toPx() else 0.6.dp.toPx(),
                 cap = StrokeCap.Round,
                 pathEffect = if (locked) PathEffect.dashPathEffect(floatArrayOf(7f, 6f)) else null
             )
@@ -693,37 +711,46 @@ private fun DrawScope.drawGraphEdges(
 private fun DrawScope.drawCircleGraphNode(
     node: GraphLayoutNode,
     selected: Boolean,
+    neighbor: Boolean,
+    hasSelection: Boolean,
     interactionActive: Boolean,
-    typeMultiplier: Float
+    typeMultiplier: Float,
+    showLabel: Boolean
 ) {
     val center = Offset(node.x * size.width, node.y * size.height)
     val visual = graphNodeStyle(node, selected)
     val radius = node.radius * size.minDimension * visual.radiusMultiplier
     val color = Color(visual.fillArgb)
-    val stroke = Color(visual.strokeArgb)
+    val fillAlpha = graphNodeFillAlpha(node, selected, neighbor, hasSelection)
     if (interactionActive) {
         drawCircle(
-            color = color.copy(alpha = 0.20f),
+            color = color.copy(alpha = 0.08f),
             radius = radius + 12.dp.toPx(),
             center = center
         )
     }
     if (selected) {
         drawCircle(
-            color = stroke.copy(alpha = 0.16f),
-            radius = radius + 8.dp.toPx(),
+            color = color.copy(alpha = GraphCanvasPresentation.SelectionHaloAlpha),
+            radius = radius * 1.6f,
             center = center
         )
         drawCircle(
-            color = stroke,
-            radius = radius + 4.dp.toPx(),
+            color = color.copy(alpha = 0.40f),
+            radius = radius + 3.dp.toPx(),
             center = center,
-            style = Stroke(width = visual.strokeWidthDp.dp.toPx())
+            style = Stroke(width = 1.5.dp.toPx())
         )
     }
-    drawCircle(Color(0x18000000), radius = radius + 3.dp.toPx(), center = center + Offset(0f, 3.dp.toPx()))
-    drawCircle(color.copy(alpha = visual.fillAlpha), radius = radius, center = center)
-    drawCircle(Color.White.copy(alpha = 0.48f), radius = radius * 0.32f, center = center - Offset(radius * 0.24f, radius * 0.26f))
+    drawCircle(color.copy(alpha = fillAlpha), radius = radius, center = center)
+    if (node.depth == 0) {
+        drawCircle(
+            Color.White.copy(alpha = 0.35f * fillAlpha),
+            radius = radius * 0.35f,
+            center = center - Offset(radius * 0.25f, radius * 0.25f)
+        )
+    }
+    if (!showLabel) return
     val label = compactLabel(node.label, 9)
     val bold = radius >= 14.dp.toPx()
     val insideTextSize = 9f
@@ -1086,7 +1113,7 @@ private fun EmptyGraphPanel(state: KnowledgeGraphUiState) {
             .background(GraphCanvasBackground),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(Modifier.fillMaxSize()) { drawGraphDotGrid() }
+        Canvas(Modifier.fillMaxSize()) { drawGraphSourceStars() }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = state.title,
@@ -1283,7 +1310,7 @@ private fun statusColor(node: GraphLayoutNode): Color = when (node.status) {
     GraphNodeStatus.Archived -> GraphMuted
 }
 
-private val GraphCanvasBackground = Color.White
+private val GraphCanvasBackground = Color(GraphCanvasPresentation.BackgroundArgb)
 private val GraphInk = Color(0xFF141C29)
 private val GraphMuted = Color(0xFF738099)
 private val GraphLocked = Color(0xFF8794A9)

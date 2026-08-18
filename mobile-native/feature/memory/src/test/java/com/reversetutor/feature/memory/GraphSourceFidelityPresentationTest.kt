@@ -49,4 +49,22 @@ class GraphSourceFidelityPresentationTest {
         assertTrue(importance in 0..100)
         assertEquals(GraphNodeStatus.NeedsReview, node.status)
     }
+
+    @Test
+    fun selectedNeighborhoodUsesReferenceOpacityHierarchy() {
+        val node = GraphLayoutNode(
+            id = "node",
+            label = "Node",
+            kind = GraphNodeKind.Concept,
+            status = GraphNodeStatus.Active,
+            x = 0.5f,
+            y = 0.5f,
+            radius = 0.03f
+        )
+
+        assertEquals(1f, graphNodeFillAlpha(node, selected = false, neighbor = false, hasSelection = false))
+        assertEquals(1f, graphNodeFillAlpha(node, selected = true, neighbor = false, hasSelection = true))
+        assertEquals(0.85f, graphNodeFillAlpha(node, selected = false, neighbor = true, hasSelection = true))
+        assertEquals(0.25f, graphNodeFillAlpha(node, selected = false, neighbor = false, hasSelection = true))
+    }
 }

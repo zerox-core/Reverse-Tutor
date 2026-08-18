@@ -46,6 +46,19 @@ fun graphNodeStyle(
         semanticStatus = node.status
     )
 
+fun graphNodeFillAlpha(
+    node: GraphLayoutNode,
+    selected: Boolean,
+    neighbor: Boolean,
+    hasSelection: Boolean
+): Float = when {
+    node.isLocked -> 0.30f
+    selected -> 1f
+    !hasSelection -> 1f
+    neighbor -> 0.85f
+    else -> 0.25f
+}
+
 fun graphKindFillArgb(kind: GraphNodeKind): Long = when (kind) {
     GraphNodeKind.Concept -> 0xFF3B82F6L
     GraphNodeKind.Requirement -> 0xFFFF6B61L
