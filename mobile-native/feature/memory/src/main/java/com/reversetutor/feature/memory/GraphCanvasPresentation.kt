@@ -15,6 +15,17 @@ data class GraphNodeVisualStyle(
 
 object GraphCanvasPresentation {
     const val ControlTouchTargetDp = 48f
+    const val BackgroundArgb = 0xFFF7F8FAL
+    const val EdgeArgb = 0xFF64748BL
+    const val EdgeAlpha = 0.16f
+    const val EdgeHighlightAlpha = 0.70f
+    const val SelectionHaloAlpha = 0.25f
+    const val NodeRadiusMin = 2.5f
+    const val NodeRadiusMax = 18f
+    const val SemanticZoomHubOnly = 0.4f
+    const val SemanticZoomHubSecondary = 0.7f
+    const val SemanticZoomAll = 0.9f
+    const val SemanticZoomLabel = 1.6f
 }
 
 fun graphNodeStyle(
@@ -22,7 +33,7 @@ fun graphNodeStyle(
     selected: Boolean
 ): GraphNodeVisualStyle =
     GraphNodeVisualStyle(
-        fillArgb = node.kind.canvasFillArgb(),
+        fillArgb = graphKindFillArgb(node.kind),
         strokeArgb = node.status.canvasStrokeArgb(),
         fillAlpha = when {
             node.isLocked -> 0.30f
@@ -35,14 +46,17 @@ fun graphNodeStyle(
         semanticStatus = node.status
     )
 
-private fun GraphNodeKind.canvasFillArgb(): Long = when (this) {
-    GraphNodeKind.Concept -> 0xFF63BFE3
-    GraphNodeKind.Requirement -> 0xFFE3AF42
-    GraphNodeKind.Source -> 0xFF4FC2AF
-    GraphNodeKind.Session -> 0xFF7AA8ED
-    GraphNodeKind.Person -> 0xFF9B7AD1
-    GraphNodeKind.Other -> 0xFF8C73C5
+fun graphKindFillArgb(kind: GraphNodeKind): Long = when (kind) {
+    GraphNodeKind.Concept -> 0xFF3B82F6L
+    GraphNodeKind.Requirement -> 0xFFFF6B61L
+    GraphNodeKind.Source -> 0xFF84B547L
+    GraphNodeKind.Session -> 0xFF8B5CF6L
+    GraphNodeKind.Person -> 0xFFF59E0BL
+    GraphNodeKind.Other -> 0xFF22B8CFL
 }
+
+fun graphDisplayImportance(node: GraphLayoutNode, relatedEdgeCount: Int): Int =
+    if (node.isLocked) 0 else (relatedEdgeCount.coerceAtLeast(0) * 25).coerceIn(0, 100)
 
 private fun GraphNodeStatus.canvasStrokeArgb(): Long = when (this) {
     GraphNodeStatus.Active -> 0xFF2E5BFF
@@ -51,4 +65,3 @@ private fun GraphNodeStatus.canvasStrokeArgb(): Long = when (this) {
     GraphNodeStatus.Hidden -> 0xFF8794A9
     GraphNodeStatus.Archived -> 0xFF738099
 }
-
