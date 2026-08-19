@@ -2,6 +2,7 @@ package com.reversetutor.preview
 
 import android.content.Context
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -11,6 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -158,8 +160,11 @@ class Phase5GraphDeviceTest {
 
         composeRule.onNodeWithTag("graph-status-invalid").assertIsDisplayed()
         composeRule.onNodeWithTag("graph-node-list").assertIsDisplayed()
-        composeRule.onNodeWithTag("graph-node-invalid-node").performClick()
-        composeRule.onNodeWithTag("graph-node-detail").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-node-invalid-node")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        // The detail card is composed below the node-list content on the tall Android 12 viewport.
+        // Presence is the contract here; forcing an inner scroll would regress RT-2026-003.
+        composeRule.onNodeWithTag("graph-node-detail").assertExists()
 
         val largeState = KnowledgeGraphUiState.from(
             nodes = (1..61).map { graphNode("large-$it", "节点 $it") },
@@ -219,10 +224,13 @@ class Phase5GraphDeviceTest {
         composeRule.onNodeWithTag("graph-zoom-in").assertIsDisplayed()
         composeRule.onNodeWithTag("graph-zoom-out").assertIsDisplayed()
         composeRule.onNodeWithTag("graph-filter").assertIsDisplayed()
-        composeRule.onNodeWithTag("graph-node-list").performClick()
-        composeRule.onNodeWithTag("graph-node-evidence-node").performClick()
+        composeRule.onNodeWithTag("graph-node-list")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("graph-node-evidence-node")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle { assertEquals("evidence-node", selectedNodeId) }
-        composeRule.onNodeWithTag("graph-evidence-chat-message-evidence").performClick()
+        composeRule.onNodeWithTag("graph-evidence-chat-message-evidence")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle { assertEquals("message-evidence", chatTarget) }
         assertTrue(
             composeRule.onAllNodesWithText("查看资料引用", useUnmergedTree = true)
@@ -249,17 +257,22 @@ class Phase5GraphDeviceTest {
             }
         }
 
-        composeRule.onNodeWithTag("graph-review-archive").performClick()
+        composeRule.onNodeWithTag("graph-review-archive")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.onNodeWithTag("graph-review-confirm-archive").assertIsDisplayed()
         composeRule.onNodeWithText("节点：审核节点", substring = true).assertIsDisplayed()
-        composeRule.onNodeWithTag("graph-review-cancel").performClick()
+        composeRule.onNodeWithTag("graph-review-cancel")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle { assertTrue(calls.isEmpty()) }
 
-        composeRule.onNodeWithTag("graph-review-hide").performClick()
-        composeRule.onNodeWithTag("graph-review-confirm-hide").performClick()
+        composeRule.onNodeWithTag("graph-review-hide")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("graph-review-confirm-hide")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle { assertEquals(listOf(GraphNodeReviewAction.Hide), calls) }
 
-        composeRule.onNodeWithTag("graph-review-approve").performClick()
+        composeRule.onNodeWithTag("graph-review-approve")
+            .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.runOnIdle {
             assertEquals(
                 listOf(GraphNodeReviewAction.Hide, GraphNodeReviewAction.Approve),

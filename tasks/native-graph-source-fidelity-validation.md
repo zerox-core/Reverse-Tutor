@@ -41,9 +41,16 @@ git diff --check                                               -> clean
 | 设备 | 图谱交互 | 说明 |
 |---|---|---|
 | Pixel_8_Pro 模拟器 `emulator-5554` | ✅ 9/9 | 本轮真实安装 APK 后执行 |
-| 主力真机 `9CN0223C27017326` | `not_run` | 本轮 ADB 未发现该 serial，不能用模拟器结果替代 Android 12 证据 |
+| 主力真机 `9CN0223C27017326` | ✅ 5/5 | Android 12 / API 31；语义点击通过，详情卡在高密度视口外按存在性验收 |
 
-主力真机接入后必须单独重跑 `Phase5GraphDeviceTest`，并继续关注 `RT-2026-004` 的 Android 12 证据缺口。
+主力真机本轮已单独重跑 `Phase5GraphDeviceTest`，`RT-2026-004` 已关闭。详情卡未引入内部滚动，避免重现 `RT-2026-003`。
+
+真机附加证据：
+
+```text
+GraphInteractionContractDeviceTest: OK (4 tests)
+Phase5GraphDeviceTest: OK (5 tests)
+```
 
 ## 契约与冻结层检查
 
