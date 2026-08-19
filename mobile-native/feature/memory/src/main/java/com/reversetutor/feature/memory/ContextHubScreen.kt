@@ -154,8 +154,9 @@ fun ContextHubRoute(
 @OptIn(ExperimentalLayoutApi::class)
 fun GlobalGraphRoute(
     graphRepository: GraphRepository,
-    onOpenChat: () -> Unit,
-    onOpenSources: () -> Unit,
+    memoryRepository: MemoryRepository,
+    onOpenGraphChatEvidence: (String) -> Unit = {},
+    onOpenGraphSourceEvidence: (String) -> Unit = {},
     onOpenSettings: () -> Unit,
     onBack: () -> Unit = {},
     canvasModeActive: Boolean = false,
@@ -210,9 +211,11 @@ fun GlobalGraphRoute(
         state = KnowledgeGraphUiState.loading(GraphScope.Global)
         state = try {
             val snapshot = graphRepository.snapshot()
+            val memorySnapshot = memoryRepository.snapshot()
             KnowledgeGraphUiState.from(
                 nodes = snapshot.nodes,
                 edges = snapshot.edges,
+                memoryItems = memorySnapshot.items,
                 selectedNodeId = selectedNodeId,
                 scope = GraphScope.Global
             )
@@ -232,8 +235,12 @@ fun GlobalGraphRoute(
             if (canvasModeActive) onCanvasModeChange(false) else onBack()
         },
         onMore = onOpenSettings,
-        onOpenChatEvidence = { node -> node.sourceMessageId?.let { onOpenChat() } },
-        onOpenSourceEvidence = { node -> node.sourceId?.let { onOpenSources() } },
+        onOpenChatEvidence = { node ->
+            node.sourceMessageId?.let(onOpenGraphChatEvidence)
+        },
+        onOpenSourceEvidence = { node ->
+            node.sourceId?.let(onOpenGraphSourceEvidence)
+        },
         canvasModeActive = canvasModeActive,
         onCanvasModeChange = onCanvasModeChange,
         onRetry = { refreshKey += 1 },

@@ -1569,8 +1569,15 @@ private fun DestinationContent(
         if (destination == AppDestination.GlobalGraph) {
             GlobalGraphRoute(
                 graphRepository = graphRepository,
-                onOpenChat = onOpenChat,
-                onOpenSources = onOpenSources,
+                memoryRepository = memoryRepository,
+                onOpenGraphChatEvidence = { messageId ->
+                    pendingChatEvidenceTarget = messageId
+                    onOpenChat()
+                },
+                onOpenGraphSourceEvidence = { sourceId ->
+                    pendingSourceEvidenceTarget = sourceId
+                    onOpenSources()
+                },
                 onOpenSettings = onOpenSettings,
                 onBack = onOpenSessions,
                 canvasModeActive = graphCanvasModeActive,

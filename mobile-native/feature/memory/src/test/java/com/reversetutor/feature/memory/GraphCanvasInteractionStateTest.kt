@@ -2,6 +2,9 @@ package com.reversetutor.feature.memory
 
 import com.reversetutor.core.model.GraphNodeKind
 import com.reversetutor.core.model.GraphNodeStatus
+import com.reversetutor.core.model.GraphNode
+import com.reversetutor.core.model.MemoryItem
+import com.reversetutor.core.model.MemoryItemKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -59,6 +62,37 @@ class GraphCanvasInteractionStateTest {
             ),
             graphLegendItems(listOf(source, concept, concept.copy(id = "concept-two")))
         )
+    }
+
+    @Test
+    fun memory_item_enriches_global_graph_node_with_chat_evidence() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                GraphNode(
+                    id = "graph-node",
+                    spaceId = "default-space",
+                    label = "证据节点",
+                    kind = GraphNodeKind.Concept,
+                    createdAtEpochMillis = 1L,
+                    sourceMemoryId = "memory-anchor"
+                )
+            ),
+            edges = emptyList(),
+            memoryItems = listOf(
+                MemoryItem(
+                    id = "memory-anchor",
+                    spaceId = "default-space",
+                    kind = MemoryItemKind.Fact,
+                    title = "证据",
+                    body = "正文",
+                    createdAtEpochMillis = 1L,
+                    sourceMessageId = "message-9"
+                )
+            ),
+            scope = GraphScope.Global
+        )
+
+        assertEquals("message-9", state.allNodes.single().sourceMessageId)
     }
 
     private fun node(id: String, kind: GraphNodeKind) = GraphLayoutNode(
