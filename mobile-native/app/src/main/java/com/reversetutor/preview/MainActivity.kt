@@ -19,6 +19,7 @@ import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
 import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
 import com.reversetutor.preview.wiring.DebugLlmProfileBootstrapper
+import com.reversetutor.preview.wiring.DebugGraphScenarioSeeder
 import com.reversetutor.preview.wiring.HybridAppGraph
 import com.reversetutor.preview.wiring.HybridOnlineConfiguration
 import com.reversetutor.preview.wiring.RepositoryDebugLlmProfileStore
@@ -51,6 +52,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         configureSystemBars()
         receivedImportPayload = readImportPayload(intent)
+        if (BuildConfig.DEBUG) {
+            lifecycleScope.launch {
+                DebugGraphScenarioSeeder(appGraph).ensureSeeded(System.currentTimeMillis())
+            }
+        }
         lifecycleScope.launch {
             DebugLlmProfileBootstrapper(
                 store = RepositoryDebugLlmProfileStore(appGraph.llmProfileRepository)
