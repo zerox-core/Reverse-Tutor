@@ -35,7 +35,7 @@ class GraphInteractionContractDeviceTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun globalGraphRequiresCanvasTapBeforeCanvasMode() {
+    fun globalGraphEntersCanvasModeWithoutObstructiveExitOverlay() {
         var canvasMode by mutableStateOf(false)
         composeRule.setContent {
             FormalGlobalKnowledgeGraphScreen(
@@ -57,9 +57,7 @@ class GraphInteractionContractDeviceTest {
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag("graph-page-mode-indicator").assertDoesNotExist()
-        composeRule.onNodeWithTag("graph-canvas-mode-exit")
-            .assertIsDisplayed()
-            .assertHeightIsAtLeast(44.dp)
+        composeRule.onNodeWithTag("graph-canvas-mode-exit").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("回到中心")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(44.dp)

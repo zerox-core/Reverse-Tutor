@@ -1,6 +1,6 @@
 # Native Graph Source Fidelity 验收记录
 
-日期：2026-08-19  
+日期：2026-08-19（收尾复验）  
 分支：`Android`  
 实现提交：`65b481a`
 
@@ -41,9 +41,11 @@ git diff --check                                               -> clean
 | 设备 | 图谱交互 | 说明 |
 |---|---|---|
 | Pixel_8_Pro 模拟器 `emulator-5554` | ✅ 9/9 | 本轮真实安装 APK 后执行 |
-| 主力真机 `9CN0223C27017326` | ✅ 5/5 | Android 12 / API 31；语义点击通过，详情卡在高密度视口外按存在性验收 |
+| 主力真机 `9CN0223C27017326` | ✅ 9/9 | Android 12 / API 31；本轮更新主 APK 与测试 APK 后完整复跑 |
 
-主力真机本轮已单独重跑 `Phase5GraphDeviceTest`，`RT-2026-004` 已关闭。详情卡未引入内部滚动，避免重现 `RT-2026-003`。
+主力真机本轮已完整重跑 `GraphInteractionContractDeviceTest`（4/4）和
+`Phase5GraphDeviceTest`（5/5），`RT-2026-004` 已关闭。详情卡未引入内部滚动，避免重现
+`RT-2026-003`。
 
 真机附加证据：
 
@@ -51,6 +53,11 @@ git diff --check                                               -> clean
 GraphInteractionContractDeviceTest: OK (4 tests)
 Phase5GraphDeviceTest: OK (5 tests)
 ```
+
+本轮第一次模拟器运行发现旧测试仍要求已从沉浸式画布移除的巨大
+`graph-canvas-mode-exit` 浮层（8/9）；已将测试契约改为验证页面模式提示消失、旧浮层不再
+存在、以及“回到中心”控制仍可用，随后模拟器和主力真机均达到 9/9。未恢复遮挡内容的旧
+浮层。
 
 ## Debug 结构化图谱场景补充验收
 
@@ -78,12 +85,7 @@ Android 真实数据库测试确认：四个固定会话存在、21 个节点（
 模拟器重新启动主应用后，首页仍显示结构化会话；进入“全局图谱”并切换画布模式后，
 已人工确认“Python 入门路线”“知识图谱算法”“百炼 API 接入”等节点及跨会话连线可见。
 
-主力真机在 seed 测试完成后 USB 连接断开，因此本轮未重跑真机的 9 项图谱矩阵；该项
-保持待补，不能以既有 Android 12 图谱证据替代本轮复跑。设备重新接入后，只需重跑：
-
-```text
-GraphInteractionContractDeviceTest + Phase5GraphDeviceTest
-```
+本轮主力真机已重新接入并完成 9 项图谱矩阵，故该项不再待补。
 
 ## 契约与冻结层检查
 
@@ -93,6 +95,5 @@ GraphInteractionContractDeviceTest + Phase5GraphDeviceTest
 
 ## 后续门槛
 
-1. 主力真机接入后重跑同一图谱矩阵，单独记录 Android 12 结果。
-2. 在两台设备各保存初始态、选中态、搜索态、帮助态截图，与 `F:\xw\.design-review` 的源码页面截图逐项比对。
-3. 设备证据齐全后，再更新 P6/PWA 退出决策；模拟器通过不得单独关闭 Android 12 阻塞项。
+1. 在两台设备各保存初始态、选中态、搜索态、帮助态截图，与 `F:\xw\.design-review` 的源码页面截图逐项比对。
+2. 设备证据齐全后，再更新 P6/PWA 退出决策；本轮已同时取得模拟器和 Android 12 真机证据。
