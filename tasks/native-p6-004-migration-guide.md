@@ -236,7 +236,21 @@ Dry-run 结果页让用户在确认前了解导入影响。
 | `Phase4ImportExportDeviceTest` | not_run | emulator-5554 未运行；导入 dry-run/append/overwrite/new-space/导出/wipe 待补 |
 | 主力真机 fixture 导入 | not_run | 主力真机 serial 未提供 |
 
-### 10.4 验收
+### 10.4 2026-08-19 JVM 复验增量
+
+以下现有契约测试在未修改冻结层实现的前提下重新执行并通过：
+
+```text
+:core:data:testDebugUnitTest --tests "*.NativeImportRepositoryTest" --tests "*.NativeExportRepositoryTest"
+:core:protocol:testDebugUnitTest --tests "*.ProtocolExportPayloadBuilderTest"
+BUILD SUCCESSFUL in 9s
+```
+
+该结果覆盖导入/导出仓储与协议载荷构建的 JVM 语义，不替代模拟器和主力真机上的五类
+fixture（valid、invalid、duplicate、secret-containing、large-but-valid）演练；设备状态仍
+保持 `not_run`。
+
+### 10.5 验收
 
 - [ ] 至少准备 valid、invalid、duplicate、secret-containing、large-but-valid 五类 fixture
 - [ ] JVM 测试覆盖 validator、dry-run、append/overwrite/new-space、幂等和脱敏
