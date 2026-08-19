@@ -52,6 +52,39 @@ GraphInteractionContractDeviceTest: OK (4 tests)
 Phase5GraphDeviceTest: OK (5 tests)
 ```
 
+## Debug 结构化图谱场景补充验收
+
+本轮新增的 Debug-only seeder 只位于 `app/wiring`，由 `MainActivity` 在
+`BuildConfig.DEBUG` 时异步触发；Release 不会写入这组数据。它通过现有
+Repository 写入固定 fixture，不修改 Room、DAO、schema、Repository 签名、协议或图谱算法。
+
+场景数据：4 个会话、8 条消息、8 个证据锚点、20 个可见节点、1 个隐藏幂等标记和
+25 条边。包含 Python、知识图谱、百炼 API 与阶段复盘四个会话根节点；所有边端点和
+所有证据反向引用均受测试约束。
+
+本轮真实证据：
+
+```text
+主力真机 9CN0223C27017326（Android 12）：
+DebugGraphScenarioSeedDeviceTest: OK (1 test, 0.387s)
+
+Pixel_8_Pro 模拟器 emulator-5554（Android 16）：
+DebugGraphScenarioSeedDeviceTest: OK (1 test, 2.157s)
+GraphInteractionContractDeviceTest + Phase5GraphDeviceTest: OK (9 tests)
+```
+
+Android 真实数据库测试确认：四个固定会话存在、21 个节点（含隐藏 marker）、25 条边、
+8 个 memory item、全部边端点有效；第二次注入结果为 `AlreadySeeded` 且数量不变。
+模拟器重新启动主应用后，首页仍显示结构化会话；进入“全局图谱”并切换画布模式后，
+已人工确认“Python 入门路线”“知识图谱算法”“百炼 API 接入”等节点及跨会话连线可见。
+
+主力真机在 seed 测试完成后 USB 连接断开，因此本轮未重跑真机的 9 项图谱矩阵；该项
+保持待补，不能以既有 Android 12 图谱证据替代本轮复跑。设备重新接入后，只需重跑：
+
+```text
+GraphInteractionContractDeviceTest + Phase5GraphDeviceTest
+```
+
 ## 契约与冻结层检查
 
 - `KnowledgeGraphUiState`、`GraphLayoutNode`、`GraphLayoutEdge`、`GraphInteractionPolicy` 签名未修改。
