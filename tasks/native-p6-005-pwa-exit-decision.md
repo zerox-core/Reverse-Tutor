@@ -158,6 +158,15 @@ PWA/Capacitor 退出决策当前处于 `blocked` 状态。原因：
 5. **全部条件满足后** → 将结论从 `blocked` 改为 `proposed`，提交用户审批
 6. **用户批准后** → 将结论改为 `approved`，方可执行 PWA/Capacitor 退出
 
+## 8. 2026-08-19 图谱证据增量
+
+图谱切片已取得两台目标设备的独立证据：`GraphInteractionContractDeviceTest` 与
+`Phase5GraphDeviceTest` 在 `emulator-5554` 和主力真机 `9CN0223C27017326` 均为 9/9
+通过，覆盖画布安全区、真实节点/边交互、搜索/帮助、详情、证据回跳和审查确认。
+
+该证据只改善 `LEG-020` / `LEG-025` 的设备证据，不改变其 `in_progress/blocker` 状态，也不
+改变本文件的 `blocked` 结论：全量 P0 parity、迁移 fixture 演练、TalkBack 与其他设备矩阵仍未完成。
+
 ---
 
 ## 7. 决策状态词汇

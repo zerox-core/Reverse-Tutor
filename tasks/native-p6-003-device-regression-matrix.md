@@ -148,3 +148,15 @@
 
 1. 定位并修复 Android 12 真机上图谱详情、确认对话框和聊天证据回调差异；修复后重跑真机图谱类。
 2. 在主力真机完成深色模式、大字号、IME、48dp 与 TalkBack 人工检查；未执行前保持 `not_run`。
+
+## 6. 2026-08-19 图谱切片复验增量
+
+本节是对上方历史矩阵快照的增量记录，不改写未在本轮执行的其他测试类。
+
+| 设备 | 测试类 | 结果 | 说明 |
+|---|---|---|---|
+| `emulator-5554`（Pixel_8_Pro，Android 16） | `GraphInteractionContractDeviceTest` + `Phase5GraphDeviceTest` | **9/9 pass** | 使用最新 Debug APK 与 AndroidTest APK；覆盖动态图例、安全区、画布交互、搜索/帮助、详情、证据入口及破坏性操作确认。 |
+| `9CN0223C27017326`（BRA-AL00，Android 12） | `GraphInteractionContractDeviceTest` + `Phase5GraphDeviceTest` | **9/9 pass** | 通过语义点击与 Android 12 详情存在性契约；未引入嵌套滚动；测试结束已卸载测试包并恢复主应用前台。 |
+
+本轮发现并修复一处测试契约漂移：旧测试仍要求已从沉浸式画布移除的巨大退出浮层。修复提交为
+`f6eb59e`，产品 UI 未恢复该遮挡浮层。该增量只更新图谱证据，不代表 P6 全量设备矩阵或 PWA 退出条件已满足。
