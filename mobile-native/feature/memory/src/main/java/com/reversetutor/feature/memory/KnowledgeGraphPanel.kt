@@ -330,6 +330,7 @@ fun FormalGraphCanvas(
     showLockedNodes: Boolean,
     onSelectedNodeChange: (String?) -> Unit,
     modifier: Modifier = Modifier,
+    nodePositionOverrides: Map<String, GraphPoint> = emptyMap(),
     initialScale: Float = 1f,
     expandedSessionRoot: Boolean = false,
     showToolbar: Boolean = false,
@@ -353,7 +354,7 @@ fun FormalGraphCanvas(
     val density = LocalDensity.current
     val viewConfiguration = LocalViewConfiguration.current
     val renderSnapshot = state.renderSnapshot(showLockedNodes)
-        .withNodePositions(gestureState.nodePositions)
+        .withNodePositions(nodePositionOverrides + gestureState.nodePositions)
     val semanticMode = graphSemanticMode(state.scope, gestureState.scale)
     val extent = graphCanvasExtent(renderSnapshot.nodes, semanticMode)
     val currentSnapshot by rememberUpdatedState(renderSnapshot)

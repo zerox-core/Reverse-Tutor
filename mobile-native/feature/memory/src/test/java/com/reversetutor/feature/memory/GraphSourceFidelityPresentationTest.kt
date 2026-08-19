@@ -67,4 +67,30 @@ class GraphSourceFidelityPresentationTest {
         assertEquals(0.85f, graphNodeFillAlpha(node, selected = false, neighbor = true, hasSelection = true))
         assertEquals(0.25f, graphNodeFillAlpha(node, selected = false, neighbor = false, hasSelection = true))
     }
+
+    @Test
+    fun legend_layout_starts_below_graph_top_bar() {
+        assertTrue(
+            GraphCanvasOverlaySpec.LegendTopPadding.value >=
+                GraphCanvasOverlaySpec.TopBarHeight.value
+        )
+    }
+
+    @Test
+    fun legend_has_no_rows_for_absent_node_kinds() {
+        val source = GraphLayoutNode(
+            id = "source",
+            label = "资料",
+            kind = GraphNodeKind.Source,
+            status = GraphNodeStatus.Active,
+            x = 0.5f,
+            y = 0.5f,
+            radius = 0.03f
+        )
+
+        assertEquals(
+            listOf(GraphLegendItem(GraphNodeKind.Source, "资料", 1)),
+            graphLegendItems(listOf(source))
+        )
+    }
 }

@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -146,9 +147,17 @@ fun FormalGlobalKnowledgeGraphScreen(
     onViewportChanged: (GraphViewportState) -> Unit = {},
     onNodePositionChanged: (String, GraphPoint) -> Unit = { _, _ -> }
 ) {
-    var showGraphHelp by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    var interactionState by remember(state.scope) {
+        mutableStateOf(GraphCanvasInteractionState())
+    }
+    LaunchedEffect(state.allNodes.map { it.id }) {
+        interactionState = reduceGraphCanvasInteraction(
+            interactionState,
+            GraphCanvasInteractionEvent.ReconcileNodes(
+                state.allNodes.mapTo(linkedSetOf()) { it.id }
+            )
+        )
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -182,19 +191,44 @@ fun FormalGlobalKnowledgeGraphScreen(
                     onRequestInteraction = { onCanvasModeChange(true) },
                     onSearch = if (canvasModeActive) {
                         {
-                            searchOpen = !searchOpen
+                            interactionState = reduceGraphCanvasInteraction(
+                                interactionState,
+                                GraphCanvasInteractionEvent.SearchOpenChanged(
+                                    !interactionState.searchOpen
+                                )
+                            )
                             onSearch?.invoke()
                         }
                     } else {
                         null
                     },
-                    onHelpToggle = { showGraphHelp = !showGraphHelp },
+                    onHelpToggle = {
+                        interactionState = reduceGraphCanvasInteraction(
+                            interactionState,
+                            GraphCanvasInteractionEvent.HelpOpenChanged(
+                                !interactionState.helpOpen
+                            )
+                        )
+                    },
                     toolbarAlignment = Alignment.TopEnd,
                     toolbarModifier = Modifier.padding(top = 16.dp, end = 16.dp),
                     showToolbar = canvasModeActive && state.allNodeCount > 0,
                     onInteractionChanged = onGraphInteractionChanged,
-                    onViewportChanged = onViewportChanged,
-                    onNodePositionChanged = onNodePositionChanged,
+                    nodePositionOverrides = interactionState.nodePositionOverrides,
+                    onViewportChanged = { viewport ->
+                        interactionState = reduceGraphCanvasInteraction(
+                            interactionState,
+                            GraphCanvasInteractionEvent.ViewportChanged(viewport)
+                        )
+                        onViewportChanged(viewport)
+                    },
+                    onNodePositionChanged = { nodeId, point ->
+                        interactionState = reduceGraphCanvasInteraction(
+                            interactionState,
+                            GraphCanvasInteractionEvent.NodeMoved(nodeId, point)
+                        )
+                        onNodePositionChanged(nodeId, point)
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
                 if (state.status in setOf(
@@ -213,62 +247,52 @@ fun FormalGlobalKnowledgeGraphScreen(
         }
         if (canvasModeActive) {
             GraphSourceLegend(
+                nodes = state.nodes,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 16.dp, top = 16.dp)
+                    .padding(
+                        start = GraphCanvasOverlaySpec.OuterPadding,
+                        top = GraphCanvasOverlaySpec.LegendTopPadding
+                    )
             )
         }
-        if (showGraphHelp && canvasModeActive) {
+        if (interactionState.helpOpen && canvasModeActive) {
             GraphSourceHelpPanel(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 16.dp, bottom = 16.dp)
             )
         }
-        if (searchOpen && canvasModeActive) {
+        if (interactionState.searchOpen && canvasModeActive) {
             GraphSourceSearchPanel(
-                query = searchQuery,
+                query = interactionState.searchQuery,
                 nodes = state.allNodes,
-                onQueryChange = { searchQuery = it },
+                onQueryChange = {
+                    interactionState = reduceGraphCanvasInteraction(
+                        interactionState,
+                        GraphCanvasInteractionEvent.SearchQueryChanged(it)
+                    )
+                },
                 onSelectNode = { nodeId ->
                     onSelectedNodeChange(nodeId)
-                    searchQuery = ""
-                    searchOpen = false
+                    interactionState = reduceGraphCanvasInteraction(
+                        interactionState,
+                        GraphCanvasInteractionEvent.SearchOpenChanged(false)
+                    )
                 },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 72.dp, end = 16.dp)
+                    .padding(
+                        top = GraphCanvasOverlaySpec.SearchTopPadding,
+                        end = GraphCanvasOverlaySpec.OuterPadding
+                    )
             )
         }
-        if (canvasModeActive) {
-            Surface(
-                onClick = { onCanvasModeChange(false) },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 72.dp)
-                    .heightIn(min = 44.dp)
-                    .testTag("graph-canvas-mode-exit"),
-                color = FormalColors.Primary,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(FormalShapes.PillRadius),
-                shadowElevation = 2.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "画布模式 · 退出",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        color = Color.White,
-                        fontSize = LocalFormalTypeScale.current.size(11f),
-                        lineHeight = LocalFormalTypeScale.current.size(16f),
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        } else {
+        if (!canvasModeActive) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 72.dp)
+                    .padding(top = GraphCanvasOverlaySpec.TopBarHeight + 16.dp)
                     .heightIn(min = 44.dp)
                     .testTag("graph-page-mode-indicator"),
                 color = FormalColors.Surface,
@@ -714,8 +738,19 @@ private fun GraphInfoChip(
     }
 }
 
+internal object GraphCanvasOverlaySpec {
+    val TopBarHeight = 72.dp
+    val OuterPadding = 16.dp
+    val LegendTopPadding = TopBarHeight + OuterPadding
+    val SearchTopPadding = TopBarHeight + 64.dp
+}
+
 @Composable
-private fun GraphSourceLegend(modifier: Modifier = Modifier) {
+private fun GraphSourceLegend(
+    nodes: List<GraphLayoutNode>,
+    modifier: Modifier = Modifier
+) {
+    val legendItems = graphLegendItems(nodes)
     Surface(
         modifier = modifier.testTag("graph-source-legend"),
         color = Color(0xE6F7F8FA),
@@ -732,22 +767,17 @@ private fun GraphSourceLegend(modifier: Modifier = Modifier) {
                 fontSize = LocalFormalTypeScale.current.size(9f),
                 fontWeight = FontWeight.Medium
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GraphSourceLegendItem(GraphNodeKind.Concept, "核心概念")
-                GraphSourceLegendItem(GraphNodeKind.Other, "知识领域")
-                GraphSourceLegendItem(GraphNodeKind.Session, "技术项目")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GraphSourceLegendItem(GraphNodeKind.Source, "资源设施")
-                GraphSourceLegendItem(GraphNodeKind.Person, "知识图谱")
-                GraphSourceLegendItem(GraphNodeKind.Requirement, "产品设计")
+            legendItems.chunked(3).forEach { rowItems ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowItems.forEach { item -> GraphSourceLegendItem(item) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun GraphSourceLegendItem(kind: GraphNodeKind, label: String) {
+private fun GraphSourceLegendItem(item: GraphLegendItem) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -755,9 +785,12 @@ private fun GraphSourceLegendItem(kind: GraphNodeKind, label: String) {
         Box(
             modifier = Modifier
                 .size(8.dp)
-                .background(Color(graphKindFillArgb(kind)), CircleShape)
+                .background(Color(graphKindFillArgb(item.kind)), CircleShape)
         )
-        Text(label, fontSize = LocalFormalTypeScale.current.size(8f))
+        Text(
+            text = "${item.label} ${item.count}",
+            fontSize = LocalFormalTypeScale.current.size(8f)
+        )
     }
 }
 
