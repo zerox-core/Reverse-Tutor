@@ -5,13 +5,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Session turn policy contract tests — wire-value normalization.
+ * Session turn policy tests.
  *
- * Task 1 covers the pure normalization surface; behavioral decision rules
- * (entry-status rewrites, understood claims, probing intensity, correction
- * timing, first-turn constraints) are added in Task 2.
+ * Task 1 covers wire-value normalization; Task 2 adds behavioral decision
+ * rules migrated from old `main:engine.py` `_normalize_turn_payload`.
  */
 class SessionTurnPolicyTest {
+
+    // =========================================================================
+    // Task 1: Normalization tests
+    // =========================================================================
 
     // --- mode normalization -------------------------------------------------
 
@@ -183,7 +186,6 @@ class SessionTurnPolicyTest {
         assertEquals(ActionTypeWire.STUDY_ALL, SessionTurnContracts.actionWhitelistForMode(SessionModeWire.STUDY))
         assertEquals(ActionTypeWire.GOAL_ALL, SessionTurnContracts.actionWhitelistForMode(SessionModeWire.GOAL))
         assertEquals(ActionTypeWire.COMPANION_ALL, SessionTurnContracts.actionWhitelistForMode(SessionModeWire.COMPANION))
-        // invalid mode falls back to study whitelist
         assertEquals(ActionTypeWire.STUDY_ALL, SessionTurnContracts.actionWhitelistForMode("tutor"))
     }
 
@@ -198,5 +200,388 @@ class SessionTurnPolicyTest {
         assertEquals(StudentRoleWire.GOAL_PARTNER, SessionTurnContracts.studentRoleForAction(ActionTypeWire.DECOMPOSE))
         assertEquals(StudentRoleWire.COMPANION, SessionTurnContracts.studentRoleForAction(ActionTypeWire.OBSERVE))
         assertEquals(StudentRoleWire.PROBING_STUDENT, SessionTurnContracts.studentRoleForAction("bogus"))
+    }
+
+    // =========================================================================
+    // Task 2: Behavioral decision rules
+    // =========================================================================
+
+    // --- study action whitelist and fallback -------------------------------
+
+    @Test
+    fun studyInvalidActionFallsBackToAsk() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = "bogus_action",
+            entryStatus = EntryStatusWire.HAS_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.ASK, out.action.type)
+    }
+
+    @Test
+    fun studyValidActionIsPreserved() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.CHALLENGE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            knowledgePoint = "导数定义"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.CHALLENGE, out.action.type)
+    }
+
+    // --- no_entry + ask/probe/next/recap -> clue ----------------------------
+
+    @Test
+    fun noEntryWithAskBecomesClue() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.NO_ENTRY,
+            knowledgePoint = "极限"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.CLUE, out.action.type)
+    }
+
+    @Test
+    fun noEntryWithProbeBecomesClue() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.PROBE,
+            entryStatus = EntryStatusWire.NO_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.CLUE, out.action.type)
+    }
+
+    @Test
+    fun noEntryWithNextBecomesClue() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.NEXT,
+            entryStatus = EntryStatusWire.NO_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.CLUE, out.action.type)
+    }
+
+    @Test
+    fun noEntryWithRecapBecomesClue() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.RECAP,
+            entryStatus = EntryStatusWire.NO_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.CLUE, out.action.type)
+    }
+
+    // --- has_entry + clue/scaffold_example -> probe -------------------------
+
+    @Test
+    fun hasEntryWithClueBecomesProbe() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.CLUE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            knowledgePoint = "连续性"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.PROBE, out.action.type)
+    }
+
+    @Test
+    fun hasEntryWithScaffoldExampleBecomesProbe() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.SCAFFOLD_EXAMPLE,
+            entryStatus = EntryStatusWire.HAS_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.PROBE, out.action.type)
+    }
+
+    // --- understood claim -> examiner_verify --------------------------------
+
+    @Test
+    fun understoodClaimBecomesExaminerVerify() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            userInput = "我懂了这个知识点",
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            knowledgePoint = "导数"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.EXAMINER_VERIFY, out.action.type)
+    }
+
+    @Test
+    fun understoodClaimWithDifferentKeyword() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            userInput = "明白了，就是这么算的",
+            actionType = ActionTypeWire.PROBE,
+            entryStatus = EntryStatusWire.HAS_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.EXAMINER_VERIFY, out.action.type)
+    }
+
+    // --- force probe --------------------------------------------------------
+
+    @Test
+    fun forceProbeOverridesActionToProbe() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            forceProbe = true,
+            knowledgePoint = "极限"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.PROBE, out.action.type)
+    }
+
+    // --- high probing intensity converting ask -> probe ---------------------
+
+    @Test
+    fun highProbingIntensityConvertsAskToProbe() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            settings = SessionStrategySettings(probingIntensity = 5),
+            knowledgePoint = "泰勒展开"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.PROBE, out.action.type)
+    }
+
+    @Test
+    fun lowProbingIntensityKeepsAsk() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            settings = SessionStrategySettings(probingIntensity = 3),
+            knowledgePoint = "泰勒展开"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.ASK, out.action.type)
+    }
+
+    // --- active error + low correctness -> small_lecture ---------------------
+
+    @Test
+    fun activeErrorAndLowCorrectnessConvertsToSmallLecture() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            settings = SessionStrategySettings(probingIntensity = 3),
+            correctness = 0.2f,
+            hasActiveError = true,
+            knowledgePoint = "链式法则"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.SMALL_LECTURE, out.action.type)
+    }
+
+    @Test
+    fun noActiveErrorKeepsAsk() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            settings = SessionStrategySettings(probingIntensity = 3),
+            correctness = 0.2f,
+            hasActiveError = false,
+            knowledgePoint = "链式法则"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.ASK, out.action.type)
+    }
+
+    // --- summary_only correction -> recap -----------------------------------
+
+    @Test
+    fun summaryOnlyCorrectionConvertsToRecap() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.CHALLENGE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            settings = SessionStrategySettings(correctionTiming = CorrectionTimingWire.SUMMARY_ONLY),
+            evidenceType = MasteryEvidenceTypeWire.CORRECTION,
+            knowledgePoint = "积分"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.RECAP, out.action.type)
+    }
+
+    @Test
+    fun immediateTimingDoesNotConvertToRecap() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.CHALLENGE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            settings = SessionStrategySettings(correctionTiming = CorrectionTimingWire.IMMEDIATE),
+            evidenceType = MasteryEvidenceTypeWire.CORRECTION,
+            knowledgePoint = "积分"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.CHALLENGE, out.action.type)
+    }
+
+    // --- goal/companion whitelist and evidence reset -----------------------
+
+    @Test
+    fun goalModeResetsEvidenceToNone() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.GOAL,
+            actionType = ActionTypeWire.ADVANCE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            evidenceType = MasteryEvidenceTypeWire.EXPLANATION,
+            evidenceStatus = MasteryEvidenceStatusWire.PASSED,
+            knowledgePoint = "项目里程碑"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(MasteryEvidenceTypeWire.NONE, out.evaluation.evidence.type)
+        assertEquals(MasteryEvidenceStatusWire.NONE, out.evaluation.evidence.status)
+        assertTrue(out.evaluation.evidence.reason.contains("goal"))
+    }
+
+    @Test
+    fun companionModeResetsEvidenceToNone() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.COMPANION,
+            actionType = ActionTypeWire.OBSERVE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            evidenceType = MasteryEvidenceTypeWire.RETRIEVAL,
+            evidenceStatus = MasteryEvidenceStatusWire.PASSED,
+            knowledgePoint = "情绪"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(MasteryEvidenceTypeWire.NONE, out.evaluation.evidence.type)
+        assertEquals(MasteryEvidenceStatusWire.NONE, out.evaluation.evidence.status)
+        assertTrue(out.evaluation.evidence.reason.contains("companion"))
+    }
+
+    @Test
+    fun goalModeInvalidActionFallsBackToAdvance() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.GOAL,
+            actionType = ActionTypeWire.ASK,  // study action in goal mode
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            knowledgePoint = "目标"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertTrue(out.action.type in ActionTypeWire.GOAL_ALL)
+    }
+
+    @Test
+    fun companionModeNegativeInputBecomesEmpathize() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.COMPANION,
+            userInput = "太累了，不想学了",
+            actionType = "bogus",
+            entryStatus = EntryStatusWire.HAS_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.EMPATHIZE, out.action.type)
+    }
+
+    // --- first-turn constraints ---------------------------------------------
+
+    @Test
+    fun firstTurnStudyIsAsk() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            isFirstTurn = true,
+            actionType = ActionTypeWire.CHALLENGE,  // should be overridden
+            knowledgePoint = "导数"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.ASK, out.action.type)
+        assertEquals(0f, out.evaluation.correctness, 0f)
+    }
+
+    @Test
+    fun firstTurnGoalIsDecompose() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.GOAL,
+            isFirstTurn = true,
+            actionType = ActionTypeWire.ADVANCE,  // should be overridden
+            knowledgePoint = "项目"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.DECOMPOSE, out.action.type)
+    }
+
+    @Test
+    fun firstTurnCompanionIsObserve() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.COMPANION,
+            isFirstTurn = true,
+            actionType = ActionTypeWire.SOFT_GUIDE,  // should be overridden
+            knowledgePoint = "状态"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(ActionTypeWire.OBSERVE, out.action.type)
+    }
+
+    // --- process summary ----------------------------------------------------
+
+    @Test
+    fun processSummaryIsNonEmpty() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.PROBE,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            knowledgePoint = "极限"
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertTrue(out.processSummary.isNotEmpty())
+        assertTrue(out.processSummary.contains("极限"))
+    }
+
+    @Test
+    fun blankKnowledgePointUsesDefault() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY,
+            knowledgePoint = ""
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(SessionTurnContracts.DEFAULT_KNOWLEDGE_POINT, out.action.knowledgePoint)
+    }
+
+    // --- entry status derivation from keywords ------------------------------
+
+    @Test
+    fun recallDecayKeywordSetsEntryStatus() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            userInput = "我忘了怎么算这个",
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(EntryStatusWire.RECALL_DECAY, out.evaluation.entryStatus)
+    }
+
+    @Test
+    fun noEntryKeywordSetsEntryStatus() {
+        val input = SessionPolicyInput(
+            mode = SessionModeWire.STUDY,
+            userInput = "完全没听说过这个",
+            actionType = ActionTypeWire.ASK,
+            entryStatus = EntryStatusWire.HAS_ENTRY
+        )
+        val out = SessionTurnPolicy.normalize(input)
+        assertEquals(EntryStatusWire.NO_ENTRY, out.evaluation.entryStatus)
     }
 }
