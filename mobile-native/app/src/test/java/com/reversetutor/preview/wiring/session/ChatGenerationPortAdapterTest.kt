@@ -61,6 +61,22 @@ class ChatGenerationPortAdapterTest {
         assertNull("buildInput must not fabricate a model binding id", input.modelBindingId)
     }
 
+    @Test
+    fun `stale preflight skips frozen generation and returns Stale`() = runTest {
+        var generationCalled = false
+        val adapter = ChatGenerationPortAdapter(
+            generate = { _, _, _, _ ->
+                generationCalled = true
+                ChatGenerationOutcome.Generated(assistantMessageId = "must-not-exist")
+            }
+        )
+
+        val outcome = adapter.generateReply(request(), 1000L) { false }
+
+        assertEquals(GenerationOutcome.Stale, outcome)
+        assertFalse("an already-stale turn must not start frozen generation", generationCalled)
+    }
+
     // -- Scenario 2: Fake Runtime 成功路径 ------------------------------------
 
     @Test

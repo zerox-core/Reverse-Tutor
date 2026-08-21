@@ -52,6 +52,7 @@ import com.reversetutor.preview.BuildConfig
 import com.reversetutor.preview.shell.ChallengeRuntimeCoordinator
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
+import com.reversetutor.preview.wiring.session.SessionConversationAssembly
 
 data class HybridFrontendFactories(
     val workspaceViewModelFactory: WorkspaceViewModelFactory,
@@ -114,6 +115,7 @@ class HybridAppGraph private constructor(
     val messageRepository: MessageRepository,
     val llmProfileRepository: LlmProfileRepository,
     val chatGenerationRepository: ChatGenerationRepository,
+    val sessionConversationAssembly: SessionConversationAssembly,
     val backgroundGenerationRepository: BackgroundGenerationRepository,
     val sourceRepository: SourceRepository,
     val memoryRepository: MemoryRepository,
@@ -183,16 +185,30 @@ class HybridAppGraph private constructor(
                 HybridLlmRuntimeMode.Production ->
                     DataModule.backgroundGenerationRepository(appContext)
             }
+            val sourceRepository = DataModule.sourceRepository(appContext)
+            val memoryRepository = DataModule.memoryRepository(appContext)
+            val graphRepository = DataModule.graphRepository(appContext)
+            val sessionConversationAssembly = SessionConversationAssembly(
+                chatGenerationRepository = chatGenerationRepository,
+                messageRepository = messageRepository,
+                conversationRunRepository = conversationRunRepository,
+                sessionRepository = sessionRepository,
+                memoryRepository = memoryRepository,
+                graphRepository = graphRepository,
+                sourceRepository = sourceRepository,
+                learningRepository = learningRepository
+            )
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,
                 llmProfileRepository = DataModule.llmProfileRepository(appContext),
                 chatGenerationRepository = chatGenerationRepository,
+                sessionConversationAssembly = sessionConversationAssembly,
                 backgroundGenerationRepository = backgroundGenerationRepository,
-                sourceRepository = DataModule.sourceRepository(appContext),
-                memoryRepository = DataModule.memoryRepository(appContext),
-                graphRepository = DataModule.graphRepository(appContext),
+                sourceRepository = sourceRepository,
+                memoryRepository = memoryRepository,
+                graphRepository = graphRepository,
                 learningRepository = learningRepository,
                 conversationRunRepository = conversationRunRepository,
                 modelConnectionRepository = modelConnectionRepository,

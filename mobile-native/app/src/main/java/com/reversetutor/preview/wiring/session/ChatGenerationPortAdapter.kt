@@ -30,10 +30,11 @@ import com.reversetutor.core.llm.LlmGenerationToken
  *   reaches the domain/UI.
  *
  * Token/session currency is enforced by the [canPersistResult] guard the
- * coordinator supplies (it is built from the persistence port). The frozen
- * `isTokenCurrent` is wired to a permissive pass: in this wiring the frozen
- * repository owns assistant persistence, and staleness is gated through
- * `canPersistResult` before the frozen repo persists.
+ * coordinator supplies (it is built from the persistence port). The adapter
+ * checks it before invoking frozen generation and passes the same guard to the
+ * frozen repository for the completion-time race check. The frozen
+ * `isTokenCurrent` is wired to a permissive pass because it has no suspend
+ * callback; this adapter does not let that pass bypass the live guard.
  */
 class ChatGenerationPortAdapter(
     private val generate: suspend (
@@ -50,6 +51,9 @@ class ChatGenerationPortAdapter(
         nowEpochMillis: Long,
         canPersistResult: suspend () -> Boolean
     ): GenerationOutcome {
+        if (!canPersistResult()) {
+            return GenerationOutcome.Stale
+        }
         val input = buildInput(request)
         val outcome = generate(input, nowEpochMillis, { _ -> true }, canPersistResult)
         return mapOutcome(request, outcome)

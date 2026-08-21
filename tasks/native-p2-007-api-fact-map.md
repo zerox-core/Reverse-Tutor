@@ -8,7 +8,7 @@
 ## 1. Scope
 
 This document inventories the **real public signatures** of the existing
-(rozen) repositories that the non-frozen adapter/wiring layer must delegate to,
+frozen repositories that the non-frozen adapter/wiring layer must delegate to,
 the domain ports each adapter implements, and the honest capability gaps that
 the wiring does NOT fake.
 
@@ -31,9 +31,11 @@ suspend fun generateReply(
   the assistant message via `messageRepository.saveMessage(...)` **inside** the
   call, gated by `canPersistResult`. The non-frozen adapter does NOT
   re-persist (see §4).
-- `isTokenCurrent` is a permissive pass in the wiring — real staleness is
-  enforced through the `canPersistResult` guard the coordinator supplies
-  (built from the persistence port).
+- `isTokenCurrent` is a permissive pass in the frozen invocation because it is
+  non-suspending. The adapter first calls the coordinator's live
+  `canPersistResult` guard and returns `Stale` without invoking frozen
+  generation when it is false; it then passes that same guard to the frozen
+  repository for the completion-time race check.
 
 ### ChatGenerationInput (rozen · core/data/llm)
 
@@ -108,9 +110,10 @@ The frozen `ChatGenerationRepository` owns assistant persistence: it saves the
 assistant message inside `generateReply`, gated by `canPersistResult`. The
 non-frozen `SessionTurnPersistencePortAdapter.acceptAssistantResult` is a
 **confirmation only** (returns `true`) — re-saving would duplicate frozen
-persistence semantics. The coordinator's `canPersistResult` guard
-(`isTokenCurrent(token) && !isSessionDeleted(sessionId)`) is the real
-staleness/deletion gate passed through to the frozen repo. (Final-report §7.2.)
+persistence semantics. The adapter evaluates the coordinator's
+`canPersistResult` guard (`isTokenCurrent(token) && !isSessionDeleted(sessionId)`)
+before invoking the frozen repository, then passes it through for the
+post-generation race check. (Final-report §7.2.)
 
 ## 5. Scoping caveats (honest, not faked)
 
@@ -139,8 +142,9 @@ into explicit `NoData` / empty categories, never a failure.
 
 ## 7. Composition root
 
-`SessionConversationAssembly` (package `com.reversetutor.preview.wiring.session`)
-is a Compose-free entry point:
+`HybridAppGraph.sessionConversationAssembly` owns one
+`SessionConversationAssembly` (package `com.reversetutor.preview.wiring.session`),
+which is the Compose-free entry point for future consumers:
 
 ```
 UI ─► SessionConversationAssembly.runTurn/overview

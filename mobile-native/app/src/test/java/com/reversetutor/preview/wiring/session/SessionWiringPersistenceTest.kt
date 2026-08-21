@@ -69,15 +69,12 @@ class SessionWiringPersistenceTest {
     }
 
     @Test
-    fun `stale token makes canPersistResult false and returns StaleToken without persisting`() = runTest {
-        var persisted = false
-        var canPersistValue: Boolean? = null
+    fun `stale token skips generation and returns StaleToken without persisting`() = runTest {
+        var generationCalled = false
         val generationPort = ChatGenerationPortAdapter(
-            generate = { _, _, _, canPersistResult ->
-                // Simulates the frozen repo checking the guard before persisting.
-                canPersistValue = canPersistResult()
-                persisted = canPersistValue == true
-                ChatGenerationOutcome.Generated("asst-1") // still returns Generated
+            generate = { _, _, _, _ ->
+                generationCalled = true
+                ChatGenerationOutcome.Generated("asst-1")
             },
             readAssistantText = { _, _ -> "" }
         )
@@ -95,13 +92,7 @@ class SessionWiringPersistenceTest {
         val result = coordinator.executeTurn(
             "space-1", "session-1", "turn-1", "user-1", "hi", "tok", SessionPolicyInput()
         )
-        // canPersistResult = { isTokenCurrent(token) && !isSessionDeleted(sessionId) } = false
-        assertEquals(
-            "canPersistResult guard must be false when the token is stale",
-            false,
-            canPersistValue
-        )
-        assertFalse("assistant must not be persisted when the token is stale", persisted)
+        assertFalse("an already-stale token must not enter frozen generation", generationCalled)
         assertTrue(result is SessionTurnResult.StaleToken)
     }
 

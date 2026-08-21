@@ -112,3 +112,19 @@ The original seven commits are on `newmp`, not pushed. This report and Codex's r
 - ✅ TDD: failing tests written first, then implementation; no existing tests deleted/weakened/skipped
 - ✅ Windows PowerShell: only `py` for Python (not used in this task); gradle via `execute_command`
 - ✅ No git push/tag
+
+## 11. NATIVE-P2-007 Acceptance Repair
+
+Acceptance found that the adapter could invoke frozen generation even when its
+live persistence guard was already false. This is now corrected: the adapter
+returns `Stale` before invoking frozen generation, while retaining the same
+guard inside the frozen call for the completion-time race check. A regression
+test proves the generation seam is not invoked for an already-stale token.
+
+`HybridAppGraph` now owns `sessionConversationAssembly`, making the Compose-free
+entry point reachable for a future UI without connecting it to any current UI
+route. The repair modified only non-frozen `app/wiring` and test code.
+
+Post-repair verification: targeted adapter/wiring tests passed; full Android
+`test :app:lint :app:assembleDebug` passed; Python completed with `510 passed,
+28 skipped`. No real provider, API key, device, or UI flow was used.
