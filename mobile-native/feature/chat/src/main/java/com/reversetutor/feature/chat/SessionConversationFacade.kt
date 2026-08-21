@@ -3,6 +3,7 @@ package com.reversetutor.feature.chat
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.SessionActionContract
 import com.reversetutor.core.domain.SessionEvaluationContract
+import com.reversetutor.core.domain.SessionTurnContracts
 import com.reversetutor.core.domain.SessionTurnResult
 
 /**
@@ -25,17 +26,6 @@ class SessionConversationFacade {
         turnId: String?,
         messages: List<ConversationMessageContract> = emptyList()
     ): SessionConversationContract {
-        val context = when (result) {
-            is SessionTurnResult.Success -> result.context
-            is SessionTurnResult.NoModel -> result.context
-            is SessionTurnResult.ProviderError -> result.context
-            is SessionTurnResult.StaleToken -> result.context
-            is SessionTurnResult.SessionDeleted -> result.context
-            is SessionTurnResult.UnsupportedInput -> result.context
-            is SessionTurnResult.BlankInput -> result.context
-            is SessionTurnResult.Discarded -> result.context
-        }
-
         return when (result) {
             is SessionTurnResult.Success -> SessionConversationContract(
                 sessionId = sessionId,
@@ -86,7 +76,7 @@ class SessionConversationFacade {
                 messages = messages,
                 generation = GenerationUiContract(
                     state = GenerationState.ERROR,
-                    safeError = result.safeError
+                    safeError = SessionTurnContracts.safeGenerationFailureCode(result.safeError)
                 ),
                 evaluation = null,
                 action = null,

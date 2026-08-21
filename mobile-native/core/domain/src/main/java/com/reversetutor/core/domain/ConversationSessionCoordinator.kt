@@ -20,7 +20,8 @@ data class GenerationRequest(
     val userMessageId: String,
     val userText: String,
     val token: String,
-    val contextEvidence: List<String>
+    val contextEvidence: List<String>,
+    val policy: SessionPolicyOutput
 )
 
 /**
@@ -30,8 +31,7 @@ data class GenerationRequest(
 sealed interface GenerationOutcome {
     data class Generated(
         val assistantMessageId: String,
-        val assistantText: String,
-        val rawProviderName: String? = null
+        val assistantText: String
     ) : GenerationOutcome
     data object NoModelConfigured : GenerationOutcome
     data class ProviderFailed(val safeError: String) : GenerationOutcome
@@ -49,8 +49,7 @@ interface ChatGenerationPort {
     suspend fun generateReply(
         request: GenerationRequest,
         nowEpochMillis: Long,
-        isTokenCurrent: Boolean,
-        canPersistResult: Boolean
+        canPersistResult: suspend () -> Boolean
     ): GenerationOutcome
 }
 
@@ -171,7 +170,9 @@ class ConversationSessionCoordinator(
         }
 
         // 5. Accept user message
-        persistencePort.acceptUserMessage(spaceId, sessionId, turnId, userMessageId, userText)
+        if (!persistencePort.acceptUserMessage(spaceId, sessionId, turnId, userMessageId, userText)) {
+            return SessionTurnResult.Discarded("user_message_not_accepted", context)
+        }
 
         // 6. Build generation request
         val request = GenerationRequest(
@@ -181,35 +182,34 @@ class ConversationSessionCoordinator(
             userMessageId = userMessageId,
             userText = userText,
             token = token,
-            contextEvidence = context.prerequisiteGaps + context.pendingReviewKnowledgePoints
+            contextEvidence = context.prerequisiteGaps + context.pendingReviewKnowledgePoints,
+            policy = policyOutput
         )
 
-        // 7. Check token current
-        val isCurrent = persistencePort.isTokenCurrent(token)
-
-        // 8. Generate
+        // 7. Generate with a live persistence guard.
         val outcome = generationPort.generateReply(
             request = request,
             nowEpochMillis = nowEpochMillis(),
-            isTokenCurrent = isCurrent,
-            canPersistResult = true
+            canPersistResult = {
+                persistencePort.isTokenCurrent(token) && !persistencePort.isSessionDeleted(sessionId)
+            }
         )
 
-        // 9. Map outcome to safe result
+        // 8. Map outcome to safe result
         return when (outcome) {
             is GenerationOutcome.Generated -> {
-                // Re-check session validity before persisting
                 if (persistencePort.isSessionDeleted(sessionId)) {
                     return SessionTurnResult.SessionDeleted(context)
                 }
-                // Stale token → do NOT persist assistant result
-                if (!isCurrent) {
+                if (!persistencePort.isTokenCurrent(token)) {
                     return SessionTurnResult.StaleToken(context)
                 }
-                persistencePort.acceptAssistantResult(
+                if (!persistencePort.acceptAssistantResult(
                     spaceId, sessionId, turnId,
                     outcome.assistantMessageId, outcome.assistantText
-                )
+                )) {
+                    return SessionTurnResult.Discarded("assistant_result_not_accepted", context)
+                }
                 SessionTurnResult.Success(
                     assistantMessageId = outcome.assistantMessageId,
                     assistantText = outcome.assistantText,
@@ -222,8 +222,12 @@ class ConversationSessionCoordinator(
             GenerationOutcome.NoModelConfigured ->
                 SessionTurnResult.NoModel(context, policyOutput.processSummary)
             is GenerationOutcome.ProviderFailed -> {
-                persistencePort.recordTerminalFailure(spaceId, sessionId, turnId, outcome.safeError)
-                SessionTurnResult.ProviderError(outcome.safeError, context)
+                val safeError = SessionTurnContracts.safeGenerationFailureCode(outcome.safeError)
+                if (!persistencePort.recordTerminalFailure(spaceId, sessionId, turnId, safeError)) {
+                    SessionTurnResult.Discarded("failure_not_recorded", context)
+                } else {
+                    SessionTurnResult.ProviderError(safeError, context)
+                }
             }
             GenerationOutcome.UnsupportedVision ->
                 SessionTurnResult.UnsupportedInput(context)

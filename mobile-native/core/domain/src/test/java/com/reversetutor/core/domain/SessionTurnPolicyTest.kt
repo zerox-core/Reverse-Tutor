@@ -559,6 +559,23 @@ class SessionTurnPolicyTest {
         assertEquals(SessionTurnContracts.DEFAULT_KNOWLEDGE_POINT, out.action.knowledgePoint)
     }
 
+    @Test
+    fun probeWithEnoughCorrectnessAndDepthDerivesExplanationEvidence() {
+        val out = SessionTurnPolicy.normalize(
+            SessionPolicyInput(
+                mode = SessionModeWire.STUDY,
+                actionType = ActionTypeWire.PROBE,
+                entryStatus = EntryStatusWire.HAS_ENTRY,
+                correctness = 0.5f,
+                depth = 0.4f,
+                evidenceType = MasteryEvidenceTypeWire.NONE
+            )
+        )
+
+        assertEquals(MasteryEvidenceTypeWire.EXPLANATION, out.evaluation.evidence.type)
+        assertEquals(MasteryEvidenceStatusWire.PASSED, out.evaluation.evidence.status)
+    }
+
     // --- entry status derivation from keywords ------------------------------
 
     @Test

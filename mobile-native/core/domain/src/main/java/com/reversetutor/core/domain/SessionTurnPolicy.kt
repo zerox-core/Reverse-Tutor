@@ -171,9 +171,28 @@ object SessionTurnPolicy {
             evidenceStatus = MasteryEvidenceStatusWire.NONE
             evidenceReason = "$mode mode does not update mastery"
         } else {
-            evidenceType = SessionTurnContracts.normalizeEvidenceType(input.evidenceType)
-            evidenceStatus = SessionTurnContracts.normalizeEvidenceStatus(input.evidenceStatus)
-            evidenceReason = input.evidenceReason.trim()
+            val requestedEvidenceType = SessionTurnContracts.normalizeEvidenceType(input.evidenceType)
+            val requestedEvidenceStatus = SessionTurnContracts.normalizeEvidenceStatus(input.evidenceStatus)
+            if (
+                requestedEvidenceType == MasteryEvidenceTypeWire.NONE &&
+                actionType == ActionTypeWire.PROBE &&
+                SessionTurnContracts.clamp01(input.correctness) >= 0.35f &&
+                SessionTurnContracts.clamp01(input.depth) >= 0.35f
+            ) {
+                evidenceType = MasteryEvidenceTypeWire.EXPLANATION
+                evidenceStatus = if (SessionTurnContracts.clamp01(input.correctness) >= 0.45f) {
+                    MasteryEvidenceStatusWire.PASSED
+                } else {
+                    MasteryEvidenceStatusWire.PARTIAL
+                }
+                evidenceReason = SessionTurnContracts.sanitizeContractText(
+                    input.evidenceReason.ifBlank { "用户给出了可追问的解释" }
+                )
+            } else {
+                evidenceType = requestedEvidenceType
+                evidenceStatus = requestedEvidenceStatus
+                evidenceReason = SessionTurnContracts.sanitizeContractText(input.evidenceReason)
+            }
         }
 
         // 9. Clamp + bound remaining fields
@@ -194,13 +213,13 @@ object SessionTurnPolicy {
             evidence = MasteryEvidenceContract(
                 type = evidenceType,
                 status = evidenceStatus,
-                errorType = input.evidenceErrorType.trim(),
+                errorType = SessionTurnContracts.sanitizeContractText(input.evidenceErrorType, maxLength = 80),
                 reason = evidenceReason
             ),
             errorPattern = errorPattern,
             misconception = misconception,
             userEmotion = userEmotion,
-            newRequirements = input.newRequirements
+            newRequirements = SessionTurnContracts.normalizeRequirements(input.newRequirements)
         )
 
         val action = SessionActionContract(

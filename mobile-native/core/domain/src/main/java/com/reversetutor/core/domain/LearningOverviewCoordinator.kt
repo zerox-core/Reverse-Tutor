@@ -29,46 +29,46 @@ class LearningOverviewCoordinator(
         val sessionIds = scope.sessionIds
 
         // Active session count
-        val activeSessionCount = safeRead("session", 0) {
+        val activeSessionCount = safeRead("session", 0, warnings) {
             sessionPort.countActiveSessions(spaceId, sessionIds)
-        }.also { if (it == 0) warnings.add(ContextWarning("session", "no active sessions")) }
+        }
 
         // Progress
-        val progress = safeRead("progress", LearningProgressContract()) {
+        val progress = safeRead("progress", LearningProgressContract(), warnings) {
             progressPort.getProgress(spaceId, sessionIds)
-        }.also { if (it.totalKnowledgePoints == 0) warnings.add(ContextWarning("progress", "no progress data")) }
+        }
 
         // Today's plan
-        val todayTasks = safeRead("plan", emptyList<TodayPlanTask>()) {
+        val todayTasks = safeRead("plan", emptyList<TodayPlanTask>(), warnings) {
             planPort.listTodayPlan(spaceId)
         }
         val todayPlan = TodayPlanContract(
             tasks = todayTasks,
             completedCount = todayTasks.count { it.status.equals("done", ignoreCase = true) },
             totalCount = todayTasks.size
-        ).also { if (it.isEmpty) warnings.add(ContextWarning("plan", "no today plan")) }
+        )
 
         // Weekly mainline (sorted by updatedAt descending, then id)
-        val weeklyMainline = safeRead("mainline", emptyList<LearningThreadContract>()) {
+        val weeklyMainline = safeRead("mainline", emptyList<LearningThreadContract>(), warnings) {
             threadPort.listWeeklyMainline(spaceId, sessionIds, mainlineLimit)
                 .sortedWith(compareByDescending<LearningThreadContract> { it.updatedAtEpochMillis }
                     .thenBy { it.id })
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("mainline", "no weekly mainline")) }
+        }
 
         // Weak points (sorted by severity descending, then errorCount, then id)
-        val weakPoints = safeRead("weakPoints", emptyList<WeakPointContract>()) {
+        val weakPoints = safeRead("weakPoints", emptyList<WeakPointContract>(), warnings) {
             weakPointPort.listWeakPoints(spaceId, sessionIds, weakPointLimit)
                 .sortedWith(
                     compareByDescending<WeakPointContract> { it.severity }
                         .thenByDescending { it.errorCount }
                         .thenBy { it.id }
                 )
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("weakPoints", "no weak points")) }
+        }
 
         // Token usage
-        val tokenUsage = safeRead("tokenUsage", TokenUsageOverviewContract()) {
+        val tokenUsage = safeRead("tokenUsage", TokenUsageOverviewContract(), warnings) {
             tokenPort.aggregateTokenUsage(spaceId, sessionIds)
-        }.also { if (it.totalTokens == 0L) warnings.add(ContextWarning("tokenUsage", "no token usage")) }
+        }
 
         // No-data detection: all sources returned empty
         val isNoData = activeSessionCount == 0 &&
@@ -92,9 +92,15 @@ class LearningOverviewCoordinator(
         )
     }
 
-    private suspend fun <T> safeRead(source: String, default: T, block: suspend () -> T): T = try {
+    private suspend fun <T> safeRead(
+        source: String,
+        default: T,
+        warnings: MutableList<ContextWarning>,
+        block: suspend () -> T
+    ): T = try {
         block()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
+        warnings += ContextWarning(source, "source_unavailable")
         default
     }
 }

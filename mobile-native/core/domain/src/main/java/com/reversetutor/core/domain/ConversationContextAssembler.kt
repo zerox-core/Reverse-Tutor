@@ -32,48 +32,59 @@ class ConversationContextAssembler(
         val warnings = mutableListOf<ContextWarning>()
 
         // Each source is read independently; failure degrades only that category.
-        val messages = safeRead("message") {
+        val messages = safeRead("message", warnings) {
             messagePort.listRecentMessages(spaceId, sessionId, messageLimit)
                 .sortedWith(compareByDescending<ContextMessage> { it.timestampEpochMillis }
                     .thenBy { it.messageId })
-                .map { it.copy(text = it.text.take(textCap)) }
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("message", "source unavailable or empty")) }
+                .map { it.copy(text = SessionTurnContracts.sanitizeContractText(it.text, textCap)) }
+        }
 
-        val memory = safeRead("memory") {
+        val memory = safeRead("memory", warnings) {
             memoryPort.listMemoryReferences(spaceId, sessionId, memoryLimit)
                 .sortedWith(compareByDescending<MemoryReferenceContract> { it.updatedAtEpochMillis }
                     .thenBy { it.id })
-                .map { it.copy(summary = it.summary.take(textCap)) }
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("memory", "source unavailable or empty")) }
+                .map {
+                    it.copy(
+                        summary = SessionTurnContracts.sanitizeContractText(it.summary, textCap)
+                    )
+                }
+        }
 
-        val errors = safeRead("error") {
+        val errors = safeRead("error", warnings) {
             errorPort.listHistoricalErrors(spaceId, sessionId, errorLimit)
                 .sortedWith(compareByDescending<ErrorReferenceContract> { it.timestampEpochMillis }
                     .thenBy { it.id })
-                .map { it.copy(description = it.description.take(textCap)) }
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("error", "source unavailable or empty")) }
+                .map {
+                    it.copy(
+                        errorType = SessionTurnContracts.sanitizeContractText(it.errorType, maxLength = 80),
+                        description = SessionTurnContracts.sanitizeContractText(it.description, textCap)
+                    )
+                }
+        }
 
-        val gaps = safeRead("graph_gaps") {
+        val gaps = safeRead("graph_gaps", warnings) {
             graphPort.listPrerequisiteGaps(spaceId, sessionId, gapLimit)
-                .map { it.take(textCap) }
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("graph_gaps", "source unavailable or empty")) }
+                .map { SessionTurnContracts.sanitizeContractText(it, textCap) }
+                .filter { it.isNotBlank() }
+        }
 
-        val reviewPoints = safeRead("graph_review") {
+        val reviewPoints = safeRead("graph_review", warnings) {
             graphPort.listPendingReviewPoints(spaceId, sessionId, reviewLimit)
-                .map { it.take(textCap) }
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("graph_review", "source unavailable or empty")) }
+                .map { SessionTurnContracts.sanitizeContractText(it, textCap) }
+                .filter { it.isNotBlank() }
+        }
 
-        val sources = safeRead("source") {
+        val sources = safeRead("source", warnings) {
             sourcePort.listSourceEvidence(spaceId, sessionId, sourceLimit)
                 .sortedWith(compareByDescending<SourceReferenceContract> { it.relevanceScore }
                     .thenBy { it.id })
                 .map {
                     it.copy(
-                        title = it.title.take(textCap),
-                        excerpt = it.excerpt.take(textCap)
+                        title = SessionTurnContracts.sanitizeContractText(it.title, textCap),
+                        excerpt = SessionTurnContracts.sanitizeContractText(it.excerpt, textCap)
                     )
                 }
-        }.also { if (it.isEmpty()) warnings.add(ContextWarning("source", "source unavailable or empty")) }
+        }
 
         return ConversationContextContract(
             spaceId = spaceId,
@@ -94,10 +105,12 @@ class ConversationContextAssembler(
      */
     private suspend fun <T> safeRead(
         source: String,
+        warnings: MutableList<ContextWarning>,
         block: suspend () -> List<T>
     ): List<T> = try {
         block()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
+        warnings += ContextWarning(source, "source_unavailable")
         emptyList()
     }
 }

@@ -24,7 +24,7 @@ class ConversationContextAssemblerTest {
     ) : MessageContextPort {
         override suspend fun listRecentMessages(spaceId: String, sessionId: String, limit: Int): List<ContextMessage> {
             if (shouldFail) throw RuntimeException("connection error")
-            return items.filter { it.messageId.startsWith("${spaceId}_${sessionId}_") }.take(limit)
+            return items.take(limit)
         }
     }
 
@@ -240,13 +240,35 @@ class ConversationContextAssemblerTest {
     }
 
     @Test
+    fun contextTextRedactsCredentialAndUrlPatterns() = runBlocking {
+        val assembler = ConversationContextAssembler(
+            messagePort = object : MessageContextPort {
+                override suspend fun listRecentMessages(spaceId: String, sessionId: String, limit: Int) =
+                    listOf(ContextMessage("m1", "user", "Authorization: Bearer sk-secret https://provider.example", 1L))
+            },
+            memoryPort = FakeMemoryPort(),
+            errorPort = FakeErrorPort(),
+            graphPort = FakeGraphPort(),
+            sourcePort = FakeSourcePort()
+        )
+
+        val text = assembler.assemble("s1", "se1").recentMessages.single().text
+        assertTrue(text.contains("[redacted]"))
+        assertTrue(!text.contains("sk-secret"))
+        assertTrue(!text.contains("https://"))
+    }
+
+    @Test
     fun sessionIsolationInMessagePort() = runBlocking {
         val messages = listOf(
             ContextMessage("space1_sess1_a", "user", "msg A", 1),
             ContextMessage("space1_sess2_b", "user", "msg B", 2)
         )
         val assembler = ConversationContextAssembler(
-            messagePort = FakeMessagePort(items = messages),
+            messagePort = object : MessageContextPort {
+                override suspend fun listRecentMessages(spaceId: String, sessionId: String, limit: Int) =
+                    messages.filter { it.messageId.startsWith("${spaceId}_${sessionId}_") }.take(limit)
+            },
             memoryPort = FakeMemoryPort(),
             errorPort = FakeErrorPort(),
             graphPort = FakeGraphPort(),

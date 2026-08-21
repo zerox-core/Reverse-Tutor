@@ -23,17 +23,16 @@ class ConversationSessionCoordinatorTest {
     private class FakeGenerationPort(
         var outcome: GenerationOutcome = GenerationOutcome.Generated("asst1", "Hello"),
         var capturedRequest: GenerationRequest? = null,
-        var capturedIsTokenCurrent: Boolean? = null
+        var beforeReturn: (suspend () -> Unit)? = null
     ) : ChatGenerationPort {
         override suspend fun generateReply(
             request: GenerationRequest,
             nowEpochMillis: Long,
-            isTokenCurrent: Boolean,
-            canPersistResult: Boolean
+            canPersistResult: suspend () -> Boolean
         ): GenerationOutcome {
             capturedRequest = request
-            capturedIsTokenCurrent = isTokenCurrent
-            return outcome
+            beforeReturn?.invoke()
+            return if (canPersistResult()) outcome else GenerationOutcome.Stale
         }
     }
 
@@ -112,7 +111,7 @@ class ConversationSessionCoordinatorTest {
         assertTrue(result is SessionTurnResult.Success)
         assertEquals(1, persist.acceptedUserMessages.size)
         assertEquals("u1", persist.acceptedUserMessages[0])
-        assertEquals(1, persist.acceptAssistantResults.size)
+        assertEquals(1, persist.acceptedAssistantResults.size)
         assertEquals("asst1", persist.acceptedAssistantResults[0])
     }
 
@@ -171,6 +170,18 @@ class ConversationSessionCoordinatorTest {
     }
 
     @Test
+    fun tokenInvalidatedDuringGenerationDoesNotPersistAssistantResult() = runBlocking {
+        val persist = FakePersistencePort(tokenCurrent = true)
+        val gen = FakeGenerationPort(beforeReturn = { persist.tokenCurrent = false })
+        val coordinator = makeCoordinator(gen, persist)
+
+        val result = coordinator.executeTurn("s1", "se1", "t1", "u1", "test", "tok", defaultPolicyInput())
+
+        assertTrue(result is SessionTurnResult.StaleToken)
+        assertEquals(0, persist.acceptedAssistantResults.size)
+    }
+
+    @Test
     fun deletedSessionReturnsSafeResult() = runBlocking {
         val gen = FakeGenerationPort()
         val persist = FakePersistencePort(sessionDeleted = true)
@@ -219,14 +230,14 @@ class ConversationSessionCoordinatorTest {
         val result = coordinator.executeTurn("s1", "se1", "t1", "u1", "test", "tok", defaultPolicyInput())
 
         assertTrue(result is SessionTurnResult.ProviderError)
-        assertEquals("timeout", (result as SessionTurnResult.ProviderError).safeError)
+        assertEquals(SessionTurnContracts.SAFE_GENERATION_FAILURE, (result as SessionTurnResult.ProviderError).safeError)
         assertEquals(1, persist.recordedFailures.size)
-        assertEquals("timeout", persist.recordedFailures[0])
+        assertEquals(SessionTurnContracts.SAFE_GENERATION_FAILURE, persist.recordedFailures[0])
     }
 
     @Test
     fun providerFailureDoesNotContainSecrets() = runBlocking {
-        val gen = FakeGenerationPort(outcome = GenerationOutcome.ProviderFailed("connection refused"))
+        val gen = FakeGenerationPort(outcome = GenerationOutcome.ProviderFailed("Authorization: Bearer sk-secret https://provider.example"))
         val persist = FakePersistencePort()
         val coordinator = makeCoordinator(gen, persist)
 
@@ -234,6 +245,7 @@ class ConversationSessionCoordinatorTest {
 
         assertTrue(result is SessionTurnResult.ProviderError)
         val err = (result as SessionTurnResult.ProviderError).safeError
+        assertEquals(SessionTurnContracts.SAFE_GENERATION_FAILURE, err)
         assertFalse("no sk-", err.contains("sk-"))
         assertFalse("no Authorization", err.contains("Authorization"))
         assertFalse("no Bearer", err.contains("Bearer"))

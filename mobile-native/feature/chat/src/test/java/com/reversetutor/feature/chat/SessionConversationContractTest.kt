@@ -3,6 +3,7 @@ package com.reversetutor.feature.chat
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.SessionActionContract
 import com.reversetutor.core.domain.SessionEvaluationContract
+import com.reversetutor.core.domain.SessionTurnContracts
 import com.reversetutor.core.domain.SessionTurnResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,11 +66,11 @@ class SessionConversationContractTest {
 
     @Test
     fun providerErrorContractHasSafeError() {
-        val result = SessionTurnResult.ProviderError("connection timeout", emptyContext())
+        val result = SessionTurnResult.ProviderError("Authorization: Bearer sk-secret https://provider.example", emptyContext())
         val contract = facade.mapResult(result, "se1", "t1")
 
         assertEquals(GenerationState.ERROR, contract.generation.state)
-        assertEquals("connection timeout", contract.generation.safeError)
+        assertEquals(SessionTurnContracts.SAFE_GENERATION_FAILURE, contract.generation.safeError)
     }
 
     @Test
@@ -163,7 +164,7 @@ class SessionConversationContractTest {
 
     @Test
     fun providerErrorDoesNotLeakRawException() {
-        val result = SessionTurnResult.ProviderError("network timeout", emptyContext())
+        val result = SessionTurnResult.ProviderError("com.reversetutor.ProviderException: Authorization: Bearer sk-secret", emptyContext())
         val contract = facade.mapResult(result, "se1", "t1")
 
         val err = contract.generation.safeError ?: ""

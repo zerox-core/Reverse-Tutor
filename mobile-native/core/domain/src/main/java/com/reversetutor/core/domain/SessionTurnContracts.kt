@@ -223,6 +223,13 @@ object SessionTurnContracts {
     const val MISCONCEPTION_MAX = 20
     const val DEFAULT_KNOWLEDGE_POINT = "当前方法"
     const val DEFAULT_NOTE = "normalized"
+    const val SAFE_GENERATION_FAILURE = "generation_failed"
+    private val sensitiveTextPatterns = listOf(
+        Regex("(?i)sk-[a-z0-9_-]+"),
+        Regex("(?i)authorization\\s*[:=].*"),
+        Regex("(?i)bearer\\s+[a-z0-9._-]+"),
+        Regex("(?i)https?://[^\\s]+")
+    )
 
     fun normalizeMode(value: String?): String =
         value?.trim()?.lowercase().let { if (it in SessionModeWire.ALL) it!! else SessionModeWire.STUDY }
@@ -270,6 +277,25 @@ object SessionTurnContracts {
 
     fun normalizeNote(value: String?): String =
         (value ?: "").trim().ifEmpty { DEFAULT_NOTE }
+
+    fun sanitizeContractText(value: String?, maxLength: Int = 200): String {
+        var sanitized = (value ?: "").trim()
+        sensitiveTextPatterns.forEach { pattern ->
+            sanitized = sanitized.replace(pattern, "[redacted]")
+        }
+        return sanitized.take(maxLength)
+    }
+
+    fun safeGenerationFailureCode(@Suppress("UNUSED_PARAMETER") value: String?): String =
+        SAFE_GENERATION_FAILURE
+
+    fun normalizeRequirements(values: List<String>): List<String> =
+        values.asSequence()
+            .map { sanitizeContractText(it, maxLength = 120) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(12)
+            .toList()
 
     fun normalizeDifficulty(value: Float?): Float = clamp01(value ?: 0.5f)
 

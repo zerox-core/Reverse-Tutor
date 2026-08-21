@@ -148,8 +148,9 @@
 
 ## Summary
 
-- **Total rules mapped:** 92
-- **All status:** migrated (code written; awaiting gradle verification in Codex environment)
+- **Additional verified rule:** `_normalize_evidence` promotes `probe` with sufficient correctness/depth from `none` to explanation evidence; verified by `probeWithEnoughCorrectnessAndDepthDerivesExplanationEvidence`.
+- **Total rules mapped:** 93
+- **All status:** migrated; focused JVM verification passed on 2026-08-21 with `:core:domain:testDebugUnitTest :feature:chat:testDebugUnitTest`.
 - **Frozen layer diff:** expected empty (no modifications to core:model, core:protocol, core:llm, core:data/*Repository, Room, SecretStore)
 - **New files:** 14 Kotlin source/test files + 1 build.gradle.kts modification + this parity matrix
 - **Test commands:**
