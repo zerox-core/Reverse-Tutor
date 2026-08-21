@@ -1,0 +1,141 @@
+package com.reversetutor.core.domain
+
+/**
+ * Conversation context contracts — safe, visual-agnostic read models for the
+ * session assistant side-panel. These types carry only domain-safe data; they
+ * never expose API keys, SecretStore references, raw Authorization headers,
+ * Provider URLs, un-redacted exceptions, or internal DAO/Entity/protocol DTOs.
+ *
+ * Source ports are non-frozen domain interfaces. Concrete adapters backing
+ * them may call existing frozen Repository methods but must translate results
+ * into the safe contracts defined here before returning.
+ */
+
+// ---------------------------------------------------------------------------
+// Safe read models
+// ---------------------------------------------------------------------------
+
+/** A bounded message reference for context display. */
+data class ContextMessage(
+    val messageId: String,
+    val role: String,
+    val text: String,
+    val timestampEpochMillis: Long
+)
+
+/** A memory reference safe for UI display. */
+data class MemoryReferenceContract(
+    val id: String,
+    val summary: String,
+    val relevanceScore: Float,
+    val updatedAtEpochMillis: Long
+)
+
+/** A historical error reference safe for UI display. */
+data class ErrorReferenceContract(
+    val id: String,
+    val errorType: String,
+    val description: String,
+    val timestampEpochMillis: Long
+)
+
+/** A source evidence reference safe for UI display. */
+data class SourceReferenceContract(
+    val id: String,
+    val title: String,
+    val excerpt: String,
+    val sourceType: String,
+    val relevanceScore: Float
+)
+
+/** A safe warning emitted when a context source degrades. */
+data class ContextWarning(
+    val source: String,
+    val message: String
+)
+
+/**
+ * The full conversation context contract consumed by the side-panel.
+ * Every list is bounded and deterministically sorted.
+ */
+data class ConversationContextContract(
+    val spaceId: String,
+    val sessionId: String,
+    val prerequisiteGaps: List<String>,
+    val relatedMemory: List<MemoryReferenceContract>,
+    val sourceEvidence: List<SourceReferenceContract>,
+    val historicalErrors: List<ErrorReferenceContract>,
+    val pendingReviewKnowledgePoints: List<String>,
+    val recentMessages: List<ContextMessage>,
+    val warnings: List<ContextWarning>
+) {
+    companion object {
+        fun empty(spaceId: String, sessionId: String): ConversationContextContract =
+            ConversationContextContract(
+                spaceId = spaceId,
+                sessionId = sessionId,
+                prerequisiteGaps = emptyList(),
+                relatedMemory = emptyList(),
+                sourceEvidence = emptyList(),
+                historicalErrors = emptyList(),
+                pendingReviewKnowledgePoints = emptyList(),
+                recentMessages = emptyList(),
+                warnings = emptyList()
+            )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Source ports (non-frozen domain interfaces)
+// ---------------------------------------------------------------------------
+
+/** Returns recent messages for a session, filtered by space+session. */
+interface MessageContextPort {
+    suspend fun listRecentMessages(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<ContextMessage>
+}
+
+/** Returns memory references relevant to the session. */
+interface MemoryContextPort {
+    suspend fun listMemoryReferences(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<MemoryReferenceContract>
+}
+
+/** Returns historical error references for the session. */
+interface ErrorContextPort {
+    suspend fun listHistoricalErrors(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<ErrorReferenceContract>
+}
+
+/** Returns graph-derived prerequisite gaps and pending review points. */
+interface GraphContextPort {
+    suspend fun listPrerequisiteGaps(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<String>
+
+    suspend fun listPendingReviewPoints(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<String>
+}
+
+/** Returns source evidence references for the session. */
+interface SourceContextPort {
+    suspend fun listSourceEvidence(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<SourceReferenceContract>
+}
