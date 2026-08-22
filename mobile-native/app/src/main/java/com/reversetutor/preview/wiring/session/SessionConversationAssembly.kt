@@ -97,7 +97,13 @@ class SessionConversationAssembly(
         planPort = LearningOverviewPlanPortAdapter(learningRepository),
         threadPort = LearningOverviewThreadPortAdapter(learningRepository),
         weakPointPort = LearningOverviewWeakPointPortAdapter(memoryRepository),
-        tokenPort = LearningOverviewTokenPortAdapter(learningRepository),
+        tokenPort = LearningOverviewTokenPortAdapter(
+            listTokenUsage = learningRepository::listTokenUsage,
+            sessionIdForTurn = { turnId ->
+                conversationRunRepository.findLatestRun(turnId)?.sessionId
+            },
+            nowEpochMillis = nowEpochMillis
+        ),
         nowEpochMillis = nowEpochMillis
     )
 

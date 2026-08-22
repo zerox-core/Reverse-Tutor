@@ -15,6 +15,9 @@ import com.reversetutor.core.domain.TodayPlanTask
 import com.reversetutor.core.domain.TokenUsageOverviewContract
 import com.reversetutor.core.domain.WeakPointContract
 import com.reversetutor.core.model.StudyPlanTaskState
+import com.reversetutor.core.model.TokenUsageRecord
+import java.util.Calendar
+import java.util.TimeZone
 
 /**
  * Adapts existing repository read capabilities to the non-frozen home learning
@@ -97,10 +100,45 @@ class LearningOverviewWeakPointPortAdapter(
 }
 
 class LearningOverviewTokenPortAdapter(
-    private val learningRepository: LearningRepositoryImpl
+    private val listTokenUsage: suspend (String) -> List<TokenUsageRecord>,
+    private val sessionIdForTurn: suspend (String) -> String?,
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val timeZone: TimeZone = TimeZone.getDefault()
 ) : LearningOverviewTokenPort {
     override suspend fun aggregateTokenUsage(
         spaceId: String,
         sessionIds: List<String>?
-    ): TokenUsageOverviewContract = TokenUsageOverviewContract()
+    ): TokenUsageOverviewContract {
+        val now = nowEpochMillis()
+        val weekStart = Calendar.getInstance(timeZone).apply {
+            timeInMillis = now
+            add(Calendar.DAY_OF_YEAR, -6)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val records = buildList {
+            listTokenUsage(spaceId).forEach { record ->
+                if (record.createdAtEpochMillis !in weekStart..now) return@forEach
+                if (sessionIds == null || sessionIdForTurn(record.turnId) in sessionIds) {
+                    add(record)
+                }
+            }
+        }
+        return TokenUsageOverviewContract(
+            totalTokens = records.sumNonNegative(TokenUsageRecord::totalTokens),
+            estimatedTokens = records.filter(TokenUsageRecord::estimated)
+                .sumNonNegative(TokenUsageRecord::totalTokens),
+            isEstimated = records.any(TokenUsageRecord::estimated),
+            period = "weekly"
+        )
+    }
+}
+
+private fun List<TokenUsageRecord>.sumNonNegative(
+    selector: (TokenUsageRecord) -> Long
+): Long = fold(0L) { total, record ->
+    val value = selector(record).coerceAtLeast(0L)
+    if (Long.MAX_VALUE - total < value) Long.MAX_VALUE else total + value
 }

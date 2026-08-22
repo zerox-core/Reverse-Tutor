@@ -27,6 +27,10 @@ import com.reversetutor.feature.chat.WelcomeMockSessionId
 import com.reversetutor.feature.chat.WelcomeMockTitle
 import com.reversetutor.feature.chat.shouldCreateWelcomeSession
 import com.reversetutor.feature.chat.challengeSessionProvenance
+import com.reversetutor.feature.chat.LearningOverviewPort
+import com.reversetutor.core.domain.LearningOverviewContract
+import com.reversetutor.core.domain.LearningOverviewScope
+import com.reversetutor.preview.wiring.session.SessionConversationAssembly
 import com.reversetutor.feature.memory.WeeklyDashboardPort
 import com.reversetutor.feature.memory.WeeklyDashboardSnapshot
 import com.reversetutor.feature.memory.WeeklyTokenUsageEntry
@@ -316,4 +320,11 @@ class RepositoryWeeklyDashboardPortAdapter(
         )
 
     override suspend fun saveTask(task: StudyPlanTask): StudyPlanTask = saveTask.invoke(task)
+}
+
+class RepositoryLearningOverviewPortAdapter(
+    private val assembly: SessionConversationAssembly
+) : LearningOverviewPort {
+    override suspend fun loadOverview(scope: LearningOverviewScope): LearningOverviewContract =
+        assembly.overview(scope)
 }

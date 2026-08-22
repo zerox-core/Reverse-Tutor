@@ -38,6 +38,8 @@ import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
 import com.reversetutor.feature.chat.ChatRunsViewModelFactory
 import com.reversetutor.feature.chat.HomePortViewModelFactory
 import com.reversetutor.feature.chat.HomeViewModelFactory
+import com.reversetutor.feature.chat.LearningOverviewViewModelFactory
+import com.reversetutor.feature.chat.LearningOverviewPortViewModelFactory
 import com.reversetutor.feature.chat.NewSessionCreatePort
 import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.SessionHomePort
@@ -63,7 +65,8 @@ data class HybridFrontendFactories(
     val tagLibraryPersistence: TagLibraryPersistence,
     val chatRunsViewModelFactory: ChatRunsViewModelFactory,
     val modelConnectionsViewModelFactory: ModelConnectionsViewModelFactory,
-    val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory
+    val weeklyDashboardViewModelFactory: WeeklyDashboardViewModelFactory,
+    val learningOverviewViewModelFactory: LearningOverviewViewModelFactory
 )
 
 enum class HybridLlmRuntimeMode { Fake, Production }
@@ -227,7 +230,8 @@ class HybridAppGraph private constructor(
                     conversationRunRepository = conversationRunRepository,
                     modelConnectionRepository = modelConnectionRepository,
                     learningRepository = learningRepository,
-                    runCoordinator = runCoordinator
+                    runCoordinator = runCoordinator,
+                    sessionConversationAssembly = sessionConversationAssembly
                 )
             )
         }
@@ -269,7 +273,8 @@ class HybridAppGraph private constructor(
             conversationRunRepository: ConversationRunRepositoryImpl,
             modelConnectionRepository: ModelConnectionRepositoryImpl,
             learningRepository: LearningRepositoryImpl,
-            runCoordinator: ConversationRunCoordinator
+            runCoordinator: ConversationRunCoordinator,
+            sessionConversationAssembly: SessionConversationAssembly
         ): HybridFrontendFactories {
             val homePort = RepositoryHomePortAdapter {
                 sessionRepository.listSessions()
@@ -333,7 +338,14 @@ class HybridAppGraph private constructor(
                 }
             )
 
+            val learningOverviewPort = RepositoryLearningOverviewPortAdapter(
+                assembly = sessionConversationAssembly
+            )
+            val learningOverviewViewModelFactory = LearningOverviewPortViewModelFactory(
+                port = learningOverviewPort
+            )
             return HybridFrontendFactories(
+                learningOverviewViewModelFactory = learningOverviewViewModelFactory,
                 workspaceViewModelFactory = DefaultWorkspaceViewModelFactory,
                 homeViewModelFactory = HomePortViewModelFactory(homePort),
                 sessionHomePort = sessionHomePort,
