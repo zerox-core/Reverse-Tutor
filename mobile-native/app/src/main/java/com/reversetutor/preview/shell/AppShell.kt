@@ -80,20 +80,17 @@ import com.reversetutor.feature.chat.ChatQueryHighlight
 import com.reversetutor.feature.chat.ChatReferenceQueryRoute
 import com.reversetutor.feature.chat.ChatReferenceQueryState
 import com.reversetutor.feature.chat.ChatScrollMemory
+import com.reversetutor.feature.chat.LearningOverviewPanel
+import com.reversetutor.feature.chat.LearningOverviewUiAction
+import com.reversetutor.feature.chat.LearningOverviewUiState
 import com.reversetutor.feature.chat.NewSessionPrefillRequest
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.toSessionListItem
-import com.reversetutor.feature.memory.FormalWeeklyDashboardScreen
-import com.reversetutor.feature.memory.FormalWeeklySessionOption
 import com.reversetutor.feature.memory.ContextHubRoute
 import com.reversetutor.feature.memory.GlobalGraphRoute
-import com.reversetutor.feature.memory.WeeklyDashboardUiState
-import com.reversetutor.feature.memory.WeeklyDashboardUiAction
-import com.reversetutor.feature.memory.WeeklyWidgetDestination
-import com.reversetutor.feature.memory.WeeklyWidgetKind
-import com.reversetutor.feature.memory.normalDestination
+import com.reversetutor.core.domain.LearningOverviewScope
 import com.reversetutor.feature.sources.SourcesRoute
 import com.reversetutor.feature.settings.FirstLaunchImportPromptUiState
 import com.reversetutor.feature.settings.FormalLlmConfigurationScreen
@@ -223,11 +220,14 @@ fun AppShell(
                 }
         }
     }
-    val weeklyDashboardViewModelFactory = hybridAppGraph.frontend.weeklyDashboardViewModelFactory
-    val weeklyDashboardViewModel = remember(weeklyDashboardViewModelFactory) {
-        weeklyDashboardViewModelFactory.create(appScope)
+    val learningOverviewViewModelFactory = hybridAppGraph.frontend.learningOverviewViewModelFactory
+    val learningOverviewViewModel = remember(learningOverviewViewModelFactory, appScope) {
+        learningOverviewViewModelFactory.create(
+            scope = LearningOverviewScope(spaceId = SessionRepository.defaultSpaceId),
+            coroutineScope = appScope
+        )
     }
-    val weeklyDashboardState by weeklyDashboardViewModel.uiState.collectAsState()
+    val learningOverviewState by learningOverviewViewModel.uiState.collectAsState()
     val workspaceInteractions = remember(workspaceViewModel) {
         WorkspaceInteractionBindings(workspaceViewModel::onAction)
     }
@@ -415,9 +415,8 @@ fun AppShell(
                         challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
                             ?: figmaUiState.challengeProgress,
                         challengeTotal = figmaUiState.challengeTotal,
-                        weeklyDashboardState = weeklyDashboardState,
-                        weeklyPageActive = workspaceState.currentPage == WorkspacePage.WeeklyDashboard,
-                        onWeeklyDashboardAction = weeklyDashboardViewModel::onAction,
+                        learningOverviewState = learningOverviewState,
+                        onLearningOverviewAction = learningOverviewViewModel::onAction,
                         onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
                         onWidgetDragChanged = workspaceInteractions::onWidgetDragChanged,
                         onInnerHorizontalControlChanged = workspaceInteractions::onInnerHorizontalControlChanged,
@@ -850,9 +849,8 @@ private fun DestinationContent(
     challengeRestoreContext: ChallengeReturnContext?,
     challengeProgress: Int,
     challengeTotal: Int,
-    weeklyDashboardState: WeeklyDashboardUiState,
-    weeklyPageActive: Boolean,
-    onWeeklyDashboardAction: (WeeklyDashboardUiAction) -> Unit,
+    learningOverviewState: LearningOverviewUiState,
+    onLearningOverviewAction: (LearningOverviewUiAction) -> Unit,
     onComposerFocusChanged: (Boolean) -> Unit,
     onWidgetDragChanged: (Boolean) -> Unit,
     onInnerHorizontalControlChanged: (Boolean) -> Unit,
@@ -966,34 +964,10 @@ private fun DestinationContent(
                         cameraPermissionState
                     }
                 }
-                if (destination == AppDestination.WeeklyDashboard) {
-                    onWeeklyDashboardAction(
-                        WeeklyDashboardUiAction.ConnectivityChanged(context.hasNetworkConnection())
-                    )
-                }
             }
         }
         destinationLifecycleOwner?.lifecycle?.addObserver(observer)
         onDispose { destinationLifecycleOwner?.lifecycle?.removeObserver(observer) }
-    }
-    DisposableEffect(context) {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: android.net.Network) {
-                onWeeklyDashboardAction(WeeklyDashboardUiAction.ConnectivityChanged(true))
-            }
-
-            override fun onLost(network: android.net.Network) {
-                onWeeklyDashboardAction(
-                    WeeklyDashboardUiAction.ConnectivityChanged(context.hasNetworkConnection())
-                )
-            }
-        }
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-        runCatching { connectivityManager?.registerNetworkCallback(request, callback) }
-        onDispose { runCatching { connectivityManager?.unregisterNetworkCallback(callback) } }
     }
     LaunchedEffect(chatPendingDeletionStore, messageRepository, pendingDeletionSweepGeneration) {
         val sweeper = ChatPendingDeletionSweeper(
@@ -1008,7 +982,6 @@ private fun DestinationContent(
             if (remaining > 0L) kotlinx.coroutines.delay(remaining)
         }
     }
-    var weeklySessions by remember { mutableStateOf(emptyList<com.reversetutor.core.model.TutorSession>()) }
     val sourceFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -1119,9 +1092,6 @@ private fun DestinationContent(
         if (destination == AppDestination.Settings) {
             llmProfiles = llmProfileRepository.listProfiles()
         }
-        if (destination == AppDestination.WeeklyDashboard) {
-            weeklySessions = sessionRepository.listSessions().filterNot { it.archived }
-        }
     }
     LaunchedEffect(destination, activeSessionId, sessionSettingsRefreshKey) {
         val currentSessionId = activeSessionId
@@ -1188,19 +1158,6 @@ private fun DestinationContent(
                     readiness = ChatAttachmentReadiness.Ready
                 )
             }
-    }
-
-    val weeklySessionOptions = remember(weeklySessions) {
-        val activeThreshold = System.currentTimeMillis() - 7L * 24L * 60L * 60L * 1_000L
-        weeklySessions.map { session ->
-            FormalWeeklySessionOption(
-                id = session.id,
-                title = session.title,
-                detail = if (session.pinned) "学习模式 · 已置顶" else "学习模式",
-                activeThisWeek = session.updatedAtEpochMillis >= activeThreshold,
-                pinned = session.pinned
-            )
-        }
     }
 
     ReverseTutorScreenSurface {
@@ -1441,40 +1398,17 @@ private fun DestinationContent(
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.WeeklyDashboard) {
-            FormalWeeklyDashboardScreen(
-                dashboardState = weeklyDashboardState,
-                sessionOptions = weeklySessionOptions,
-                selectedSessionIds = weeklySessionOptions
-                    .filter { it.activeThisWeek }
-                    .take(3)
-                    .mapTo(linkedSetOf()) { it.id },
-                onOpenSession = { sessionId ->
-                    weeklySessions
-                        .firstOrNull { it.id == sessionId }
-                        ?.toSessionListItem(appPreferences.globalAvatarVisible)
-                        ?.let(onOpenSession)
+            LearningOverviewPanel(
+                state = learningOverviewState,
+                onRefresh = {
+                    onLearningOverviewAction(LearningOverviewUiAction.Refresh)
                 },
-                onOpenWidget = { kind ->
-                    when (kind.normalDestination()) {
-                        WeeklyWidgetDestination.LearningGraph -> onOpenGlobalGraph()
-                        WeeklyWidgetDestination.Challenge -> onOpenChallenge()
-                        else -> Unit
-                    }
+                onChangeScope = { scope ->
+                    onLearningOverviewAction(LearningOverviewUiAction.ChangeScope(scope))
                 },
-                onOpenQuestion = { onOpenGlobalGraph() },
-                onQuickSwitchModel = onOpenSettings,
-                onAction = onWeeklyDashboardAction,
-                isPageActive = weeklyPageActive,
-                onWidgetDragChanged = onWidgetDragChanged,
-                onInnerHorizontalControlChanged = onInnerHorizontalControlChanged,
-                onEditSurfaceChanged = { active, dismiss ->
-                    onPageLocalActionSurfaceChanged(
-                        WorkspacePage.WeeklyDashboard,
-                        active,
-                        dismiss
-                    )
-                },
-                showSpatialIndicator = false
+                onOpenWeekly = {},
+                onOpenWeakPoint = { onOpenGlobalGraph() },
+                currentSessionId = null
             )
             return@ReverseTutorScreenSurface
         }
