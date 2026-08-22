@@ -274,6 +274,29 @@ class SessionAssistantPanelStateTest {
         assertEquals("second", second.assistantText)
     }
 
+    // --- B3: 详情微面板安全投影 — 回复正文归聊天流、生成标签不泄露 ---
+
+    @Test
+    fun readyStateKeepsAssistantTextForChatFlowOnly() {
+        val ready = contract(
+            state = GenerationState.READY,
+            assistantText = "对话原文只属于聊天流。"
+        ).toPanelState()
+        assertEquals("对话原文只属于聊天流。", ready.assistantText)
+        assertNull(ready.generationLabel)
+    }
+
+    @Test
+    fun errorStateLabelIsSafeChineseWithoutLeaks() {
+        val error = contract(
+            state = GenerationState.ERROR,
+            safeError = "暂时无法生成回复"
+        ).toPanelState()
+        assertEquals("生成失败", error.generationLabel)
+        assertFalse(error.generationLabel.orEmpty().contains("https://"))
+        assertFalse(error.generationLabel.orEmpty().contains("sk-"))
+    }
+
     // --- Helper ---
 
     private fun contract(

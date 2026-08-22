@@ -200,12 +200,22 @@ private fun ConversationUiEventType.toInteraction(): SessionAssistantInteraction
 }
 
 /**
+ * Test-only exposure of the stable UI-event → interaction mapping. Delegates to
+ * the private [toInteraction] mapper so production behavior stays unchanged.
+ */
+internal fun ConversationUiEventType.toPanelInteractionForTest(): SessionAssistantInteraction =
+    toInteraction()
+
+/**
  * Session assistant side-panel. Renders the current [SessionConversationContract]
  * and dispatches [SessionAssistantInteraction] intents. Pure presentation: the
  * host owns the contract and routes RETRY to the Facade/Coordinator; DISMISS only
  * toggles local visibility.
  *
  * Pass `contract = null` to render the dismissed/empty state (nothing shown).
+ *
+ * Detail micro-panel: the assistant reply text belongs to the chat flow and is
+ * not duplicated here. Empty context/evaluation/action sections are hidden.
  *
  * Uses [com.reversetutor.core.design.FormalColors] and
  * [com.reversetutor.core.design.LocalFormalTypeScale] for consistent theming.
@@ -259,15 +269,18 @@ private fun PanelHeader(state: SessionAssistantPanelState, onDismiss: () -> Unit
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "会话辅助",
+                text = "本轮学习提示",
                 style = type.style(16f, 23f, FontWeight.SemiBold, FormalColors.Ink)
             )
-            Text(
-                text = state.currentKnowledgePoint ?: "当前知识点",
-                style = type.style(11f, 16f, color = FormalColors.Muted),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            val knowledgePoint = state.currentKnowledgePoint
+            if (!knowledgePoint.isNullOrBlank()) {
+                Text(
+                    text = knowledgePoint,
+                    style = type.style(11f, 16f, color = FormalColors.Muted),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         Surface(
             onClick = onDismiss,
@@ -277,7 +290,7 @@ private fun PanelHeader(state: SessionAssistantPanelState, onDismiss: () -> Unit
             modifier = Modifier
                 .size(48.dp)
                 .testTag("session_assistant_dismiss")
-                .semantics { contentDescription = "关闭会话辅助面板" }
+                .semantics { contentDescription = "关闭本轮学习提示" }
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text("×", style = type.style(18f, 24f, color = FormalColors.Muted))
@@ -290,50 +303,39 @@ private fun PanelHeader(state: SessionAssistantPanelState, onDismiss: () -> Unit
 private fun GenerationSection(state: SessionAssistantPanelState, onRetry: () -> Unit) {
     val type = LocalFormalTypeScale.current
     val label = state.generationLabel
-    val text = state.assistantText
-    if (label == null && text.isNullOrBlank()) return
+    if (label == null) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!text.isNullOrBlank()) {
-            PanelCard {
+        val isError = state.generationState == GenerationState.ERROR ||
+            state.generationState == GenerationState.NO_MODEL
+        PanelCard(
+            tint = if (isError) FormalColors.Danger.copy(alpha = 0.08f) else FormalColors.SurfaceSubtle,
+            border = if (isError) FormalColors.Danger else FormalColors.Border
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = text,
-                    style = type.style(13f, 20f, color = FormalColors.Ink)
+                    text = label,
+                    style = type.style(12f, 17f, color = if (isError) FormalColors.Danger else FormalColors.Muted),
+                    modifier = Modifier.weight(1f)
                 )
-            }
-        }
-        if (label != null) {
-            val isError = state.generationState == GenerationState.ERROR ||
-                state.generationState == GenerationState.NO_MODEL
-            PanelCard(
-                tint = if (isError) FormalColors.Danger.copy(alpha = 0.08f) else FormalColors.SurfaceSubtle,
-                border = if (isError) FormalColors.Danger else FormalColors.Border
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = label,
-                        style = type.style(12f, 17f, color = if (isError) FormalColors.Danger else FormalColors.Muted),
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (state.retryable) {
-                        TextButton(
-                            onClick = onRetry,
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier
-                                .defaultMinSize(minHeight = 48.dp)
-                                .testTag("session_assistant_retry")
-                                .semantics { contentDescription = "重试生成回复" }
-                        ) {
-                            Icon(
-                                Icons.Filled.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(
-                                "重试",
-                                style = type.style(12f, 17f, color = FormalColors.Primary)
-                            )
-                        }
+                if (state.retryable) {
+                    TextButton(
+                        onClick = onRetry,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier
+                            .defaultMinSize(minHeight = 48.dp)
+                            .testTag("session_assistant_retry")
+                            .semantics { contentDescription = "重试生成回复" }
+                    ) {
+                        Icon(
+                            Icons.Filled.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "重试",
+                            style = type.style(12f, 17f, color = FormalColors.Primary)
+                        )
                     }
                 }
             }
@@ -381,10 +383,19 @@ private fun ActionSection(state: SessionAssistantPanelState) {
     val type = LocalFormalTypeScale.current
     val label = state.actionLabel ?: return
     PanelCard(tint = FormalColors.PrimarySoft, border = FormalColors.Primary.copy(alpha = 0.3f)) {
-        Text(
-            text = label,
-            style = type.style(12f, 17f, FontWeight.Medium, color = FormalColors.Primary)
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = label,
+                style = type.style(12f, 17f, FontWeight.Medium, color = FormalColors.Primary)
+            )
+            val hint = state.nextStepHint
+            if (!hint.isNullOrBlank()) {
+                Text(
+                    text = hint,
+                    style = type.style(11f, 16f, color = FormalColors.Muted)
+                )
+            }
+        }
     }
 }
 
@@ -418,10 +429,7 @@ private fun ContextSection(
             )
         }
         if (state.historicalErrors.isNotEmpty()) {
-            ContextRow(
-                label = "历史错误",
-                values = state.historicalErrors.map { it.errorType }
-            )
+            ContextRow(label = "历史错误", values = state.historicalErrors.map { it.errorType })
         }
         // B2: non-blocking warnings — mapped to safe Chinese text
         state.warnings.take(3).forEach { warning ->
