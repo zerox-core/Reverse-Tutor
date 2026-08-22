@@ -33,12 +33,12 @@ import org.junit.Test
 
 class SchemaPolicyTest {
     @Test
-    fun databaseSchemaExportsVersionFiveWithCompleteMigrationChain() {
-        assertEquals(5, DatabaseSchema.version)
+    fun databaseSchemaExportsVersionSixWithCompleteMigrationChain() {
+        assertEquals(6, DatabaseSchema.version)
         assertTrue(DatabaseSchema.exportSchema)
-        assertEquals(4, DatabaseSchema.migrations.size)
-        assertEquals(listOf(1, 2, 3, 4), DatabaseSchema.migrations.map { it.startVersion })
-        assertEquals(listOf(2, 3, 4, 5), DatabaseSchema.migrations.map { it.endVersion })
+        assertEquals(5, DatabaseSchema.migrations.size)
+        assertEquals(listOf(1, 2, 3, 4, 5), DatabaseSchema.migrations.map { it.startVersion })
+        assertEquals(listOf(2, 3, 4, 5, 6), DatabaseSchema.migrations.map { it.endVersion })
     }
 
     @Test
@@ -70,6 +70,14 @@ class SchemaPolicyTest {
                 entityType.declaredFields.any { it.name == "spaceId" }
             )
         }
+    }
+
+    @Test
+    fun backgroundJobPolicySnapshotRemainsOptionalForLegacyRows() {
+        val policyPayload = BackgroundJobEntity::class.java.declaredFields
+            .firstOrNull { it.name == "sessionPolicyPayload" }
+        assertTrue(policyPayload != null)
+        assertTrue(policyPayload?.type == String::class.java)
     }
 
     @Test

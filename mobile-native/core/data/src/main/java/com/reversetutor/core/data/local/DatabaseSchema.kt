@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 5
+    const val version = 6
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -54,11 +54,18 @@ object DatabaseSchema {
         }
     }
 
+    val migration5To6: Migration = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN sessionPolicyPayload TEXT")
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
         migration3To4,
-        migration4To5
+        migration4To5,
+        migration5To6
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {

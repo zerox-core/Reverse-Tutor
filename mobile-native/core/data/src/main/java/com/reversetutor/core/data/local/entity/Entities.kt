@@ -222,7 +222,8 @@ data class BackgroundJobEntity(
     val modelBindingId: String? = null,
     val quoteExcerpt: String? = null,
     val imageAttachmentsPayload: String? = null,
-    val contextEvidencePayload: String? = null
+    val contextEvidencePayload: String? = null,
+    val sessionPolicyPayload: String? = null
 )
 
 @Entity(tableName = "import_batches", indices = [Index("spaceId"), Index("status")])

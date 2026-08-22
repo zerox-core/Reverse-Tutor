@@ -22,6 +22,7 @@ import com.reversetutor.core.llm.LlmGenerationRequest
 import com.reversetutor.core.llm.LlmGenerationResult
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.ModelBinding
@@ -29,10 +30,45 @@ import com.reversetutor.core.model.ModelProtocol
 import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BackgroundGenerationRepositoryTest {
+    @Test
+    fun queuedPolicySnapshotIsForwardedToRecoveredGenerationRequest() = runBlocking {
+        val runtime = CapturingRuntime()
+        val jobDao = FakeBackgroundJobDao()
+        val firstRepository = repository(jobDao = jobDao, runtime = runtime)
+
+        firstRepository.enqueueGenerationJob(
+            input(token = "token-policy").copy(sessionPolicy = policy()),
+            nowEpochMillis = 10L,
+            jobId = "job-policy"
+        )
+
+        val recoveredRepository = repository(jobDao = jobDao, runtime = runtime)
+        recoveredRepository.recoverInterruptedGenerationJobs(nowEpochMillis = 20L)
+        recoveredRepository.runGenerationJob("job-policy", nowEpochMillis = 30L)
+
+        assertEquals(policy().normalized(), runtime.requests.single().sessionPolicy)
+    }
+
+    @Test
+    fun legacyJobWithoutPolicyForwardsNullToGenerationRequest() = runBlocking {
+        val runtime = CapturingRuntime()
+        val repository = repository(runtime = runtime)
+
+        repository.enqueueGenerationJob(
+            input(token = "token-legacy"),
+            nowEpochMillis = 10L,
+            jobId = "job-legacy"
+        )
+        repository.runGenerationJob("job-legacy", nowEpochMillis = 20L)
+
+        assertNull(runtime.requests.single().sessionPolicy)
+    }
+
     @Test
     fun defaultSwitchAndProcessRecoveryKeepEnqueueModelSnapshot() = runBlocking {
         val jobDao = FakeBackgroundJobDao()
@@ -233,6 +269,17 @@ class BackgroundGenerationRepositoryTest {
             token = LlmGenerationToken(token),
             capabilities = LlmCapabilities()
         )
+
+    private fun policy() = LlmSessionPolicyContext(
+        actionType = "probe",
+        studentRole = "probing_student",
+        knowledgePoint = "factoring",
+        difficulty = 0.7f,
+        processSummary = "要求学习者说明依据",
+        evaluationCorrectness = 0.4f,
+        userEmotion = "neutral",
+        correctionTiming = "immediate"
+    )
 }
 
 private class FakeBackgroundJobDao : BackgroundJobDao {

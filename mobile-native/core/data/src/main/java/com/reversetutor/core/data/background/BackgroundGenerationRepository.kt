@@ -13,6 +13,7 @@ import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageAttachment
 
@@ -50,7 +51,8 @@ class BackgroundGenerationRepository(
             modelBindingId = modelBindingId,
             quoteExcerpt = input.quoteExcerpt,
             imageAttachmentsPayload = input.imageAttachments.toAttachmentPayload(),
-            contextEvidencePayload = input.contextEvidence.toEvidencePayload()
+            contextEvidencePayload = input.contextEvidence.toEvidencePayload(),
+            sessionPolicyPayload = input.sessionPolicy.toPayload()
         )
         backgroundJobDao.upsert(job)
         return job.toGenerationJob() ?: error("Persisted generation job is invalid")
@@ -144,7 +146,8 @@ class BackgroundGenerationRepository(
                 capabilities = job.capabilities,
                 quoteExcerpt = job.quoteExcerpt,
                 imageAttachments = job.imageAttachments,
-                contextEvidence = job.contextEvidence
+                contextEvidence = job.contextEvidence,
+                sessionPolicy = job.sessionPolicy
             ),
             nowEpochMillis = nowEpochMillis,
             isTokenCurrent = { it == job.token },
@@ -252,7 +255,8 @@ class BackgroundGenerationRepository(
             errorMessage = errorMessage,
             quoteExcerpt = quoteExcerpt,
             imageAttachments = imageAttachmentsPayload.toImageAttachments(),
-            contextEvidence = contextEvidencePayload.toContextEvidence()
+            contextEvidence = contextEvidencePayload.toContextEvidence(),
+            sessionPolicy = sessionPolicyPayload.toSessionPolicy()
         )
     }
 
@@ -275,7 +279,8 @@ data class BackgroundGenerationInput(
     val capabilities: LlmCapabilities? = null,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
-    val contextEvidence: List<LlmContextEvidence> = emptyList()
+    val contextEvidence: List<LlmContextEvidence> = emptyList(),
+    val sessionPolicy: LlmSessionPolicyContext? = null
 )
 
 data class BackgroundGenerationJob(
@@ -294,7 +299,8 @@ data class BackgroundGenerationJob(
     val capabilities: LlmCapabilities? = null,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
-    val contextEvidence: List<LlmContextEvidence> = emptyList()
+    val contextEvidence: List<LlmContextEvidence> = emptyList(),
+    val sessionPolicy: LlmSessionPolicyContext? = null
 )
 
 sealed interface BackgroundGenerationOutcome {
@@ -354,6 +360,37 @@ private fun String?.toContextEvidence(): List<LlmContextEvidence> =
             sourceId = fields[5].ifBlank { null }
         ).normalized()
     }
+
+private fun LlmSessionPolicyContext?.toPayload(): String? =
+    this?.normalized()?.let { policy ->
+        listOf(
+            policy.actionType,
+            policy.studentRole,
+            policy.knowledgePoint,
+            policy.difficulty.toString(),
+            policy.processSummary,
+            policy.evaluationCorrectness.toString(),
+            policy.userEmotion,
+            policy.correctionTiming
+        ).joinToString(separator = "\t") { it.encodePayloadField() }
+    }
+
+private fun String?.toSessionPolicy(): LlmSessionPolicyContext? {
+    val fields = this?.split('\t')?.map { it.decodePayloadField() } ?: return null
+    if (fields.size != 8) return null
+    val difficulty = fields[3].toFloatOrNull() ?: return null
+    val evaluationCorrectness = fields[5].toFloatOrNull() ?: return null
+    return LlmSessionPolicyContext(
+        actionType = fields[0],
+        studentRole = fields[1],
+        knowledgePoint = fields[2],
+        difficulty = difficulty,
+        processSummary = fields[4],
+        evaluationCorrectness = evaluationCorrectness,
+        userEmotion = fields[6],
+        correctionTiming = fields[7]
+    ).normalized()
+}
 
 private fun String?.decodePayloadRows(expectedFields: Int): List<List<String>> {
     val payload = this?.takeIf { it.isNotBlank() } ?: return emptyList()
