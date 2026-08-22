@@ -53,9 +53,10 @@ data class ChatGenerationInput(
 )
 ```
 
-**No field for `SessionPolicyOutput`** (action / evaluation / processSummary).
-The adapter maps context-evidence strings to `LlmContextEvidence` (body = real
-text) but **cannot** inject policy. See `capability-requests/P3-session-policy-context.md`.
+`ChatGenerationInput.sessionPolicy` now accepts the optional
+`LlmSessionPolicyContext` wire payload from `core:llm`. The app adapter maps
+the normalized `SessionPolicyOutput` into it; `null` preserves the old prompt
+exactly. See `capability-requests/P3-session-policy-context.md`.
 
 ### ChatGenerationOutcome (rozen · core/data/llm)
 
@@ -90,7 +91,7 @@ data class LlmContextEvidence(
 
 | Domain port | Adapter | Frozen source (seam/delegate) | Notes |
 |---|---|---|---|
-| `ChatGenerationPort` | `ChatGenerationPortAdapter` | `ChatGenerationRepository.generateReply` | Functional-seam `generate`; maps `GenerationRequest`→`ChatGenerationInput` (no policy); maps outcome→`GenerationOutcome`; `readAssistantText` reads back persisted assistant via `MessageRepository.listMessages`. |
+| `ChatGenerationPort` | `ChatGenerationPortAdapter` | `ChatGenerationRepository.generateReply` | Functional-seam `generate`; maps `GenerationRequest`→`ChatGenerationInput`, including bounded optional policy wire data; maps outcome→`GenerationOutcome`; `readAssistantText` reads back persisted assistant via `MessageRepository.listMessages`. |
 | `SessionTurnPersistencePort` | `SessionTurnPersistencePortAdapter` | 5 functional seams | `saveUserMessage`→`MessageRepository.sendUserMessage`; `acceptAssistantResult` = confirmation only (frozen repo already persisted); `isSessionDeleted`→`ConversationRunRepository.isSessionDeleted`; `isTokenCurrent` permissive; `isTurnCompleted`→`findLatestRun(turnId)?.isTerminal`. |
 | `MessageContextPort` | `MessageContextPortAdapter` | `MessageRepository.listMessages(sessionId)` | `.takeLast(limit)` → `ContextMessage(role.name.lowercase())`. |
 | `MemoryContextPort` | `MemoryContextPortAdapter` | `MemoryRepository.snapshot(spaceId).items` | Filters out `MemoryItemKind.Error`; space-scoped (see §5). |

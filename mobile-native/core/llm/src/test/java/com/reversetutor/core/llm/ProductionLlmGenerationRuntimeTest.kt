@@ -81,6 +81,33 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
+    fun productionRuntimeIncludesSessionPolicyInProviderPayload() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(200, """{"choices":[{"message":{"content":"OK"}}]}""")
+        )
+        val runtime = productionRuntime(LlmProviderProtocol.OpenAiCompatible, transport)
+
+        runtime.generate(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                sessionPolicy = LlmSessionPolicyContext(
+                    actionType = "probe",
+                    studentRole = "probing_student",
+                    knowledgePoint = "factoring",
+                    difficulty = 0.7f,
+                    processSummary = "ask for a justification",
+                    evaluationCorrectness = 0.4f,
+                    userEmotion = "engaged",
+                    correctionTiming = "summary_only"
+                )
+            )
+        )
+
+        assertTrue(transport.singleRequest().jsonBody.contains("Teaching policy:"))
+        assertTrue(transport.singleRequest().jsonBody.contains("Action: probe"))
+        assertTrue(transport.singleRequest().jsonBody.contains("Knowledge point: factoring"))
+    }
+
+    @Test
     fun anthropicRuntimeBuildsHeadersAndParsesStreamingAndNonStreamingResponses() = runBlocking {
         val streamingTransport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(

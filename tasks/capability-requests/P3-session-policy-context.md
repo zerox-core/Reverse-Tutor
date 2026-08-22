@@ -1,8 +1,8 @@
 # P3 Capability Request: Session Policy / Context Injection into ChatGenerationInput
 
-> Status: **requested** — not yet implemented. The frozen `core/data/llm`
-> `ChatGenerationInput` must not be modified without a change request +
-> user approval. This document is the change request.
+> Status: **implemented** — approved by the user on 2026-08-22. The frozen
+> `core:data` / `core:llm` change was additive, test-gated, and introduces no
+> storage schema, DAO, migration, or secret-store change.
 
 ## Background
 
@@ -30,23 +30,23 @@ The adapter currently:
 - **Does not** inject `SessionPolicyOutput`. ✅ honest — it does not fake
   "已注入提示词".
 
-This means the strategy decision and rich context are computed but never
-reach the LLM prompt in the frozen path. This is acceptable for P2 (the
-wiring forms a single entry point and the contract is testable), but the gap
-must be closed in P3.
+This meant the strategy decision and rich context were computed but never
+reached the LLM prompt in the frozen path. The P3 implementation closes that
+gap while preserving the null-policy behaviour exactly.
 
-## Requested minimal change (P3)
+## Implemented minimal change (P3)
 
-Add a backward-compatible, optional policy payload to `ChatGenerationInput`
-(or a sibling input the frozen planner can consume):
+Add a backward-compatible, optional wire payload to `core:llm`, then reference
+it from `ChatGenerationInput`. Defining the type in `core:llm` keeps the
+planner independent of `core:data` and avoids a reverse module dependency:
 
 ```
 data class ChatGenerationInput(
     … // existing fields unchanged
-    val sessionPolicy: SessionPolicyWireInput? = null   // NEW, default null
+    val sessionPolicy: LlmSessionPolicyContext? = null   // NEW, default null
 )
 
-data class SessionPolicyWireInput(
+data class LlmSessionPolicyContext(
     val actionType: String,
     val studentRole: String,
     val knowledgePoint: String,
@@ -71,22 +71,20 @@ P3 input should follow the same convention.
 2. **Frozen planner opt-in** — `LlmGenerationPlanner.plan` consumes
    `sessionPolicy` only when non-null; when `null`, behaviour is identical to
    today (no prompt injection).
-3. **Adapter wiring** — once P3 lands, `ChatGenerationPortAdapter.buildInput`
-   maps `GenerationRequest.policy` → `SessionPolicyWireInput`. The adapter's
-   honesty doc-comment is updated to "policy injected" (replacing the current
-   "not injected" note). No other wiring change.
+3. **Adapter wiring** — `ChatGenerationPortAdapter.buildInput` maps
+   `GenerationRequest.policy` → `LlmSessionPolicyContext`, using bounded
+   redaction before the frozen boundary. `SessionPolicyOutput` also carries the
+   normalized correction timing so `summary_only` cannot silently become
+   `immediate`.
 
 ## Test plan
 
-- Existing frozen `ChatGenerationRepository` / `LlmGenerationPlanner` tests
-  must pass unchanged (null policy = current behaviour).
-- New test: when `sessionPolicy` is non-null, the planner's prompt/profile
-  includes the action/role/knowledgePoint (assertion on the assembled prompt
-  string, no network).
-- New test: `sessionPolicy = null` produces the same prompt as before the
-  change (regression guard).
-- NATIVE-P2-007 adapter test `provider failure maps to safe code …` remains
-  green (the mapping path is unchanged).
+- Null-policy regression is preserved by the existing exact context-payload
+  tests (no `Teaching policy` block when the field is null).
+- New planner, frozen repository, preview runtime, production runtime, and
+  adapter tests prove the optional policy reaches the assembled provider payload
+  without a network call.
+- P2-007 provider-failure and stale-token tests remain green.
 
 ## Rollback
 
@@ -96,12 +94,16 @@ payload is transient (per-turn, not persisted).
 
 ## Frozen-layer impact
 
-- `core/data/llm/ChatGenerationInput` — one additive field.
-- `core/llm/LlmGenerationPlanner` — consume the new field when non-null.
+- `core/llm/LlmGenerationLifecycle.kt` — `LlmSessionPolicyContext`, optional
+  request/planner field, bounded normalization, and prompt block.
+- `core/data/llm/ChatGenerationInput` — one additive optional field and
+  forwarding to the planner.
+- `core/llm/ProductionLlmGenerationRuntime.kt` — include the policy block only
+  when non-null.
 - No `core/model`, `core/protocol`, Room, DAO, migration, or `SecretStore`
   change.
 
 ## Approval
 
-Requires user approval per `wave0-a3-freeze-boundary.md` change-request flow
-before any frozen-layer edit.
+Approved and implemented under the `wave0-a3-freeze-boundary.md` change-request
+flow on 2026-08-22.

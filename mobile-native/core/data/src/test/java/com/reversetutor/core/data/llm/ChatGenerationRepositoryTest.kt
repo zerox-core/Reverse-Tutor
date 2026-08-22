@@ -18,6 +18,7 @@ import com.reversetutor.core.llm.LlmGenerationResult
 import com.reversetutor.core.llm.LlmGenerationRequest
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.ModelBinding
@@ -165,6 +166,37 @@ class ChatGenerationRepositoryTest {
         assertEquals(listOf(MessageRole.Assistant), messages.map { it.role })
         assertEquals("Mock assistant reply", messages.single().text)
         assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun generateReplyForwardsOptionalSessionPolicyToRuntime() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+        val policy = LlmSessionPolicyContext(
+            actionType = "probe",
+            studentRole = "probing_student",
+            knowledgePoint = "factoring",
+            difficulty = 0.7f,
+            processSummary = "ask for a justification",
+            evaluationCorrectness = 0.4f,
+            userEmotion = "engaged",
+            correctionTiming = "summary_only"
+        )
+
+        repository.generateReply(
+            input = input("token-policy").copy(sessionPolicy = policy),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        assertEquals(policy, runtime.requests.single().sessionPolicy)
     }
 
     @Test

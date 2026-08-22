@@ -4,6 +4,7 @@ import com.reversetutor.core.data.llm.ChatGenerationOutcome
 import com.reversetutor.core.domain.GenerationOutcome
 import com.reversetutor.core.domain.GenerationRequest
 import com.reversetutor.core.domain.SessionActionContract
+import com.reversetutor.core.domain.CorrectionTimingWire
 import com.reversetutor.core.domain.SessionEvaluationContract
 import com.reversetutor.core.domain.SessionPolicyOutput
 import com.reversetutor.core.domain.SessionTurnContracts
@@ -34,9 +35,15 @@ class ChatGenerationPortAdapterTest {
         token = token,
         contextEvidence = contextEvidence,
         policy = SessionPolicyOutput(
-            evaluation = SessionEvaluationContract(),
-            action = SessionActionContract(),
-            processSummary = "test"
+            evaluation = SessionEvaluationContract(correctness = 0.4f, userEmotion = "engaged"),
+            action = SessionActionContract(
+                type = "probe",
+                studentRole = "probing_student",
+                knowledgePoint = "factoring",
+                difficulty = 0.7f
+            ),
+            processSummary = "ask for a justification",
+            correctionTiming = CorrectionTimingWire.SUMMARY_ONLY
         )
     )
 
@@ -100,8 +107,32 @@ class ChatGenerationPortAdapterTest {
         assertEquals(2, input.contextEvidence.size)
         assertEquals("gap A", input.contextEvidence[0].body)
         assertEquals("review B", input.contextEvidence[1].body)
-        // No policy field leaks into the frozen input.
+        assertEquals("probe", input.sessionPolicy?.actionType)
+        assertEquals("factoring", input.sessionPolicy?.knowledgePoint)
+        assertEquals(CorrectionTimingWire.SUMMARY_ONLY, input.sessionPolicy?.correctionTiming)
         assertNull(input.modelBindingId)
+    }
+
+    @Test
+    fun `policy wire redacts sensitive text before crossing the frozen boundary`() {
+        val sensitive = "Authorization: Bearer sk-live-example at https://provider.example/v1"
+        val input = ChatGenerationPortAdapter(
+            generate = { _, _, _, _ -> ChatGenerationOutcome.NoModelConfigured }
+        ).buildInput(
+            request().copy(
+                policy = SessionPolicyOutput(
+                    evaluation = SessionEvaluationContract(),
+                    action = SessionActionContract(knowledgePoint = sensitive),
+                    processSummary = sensitive
+                )
+            )
+        )
+
+        val policy = requireNotNull(input.sessionPolicy)
+        assertFalse(policy.knowledgePoint.contains("sk-live-example"))
+        assertFalse(policy.knowledgePoint.contains("provider.example"))
+        assertFalse(policy.processSummary.contains("Authorization"))
+        assertFalse(policy.processSummary.contains("https://"))
     }
 
     // -- Scenario 4: Provider 错误始终映射 generation_failed，不泄露 -----------

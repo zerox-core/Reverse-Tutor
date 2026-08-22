@@ -9,6 +9,7 @@ import com.reversetutor.core.domain.SessionPolicyOutput
 import com.reversetutor.core.domain.SessionTurnContracts
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.llm.LlmSessionPolicyContext
 
 /**
  * Adapts the frozen `ChatGenerationRepository.generateReply` to the non-frozen
@@ -16,12 +17,8 @@ import com.reversetutor.core.llm.LlmGenerationToken
  * repository method; tests inject a controlled seam.
  *
  * Honesty contract (see tasks/native-p2-007-api-fact-map.md §3):
- * - Builds a frozen [ChatGenerationInput] using ONLY fields the frozen protocol
- *   safely receives: sessionId, userMessageId, userText, token, contextEvidence.
- * - Does NOT inject [SessionPolicyOutput] (action/evaluation/processSummary):
- *   the frozen `ChatGenerationInput` has no such field. Faking injection would
- *   be dishonest. The gap is recorded in
- *   tasks/capability-requests/P3-session-policy-context.md.
+ * - Builds a frozen [ChatGenerationInput] using session, message, evidence,
+ *   and the optional, bounded [SessionPolicyOutput] wire payload.
  * - Maps context-evidence strings to structured [LlmContextEvidence] using the
  *   real gap/review text as the body — no fabricated structure.
  * - Maps the frozen [ChatGenerationOutcome] to the domain [GenerationOutcome],
@@ -61,8 +58,8 @@ class ChatGenerationPortAdapter(
 
     /**
      * Maps the domain [GenerationRequest] to the frozen [ChatGenerationInput].
-     * Policy fields ([GenerationRequest.policy]) are deliberately NOT mapped —
-     * the frozen input has no field for them.
+     * Policy fields are mapped to the optional `core:llm` wire type; the wire
+     * type remains independent of `core:domain` to preserve module direction.
      */
     internal fun buildInput(request: GenerationRequest): ChatGenerationInput =
         ChatGenerationInput(
@@ -74,6 +71,7 @@ class ChatGenerationPortAdapter(
             capabilities = null,
             quoteExcerpt = null,
             imageAttachments = emptyList(),
+            sessionPolicy = request.policy.toLlmSessionPolicyContext(),
             contextEvidence = request.contextEvidence.mapIndexed { index, text ->
                 LlmContextEvidence(
                     id = "ctx-${request.turnId}-$index",
@@ -110,4 +108,16 @@ class ChatGenerationPortAdapter(
         ChatGenerationOutcome.BlankPrompt -> GenerationOutcome.BlankPrompt
         ChatGenerationOutcome.Stale -> GenerationOutcome.Stale
     }
+
+    private fun SessionPolicyOutput.toLlmSessionPolicyContext(): LlmSessionPolicyContext =
+        LlmSessionPolicyContext(
+            actionType = SessionTurnContracts.sanitizeContractText(action.type, maxLength = 48),
+            studentRole = SessionTurnContracts.sanitizeContractText(action.studentRole, maxLength = 64),
+            knowledgePoint = SessionTurnContracts.sanitizeContractText(action.knowledgePoint, maxLength = 120),
+            difficulty = action.difficulty,
+            processSummary = SessionTurnContracts.sanitizeContractText(processSummary, maxLength = 320),
+            evaluationCorrectness = evaluation.correctness,
+            userEmotion = SessionTurnContracts.sanitizeContractText(evaluation.userEmotion, maxLength = 48),
+            correctionTiming = SessionTurnContracts.sanitizeContractText(correctionTiming, maxLength = 48)
+        )
 }

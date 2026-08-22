@@ -21,8 +21,41 @@ data class LlmGenerationRequest(
     val streaming: Boolean = true,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
-    val contextEvidence: List<LlmContextEvidence> = emptyList()
+    val contextEvidence: List<LlmContextEvidence> = emptyList(),
+    val sessionPolicy: LlmSessionPolicyContext? = null
 )
+
+/**
+ * Optional, wire-only teaching strategy supplied by the application layer.
+ * This type deliberately contains no `core:domain` dependency, so the LLM
+ * planner can consume it without reversing the module dependency direction.
+ */
+data class LlmSessionPolicyContext(
+    val actionType: String,
+    val studentRole: String,
+    val knowledgePoint: String,
+    val difficulty: Float,
+    val processSummary: String,
+    val evaluationCorrectness: Float = 0f,
+    val userEmotion: String = "neutral",
+    val correctionTiming: String = "immediate"
+) {
+    fun normalized(): LlmSessionPolicyContext? {
+        val normalizedAction = actionType.trim().lowercase().take(48)
+        val normalizedRole = studentRole.trim().lowercase().take(64)
+        if (normalizedAction.isEmpty() || normalizedRole.isEmpty()) return null
+        return copy(
+            actionType = normalizedAction,
+            studentRole = normalizedRole,
+            knowledgePoint = knowledgePoint.trim().ifEmpty { "Current method" }.take(120),
+            difficulty = difficulty.coerceIn(0f, 1f),
+            processSummary = processSummary.trim().ifEmpty { "Teaching turn" }.take(320),
+            evaluationCorrectness = evaluationCorrectness.coerceIn(0f, 1f),
+            userEmotion = userEmotion.trim().lowercase().ifEmpty { "neutral" }.take(48),
+            correctionTiming = correctionTiming.trim().lowercase().ifEmpty { "immediate" }.take(48)
+        )
+    }
+}
 
 data class LlmContextEvidence(
     val id: String,
@@ -69,11 +102,13 @@ object LlmGenerationPlanner {
         token: LlmGenerationToken,
         quoteExcerpt: String? = null,
         imageAttachments: List<MessageAttachment> = emptyList(),
-        contextEvidence: List<LlmContextEvidence> = emptyList()
+        contextEvidence: List<LlmContextEvidence> = emptyList(),
+        sessionPolicy: LlmSessionPolicyContext? = null
     ): LlmGenerationPlan {
         val normalizedText = userText.trim()
         val normalizedImageAttachments = imageAttachments.filter { it.isImageAttachment() }
         val normalizedEvidence = contextEvidence.mapNotNull { it.normalized() }.take(MaxContextEvidence)
+        val normalizedSessionPolicy = sessionPolicy?.normalized()
         if (profile == null) {
             return LlmGenerationPlan.Blocked(LlmGenerationBlockReason.NoModelConfigured)
         }
@@ -98,7 +133,8 @@ object LlmGenerationPlanner {
                 secretRef = profile.secretRef,
                 quoteExcerpt = quoteExcerpt?.trim()?.ifEmpty { null },
                 imageAttachments = normalizedImageAttachments,
-                contextEvidence = normalizedEvidence
+                contextEvidence = normalizedEvidence,
+                sessionPolicy = normalizedSessionPolicy
             )
         )
     }
@@ -203,6 +239,7 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
 
 private fun LlmGenerationRequest.contextualUserText(): String {
     val contextLines = buildList {
+        sessionPolicyPromptBlock()?.let { add(it) }
         if (!quoteExcerpt.isNullOrBlank()) {
             add("Quote: $quoteExcerpt")
         }
@@ -227,6 +264,21 @@ private fun LlmGenerationRequest.contextualUserText(): String {
     if (contextLines.isEmpty()) return userText
     return (contextLines + userText).joinToString(separator = "\n\n")
 }
+
+internal fun LlmGenerationRequest.sessionPolicyPromptBlock(): String? =
+    sessionPolicy?.normalized()?.let { policy ->
+        buildString {
+            append("Teaching policy:")
+            append("\nAction: ").append(policy.actionType)
+            append("\nStudent role: ").append(policy.studentRole)
+            append("\nKnowledge point: ").append(policy.knowledgePoint)
+            append("\nDifficulty: ").append(policy.difficulty)
+            append("\nEvaluation correctness: ").append(policy.evaluationCorrectness)
+            append("\nLearner emotion: ").append(policy.userEmotion)
+            append("\nCorrection timing: ").append(policy.correctionTiming)
+            append("\nTurn intent: ").append(policy.processSummary)
+        }
+    }
 
 private fun LlmGenerationRequest.openAiUserContent(): Any =
     if (imageAttachments.isEmpty()) {

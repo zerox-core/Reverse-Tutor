@@ -236,6 +236,7 @@ object SessionTurnPolicy {
             evaluation = evaluation,
             action = action,
             processSummary = summary,
+            correctionTiming = settings.correctionTiming,
             normalizationWarnings = warnings
         )
     }
@@ -287,6 +288,7 @@ object SessionTurnPolicy {
             evaluation = evaluation,
             action = action,
             processSummary = summary,
+            correctionTiming = settings.correctionTiming,
             normalizationWarnings = warnings
         )
     }

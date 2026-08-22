@@ -128,3 +128,15 @@ route. The repair modified only non-frozen `app/wiring` and test code.
 Post-repair verification: targeted adapter/wiring tests passed; full Android
 `test :app:lint :app:assembleDebug` passed; Python completed with `510 passed,
 28 skipped`. No real provider, API key, device, or UI flow was used.
+
+## 12. P3 Session Policy Injection
+
+The approved additive P3 change is complete. `LlmSessionPolicyContext` lives in
+`core:llm`, crosses the frozen input/planner/request path as an optional field,
+and appears in the provider prompt only when non-null. The app adapter maps the
+bounded policy output into that field; null-policy payloads retain the prior
+prompt. Correction timing is now part of `SessionPolicyOutput`, preventing
+`summary_only` from being silently lost at the LLM boundary.
+
+Focused cross-layer tests and the full Android/Python regressions passed on
+2026-08-22 without a real provider call.

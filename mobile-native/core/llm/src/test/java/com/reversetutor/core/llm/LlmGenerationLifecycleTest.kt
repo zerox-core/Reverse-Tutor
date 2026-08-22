@@ -5,6 +5,7 @@ import com.reversetutor.core.model.LlmProviderKind
 import com.reversetutor.core.model.MessageAttachment
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +44,7 @@ class LlmGenerationLifecycleTest {
         assertEquals(listOf("question.png"), request.imageAttachments.map { it.name })
         assertEquals(listOf("Algebra note"), request.contextEvidence.map { it.title })
         assertEquals(LlmGenerationToken("token-1"), request.token)
+        assertNull(request.sessionPolicy)
 
         val blocked = LlmGenerationPlanner.plan(
             sessionId = "session-1",
@@ -75,6 +77,32 @@ class LlmGenerationLifecycleTest {
             LlmGenerationPlan.Blocked(LlmGenerationBlockReason.NoModelConfigured),
             plan
         )
+    }
+
+    @Test
+    fun plannerCarriesAnOptionalNormalizedSessionPolicy() {
+        val policy = LlmSessionPolicyContext(
+            actionType = "probe",
+            studentRole = "probing_student",
+            knowledgePoint = "factoring",
+            difficulty = 0.7f,
+            processSummary = "ask for a justification",
+            evaluationCorrectness = 0.4f,
+            userEmotion = "engaged",
+            correctionTiming = "summary_only"
+        )
+
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Explain factoring",
+            profile = profile(LlmProviderKind.OpenAiCompatible, "secret-1"),
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-policy"),
+            sessionPolicy = policy
+        )
+
+        assertEquals(policy, (plan as LlmGenerationPlan.Ready).request.sessionPolicy)
     }
 
     @Test
@@ -174,6 +202,33 @@ class LlmGenerationLifecycleTest {
 
         assertTrue(content.contains("Context evidence:"))
         assertTrue(content.contains("[1] Note - Algebra note: Remember difference of squares."))
+        assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun providerPayloadsCarrySessionPolicyWithoutNetworkCalls() {
+        val runtime = OpenAiCompatibleGenerationRuntime()
+        val payload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                sessionPolicy = LlmSessionPolicyContext(
+                    actionType = "probe",
+                    studentRole = "probing_student",
+                    knowledgePoint = "factoring",
+                    difficulty = 0.7f,
+                    processSummary = "ask for a justification",
+                    evaluationCorrectness = 0.4f,
+                    userEmotion = "engaged",
+                    correctionTiming = "summary_only"
+                )
+            )
+        )
+        val messages = payload.body["messages"] as List<*>
+        val userMessage = messages.single() as Map<*, *>
+        val content = userMessage["content"] as String
+
+        assertTrue(content.contains("Teaching policy:"))
+        assertTrue(content.contains("Action: probe"))
+        assertTrue(content.contains("Knowledge point: factoring"))
         assertEquals(0, runtime.realProviderCallCount)
     }
 

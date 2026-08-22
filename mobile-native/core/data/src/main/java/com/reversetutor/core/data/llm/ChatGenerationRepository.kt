@@ -12,6 +12,7 @@ import com.reversetutor.core.llm.LlmGenerationResult
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.llm.LlmProfileCapabilityResolver
+import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.model.Message
 import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageRole
@@ -46,7 +47,8 @@ class ChatGenerationRepository(
             token = input.token,
             quoteExcerpt = input.quoteExcerpt,
             imageAttachments = input.imageAttachments,
-            contextEvidence = input.contextEvidence
+            contextEvidence = input.contextEvidence,
+            sessionPolicy = input.sessionPolicy
         )
 
         val request = when (plan) {
@@ -117,7 +119,8 @@ data class ChatGenerationInput(
     val capabilities: LlmCapabilities? = null,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
-    val contextEvidence: List<LlmContextEvidence> = emptyList()
+    val contextEvidence: List<LlmContextEvidence> = emptyList(),
+    val sessionPolicy: LlmSessionPolicyContext? = null
 )
 
 private fun ExecutionModelConfiguration.toExecutionProfile(): LlmProfile =

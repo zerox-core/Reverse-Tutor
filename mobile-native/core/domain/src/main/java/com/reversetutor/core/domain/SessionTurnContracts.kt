@@ -210,6 +210,7 @@ data class SessionPolicyOutput(
     val evaluation: SessionEvaluationContract,
     val action: SessionActionContract,
     val processSummary: String,
+    val correctionTiming: String = CorrectionTimingWire.IMMEDIATE,
     val normalizationWarnings: List<String> = emptyList()
 )
 

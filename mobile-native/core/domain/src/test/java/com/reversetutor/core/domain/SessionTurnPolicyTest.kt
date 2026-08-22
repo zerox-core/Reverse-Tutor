@@ -419,6 +419,7 @@ class SessionTurnPolicyTest {
         )
         val out = SessionTurnPolicy.normalize(input)
         assertEquals(ActionTypeWire.RECAP, out.action.type)
+        assertEquals(CorrectionTimingWire.SUMMARY_ONLY, out.correctionTiming)
     }
 
     @Test
