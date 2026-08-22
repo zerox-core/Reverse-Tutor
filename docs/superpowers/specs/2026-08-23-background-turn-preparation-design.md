@@ -1,6 +1,6 @@
 # 后台会话预处理设计
 
-> 状态：用户已确认，待规格审阅
+> 状态：用户已确认，可进入实施计划
 > 分支：`newmp`
 > 前置提交：`ffdbb9f` 后台策略快照
 
@@ -12,7 +12,7 @@
 
 新增 `BackgroundTurnPreparationPort` 作为 `feature:chat` 到 app/wiring 的唯一入口。它接收已保存消息的稳定标识、用户文本、引用和图片附件，返回安全的 `BackgroundTurnPreparation`：`BackgroundGenerationInput`、加载态 `SessionConversationContract`、以及 jobId 之外必要的安全状态。
 
-生产实现位于 `app/wiring/session`，复用 `ConversationContextAssembler` 与 `SessionTurnPolicy`，但不复用会保存用户消息且会直接生成的 `ConversationSessionCoordinator`。预处理器只做：会话/token 可用性检查、上下文聚合、策略归一化、将策略映射为获批的后台任务快照、入队。它不写第二条用户消息、不调用 `ChatGenerationRepository`、不运行 Worker、不构造 Compose 类型。
+生产实现位于 `app/wiring/session`，复用 `ConversationContextAssembler` 与 `SessionTurnPolicy`，但不复用会保存用户消息且会直接生成的 `ConversationSessionCoordinator`。预处理器只做：空输入与会话可用性检查、上下文聚合、策略归一化、将策略映射为获批的后台任务快照、入队。它不写第二条用户消息、不调用 `ChatGenerationRepository`、不运行 Worker、不构造 Compose 类型。token 在任务入库前没有可查询的持久化状态，因此不在预处理阶段伪造“token 已失效”判断；入库后继续由既有后台仓库/Worker 基于任务状态校验 token。
 
 ## 调用顺序
 
@@ -35,7 +35,7 @@ ChatRoute
 ## 失败策略
 
 - 若用户消息写入失败，不调用预处理器或入队。
-- 若预处理判定会话已删除、token 已陈旧或输入为空，不入队且返回安全契约。
+- 若预处理判定会话已删除或输入为空，不入队且返回安全契约。token 的有效性只在任务入库后由既有后台仓库/Worker 判断。
 - 若局部上下文来源失败，保留可用类别并通过既有白名单 warning 告知；不阻塞策略。
 - 预处理器不检查 Provider 可用性；无模型与 Provider 失败由后台任务的既有终态路径处理。
 
