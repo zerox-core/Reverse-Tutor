@@ -251,20 +251,6 @@ fun ChatRoute(
             )
         }.orEmpty()
         rememberedMessageIds = rememberedMessageStore.loadRememberedMessageIds()
-        val currentContract = sessionContract
-        if (currentContract != null && currentContract.generation.state == GenerationState.READY) {
-            val assistantRecord = loadedRecords
-                .filter { it.message.role == MessageRole.Assistant }
-                .maxByOrNull { it.message.createdAtEpochMillis }
-            if (assistantRecord != null && assistantRecord.message.id.isNotBlank()) {
-                sessionContract = currentContract.copy(
-                    generation = currentContract.generation.copy(
-                        assistantMessageId = assistantRecord.message.id,
-                        assistantText = assistantRecord.message.text
-                    )
-                )
-            }
-        }
     }
 
     LaunchedEffect(pendingDeletion?.messageId, pendingDeletion?.expiresAtEpochMillis) {

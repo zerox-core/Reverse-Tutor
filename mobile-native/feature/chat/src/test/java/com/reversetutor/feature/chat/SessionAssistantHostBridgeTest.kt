@@ -40,10 +40,10 @@ class SessionAssistantHostBridgeTest {
                 studentRole = "learner",
                 knowledgePoint = "因式分解",
                 difficulty = 0.5f,
-                note = null
+                note = ""
             ),
             processSummary = "正在探查理解",
-            correctionTiming = null,
+            correctionTiming = "immediate",
             normalizationWarnings = emptyList()
         )
         return SessionConversationFacade().mapQueued(
