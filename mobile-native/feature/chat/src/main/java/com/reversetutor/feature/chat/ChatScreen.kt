@@ -86,6 +86,7 @@ fun ChatRoute(
     messageRepository: MessageRepository,
     chatGenerationRepository: ChatGenerationRepository? = null,
     backgroundGenerationRepository: BackgroundGenerationRepository? = null,
+    backgroundTurnPreparationPort: BackgroundTurnPreparationPort = BackgroundTurnPreparationPort.Unavailable,
     memoryRepository: MemoryRepository? = null,
     sourceRepository: SourceRepository? = null,
     sourceUsagePort: ChatSourceUsagePort = ChatSourceUsagePort.None,
@@ -143,25 +144,6 @@ fun ChatRoute(
     var clientRequestId by remember(sessionId) { mutableStateOf(restoredDraft.clientRequestId) }
     var composer by remember(sessionId) { mutableStateOf(ChatComposerState.from(restoredDraft)) }
     var generation by remember(sessionId) { mutableStateOf<ChatGenerationUiState>(ChatGenerationUiState.Idle) }
-    val latestProviderGenerationFailed by rememberUpdatedState(onProviderGenerationFailed)
-    val directGenerationCoordinator = remember(sessionId, chatGenerationRepository) {
-        ChatGenerationCoordinator(
-            executor = ChatGenerationExecutor { input, nowEpochMillis, isTokenCurrent ->
-                val outcome = chatGenerationRepository?.generateReply(
-                    input = input,
-                    nowEpochMillis = nowEpochMillis,
-                    isTokenCurrent = isTokenCurrent
-                ) ?: ChatGenerationOutcome.NoModelConfigured
-                if (outcome is ChatGenerationOutcome.ProviderFailed) {
-                    latestProviderGenerationFailed(input.userMessageId)
-                }
-                outcome
-            }
-        )
-    }
-    DisposableEffect(directGenerationCoordinator) {
-        onDispose { directGenerationCoordinator.invalidate() }
-    }
     var activeGenerationToken by remember(sessionId) { mutableStateOf<LlmGenerationToken?>(null) }
     var activeBackgroundJobId by remember(sessionId) { mutableStateOf<String?>(null) }
     var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
@@ -379,16 +361,8 @@ fun ChatRoute(
                     val userMessage = messageRepository.listMessages(sessionId)
                         .firstOrNull { it.id == attempt.messageId }
                         ?: return@launch
-                    val token = LlmGenerationToken("${userMessage.id}-${System.currentTimeMillis()}")
-                    val contextEvidence = buildGenerationChatContextEvidence(
-                        userText = userMessage.text,
-                        memoryRepository = memoryRepository,
-                        sourceRepository = sourceRepository,
-                        sessionSnapshot = sessionSnapshot,
-                        sessionId = sessionId,
-                        sourceUsagePort = sourceUsagePort,
-                        usedAtEpochMillis = System.currentTimeMillis()
-                    )
+                    val tokenValue = "${userMessage.id}-${System.currentTimeMillis()}"
+                    val token = LlmGenerationToken(tokenValue)
                     val imageAttachments = sentComposer.toAttachmentDrafts()
                         .filter { it.mimeType?.startsWith("image/") == true }
                         .mapIndexed { index, attachment ->
@@ -398,40 +372,29 @@ fun ChatRoute(
                                 index = index
                             )
                         }
-                    val backgroundRepository = backgroundGenerationRepository
-                    if (backgroundRepository != null) {
-                        activeGenerationToken = token
-                        generation = ChatGenerationUiState.Pending
-                        val job = backgroundRepository.enqueueGenerationJob(
-                            input = BackgroundGenerationInput(
-                                spaceId = userMessage.spaceId,
-                                sessionId = sessionId,
-                                userMessageId = userMessage.id,
-                                userText = userMessage.text,
-                                token = token,
-                                quoteExcerpt = sentComposer.quoteTarget?.excerpt,
-                                imageAttachments = imageAttachments,
-                                contextEvidence = contextEvidence
-                            ),
-                            nowEpochMillis = System.currentTimeMillis()
-                        )
-                        activeBackgroundJobId = job.id
-                        onBackgroundGenerationQueued(job.id)
-                        return@launch
-                    }
-                    directGenerationCoordinator.generate(
-                        input = ChatGenerationInput(
-                            sessionId = sessionId,
-                            userMessageId = userMessage.id,
-                            userText = userMessage.text,
-                            token = token,
-                            quoteExcerpt = sentComposer.quoteTarget?.excerpt,
-                            imageAttachments = imageAttachments,
-                            contextEvidence = contextEvidence
-                        ),
-                        onStateChanged = { generation = it }
+                    val request = BackgroundTurnPreparationRequest(
+                        spaceId = userMessage.spaceId,
+                        sessionId = sessionId,
+                        userMessageId = userMessage.id,
+                        userText = userMessage.text,
+                        token = tokenValue,
+                        quoteExcerpt = sentComposer.quoteTarget?.excerpt,
+                        imageAttachments = imageAttachments,
+                        sessionSnapshot = sessionSnapshot
                     )
-                    reload()
+                    when (val prepared = backgroundTurnPreparationPort.prepareAndEnqueue(request)) {
+                        is BackgroundTurnPreparationResult.Queued -> {
+                            activeGenerationToken = token
+                            generation = ChatGenerationUiState.Pending
+                            activeBackgroundJobId = prepared.jobId
+                            onBackgroundGenerationQueued(prepared.jobId)
+                        }
+                        BackgroundTurnPreparationResult.BlankInput,
+                        BackgroundTurnPreparationResult.SessionUnavailable,
+                        BackgroundTurnPreparationResult.Unavailable,
+                        BackgroundTurnPreparationResult.Failed ->
+                            generation = ChatGenerationUiState.Failure("后台准备失败")
+                    }
                 }
             }
         },

@@ -1217,6 +1217,7 @@ private fun DestinationContent(
                 messageRepository = messageRepository,
                 chatGenerationRepository = chatGenerationRepository,
                 backgroundGenerationRepository = backgroundGenerationRepository,
+                backgroundTurnPreparationPort = hybridAppGraph.backgroundTurnPreparationPort,
                 memoryRepository = memoryRepository,
                 sourceRepository = sourceRepository,
                 sourceUsagePort = chatSourceUsagePort,

@@ -8,6 +8,7 @@ import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.domain.ConversationContextAssembler
+import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.ConversationRunRepository
 import com.reversetutor.core.domain.ConversationSessionCoordinator
 import com.reversetutor.core.domain.LearningOverviewCoordinator
@@ -108,6 +109,17 @@ class SessionConversationAssembly(
     )
 
     private val facade: SessionConversationFacade = SessionConversationFacade()
+
+    /**
+     * Assemble bounded conversation context for the given session.
+     * Delegates to the private [ConversationContextAssembler] without
+     * running a generation turn.
+     */
+    suspend fun assembleContext(
+        spaceId: String,
+        sessionId: String
+    ): ConversationContextContract =
+        contextAssembler.assemble(spaceId, sessionId)
 
     /**
      * Run a single conversation turn and return the immutable

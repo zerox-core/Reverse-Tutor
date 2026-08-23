@@ -34,6 +34,7 @@ import com.reversetutor.core.remote.HttpOnlineApi
 import com.reversetutor.core.remote.OnlineAuthSessionManager
 import com.reversetutor.core.remote.OnlineAuthTokenProvider
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
+import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
 import com.reversetutor.feature.chat.ChatRunsViewModelFactory
 import com.reversetutor.feature.chat.HomePortViewModelFactory
@@ -54,6 +55,7 @@ import com.reversetutor.preview.BuildConfig
 import com.reversetutor.preview.shell.ChallengeRuntimeCoordinator
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
+import com.reversetutor.preview.wiring.session.BackgroundTurnPreparationCoordinator
 import com.reversetutor.preview.wiring.session.SessionConversationAssembly
 
 data class HybridFrontendFactories(
@@ -120,6 +122,7 @@ class HybridAppGraph private constructor(
     val chatGenerationRepository: ChatGenerationRepository,
     val sessionConversationAssembly: SessionConversationAssembly,
     val backgroundGenerationRepository: BackgroundGenerationRepository,
+    val backgroundTurnPreparationPort: BackgroundTurnPreparationPort,
     val sourceRepository: SourceRepository,
     val memoryRepository: MemoryRepository,
     val graphRepository: GraphRepository,
@@ -201,6 +204,18 @@ class HybridAppGraph private constructor(
                 sourceRepository = sourceRepository,
                 learningRepository = learningRepository
             )
+            val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =
+                BackgroundTurnPreparationCoordinator(
+                    isSessionDeleted = { sessionId ->
+                        conversationRunRepository.isSessionDeleted(sessionId)
+                    },
+                    assembleContext = { spaceId, sessionId ->
+                        sessionConversationAssembly.assembleContext(spaceId, sessionId)
+                    },
+                    enqueueJob = { input, now ->
+                        backgroundGenerationRepository.enqueueGenerationJob(input, now)
+                    }
+                )
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
                 sessionRepository = sessionRepository,
@@ -209,6 +224,7 @@ class HybridAppGraph private constructor(
                 chatGenerationRepository = chatGenerationRepository,
                 sessionConversationAssembly = sessionConversationAssembly,
                 backgroundGenerationRepository = backgroundGenerationRepository,
+                backgroundTurnPreparationPort = backgroundTurnPreparationPort,
                 sourceRepository = sourceRepository,
                 memoryRepository = memoryRepository,
                 graphRepository = graphRepository,
