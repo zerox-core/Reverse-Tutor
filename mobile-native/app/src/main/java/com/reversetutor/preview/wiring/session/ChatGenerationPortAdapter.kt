@@ -109,15 +109,4 @@ class ChatGenerationPortAdapter(
         ChatGenerationOutcome.Stale -> GenerationOutcome.Stale
     }
 
-    private fun SessionPolicyOutput.toLlmSessionPolicyContext(): LlmSessionPolicyContext =
-        LlmSessionPolicyContext(
-            actionType = SessionTurnContracts.sanitizeContractText(action.type, maxLength = 48),
-            studentRole = SessionTurnContracts.sanitizeContractText(action.studentRole, maxLength = 64),
-            knowledgePoint = SessionTurnContracts.sanitizeContractText(action.knowledgePoint, maxLength = 120),
-            difficulty = action.difficulty,
-            processSummary = SessionTurnContracts.sanitizeContractText(processSummary, maxLength = 320),
-            evaluationCorrectness = evaluation.correctness,
-            userEmotion = SessionTurnContracts.sanitizeContractText(evaluation.userEmotion, maxLength = 48),
-            correctionTiming = SessionTurnContracts.sanitizeContractText(correctionTiming, maxLength = 48)
-        )
 }
