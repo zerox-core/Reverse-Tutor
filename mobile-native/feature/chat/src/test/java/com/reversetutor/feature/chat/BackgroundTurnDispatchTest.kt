@@ -2,7 +2,9 @@ package com.reversetutor.feature.chat
 
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.SessionActionContract
+import com.reversetutor.core.domain.SessionEvaluationContract
 import com.reversetutor.core.domain.SessionPolicyOutput
+import com.reversetutor.core.domain.CorrectionTimingWire
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -22,16 +24,16 @@ class BackgroundTurnDispatchTest {
     )
 
     private fun minimalPolicy() = SessionPolicyOutput(
-        evaluation = null,
+        evaluation = SessionEvaluationContract(),
         action = SessionActionContract(
             type = "probe",
             studentRole = "learner",
             knowledgePoint = "",
             difficulty = 0.5f,
-            note = null
+            note = ""
         ),
-        processSummary = null,
-        correctionTiming = null,
+        processSummary = "",
+        correctionTiming = CorrectionTimingWire.IMMEDIATE,
         normalizationWarnings = emptyList()
     )
 
@@ -68,21 +70,9 @@ class BackgroundTurnDispatchTest {
     @Test
     fun rejected_result_triggers_no_callback_and_no_direct_generation() = runBlocking {
         val callbacks = mutableListOf<String>()
-        var directGenerationCalls = 0
-
-        when (val prepared = BackgroundTurnPreparationPort.Unavailable.prepareAndEnqueue(request())) {
-            is BackgroundTurnPreparationResult.Queued -> {
-                callbacks.add(prepared.jobId)
-            }
-            BackgroundTurnPreparationResult.BlankInput,
-            BackgroundTurnPreparationResult.SessionUnavailable,
-            BackgroundTurnPreparationResult.Unavailable,
-            BackgroundTurnPreparationResult.Failed -> {
-                // No callback, no direct generation
-            }
-        }
-
+        val result: BackgroundTurnPreparationResult =
+            BackgroundTurnPreparationPort.Unavailable.prepareAndEnqueue(request())
+        assertEquals(BackgroundTurnPreparationResult.Unavailable, result)
         assertTrue(callbacks.isEmpty())
-        assertEquals(0, directGenerationCalls)
     }
 }

@@ -27,7 +27,7 @@ import kotlinx.coroutines.CancellationException
  * [CancellationException] is rethrown; all other exceptions map to [BackgroundTurnPreparationResult.Failed].
  */
 internal class BackgroundTurnPreparationCoordinator(
-    private val isSessionDeleted: (String) -> Boolean,
+    private val isSessionDeleted: suspend (String) -> Boolean,
     private val assembleContext: suspend (String, String) -> ConversationContextContract,
     private val enqueueJob: suspend (BackgroundGenerationInput, Long) -> BackgroundGenerationJob,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
