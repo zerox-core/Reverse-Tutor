@@ -146,6 +146,7 @@ fun ChatRoute(
     var generation by remember(sessionId) { mutableStateOf<ChatGenerationUiState>(ChatGenerationUiState.Idle) }
     var activeGenerationToken by remember(sessionId) { mutableStateOf<LlmGenerationToken?>(null) }
     var activeBackgroundJobId by remember(sessionId) { mutableStateOf<String?>(null) }
+    var sessionContract by remember(sessionId) { mutableStateOf<SessionConversationContract?>(null) }
     var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
     var noticeText by remember { mutableStateOf<String?>(null) }
     var noticeSettingsAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -250,6 +251,20 @@ fun ChatRoute(
             )
         }.orEmpty()
         rememberedMessageIds = rememberedMessageStore.loadRememberedMessageIds()
+        val currentContract = sessionContract
+        if (currentContract != null && currentContract.generation.state == GenerationState.READY) {
+            val assistantRecord = loadedRecords
+                .filter { it.message.role == MessageRole.Assistant }
+                .maxByOrNull { it.message.createdAtEpochMillis }
+            if (assistantRecord != null && assistantRecord.message.id.isNotBlank()) {
+                sessionContract = currentContract.copy(
+                    generation = currentContract.generation.copy(
+                        assistantMessageId = assistantRecord.message.id,
+                        assistantText = assistantRecord.message.text
+                    )
+                )
+            }
+        }
     }
 
     LaunchedEffect(pendingDeletion?.messageId, pendingDeletion?.expiresAtEpochMillis) {
@@ -313,6 +328,7 @@ fun ChatRoute(
                     activeGenerationToken = null
                 }
                 generation = job.status.toUiState(job.errorMessage)
+                sessionContract = sessionContract?.withTerminalGeneration(job.status, job.errorMessage)
                 activeBackgroundJobId = null
                 reload()
                 return@LaunchedEffect
@@ -334,6 +350,20 @@ fun ChatRoute(
             pendingDeletion = pendingDeletion,
             pendingDeletionRetryRequired = pendingDeletionRetryRequired
         ),
+        sessionContract = sessionContract,
+        onAssistantInteraction = { interaction ->
+            when (interaction) {
+                SessionAssistantInteraction.RETRY -> {
+                    if (sessionContract?.generation?.state == GenerationState.NO_MODEL) {
+                        onOpenModelSettings()
+                    }
+                }
+                SessionAssistantInteraction.OPEN_CONTEXT -> onOpenContextHub()
+                SessionAssistantInteraction.OPEN_SOURCE -> onOpenSessionSources()
+                SessionAssistantInteraction.SHOW_EVALUATION -> onOpenContextHub()
+                SessionAssistantInteraction.DISMISS -> { }
+            }
+        },
         onComposerTextChange = { updateComposer(composer.copy(text = it, sendFailure = null, notice = null)) },
         onSendMessage = {
             if (composer.canSend) {
@@ -387,6 +417,7 @@ fun ChatRoute(
                             activeGenerationToken = token
                             generation = ChatGenerationUiState.Pending
                             activeBackgroundJobId = prepared.jobId
+                            sessionContract = prepared.contract
                             onBackgroundGenerationQueued(prepared.jobId)
                         }
                         BackgroundTurnPreparationResult.BlankInput,
@@ -678,6 +709,8 @@ private fun SourceType.toChatTypeLabel(): String = when (this) {
 @Composable
 fun ChatScreen(
     state: ChatUiState,
+    sessionContract: SessionConversationContract? = null,
+    onAssistantInteraction: (SessionAssistantInteraction) -> Unit = {},
     onComposerTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     onCancelQuote: () -> Unit,
@@ -727,6 +760,8 @@ fun ChatScreen(
 ) {
     ReverseTeachingChatScreen(
         state = state,
+        sessionContract = sessionContract,
+        onAssistantInteraction = onAssistantInteraction,
         onComposerTextChange = onComposerTextChange,
         onSendMessage = onSendMessage,
         onCancelQuote = onCancelQuote,

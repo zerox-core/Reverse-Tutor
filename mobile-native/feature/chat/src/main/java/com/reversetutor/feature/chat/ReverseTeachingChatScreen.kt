@@ -128,6 +128,8 @@ enum class ChatOverflowAction(val label: String) {
 @Composable
 internal fun ReverseTeachingChatScreen(
     state: ChatUiState,
+    sessionContract: SessionConversationContract? = null,
+    onAssistantInteraction: (SessionAssistantInteraction) -> Unit = {},
     onComposerTextChange: (String) -> Unit,
     onSendMessage: () -> Unit,
     onCancelQuote: () -> Unit,
@@ -301,6 +303,14 @@ internal fun ReverseTeachingChatScreen(
                         label = label,
                         onOpenSettings = onOpenModelSettings,
                         onRetry = null
+                    )
+                }
+            }
+            sessionContract?.let { contract ->
+                item {
+                    SessionAssistantReplyHint(
+                        contract = contract,
+                        onInteraction = onAssistantInteraction
                     )
                 }
             }
