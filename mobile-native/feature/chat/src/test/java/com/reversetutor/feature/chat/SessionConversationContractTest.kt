@@ -5,6 +5,7 @@ import com.reversetutor.core.domain.SessionActionContract
 import com.reversetutor.core.domain.SessionEvaluationContract
 import com.reversetutor.core.domain.SessionTurnContracts
 import com.reversetutor.core.domain.SessionTurnResult
+import com.reversetutor.core.domain.SessionPolicyOutput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -172,5 +173,24 @@ class SessionConversationContractTest {
         assertFalse("no stacktrace", err.contains("StackTrace"))
         assertFalse("no class path", err.contains("com.reversetutor"))
         assertFalse("no sk-", err.contains("sk-"))
+    }
+
+    private fun policyOutput(type: String) = SessionPolicyOutput(
+        evaluation = SessionEvaluationContract(correctness = 0.5f),
+        action = SessionActionContract(type = type, knowledgePoint = "导数"),
+        processSummary = "探测理解：导数",
+        correctionTiming = "即时",
+        normalizationWarnings = emptyList()
+    )
+
+    @Test
+    fun queued_turn_is_loading_and_keeps_policy_context() {
+        val actual = facade.mapQueued(
+            "s-1", "turn-1", policyOutput("probe"),
+            ConversationContextContract.empty("space-1", "s-1"), emptyList()
+        )
+        assertEquals(GenerationState.LOADING, actual.generation.state)
+        assertEquals("probe", actual.action?.type)
+        assertEquals("open_ctx_turn-1", actual.events.single().eventId)
     }
 }

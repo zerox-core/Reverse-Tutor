@@ -5,6 +5,7 @@ import com.reversetutor.core.domain.SessionActionContract
 import com.reversetutor.core.domain.SessionEvaluationContract
 import com.reversetutor.core.domain.SessionTurnContracts
 import com.reversetutor.core.domain.SessionTurnResult
+import com.reversetutor.core.domain.SessionPolicyOutput
 
 /**
  * The single stable entry point for the chat UI to obtain a
@@ -163,4 +164,39 @@ class SessionConversationFacade {
             )
         }
     }
+
+    /**
+     * Project a queued background turn into a [SessionConversationContract].
+     * Pure and deterministic; no I/O. The returned contract has
+     * [GenerationState.LOADING] and carries the policy snapshot so the UI
+     * can show what the background Worker will work on.
+     */
+    fun mapQueued(
+        sessionId: String,
+        turnId: String,
+        policy: SessionPolicyOutput,
+        context: ConversationContextContract,
+        messages: List<ConversationMessageContract>
+    ): SessionConversationContract = SessionConversationContract(
+        sessionId = sessionId,
+        turnId = turnId,
+        messages = messages,
+        generation = GenerationUiContract(GenerationState.LOADING),
+        evaluation = policy.evaluation,
+        action = policy.action,
+        processSummary = policy.processSummary,
+        currentKnowledgePoint = policy.action.knowledgePoint,
+        nextStep = NextStepContract(
+            hint = policy.processSummary,
+            knowledgePoint = policy.action.knowledgePoint,
+            actionType = policy.action.type
+        ),
+        context = context,
+        events = listOf(
+            ConversationUiEvent(
+                eventId = "open_ctx_$turnId",
+                type = ConversationUiEventType.OPEN_CONTEXT
+            )
+        )
+    )
 }
