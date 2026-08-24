@@ -3,12 +3,9 @@ package com.reversetutor.core.domain
 /**
  * Pure window heartbeat eligibility and initiative-plan policy.
  *
- * This object never reads a clock, Room, a DAO, a Repository, or an LLM; time
- * is passed in by the caller. Every root is heartbeat-enabled by default; a child
- * has no schedule until an explicit [EnableWindowHeartbeatCommand]. A plan always
- * targets the exact eligible window, never a parent or sibling. No scenario policy
- * configured means an enabled heartbeat stays [InitiativeDecision.Silent]. The
- * policy never calls the Provider and never writes a prewritten reminder.
+ * This object never reads a clock, persistent storage, a data-access layer, or
+ * an LLM; time is passed in by the caller. Every root is heartbeat-enabled by
+ * default; a child has no schedule until an explicit [EnableWindowHeartbeatCommand].
  */
 object InitiativeEligibilityPolicy {
 

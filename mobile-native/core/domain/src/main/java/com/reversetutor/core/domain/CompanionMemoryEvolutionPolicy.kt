@@ -3,9 +3,9 @@ package com.reversetutor.core.domain
 /**
  * Pure Hermes-like companion-memory curation policy.
  *
- * This policy never reads a clock, Room, a DAO, a Repository, or an LLM. It
- * decides whether a candidate observation should be ignored, retained as
- * short-lived context, reinforce the active value, supersede it, or conflict.
+ * This policy never reads a clock, persistent storage, a data-access layer, or
+ * an LLM. It decides whether a candidate observation should be ignored, retained
+ * as short-lived context, reinforce the active value, supersede it, or conflict.
  *
  * It does NOT model a learning-forgetting curve. An automatic supersession of a
  * template/manual/inferred active value requires independent, temporally stable

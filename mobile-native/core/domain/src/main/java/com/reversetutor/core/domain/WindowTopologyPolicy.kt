@@ -3,9 +3,9 @@ package com.reversetutor.core.domain
 /**
  * Pure window-topology decision policy.
  *
- * This object is pure Kotlin: it never reads a clock, Room, a DAO, a Repository,
- * an LLM, or any Android API. It returns the same result for the same
- * `(childId, parentId, deltaId, sourceRevision)` tuple.
+ * This object is pure Kotlin: it never reads a clock, persistent storage, a
+ * data-access layer, an LLM, or any framework API. It returns the same result
+ * for the same `(childId, parentId, deltaId, sourceRevision)` tuple.
  *
  * Rules encoded here (mirrors the design's acceptance invariants):
  * - Every root has heartbeat capability enabled by default.
