@@ -40,8 +40,8 @@ android {
         applicationId = "com.reversetutor.preview"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0-native-preview"
+        versionCode = 2
+        versionName = "0.2.0-newmp"
         buildConfigField("String", "ONLINE_API_BASE_URL", "\"$escapedOnlineApiBaseUrl\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
