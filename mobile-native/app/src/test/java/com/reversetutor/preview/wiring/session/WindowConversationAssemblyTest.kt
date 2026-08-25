@@ -80,6 +80,13 @@ class WindowConversationAssemblyTest {
     }
 
     @Test
+    fun explicitly_enabled_child_projects_its_stored_heartbeat_state() {
+        val asm = assembly(child("c1", "p1"), WindowHeartbeatState.ExplicitlyEnabled)
+
+        assertEquals(WindowHeartbeatState.ExplicitlyEnabled, asm.heartbeat("c1").state)
+    }
+
+    @Test
     fun initiative_decision_produces_plan_only() {
         val w = root("l1", WindowKind.LEARNING_ROOT)
         val asm = assembly(w, WindowHeartbeatState.RootEnabled, eligibilityInput = eligibility(w, WindowHeartbeatState.RootEnabled))

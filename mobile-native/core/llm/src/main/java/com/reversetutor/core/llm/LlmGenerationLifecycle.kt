@@ -9,8 +9,8 @@ value class LlmGenerationToken(val value: String)
 
 data class LlmGenerationRequest(
     val sessionId: String,
-    val userMessageId: String,
-    val userText: String,
+    val userMessageId: String? = null,
+    val userText: String? = null,
     val profileId: String,
     val provider: LlmProviderKind,
     val model: String,
@@ -22,7 +22,8 @@ data class LlmGenerationRequest(
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
-    val sessionPolicy: LlmSessionPolicyContext? = null
+    val sessionPolicy: LlmSessionPolicyContext? = null,
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null
 )
 
 /**
@@ -55,6 +56,107 @@ data class LlmSessionPolicyContext(
             correctionTiming = correctionTiming.trim().lowercase().ifEmpty { "immediate" }.take(48)
         )
     }
+}
+
+/** Immutable window/topology context snapshot carried into generation (P3). */
+data class LlmWindowContext(
+    val windowId: String,
+    val rootId: String,
+    val parentId: String? = null,
+    val windowKind: String = "",
+    val forkRevision: Long = 0L
+) {
+    fun normalized(): LlmWindowContext? {
+        val id = windowId.trim()
+        val root = rootId.trim()
+        if (id.isEmpty() || root.isEmpty()) return null
+        return copy(
+            windowId = id,
+            rootId = root,
+            parentId = parentId?.trim()?.ifEmpty { null },
+            windowKind = windowKind.trim().take(32),
+            forkRevision = forkRevision
+        )
+    }
+}
+
+/** Bounded turn plan snapshot carried into generation (P3). Not a provider request. */
+data class LlmTurnPlan(
+    val intent: String = "",
+    val actionType: String = "",
+    val studentRole: String = "",
+    val knowledgePoint: String = "",
+    val difficulty: Float = 0.5f,
+    val studyMethod: String = "",
+    val toneConstraints: List<String> = emptyList(),
+    val expiryEpochMillis: Long = 0L,
+    val minCooldownMillis: Long = 0L
+) {
+    fun normalized(): LlmTurnPlan? {
+        val ni = intent.trim().take(96)
+        val na = actionType.trim().lowercase().take(48)
+        val nr = studentRole.trim().lowercase().take(64)
+        if (ni.isEmpty() || na.isEmpty() || nr.isEmpty()) return null
+        return copy(
+            intent = ni,
+            actionType = na,
+            studentRole = nr,
+            knowledgePoint = knowledgePoint.trim().take(120),
+            difficulty = difficulty.coerceIn(0f, 1f),
+            studyMethod = studyMethod.trim().take(64),
+            toneConstraints = toneConstraints.take(6).map { it.trim().take(160) }.filter { it.isNotEmpty() },
+            expiryEpochMillis = expiryEpochMillis.coerceAtLeast(0L),
+            minCooldownMillis = minCooldownMillis.coerceAtLeast(0L)
+        )
+    }
+}
+
+/** Immutable assistant-turn envelope (P3). Missing or malformed -> null (plain path). */
+data class LlmAssistantTurnEnvelope(
+    val window: LlmWindowContext,
+    val turnPlan: LlmTurnPlan? = null,
+    val initiativeSource: String? = null
+) {
+    fun normalized(): LlmAssistantTurnEnvelope? {
+        val normalizedWindow = window.normalized() ?: return null
+        return copy(
+            window = normalizedWindow,
+            turnPlan = turnPlan?.normalized(),
+            initiativeSource = initiativeSource?.trim()?.ifEmpty { null }
+        )
+    }
+}
+
+/**
+ * Validated bounded structured turn outcome (P3). It never carries raw
+ * conversation or Provider text; a malformed envelope yields [StructuredTurnOutcome.EMPTY].
+ */
+data class StructuredTurnOutcome(
+    val windowId: String? = null,
+    val actionType: String = "",
+    val studentRole: String = "",
+    val knowledgePoint: String = "",
+    val correctness: Float = 0f,
+    val depth: Float = 0f,
+    val evidenceType: String = "none",
+    val evidenceStatus: String = "none",
+    val processSummary: String = "",
+    val initiativeSource: String? = null
+) {
+    companion object {
+        val EMPTY = StructuredTurnOutcome()
+    }
+
+    fun normalized(): StructuredTurnOutcome = copy(
+        correctness = correctness.coerceIn(0f, 1f),
+        depth = depth.coerceIn(0f, 1f),
+        evidenceType = evidenceType.trim().lowercase().take(32).ifEmpty { "none" },
+        evidenceStatus = evidenceStatus.trim().lowercase().take(24).ifEmpty { "none" },
+        actionType = actionType.trim().take(48),
+        studentRole = studentRole.trim().take(64),
+        knowledgePoint = knowledgePoint.trim().take(120),
+        processSummary = processSummary.trim().take(320)
+    )
 }
 
 data class LlmContextEvidence(
@@ -95,24 +197,30 @@ enum class LlmGenerationBlockReason {
 object LlmGenerationPlanner {
     fun plan(
         sessionId: String,
-        userMessageId: String,
-        userText: String,
+        userMessageId: String?,
+        userText: String?,
         profile: LlmProfile?,
         capabilities: LlmCapabilities,
         token: LlmGenerationToken,
         quoteExcerpt: String? = null,
         imageAttachments: List<MessageAttachment> = emptyList(),
         contextEvidence: List<LlmContextEvidence> = emptyList(),
-        sessionPolicy: LlmSessionPolicyContext? = null
+        sessionPolicy: LlmSessionPolicyContext? = null,
+        assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+        allowPlanDrivenOpening: Boolean = false
     ): LlmGenerationPlan {
-        val normalizedText = userText.trim()
+        val normalizedText = userText.orEmpty().trim()
         val normalizedImageAttachments = imageAttachments.filter { it.isImageAttachment() }
         val normalizedEvidence = contextEvidence.mapNotNull { it.normalized() }.take(MaxContextEvidence)
         val normalizedSessionPolicy = sessionPolicy?.normalized()
+        val normalizedEnvelope = assistantTurnEnvelope?.normalized()
+        // A plan-driven opening (P3 appendix A) needs no user text: the immutable
+        // envelope + TurnPlan drive generation. Never fabricate a placeholder user text.
+        val planDrivenOpening = allowPlanDrivenOpening && normalizedEnvelope?.turnPlan != null
         if (profile == null) {
             return LlmGenerationPlan.Blocked(LlmGenerationBlockReason.NoModelConfigured)
         }
-        if (normalizedText.isEmpty() && normalizedImageAttachments.isEmpty()) {
+        if (normalizedText.isEmpty() && normalizedImageAttachments.isEmpty() && !planDrivenOpening) {
             return LlmGenerationPlan.Blocked(LlmGenerationBlockReason.BlankPrompt)
         }
         if (normalizedImageAttachments.isNotEmpty() && !capabilities.supportsVision) {
@@ -122,8 +230,12 @@ object LlmGenerationPlanner {
         return LlmGenerationPlan.Ready(
             LlmGenerationRequest(
                 sessionId = sessionId,
-                userMessageId = userMessageId,
-                userText = normalizedText.ifEmpty { DefaultImagePrompt },
+                userMessageId = userMessageId?.trim()?.ifEmpty { null },
+                userText = when {
+                    normalizedText.isNotEmpty() -> normalizedText
+                    planDrivenOpening -> null
+                    else -> DefaultImagePrompt
+                },
                 profileId = profile.id,
                 provider = profile.provider,
                 model = profile.model,
@@ -134,7 +246,8 @@ object LlmGenerationPlanner {
                 quoteExcerpt = quoteExcerpt?.trim()?.ifEmpty { null },
                 imageAttachments = normalizedImageAttachments,
                 contextEvidence = normalizedEvidence,
-                sessionPolicy = normalizedSessionPolicy
+                sessionPolicy = normalizedSessionPolicy,
+                assistantTurnEnvelope = normalizedEnvelope
             )
         )
     }
@@ -239,6 +352,7 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
 
 private fun LlmGenerationRequest.contextualUserText(): String {
     val contextLines = buildList {
+        turnPlanPromptBlock()?.let { add(it) }
         sessionPolicyPromptBlock()?.let { add(it) }
         if (!quoteExcerpt.isNullOrBlank()) {
             add("Quote: $quoteExcerpt")
@@ -261,9 +375,26 @@ private fun LlmGenerationRequest.contextualUserText(): String {
             )
         }
     }
-    if (contextLines.isEmpty()) return userText
-    return (contextLines + userText).joinToString(separator = "\n\n")
+    if (contextLines.isEmpty()) return userText.orEmpty()
+    return (contextLines + listOfNotNull(userText?.takeIf { it.isNotBlank() }))
+        .joinToString(separator = "\n\n")
 }
+
+private fun LlmGenerationRequest.turnPlanPromptBlock(): String? =
+    assistantTurnEnvelope?.turnPlan?.normalized()?.let { plan ->
+        buildString {
+            append("Initiative plan:")
+            append("\nIntent: ").append(plan.intent)
+            append("\nAction: ").append(plan.actionType)
+            append("\nStudent role: ").append(plan.studentRole)
+            append("\nKnowledge point: ").append(plan.knowledgePoint.ifBlank { "Current context" })
+            append("\nDifficulty: ").append(plan.difficulty)
+            if (plan.studyMethod.isNotBlank()) append("\nStudy method: ").append(plan.studyMethod)
+            if (plan.toneConstraints.isNotEmpty()) {
+                append("\nTone constraints: ").append(plan.toneConstraints.joinToString(", "))
+            }
+        }
+    }
 
 internal fun LlmGenerationRequest.sessionPolicyPromptBlock(): String? =
     sessionPolicy?.normalized()?.let { policy ->

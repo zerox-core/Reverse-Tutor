@@ -29,6 +29,7 @@ data class HeartbeatScheduleContract(
  */
 data class InitiativeEligibilityInput(
     val window: WindowRef,
+    val spaceId: String = "",
     val heartbeatState: WindowHeartbeatState,
     val scenarioConfigured: Boolean,
     val hasActiveUserActivity: Boolean,

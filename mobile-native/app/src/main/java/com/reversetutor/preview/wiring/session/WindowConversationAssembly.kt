@@ -5,6 +5,8 @@ import com.reversetutor.core.domain.LearningIntentEnvelope
 import com.reversetutor.core.domain.ScopeSignal
 import com.reversetutor.core.domain.WindowHeartbeatState
 import com.reversetutor.core.domain.WindowRef
+import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
+import com.reversetutor.feature.chat.HeartbeatTurnDispatchPort
 import com.reversetutor.feature.chat.InitiativeStatus
 import com.reversetutor.feature.chat.WindowConversationContract
 import com.reversetutor.feature.chat.WindowConversationFacade
@@ -41,11 +43,14 @@ class WindowConversationAssembly(
     private val readScope: (windowId: String) -> Pair<LearningIntentEnvelope?, List<ScopeSignal>>,
     private val readEligibilityInput: (windowId: String) -> InitiativeEligibilityInput,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
-    private val facade: WindowConversationFacade = WindowConversationFacade()
+    private val facade: WindowConversationFacade = WindowConversationFacade(),
+    private val heartbeatPort: HeartbeatTurnDispatchPort = HeartbeatTurnDispatchPort.Unavailable
 ) {
 
+    private val heartbeatCoordinator = WindowHeartbeatCoordinator(heartbeatPort)
+
     fun heartbeat(windowId: String): WindowHeartbeatContract =
-        facade.defaultHeartbeat(readWindow(windowId))
+        facade.heartbeat(readHeartbeatState(windowId))
 
     fun enableChildHeartbeat(windowId: String): WindowHeartbeatContract =
         facade.enableChildHeartbeat(readHeartbeatState(windowId))
@@ -79,6 +84,14 @@ class WindowConversationAssembly(
      */
     fun prepareDispatch(windowId: String): WindowDispatchReceipt =
         WindowDispatchReceipt(targetWindowId = windowId)
+
+    /**
+     * Evaluate and, if eligible, dispatch exactly one target-bound heartbeat job
+     * through the lightweight [heartbeatPort]. Never calls a Provider or writes an
+     * assistant record; the Worker remains the sole writer.
+     */
+    suspend fun dispatchHeartbeat(windowId: String, envelope: LlmAssistantTurnEnvelope): HeartbeatDecision =
+        heartbeatCoordinator.run(readEligibilityInput(windowId), nowEpochMillis(), envelope)
 }
 
 /** Convenience helper to read an initiative status from a contract. */

@@ -23,6 +23,15 @@ import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
+import com.reversetutor.core.data.local.entity.WindowEntity
+import com.reversetutor.core.data.local.entity.WindowSnapshotEntity
+import com.reversetutor.core.data.local.entity.WindowDeltaEntity
+import com.reversetutor.core.data.local.entity.MergeCommitEntity
+import com.reversetutor.core.data.local.entity.LearningFactReceiptEntity
+import com.reversetutor.core.data.local.entity.ScopeSignalEntity
+import com.reversetutor.core.data.local.entity.CompanionMemoryVersionEntity
+import com.reversetutor.core.data.local.entity.MemoryObservationEntity
+import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
 
 @Dao
 interface SpaceDao {
@@ -244,10 +253,27 @@ interface BackgroundJobDao {
     @Query("SELECT * FROM background_jobs WHERE id = :id")
     suspend fun getById(id: String): BackgroundJobEntity?
 
-    @Query("SELECT * FROM background_jobs WHERE kind = 'Generation' AND status IN (:statuses) ORDER BY createdAtEpochMillis ASC")
+    /** Atomically claims a queued job so only one Worker can invoke the Provider. */
+    @Query(
+        """
+        UPDATE background_jobs
+        SET status = :runningStatus,
+            startedAtEpochMillis = :startedAtEpochMillis,
+            errorMessage = NULL
+        WHERE id = :id AND status = :queuedStatus
+        """
+    )
+    suspend fun claimQueued(
+        id: String,
+        queuedStatus: String,
+        runningStatus: String,
+        startedAtEpochMillis: Long
+    ): Int
+
+    @Query("SELECT * FROM background_jobs WHERE kind IN ('Generation', 'Initiative') AND status IN (:statuses) ORDER BY createdAtEpochMillis ASC")
     suspend fun listGenerationByStatuses(statuses: List<String>): List<BackgroundJobEntity>
 
-    @Query("SELECT * FROM background_jobs WHERE kind = 'Generation' AND sessionId = :sessionId ORDER BY createdAtEpochMillis ASC")
+    @Query("SELECT * FROM background_jobs WHERE kind IN ('Generation', 'Initiative') AND sessionId = :sessionId ORDER BY createdAtEpochMillis ASC")
     suspend fun listGenerationBySession(sessionId: String): List<BackgroundJobEntity>
 
 }
@@ -268,4 +294,103 @@ interface ExportRecordDao {
 
     @Query("SELECT * FROM export_records WHERE id = :id")
     suspend fun getById(id: String): ExportRecordEntity?
+}
+
+@Dao
+interface WindowTopologyDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWindow(window: WindowEntity)
+
+    @Query("SELECT * FROM windows WHERE sessionId = :sessionId")
+    suspend fun getWindow(sessionId: String): WindowEntity?
+
+    @Query("SELECT * FROM windows WHERE spaceId = :spaceId ORDER BY createdAtEpochMillis ASC")
+    suspend fun listWindows(spaceId: String): List<WindowEntity>
+
+    @Query("DELETE FROM windows WHERE sessionId = :sessionId")
+    suspend fun deleteWindow(sessionId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSnapshot(snapshot: WindowSnapshotEntity)
+
+    @Query("SELECT * FROM window_snapshots WHERE windowId = :windowId")
+    suspend fun getSnapshot(windowId: String): WindowSnapshotEntity?
+
+    @Query("DELETE FROM window_snapshots WHERE windowId = :windowId")
+    suspend fun deleteSnapshots(windowId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDelta(delta: WindowDeltaEntity)
+
+    @Query("DELETE FROM window_deltas WHERE windowId = :windowId")
+    suspend fun deleteDeltas(windowId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertMergeCommit(commit: MergeCommitEntity): Long
+
+    @Query("SELECT * FROM merge_commits WHERE id = :id")
+    suspend fun getMergeCommit(id: String): MergeCommitEntity?
+
+    @Query("SELECT * FROM merge_commits WHERE childId = :childId ORDER BY sourceRevision ASC")
+    suspend fun listMergeCommitsForChild(childId: String): List<MergeCommitEntity>
+}
+
+@Dao
+interface LearningLedgerDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertReceipt(receipt: LearningFactReceiptEntity): Long
+
+    @Query("SELECT * FROM learning_fact_receipts WHERE spaceId = :spaceId ORDER BY occurredAtEpochMillis ASC")
+    suspend fun listFactsBySpace(spaceId: String): List<LearningFactReceiptEntity>
+
+    @Query("SELECT * FROM learning_fact_receipts WHERE sourceWindowId = :windowId ORDER BY occurredAtEpochMillis ASC")
+    suspend fun listFactsByWindow(windowId: String): List<LearningFactReceiptEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertScopeSignal(signal: ScopeSignalEntity): Long
+
+    @Query("SELECT * FROM scope_signals WHERE windowId = :windowId ORDER BY occurredAtEpochMillis ASC")
+    suspend fun listScopeSignals(windowId: String): List<ScopeSignalEntity>
+
+    @Query("SELECT * FROM scope_signals WHERE spaceId = :spaceId ORDER BY occurredAtEpochMillis ASC")
+    suspend fun listScopeSignalsBySpace(spaceId: String): List<ScopeSignalEntity>
+}
+
+@Dao
+interface CompanionMemoryDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertVersion(version: CompanionMemoryVersionEntity)
+
+    @Query("SELECT * FROM companion_memory_versions WHERE windowId = :windowId")
+    suspend fun listVersions(windowId: String): List<CompanionMemoryVersionEntity>
+
+    @Query("SELECT * FROM companion_memory_versions WHERE windowId = :windowId AND partition = :partition")
+    suspend fun getVersion(windowId: String, partition: String): CompanionMemoryVersionEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertObservation(observation: MemoryObservationEntity)
+
+    @Query("SELECT * FROM memory_observations WHERE windowId = :windowId ORDER BY observedAtEpochMillis ASC")
+    suspend fun listObservations(windowId: String): List<MemoryObservationEntity>
+
+    @Query("SELECT * FROM memory_observations WHERE spaceId = :spaceId ORDER BY observedAtEpochMillis ASC")
+    suspend fun listObservationsBySpace(spaceId: String): List<MemoryObservationEntity>
+}
+
+@Dao
+interface WindowHeartbeatDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertHeartbeat(heartbeat: WindowHeartbeatEntity)
+
+    @Query("SELECT * FROM window_heartbeats WHERE windowId = :windowId")
+    suspend fun getHeartbeat(windowId: String): WindowHeartbeatEntity?
+
+    @Query("SELECT * FROM window_heartbeats WHERE spaceId = :spaceId")
+    suspend fun listBySpace(spaceId: String): List<WindowHeartbeatEntity>
+
+    @Query("SELECT * FROM window_heartbeats")
+    suspend fun listAll(): List<WindowHeartbeatEntity>
+
+    @Query("DELETE FROM window_heartbeats WHERE windowId = :windowId")
+    suspend fun deleteHeartbeat(windowId: String): Int
 }

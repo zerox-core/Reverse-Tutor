@@ -1,4 +1,4 @@
-# Native Companion Old-Main Parity Matrix
+﻿# Native Companion Old-Main Parity Matrix
 
 > Purpose: lock the old `main` teaching-turn algorithm facts *before* introducing the window/memory/initiative contracts from
 > [native-companion-memory-topology-design.md](native-companion-memory-topology-design.md).
@@ -6,15 +6,15 @@
 > Scope: `newmp` native Android production branch. Documentation only; **no code changed by this document.**
 >
 > Status vocabulary used below:
-> - `migrated` — the behavior is implemented by an existing native contract and consumed by the real Worker path.
-> - `partial` — a subset is implemented, but the full old behavior is not yet reached by the production path.
-> - `unavailable` — the old behavior is intentionally *not* claimed by the current native Worker; it is future/differential work.
-> - `proposed` — a native contract exists only as a proposal inside a P3/P6 capability request, not in source today.
+> - `migrated` 鈥?the behavior is implemented by an existing native contract and consumed by the real Worker path.
+> - `partial` 鈥?a subset is implemented, but the full old behavior is not yet reached by the production path.
+> - `unavailable` 鈥?the old behavior is intentionally *not* claimed by the current native Worker; it is future/differential work.
+> - `proposed` 鈥?a native contract exists only as a proposal inside a P3/P6 capability request, not in source today.
 >
 > Helper contract vocabulary:
-> - `frozen` — a type/signature in the frozen layers (`core/model`, `core/protocol`, `core/llm`, `core/data/*Repository`,
+> - `frozen` 鈥?a type/signature in the frozen layers (`core/model`, `core/protocol`, `core/llm`, `core/data/*Repository`,
 >   `core/data/local`, `core/data/preferences`, `SecretStore`). Must not be modified by Package A/B.
-> - `domain` — a pure type in `core:domain` (non-frozen). Safe to define and test now.
+> - `domain` 鈥?a pure type in `core:domain` (non-frozen). Safe to define and test now.
 
 ## 1. The single real turn path claim
 
@@ -44,15 +44,15 @@ persist user+assistant -> upsert_mastery -> upsert_error_log -> anchor_updates -
 
 | # | Behavior | Old function / test | Native target contract | Native test (existing) | Runtime consumer | Status |
 |---|---|---|---|---|---|---|
-| 1 | `build_system_prompt` | `engine.build_system_prompt`; `test_engine.py` (no direct test, exercised through `run_opening_turn`/`run_turn`) | `frozen` `LlmGenerationPlanner.plan(...)` → prompt payload; `domain` `SessionPolicyInput`/`SessionPolicyOutput` (mode/role/goal/companion) | `SessionTurnPolicyTest` (policy only), `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` → `ChatGenerationRepository.generateReply` | **partial** — policy-level mode/role normalization is wired via `sessionPolicy`; the old persona/anchors/mastery/strategy prompt blocks and the mode templates are **not** migrated as a native `TurnPlanner`. Rich prompt injection is not claimed by the Worker. |
-| 2 | `build_messages` | `engine.build_messages`; `test_engine.py::test_build_messages_skips_compressed_history` | `frozen` `ChatGenerationInput.userText` + `contextEvidence`; message windowing handled inside the frozen Worker | `BackgroundTurnPreparationCoordinatorTest`, `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** — the Worker reconstructs a bounded recent-message window, but the old `skip_until_id`/summary-cutoff compression semantics are **not** exposed as a native contract. No native summary-compression parity yet. |
-| 3 | runtime memory hint | `engine.build_runtime_memory_hint`; (no direct test) | `frozen` `contextEvidence` list; `domain` `MemoryObservation`/`LearningFactReceipt` (proposed for companion topology) | `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** — the Worker accepts `contextEvidence` (memory/source/message evidence), so a bounded evidence projection reaches the prompt. The old `build_runtime_memory_hint` multi-source relevance/limiting heuristic is **not** reproduced; companion-memory evidence is `proposed`. |
-| 4 | action/role selection | `engine._normalize_turn_payload` + `engine._student_role_for_action` + `engine._fallback_action_for_mode`; `test_engine.py::test_no_entry_routes_to_clue_student`, `::test_understood_triggers_examiner_without_mastery_increase` | `domain` `SessionTurnPolicy.normalize(input)` → `SessionActionContract` (+ `SessionPolicyOutput`); out of `core:domain` | `SessionTurnPolicyTest` | `ChatGenerationPortAdapter` → `LlmSessionPolicyContext` | **migrated** — `SessionTurnPolicy` reproduces entry-status derivation, understood→examiner, no_entry→clue, has_entry→probe probe-intensity/low-correctness→small_lecture, summary_only→recap, and student-role derivation. This is the migrated old policy. |
-| 5 | evidence normalization | `engine._normalize_evidence`; `test_engine.py::test_understood_triggers_examiner_without_mastery_increase` | `domain` `SessionTurnContracts`/`MasteryEvidenceContract` (`type/status/error_type/reason`) | `SessionTurnPolicyTest` | `SessionPolicyOutput` → `LlmSessionPolicyContext` | **migrated** — non-study forces `none`; probe+correctness/depth threshold → `explanation` passed/partial; bounded sanitization. |
-| 6 | process summary | `engine._build_process_summary`; (no direct test) | `domain` `SessionPolicyOutput.processSummary` | `SessionTurnPolicyTest` (summary assertions) | `SessionPolicyOutput` → meta | **migrated** — `SessionTurnPolicy.buildProcessSummary` emits the `mode`-scoped summary string (goal/companion/study branches). |
-| 7 | mastery projection | `engine.run_turn` mastery block (`db.upsert_mastery`, `upsert_error_log`, `resolve_error_pattern`) | `domain` `MasteryEvidenceContract`; `frozen` `MemoryRepository`/mastery write is **not** owned by the Worker | `ChatGenerationPortAdapterTest` (evidence only) | `BackgroundGenerationRepository` | **unavailable** — old mastery/error-log projection happens **inside** the old loop. The native Worker persists an assistant message and evidence meta, but there is **no** native post-turn mastery upsert. Mastery projection is future `PostTurnProjector` work → `proposed`. |
-| 8 | graph/context retrieval | `engine.run_turn` (`retrieve_kg_context`, `make_default_retriever`, `_should_inject_clue_retrieval`, `_format_citable_clues`); `test_engine.py` (no direct test) | `frozen` `contextEvidence` (injected evidence); `domain` evidence handles | `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** — the Worker accepts bounded `contextEvidence`, so a source/message evidence projection is reachable. The old `retrieve_kg_context` + citable-clue injection heuristic and graph/persona-trait/preference hinting are **not** reproduced as a native contract. |
-| 9 | post-turn memory review | `engine.run_turn` (`kg_extractor.extract_from_turn`, `kg_gate.should_extract`, `mark_review_pending`, anchor_updates) | `domain` `CompanionMemoryEvolutionPolicy`/`LearningScopeGuard` (proposed); `frozen` no post-turn contract | (none yet) | None | **unavailable** — the old loop ran `kg_extract` and `mark_review_pending` after a turn. The native Worker does **no** post-turn curation. Companion-memory curation and learning-scope guard are new, `proposed` contracts in this topology plan. |
+| 1 | `build_system_prompt` | `engine.build_system_prompt`; `test_engine.py` (no direct test, exercised through `run_opening_turn`/`run_turn`) | `frozen` `LlmGenerationPlanner.plan(...)` 鈫?prompt payload; `domain` `SessionPolicyInput`/`SessionPolicyOutput` (mode/role/goal/companion) | `SessionTurnPolicyTest` (policy only), `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` 鈫?`ChatGenerationRepository.generateReply` | **partial** 鈥?policy-level mode/role normalization is wired via `sessionPolicy`; the old persona/anchors/mastery/strategy prompt blocks and the mode templates are **not** migrated as a native `TurnPlanner`. Rich prompt injection is not claimed by the Worker. |
+| 2 | `build_messages` | `engine.build_messages`; `test_engine.py::test_build_messages_skips_compressed_history` | `frozen` `ChatGenerationInput.userText` + `contextEvidence`; message windowing handled inside the frozen Worker | `BackgroundTurnPreparationCoordinatorTest`, `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** 鈥?the Worker reconstructs a bounded recent-message window, but the old `skip_until_id`/summary-cutoff compression semantics are **not** exposed as a native contract. No native summary-compression parity yet. |
+| 3 | runtime memory hint | `engine.build_runtime_memory_hint`; (no direct test) | `frozen` `contextEvidence` list; `domain` `MemoryObservation`/`LearningFactReceipt` (proposed for companion topology) | `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** 鈥?the Worker accepts `contextEvidence` (memory/source/message evidence), so a bounded evidence projection reaches the prompt. The old `build_runtime_memory_hint` multi-source relevance/limiting heuristic is **not** reproduced; companion-memory evidence is `proposed`. |
+| 4 | action/role selection | `engine._normalize_turn_payload` + `engine._student_role_for_action` + `engine._fallback_action_for_mode`; `test_engine.py::test_no_entry_routes_to_clue_student`, `::test_understood_triggers_examiner_without_mastery_increase` | `domain` `SessionTurnPolicy.normalize(input)` 鈫?`SessionActionContract` (+ `SessionPolicyOutput`); out of `core:domain` | `SessionTurnPolicyTest` | `ChatGenerationPortAdapter` 鈫?`LlmSessionPolicyContext` | **migrated** 鈥?`SessionTurnPolicy` reproduces entry-status derivation, understood鈫抏xaminer, no_entry鈫抍lue, has_entry鈫抪robe probe-intensity/low-correctness鈫抯mall_lecture, summary_only鈫抮ecap, and student-role derivation. This is the migrated old policy. |
+| 5 | evidence normalization | `engine._normalize_evidence`; `test_engine.py::test_understood_triggers_examiner_without_mastery_increase` | `domain` `SessionTurnContracts`/`MasteryEvidenceContract` (`type/status/error_type/reason`) | `SessionTurnPolicyTest` | `SessionPolicyOutput` 鈫?`LlmSessionPolicyContext` | **migrated** 鈥?non-study forces `none`; probe+correctness/depth threshold 鈫?`explanation` passed/partial; bounded sanitization. |
+| 6 | process summary | `engine._build_process_summary`; (no direct test) | `domain` `SessionPolicyOutput.processSummary` | `SessionTurnPolicyTest` (summary assertions) | `SessionPolicyOutput` 鈫?meta | **migrated** 鈥?`SessionTurnPolicy.buildProcessSummary` emits the `mode`-scoped summary string (goal/companion/study branches). |
+| 7 | mastery projection | `engine.run_turn` mastery block (`db.upsert_mastery`, `upsert_error_log`, `resolve_error_pattern`) | `domain` `MasteryEvidenceContract`; `frozen` `MemoryRepository`/mastery write is **not** owned by the Worker | `ChatGenerationPortAdapterTest` (evidence only) | `BackgroundGenerationRepository` | **unavailable** 鈥?old mastery/error-log projection happens **inside** the old loop. The native Worker persists an assistant message and evidence meta, but there is **no** native post-turn mastery upsert. Mastery projection is future `PostTurnProjector` work 鈫?`proposed`. |
+| 8 | graph/context retrieval | `engine.run_turn` (`retrieve_kg_context`, `make_default_retriever`, `_should_inject_clue_retrieval`, `_format_citable_clues`); `test_engine.py` (no direct test) | `frozen` `contextEvidence` (injected evidence); `domain` evidence handles | `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** 鈥?the Worker accepts bounded `contextEvidence`, so a source/message evidence projection is reachable. The old `retrieve_kg_context` + citable-clue injection heuristic and graph/persona-trait/preference hinting are **not** reproduced as a native contract. |
+| 9 | post-turn memory review | `engine.run_turn` (`kg_extractor.extract_from_turn`, `kg_gate.should_extract`, `mark_review_pending`, anchor_updates) | `domain` `CompanionMemoryEvolutionPolicy`/`LearningScopeGuard` (proposed); `frozen` no post-turn contract | (none yet) | None | **unavailable** 鈥?the old loop ran `kg_extract` and `mark_review_pending` after a turn. The native Worker does **no** post-turn curation. Companion-memory curation and learning-scope guard are new, `proposed` contracts in this topology plan. |
 
 ## 3. Verified native signature claims
 
@@ -82,3 +82,19 @@ requests (Task 9) and are available only inside `core:domain` (Package A) and th
   `partial`/`unavailable` above, not `migrated`.
 - These two gaps are precisely the subject of the P3 (turn snapshot/structured outcome) and P6
   (window/memory/heartbeat persistence) capability requests in Task 9.
+
+## 5. Package C evidence (2026-08-25, uncommitted)
+
+P3 and P6 were approved separately. The following native paths now exist and carry real JVM test evidence
+(see `native-companion-package-c-execution-plan.md`); row statuses above are intentionally not upgraded to
+`migrated`/`closed` until the real Worker path consumes them end-to-end:
+
+- P6 `6->7` window tree (windowId == sessionId), fork snapshots, direct-parent idempotent merge receipts.
+- P6 `7->8` normalized global learning ledger + minimal scope signals (no raw transcript columns).
+- P6 `8->9` companion-memory versions (root-exclusive), heartbeat state (root enabled / child explicit).
+- P3 immutable turn envelope (window/topology + bounded `TurnPlan`) persisted per job (`background_jobs`, `9->10`)
+  so retries use the persisted snapshot; malformed envelope keeps a plain reply and yields `StructuredTurnOutcome.EMPTY`.
+- App: `WindowHeartbeatCoordinator` (InitiativePlan -> target-bound job via the Worker) + idempotent `PostTurnProjector`
+  writing P6-approved records. The Worker remains the sole Provider/assistant-message writer.
+- Migration instrumentation remains device-blocked (RT-2026-015 analog): 4 migration tests authored and
+  `compileDebugAndroidTestKotlin` passed, but no device/emulator was attached, so migrations are not device-verified.

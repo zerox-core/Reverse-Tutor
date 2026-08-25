@@ -157,10 +157,10 @@ class BackgroundGenerationRepositoryTest {
 
         val outcome = repository.runGenerationJob("job-1", nowEpochMillis = 30L)
 
-        assertEquals(BackgroundGenerationOutcome.Failed("Rate limited"), outcome)
+        assertEquals(BackgroundGenerationOutcome.Failed("background_generation_failed"), outcome)
         val persisted = repository.getJob("job-1")
         assertEquals(BackgroundJobStatus.Failed, persisted?.status)
-        assertEquals("Rate limited", persisted?.errorMessage)
+        assertEquals("background_generation_failed", persisted?.errorMessage)
         assertTrue(messageRepository.listMessages("session-1").isEmpty())
     }
 
@@ -204,6 +204,43 @@ class BackgroundGenerationRepositoryTest {
         assertEquals(BackgroundGenerationOutcome.Discarded("Session is unavailable"), outcome)
         assertEquals(BackgroundJobStatus.Discarded, repository.getJob("job-1")?.status)
         assertTrue(messageRepository.listMessages("session-1").isEmpty())
+    }
+
+    @Test
+    fun cross_space_session_discards_job_before_provider_call() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val sessionDao = FakeSessionDao()
+        val runtime = CapturingRuntime()
+        val repository = repository(
+            jobDao = jobDao,
+            sessionDao = sessionDao,
+            runtime = runtime
+        )
+        repository.enqueueGenerationJob(
+            input(token = "token-cross-space").copy(spaceId = "space-a"),
+            nowEpochMillis = 10L,
+            jobId = "job-cross-space"
+        )
+        sessionDao.setSpace("session-1", "space-b")
+
+        val outcome = repository.runGenerationJob("job-cross-space", nowEpochMillis = 20L)
+
+        assertEquals(BackgroundGenerationOutcome.Discarded("Session is unavailable"), outcome)
+        assertTrue(runtime.requests.isEmpty())
+    }
+
+    @Test
+    fun second_claim_does_not_invoke_provider_again() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val runtime = CapturingRuntime()
+        val repository = repository(jobDao = jobDao, runtime = runtime)
+        repository.enqueueGenerationJob(input(token = "token-claim"), nowEpochMillis = 10L, jobId = "job-claim")
+        jobDao.forceStatus("job-claim", BackgroundJobStatus.Running.name, startedAtEpochMillis = 11L)
+
+        val outcome = repository.runGenerationJob("job-claim", nowEpochMillis = 20L)
+
+        assertEquals(BackgroundGenerationOutcome.AlreadyRunning, outcome)
+        assertTrue(runtime.requests.isEmpty())
     }
 
     @Test
@@ -291,14 +328,30 @@ private class FakeBackgroundJobDao : BackgroundJobDao {
 
     override suspend fun getById(id: String): BackgroundJobEntity? = jobs[id]
 
+    override suspend fun claimQueued(
+        id: String,
+        queuedStatus: String,
+        runningStatus: String,
+        startedAtEpochMillis: Long
+    ): Int {
+        val existing = jobs[id] ?: return 0
+        if (existing.status != queuedStatus) return 0
+        jobs[id] = existing.copy(
+            status = runningStatus,
+            startedAtEpochMillis = startedAtEpochMillis,
+            errorMessage = null
+        )
+        return 1
+    }
+
     override suspend fun listGenerationByStatuses(statuses: List<String>): List<BackgroundJobEntity> =
         jobs.values
-            .filter { it.kind == "Generation" && it.status in statuses }
+            .filter { it.kind in setOf("Generation", "Initiative") && it.status in statuses }
             .sortedBy { it.createdAtEpochMillis }
 
     override suspend fun listGenerationBySession(sessionId: String): List<BackgroundJobEntity> =
         jobs.values
-            .filter { it.kind == "Generation" && it.sessionId == sessionId }
+            .filter { it.kind in setOf("Generation", "Initiative") && it.sessionId == sessionId }
             .sortedBy { it.createdAtEpochMillis }
 
     fun forceStatus(id: String, status: String, startedAtEpochMillis: Long? = null) {
@@ -352,6 +405,10 @@ private class FakeSessionDao : SessionDao {
         sessionId: String,
         modelBindingId: String
     ): Int = 0
+
+    fun setSpace(sessionId: String, spaceId: String) {
+        sessions[sessionId]?.let { sessions[sessionId] = it.copy(spaceId = spaceId) }
+    }
 }
 
 private class FakeMessageDao : MessageDao {

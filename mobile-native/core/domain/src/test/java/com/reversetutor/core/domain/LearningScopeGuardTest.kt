@@ -78,11 +78,13 @@ class LearningScopeGuardTest {
     }
 
     @Test
-    fun signal_has_category_and_count_but_no_raw_user_text() {
+    fun signal_has_minimal_provenance_but_no_raw_user_text() {
         val fields = ScopeSignal.ALLOWED_PERSISTED_FIELDS
         assertFalse(fields.any { it.contains("transcript", ignoreCase = true) })
         assertFalse(fields.any { it.contains("rawText", ignoreCase = true) || it.contains("messageText", ignoreCase = true) })
         assertTrue(fields.contains("category"))
         assertTrue(fields.contains("count"))
+        assertTrue(fields.contains("sourceTurnId"))
+        assertTrue(fields.contains("observedAtEpochMillis"))
     }
 }

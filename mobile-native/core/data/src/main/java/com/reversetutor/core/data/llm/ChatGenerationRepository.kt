@@ -4,6 +4,7 @@ import com.reversetutor.core.data.model.ExecutionModelConfiguration
 import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.llm.LlmCapabilities
+import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationBlockReason
 import com.reversetutor.core.llm.LlmGenerationPlan
@@ -48,7 +49,9 @@ class ChatGenerationRepository(
             quoteExcerpt = input.quoteExcerpt,
             imageAttachments = input.imageAttachments,
             contextEvidence = input.contextEvidence,
-            sessionPolicy = input.sessionPolicy
+            sessionPolicy = input.sessionPolicy,
+            assistantTurnEnvelope = input.assistantTurnEnvelope,
+            allowPlanDrivenOpening = input.allowPlanDrivenOpening
         )
 
         val request = when (plan) {
@@ -72,7 +75,7 @@ class ChatGenerationRepository(
                     messageRepository.saveMessage(
                         Message(
                             id = assistantMessageId,
-                            spaceId = activeProfile.spaceId,
+                            spaceId = input.spaceId?.trim()?.ifEmpty { null } ?: activeProfile.spaceId,
                             sessionId = input.sessionId,
                             role = MessageRole.Assistant,
                             text = replyText.withCitationFooter(input.contextEvidence),
@@ -112,15 +115,18 @@ class ChatGenerationRepository(
 
 data class ChatGenerationInput(
     val sessionId: String,
-    val userMessageId: String,
-    val userText: String,
+    val userMessageId: String? = null,
+    val userText: String? = null,
     val token: LlmGenerationToken,
+    val allowPlanDrivenOpening: Boolean = false,
+    val spaceId: String? = null,
     val modelBindingId: String? = null,
     val capabilities: LlmCapabilities? = null,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
-    val sessionPolicy: LlmSessionPolicyContext? = null
+    val sessionPolicy: LlmSessionPolicyContext? = null,
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null
 )
 
 private fun ExecutionModelConfiguration.toExecutionProfile(): LlmProfile =

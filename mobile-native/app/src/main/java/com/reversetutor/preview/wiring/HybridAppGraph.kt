@@ -35,6 +35,8 @@ import com.reversetutor.core.remote.OnlineAuthSessionManager
 import com.reversetutor.core.remote.OnlineAuthTokenProvider
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
+import com.reversetutor.feature.chat.HeartbeatTurnDispatchPort
+import com.reversetutor.preview.wiring.session.DefaultHeartbeatTurnDispatchPort
 import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
 import com.reversetutor.feature.chat.ChatRunsViewModelFactory
 import com.reversetutor.feature.chat.HomePortViewModelFactory
@@ -123,6 +125,7 @@ class HybridAppGraph private constructor(
     val sessionConversationAssembly: SessionConversationAssembly,
     val backgroundGenerationRepository: BackgroundGenerationRepository,
     val backgroundTurnPreparationPort: BackgroundTurnPreparationPort,
+    val heartbeatTurnDispatchPort: HeartbeatTurnDispatchPort,
     val sourceRepository: SourceRepository,
     val memoryRepository: MemoryRepository,
     val graphRepository: GraphRepository,
@@ -225,6 +228,7 @@ class HybridAppGraph private constructor(
                 sessionConversationAssembly = sessionConversationAssembly,
                 backgroundGenerationRepository = backgroundGenerationRepository,
                 backgroundTurnPreparationPort = backgroundTurnPreparationPort,
+                heartbeatTurnDispatchPort = DefaultHeartbeatTurnDispatchPort(backgroundGenerationRepository),
                 sourceRepository = sourceRepository,
                 memoryRepository = memoryRepository,
                 graphRepository = graphRepository,

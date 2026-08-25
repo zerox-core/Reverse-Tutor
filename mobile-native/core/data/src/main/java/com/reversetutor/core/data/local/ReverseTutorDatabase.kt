@@ -20,6 +20,10 @@ import com.reversetutor.core.data.local.dao.SourceDao
 import com.reversetutor.core.data.local.dao.SpaceDao
 import com.reversetutor.core.data.local.dao.SyncDao
 import com.reversetutor.core.data.local.dao.TurnRunDao
+import com.reversetutor.core.data.local.dao.WindowTopologyDao
+import com.reversetutor.core.data.local.dao.LearningLedgerDao
+import com.reversetutor.core.data.local.dao.CompanionMemoryDao
+import com.reversetutor.core.data.local.dao.WindowHeartbeatDao
 import com.reversetutor.core.data.local.dao.WorldTreeDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
@@ -55,6 +59,15 @@ import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
 import com.reversetutor.core.data.local.entity.WorldTreeDraftEntity
 import com.reversetutor.core.data.local.entity.WorldTreeSectionEntity
 import com.reversetutor.core.data.local.entity.WorldTreeSourceCrossRef
+import com.reversetutor.core.data.local.entity.WindowEntity
+import com.reversetutor.core.data.local.entity.WindowSnapshotEntity
+import com.reversetutor.core.data.local.entity.WindowDeltaEntity
+import com.reversetutor.core.data.local.entity.MergeCommitEntity
+import com.reversetutor.core.data.local.entity.LearningFactReceiptEntity
+import com.reversetutor.core.data.local.entity.ScopeSignalEntity
+import com.reversetutor.core.data.local.entity.CompanionMemoryVersionEntity
+import com.reversetutor.core.data.local.entity.MemoryObservationEntity
+import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
 
 @Database(
     entities = [
@@ -91,7 +104,16 @@ import com.reversetutor.core.data.local.entity.WorldTreeSourceCrossRef
         EntityTombstoneEntity::class,
         WorldTreeDraftEntity::class,
         WorldTreeSectionEntity::class,
-        WorldTreeSourceCrossRef::class
+        WorldTreeSourceCrossRef::class,
+        WindowEntity::class,
+        WindowSnapshotEntity::class,
+        WindowDeltaEntity::class,
+        MergeCommitEntity::class,
+        LearningFactReceiptEntity::class,
+        ScopeSignalEntity::class,
+        CompanionMemoryVersionEntity::class,
+        MemoryObservationEntity::class,
+        WindowHeartbeatEntity::class
     ],
     version = DatabaseSchema.version,
     exportSchema = DatabaseSchema.exportSchema
@@ -116,4 +138,8 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun searchDocumentDao(): SearchDocumentDao
     abstract fun syncDao(): SyncDao
     abstract fun worldTreeDao(): WorldTreeDao
+    abstract fun windowTopologyDao(): WindowTopologyDao
+    abstract fun learningLedgerDao(): LearningLedgerDao
+    abstract fun companionMemoryDao(): CompanionMemoryDao
+    abstract fun windowHeartbeatDao(): WindowHeartbeatDao
 }

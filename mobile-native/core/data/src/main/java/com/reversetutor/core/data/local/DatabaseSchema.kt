@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 6
+    const val version = 10
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -60,12 +60,49 @@ object DatabaseSchema {
         }
     }
 
+    val migration6To7: Migration = object : Migration(6, 7) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            windowTopologyTableSql.forEach(db::execSQL)
+            windowTopologyIndexSql.forEach(db::execSQL)
+            db.execSQL(
+                """
+                INSERT INTO windows (sessionId, spaceId, rootId, parentId, kind, createdAtEpochMillis)
+                SELECT id, spaceId, id, NULL, 'TASK_ROOT', createdAtEpochMillis FROM sessions
+                """.trimIndent()
+            )
+        }
+    }
+
+    val migration7To8: Migration = object : Migration(7, 8) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            learningLedgerTableSql.forEach(db::execSQL)
+            learningLedgerIndexSql.forEach(db::execSQL)
+        }
+    }
+
+    val migration8To9: Migration = object : Migration(8, 9) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            companionHeartbeatTableSql.forEach(db::execSQL)
+            companionHeartbeatIndexSql.forEach(db::execSQL)
+        }
+    }
+
+    val migration9To10: Migration = object : Migration(9, 10) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE background_jobs ADD COLUMN assistantTurnEnvelopePayload TEXT")
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
         migration3To4,
         migration4To5,
-        migration5To6
+        migration5To6,
+        migration6To7,
+        migration7To8,
+        migration8To9,
+        migration9To10
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -436,6 +473,148 @@ object DatabaseSchema {
         "CREATE UNIQUE INDEX IF NOT EXISTS index_world_tree_sections_draftId_orderIndex ON world_tree_sections(draftId, orderIndex)",
         "CREATE INDEX IF NOT EXISTS index_world_tree_source_cross_ref_sourceId ON world_tree_source_cross_ref(sourceId)",
         "CREATE UNIQUE INDEX IF NOT EXISTS index_world_tree_source_cross_ref_draftId_orderIndex ON world_tree_source_cross_ref(draftId, orderIndex)"
+    )
+
+    private val windowTopologyTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS windows (
+            sessionId TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            rootId TEXT NOT NULL,
+            parentId TEXT,
+            kind TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_snapshots (
+            windowId TEXT NOT NULL,
+            ancestorRevision INTEGER NOT NULL,
+            forkedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(windowId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_deltas (
+            id TEXT NOT NULL,
+            windowId TEXT NOT NULL,
+            deltaId TEXT NOT NULL,
+            payloadHandle TEXT NOT NULL,
+            sourceRevision INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS merge_commits (
+            id TEXT NOT NULL,
+            childId TEXT NOT NULL,
+            parentId TEXT NOT NULL,
+            deltaId TEXT NOT NULL,
+            sourceRevision INTEGER NOT NULL,
+            spaceId TEXT NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val windowTopologyIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_windows_spaceId ON windows(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_windows_rootId ON windows(rootId)",
+        "CREATE INDEX IF NOT EXISTS index_windows_parentId ON windows(parentId)",
+        "CREATE INDEX IF NOT EXISTS index_window_snapshots_windowId ON window_snapshots(windowId)",
+        "CREATE INDEX IF NOT EXISTS index_window_deltas_windowId ON window_deltas(windowId)",
+        "CREATE INDEX IF NOT EXISTS index_merge_commits_childId ON merge_commits(childId)",
+        "CREATE INDEX IF NOT EXISTS index_merge_commits_parentId ON merge_commits(parentId)",
+        "CREATE INDEX IF NOT EXISTS index_merge_commits_spaceId ON merge_commits(spaceId)"
+    )
+
+    private val learningLedgerTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS learning_fact_receipts (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            knowledgePoint TEXT NOT NULL,
+            evidenceType TEXT NOT NULL,
+            result TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            sourceWindowId TEXT NOT NULL,
+            sourceTurnId TEXT NOT NULL,
+            occurredAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS scope_signals (
+            id TEXT NOT NULL,
+            windowId TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            category TEXT NOT NULL,
+            count INTEGER NOT NULL,
+            sourceTurnId TEXT NOT NULL,
+            occurredAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val learningLedgerIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_learning_fact_receipts_spaceId ON learning_fact_receipts(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_learning_fact_receipts_knowledgePoint ON learning_fact_receipts(knowledgePoint)",
+        "CREATE INDEX IF NOT EXISTS index_learning_fact_receipts_sourceWindowId ON learning_fact_receipts(sourceWindowId)",
+        "CREATE INDEX IF NOT EXISTS index_scope_signals_windowId ON scope_signals(windowId)",
+        "CREATE INDEX IF NOT EXISTS index_scope_signals_spaceId ON scope_signals(spaceId)"
+    )
+
+    private val companionHeartbeatTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS companion_memory_versions (
+            id TEXT NOT NULL,
+            windowId TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            partition TEXT NOT NULL,
+            value TEXT NOT NULL,
+            origin TEXT NOT NULL,
+            promotedAtEpochMillis INTEGER NOT NULL,
+            revision INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS memory_observations (
+            id TEXT NOT NULL,
+            windowId TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            partition TEXT,
+            normalizedValue TEXT NOT NULL,
+            sourceClass TEXT NOT NULL,
+            observedAtEpochMillis INTEGER NOT NULL,
+            confidence REAL NOT NULL,
+            provenanceHandle TEXT NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_heartbeats (
+            windowId TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            enabled INTEGER NOT NULL,
+            minCooldownMillis INTEGER NOT NULL,
+            cooldownUntilEpochMillis INTEGER NOT NULL DEFAULT 0,
+            pendingJobId TEXT,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(windowId)
+        )
+        """.trimIndent()
+    )
+
+    private val companionHeartbeatIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_companion_memory_versions_windowId ON companion_memory_versions(windowId)",
+        "CREATE INDEX IF NOT EXISTS index_companion_memory_versions_spaceId ON companion_memory_versions(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_memory_observations_windowId ON memory_observations(windowId)",
+        "CREATE INDEX IF NOT EXISTS index_memory_observations_spaceId ON memory_observations(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_window_heartbeats_spaceId ON window_heartbeats(spaceId)"
     )
 }
 

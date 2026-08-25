@@ -223,7 +223,8 @@ data class BackgroundJobEntity(
     val quoteExcerpt: String? = null,
     val imageAttachmentsPayload: String? = null,
     val contextEvidencePayload: String? = null,
-    val sessionPolicyPayload: String? = null
+    val sessionPolicyPayload: String? = null,
+    val assistantTurnEnvelopePayload: String? = null
 )
 
 @Entity(tableName = "import_batches", indices = [Index("spaceId"), Index("status")])
@@ -525,3 +526,171 @@ fun GraphEdgeEntity.toDomain(): GraphEdge = GraphEdge(
     createdAtEpochMillis = createdAtEpochMillis,
     sourceMemoryId = sourceMemoryId
 )
+
+// ---------------------------------------------------------------------------
+// Window topology (P6 6 -> 7). Window identity == session identity.
+// ---------------------------------------------------------------------------
+
+@Entity(
+    tableName = "windows",
+    indices = [Index("spaceId"), Index("rootId"), Index("parentId")]
+)
+data class WindowEntity(
+    @PrimaryKey val sessionId: String,
+    val spaceId: String,
+    val rootId: String,
+    val parentId: String?,
+    val kind: String,
+    val createdAtEpochMillis: Long
+)
+
+@Entity(tableName = "window_snapshots", indices = [Index("windowId")])
+data class WindowSnapshotEntity(
+    @PrimaryKey val windowId: String,
+    val ancestorRevision: Long,
+    val forkedAtEpochMillis: Long
+)
+
+@Entity(tableName = "window_deltas", indices = [Index("windowId")])
+data class WindowDeltaEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val deltaId: String,
+    val payloadHandle: String,
+    val sourceRevision: Long
+)
+
+@Entity(
+    tableName = "merge_commits",
+    indices = [Index("childId"), Index("parentId"), Index("spaceId")]
+)
+data class MergeCommitEntity(
+    @PrimaryKey val id: String,
+    val childId: String,
+    val parentId: String,
+    val deltaId: String,
+    val sourceRevision: Long,
+    val spaceId: String
+)
+
+// ---------------------------------------------------------------------------
+// Global learning ledger + scope signals (P6 7 -> 8). No raw transcript.
+// ---------------------------------------------------------------------------
+
+@Entity(
+    tableName = "learning_fact_receipts",
+    indices = [Index("spaceId"), Index("knowledgePoint"), Index("sourceWindowId")]
+)
+data class LearningFactReceiptEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val knowledgePoint: String,
+    val evidenceType: String,
+    val result: String,
+    val confidence: Float,
+    val sourceWindowId: String,
+    val sourceTurnId: String,
+    val occurredAtEpochMillis: Long
+) {
+    companion object {
+        /** Only these columns may be persisted; no raw transcript / provider / secret. */
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "spaceId", "knowledgePoint", "evidenceType", "result",
+            "confidence", "sourceWindowId", "sourceTurnId", "occurredAtEpochMillis"
+        )
+    }
+}
+
+@Entity(
+    tableName = "scope_signals",
+    indices = [Index("windowId"), Index("spaceId")]
+)
+data class ScopeSignalEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val spaceId: String,
+    val category: String,
+    val count: Int,
+    val sourceTurnId: String,
+    val occurredAtEpochMillis: Long
+) {
+    companion object {
+        /** Only minimal provenance columns may be persisted; no raw user text. */
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "windowId", "spaceId", "category", "count", "sourceTurnId", "occurredAtEpochMillis"
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Companion memory versions + heartbeat (P6 8 -> 9).
+// Companion memory is root-only; heartbeats are window-keyed (root enabled,
+// child disabled until an explicit enable command). No raw transcript.
+// ---------------------------------------------------------------------------
+
+@Entity(
+    tableName = "companion_memory_versions",
+    indices = [Index("windowId"), Index("spaceId")]
+)
+data class CompanionMemoryVersionEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val spaceId: String,
+    val partition: String,
+    val value: String,
+    val origin: String,
+    val promotedAtEpochMillis: Long,
+    val revision: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "windowId", "spaceId", "partition", "value", "origin",
+            "promotedAtEpochMillis", "revision"
+        )
+    }
+}
+
+@Entity(
+    tableName = "memory_observations",
+    indices = [Index("windowId"), Index("spaceId")]
+)
+data class MemoryObservationEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val spaceId: String,
+    val domain: String,
+    val partition: String?,
+    val normalizedValue: String,
+    val sourceClass: String,
+    val observedAtEpochMillis: Long,
+    val confidence: Float,
+    val provenanceHandle: String
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "windowId", "spaceId", "domain", "partition", "normalizedValue",
+            "sourceClass", "observedAtEpochMillis", "confidence", "provenanceHandle"
+        )
+    }
+}
+
+@Entity(
+    tableName = "window_heartbeats",
+    indices = [Index("spaceId")]
+)
+data class WindowHeartbeatEntity(
+    @PrimaryKey val windowId: String,
+    val spaceId: String,
+    val enabled: Boolean,
+    val minCooldownMillis: Long,
+    val cooldownUntilEpochMillis: Long = 0L,
+    val pendingJobId: String? = null,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "windowId", "spaceId", "enabled", "minCooldownMillis",
+            "cooldownUntilEpochMillis", "pendingJobId", "updatedAtEpochMillis"
+        )
+    }
+}

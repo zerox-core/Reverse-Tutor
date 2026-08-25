@@ -28,6 +28,7 @@ object BackgroundGenerationNotificationPolicy {
             is BackgroundGenerationOutcome.Failed -> NotificationKind.Failed
             is BackgroundGenerationOutcome.Discarded,
             BackgroundGenerationOutcome.Cancelled,
+            BackgroundGenerationOutcome.AlreadyRunning,
             BackgroundGenerationOutcome.MissingJob -> NotificationKind.None
         }
     }

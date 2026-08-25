@@ -21,6 +21,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    sourceSets {
+        // Room MigrationTestHelper reads exported schema JSON from the androidTest
+        // APK assets. Package the generated schemas so migration tests can run.
+        getByName("androidTest").assets.srcDirs("schemas")
+    }
 }
 
 kapt {

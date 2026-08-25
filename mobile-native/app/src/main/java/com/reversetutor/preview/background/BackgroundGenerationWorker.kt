@@ -44,7 +44,8 @@ class BackgroundGenerationWorker(
         return when (outcome) {
             is BackgroundGenerationOutcome.Completed,
             is BackgroundGenerationOutcome.Discarded,
-            BackgroundGenerationOutcome.Cancelled -> Result.success()
+            BackgroundGenerationOutcome.Cancelled,
+            BackgroundGenerationOutcome.AlreadyRunning -> Result.success()
             is BackgroundGenerationOutcome.Failed,
             BackgroundGenerationOutcome.MissingJob -> Result.failure()
         }

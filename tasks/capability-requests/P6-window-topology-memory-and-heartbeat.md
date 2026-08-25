@@ -9,7 +9,7 @@
 
 ## 1. 能力缺口（源码事实）
 
-当前 `ReverseTutorDatabase.version = 2`，表集合仅覆盖会话/消息/来源/图谱/记忆项/后台任务等。没有以下可持久化载体：
+当前 `ReverseTutorDatabase.version = 6`，且已有 `migration1To2`、`migration2To3`、`migration3To4`、`migration4To5`、`migration5To6`。现有表集合覆盖会话/消息/来源/图谱/记忆项/后台任务等，但没有以下可持久化载体：
 
 - **窗口树**（root/child、rootId、parentId、kind）：`SessionConversationAssembly` 与 `WindowConversationAssembly`（Package B）只做了纯投影，接口层没有窗口树存储，只能靠每次从读端口 fakes 注入。
 - **不变 fork 快照元数据**（ancestorRevision、forkedAtEpochMillis）：Task 2 的 `WindowSnapshotRef` 仅存在于内存领域类型。
@@ -24,18 +24,23 @@
 
 ## 2. 最小提案（待审批后再细化）
 
-将上一节各类数据**分别按 aggregate 切块**持久化，每块都满足：`spaceId` + root/window 归属、外键安全删除、需要时带 idempotency key、**无 raw transcript 列**。列表（每个聚合独立切片，审批后再定表名/列/索引细节——本申请不预设 schema 实现、不授权立即改 Room）：
+将上一节各类数据**分别按 aggregate 切块**持久化，每块都满足：`spaceId` + root/window 归属、外键安全删除、需要时带 idempotency key、**无 raw transcript 列**。
+
+窗口身份采用既有会话身份：`WindowRef.id == Session.id`，即 `windowId` 直接复用现有 `sessionId`。根窗口的 `rootId == sessionId`；子窗口的 `parentId` 是直接父会话 id。不得新建可漂移的 window-to-session 映射表。迁移对已有 session 一律建立 `TASK_ROOT` 拓扑行；不从历史内容推断 companion/personality。新的 companion root 只能通过明确创建流程建立。
+
+列表（每个聚合独立切片，审批后再定表名/列/索引细节——本申请不预设 schema 实现、不授权立即改 Room）：
 
 ```text
-A. 窗口树：WindowEntity(windowId PK, spaceId, rootId, parentId?, kind, createdEpochMillis)
+A. 窗口树：WindowEntity(sessionId PK/FK -> existing Session, spaceId, rootId, parentId?, kind, createdEpochMillis)
    + 不变 fork 快照元数据：WindowSnapshotEntity(windowId PK, ancestryRevision, forkedAtEpochMillis)
    + 窗口局部 delta：WindowDeltaEntity(id, windowId, deltaId, payloadHandle, sourceRevision)
 B. merge receipt + idempotency key: MergeCommitEntity(id PK, childId, parentId, deltaId, sourceRevision, spaceId)
    （idempotency 键 = childId|parentId|deltaId|sourceRevision，与 Task 2 mergeCommitId 一致）
 C. 归一化学习 ledger: LearningFactReceiptEntity(id, spaceId, knowledgePoint, evidenceType, result,
    confidence, sourceWindowId, sourceTurnId, occurredAtEpochMillis)
-D. 最小 scope signal: ScopeSignalEntity(id, windowId, spaceId, category, count)
-   （无 transcript/无监控文本列）
+D. 最小 scope signal: ScopeSignalEntity(id, windowId/sessionId, spaceId, category, count,
+   sourceTurnId, occurredAtEpochMillis)
+   （无 transcript/无监控文本列；时间和回合标识仅用于有限窗口内判断“持续”，不保存用户原文）
 E. companion-memory versions: CompanionMemoryVersionEntity(partition, windowId, spaceId, value,
    origin, promotedAtEpochMillis, revision) + MemoryObservationEntity(...)（含 provenance handle，
    【无】raw message text 列）— 复用 Task 3 `ALLOWED_PERSISTED_FIELDS`
@@ -45,9 +50,9 @@ F. heartbeat jobs: WindowHeartbeatEntity(windowId PK, spaceId, enabled, minCoold
 
 ### 2.1 迁移顺序（一次性建议）
 
-1. `migration(2 -> 3)`：表 A + B（窗口树/快照/局部 delta/merge receipt）。
-2. `migration(3 -> 4)`：表 C + D（learning ledger / scope signal）——独立于 companion 内存域。
-3. `migration(4 -> 5)`：表 E + F（companion-memory versions / heartbeat jobs）。
+1. `migration(6 -> 7)`：表 A + B（窗口树/快照/局部 delta/merge receipt）并为现有 session 创建安全的 `TASK_ROOT` 行。
+2. `migration(7 -> 8)`：表 C + D（learning ledger / 有发生时间的 scope signal）——独立于 companion 内存域。
+3. `migration(8 -> 9)`：表 E + F（companion-memory versions / heartbeat jobs）。
 4. 每步：bump `DatabaseSchema.version`、补充 `Migration`、导出 schema JSON、补 migration test。禁止 destructive migration；新列/表优先 nullable/默认值，避免破坏旧安装升级。禁止删除已有 `migration1To2`。
 
 ### 2.2 Repository 只出 domain-safe 模型
@@ -59,7 +64,7 @@ F. heartbeat jobs: WindowHeartbeatEntity(windowId PK, spaceId, enabled, minCoold
 
 | 区域 | 可能变更 | 当前状态 |
 |---|---|---|
-| `core/data/local` | Entity/DAO/`DatabaseSchema`/`ReverseTutorDatabase`/migration（版本 2→3/4/5，导出 schema JSON） | 未批准 |
+| `core/data/local` | Entity/DAO/`DatabaseSchema`/`ReverseTutorDatabase`/migration（版本 6→7→8→9，导出 schema JSON） | 未批准 |
 | `core/data/*Repository` | 新增 topology/memory/scope/ledger/heartbeat Repository 方法（只出 domain-safe 模型） | 未批准 |
 | `core/data/preferences` | 无（heartbeat 由表而非偏好 key 表达） | 不触及 |
 | `SecretStore` | 无 | 不触及 |
@@ -81,8 +86,8 @@ F. heartbeat jobs: WindowHeartbeatEntity(windowId PK, spaceId, enabled, minCoold
 
 ### 回滚
 
-- 逐级 migration 可逆降级：若 5 级回退，按 5→4→3 降级读取（缺省列时用默认值），不可逆风险在写入前说明。
-- 合并/心跳/内存/ledger 表均为新增表，revert 提交即移除；已有 `migration1To2` 保留。
+- Room 数据库只做前向迁移，不通过降低 schema version 回滚。发布后发现问题时，以 feature-disable/no-op 读取路径关闭新能力，同时保留 6→7→8→9 migration，避免已升级安装无法重新打开。
+- 合并/心跳/内存/ledger 表均为新增表；代码回滚必须保留已发布 migration 的兼容读取。已有 `migration1To2` 到 `migration5To6` 全部保留。
 - 若引入破坏性数据变更（本申请未包含），需先说明与提供数据迁移备份。
 
 ## 5. 审批门禁

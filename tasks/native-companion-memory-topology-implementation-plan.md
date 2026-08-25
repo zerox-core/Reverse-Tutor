@@ -192,7 +192,7 @@ This package is independently useful: it creates deterministic behavior and a te
 
 - [ ] **Step 3: Implement the contract and pure classifier.**
 
-  Define `LearningIntentEnvelope`, `ScopeRelation` (`CONTINUOUS`, `RELATED_EVOLUTION`, `AMBIGUOUS`, `SUSTAINED_OUT_OF_SCOPE`), `ScopeSignal`, and `ScopeDecision`. The only intervention is a `reanchorConstraint` returned in `ScopeDecision`; no result may block a turn or rewrite `LearningIntentEnvelope`.
+  Define `LearningIntentEnvelope`, `ScopeRelation` (`CONTINUOUS`, `RELATED_EVOLUTION`, `AMBIGUOUS`, `SUSTAINED_OUT_OF_SCOPE`), `ScopeSignal`, and `ScopeDecision`. `ScopeSignal` contains only category, count, source-turn handle, and occurrence time; it never contains user text. The only intervention is a `reanchorConstraint` returned in `ScopeDecision`; no result may block a turn or rewrite `LearningIntentEnvelope`.
 
 - [ ] **Step 4: Run focused tests and commit.**
 
