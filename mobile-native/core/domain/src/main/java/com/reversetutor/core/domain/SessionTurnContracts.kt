@@ -183,6 +183,12 @@ data class SessionPolicyInput(
     val userInput: String = "",
     val recentUserInputs: List<String> = emptyList(),
     val knowledgePoint: String = "",
+    /** Bounded template identity used by the strategy/runtime prompt bridge. */
+    val learnerRole: String = "学习者",
+    val learnerProfile: String = "未设置",
+    val learningPlan: String = "未设置",
+    val dialogueStrategy: String = "未设置",
+    val speakingTone: String = "自然",
     val correctness: Float = 0f,
     val depth: Float = 0f,
     val entryStatus: String = EntryStatusWire.HAS_ENTRY,

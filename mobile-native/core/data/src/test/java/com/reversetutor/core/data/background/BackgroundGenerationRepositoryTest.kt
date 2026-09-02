@@ -17,12 +17,17 @@ import com.reversetutor.core.data.local.entity.SessionEntity
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.model.ExecutionModelConfiguration
 import com.reversetutor.core.data.model.ExecutionModelResolver
+import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
 import com.reversetutor.core.llm.LlmCapabilities
+import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationRequest
 import com.reversetutor.core.llm.LlmGenerationResult
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.llm.LlmSessionPolicyContext
+import com.reversetutor.core.llm.LlmTurnPlan
+import com.reversetutor.core.llm.LlmWindowContext
+import com.reversetutor.core.llm.StructuredTurnOutcome
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.ModelBinding
@@ -30,6 +35,7 @@ import com.reversetutor.core.model.ModelProtocol
 import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -165,6 +171,35 @@ class BackgroundGenerationRepositoryTest {
     }
 
     @Test
+    fun providerFailureWithSensitiveDiagnosticsMapsToSafePersistedError() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(
+                LlmGenerationResult.Failure(
+                    "java.net.SocketTimeoutException: connect timed out " +
+                        "GET https://api.example.test/v1/chat/completions 401 " +
+                        "Authorization: Bearer sk-live-9f8e7d6c invalid_api_key"
+                )
+            )
+        )
+        repository.enqueueGenerationJob(input(token = "token-sensitive"), nowEpochMillis = 10L, jobId = "job-1")
+
+        val outcome = repository.runGenerationJob("job-1", nowEpochMillis = 30L)
+
+        val persistedError = repository.getJob("job-1")?.errorMessage.orEmpty()
+        assertEquals(BackgroundGenerationOutcome.Failed("background_generation_failed"), outcome)
+        assertEquals("background_generation_failed", persistedError)
+        assertFalse(persistedError.contains("sk-"))
+        assertFalse(persistedError.contains("Authorization"))
+        assertFalse(persistedError.contains("https://"))
+        assertFalse(persistedError.contains("Exception"))
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+    }
+
+    @Test
     fun recoveryRequeuesRunningJobsAndCancellationPreventsExecution() = runBlocking {
         val jobDao = FakeBackgroundJobDao()
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
@@ -204,6 +239,57 @@ class BackgroundGenerationRepositoryTest {
         assertEquals(BackgroundGenerationOutcome.Discarded("Session is unavailable"), outcome)
         assertEquals(BackgroundJobStatus.Discarded, repository.getJob("job-1")?.status)
         assertTrue(messageRepository.listMessages("session-1").isEmpty())
+    }
+
+    @Test
+    fun reopeningSessionFindsItsNewestActiveBackgroundJob() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val repository = repository(jobDao = jobDao)
+        repository.enqueueGenerationJob(input(token = "token-old"), nowEpochMillis = 10L, jobId = "job-old")
+        repository.enqueueGenerationJob(input(token = "token-new"), nowEpochMillis = 20L, jobId = "job-new")
+        jobDao.forceStatus("job-old", "Completed")
+        jobDao.forceStatus("job-new", "Running", startedAtEpochMillis = 21L)
+
+        val resumed = repository.findActiveJobForSession("session-1")
+
+        assertEquals("job-new", resumed?.id)
+        assertEquals(BackgroundJobStatus.Running, resumed?.status)
+        assertEquals(null, repository.findActiveJobForSession("another-session"))
+    }
+
+    @Test
+    fun richReplyIsCarriedByCompletionWithoutAnotherAssistantWrite() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(
+                LlmGenerationResult.Success(
+                    """{"version":"v1","blocks":[{"type":"paragraph","text":"先检查定义域。"}],"evidenceReferenceIds":["source-1"],"toolCalls":[],"outcome":{}}"""
+                )
+            )
+        )
+        repository.enqueueGenerationJob(
+            input = input(token = "token-rich").copy(
+                contextEvidence = listOf(
+                    LlmContextEvidence(
+                        id = "source-1",
+                        title = "定义域提示",
+                        body = "变量需要满足取值范围。",
+                        kind = "Source"
+                    )
+                )
+            ),
+            nowEpochMillis = 100L,
+            jobId = "rich-job"
+        )
+
+        val outcome = repository.runGenerationJob("rich-job", nowEpochMillis = 200L)
+
+        assertTrue(outcome is BackgroundGenerationOutcome.Completed)
+        val completed = outcome as BackgroundGenerationOutcome.Completed
+        assertEquals(listOf("source-1"), completed.replyEnvelope!!.evidenceReferenceIds)
+        assertEquals(1, messageRepository.listMessages("session-1").size)
+        assertEquals("先检查定义域。", messageRepository.listMessages("session-1").single().text)
     }
 
     @Test
@@ -276,6 +362,74 @@ class BackgroundGenerationRepositoryTest {
         assertEquals(BackgroundJobStatus.Completed, repository.getJob("job-old")?.status)
         assertEquals(listOf("Old late reply"), messageRepository.listMessages("session-1").map { it.text })
     }
+
+    @Test
+    fun completedJobRoundTripRecoversStructuredOutcomeFromPersistedEnvelope() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Success("Use common factors first."))
+        )
+        repository.enqueueGenerationJob(
+            input(token = "token-envelope").copy(assistantTurnEnvelope = envelope()),
+            nowEpochMillis = 10L,
+            jobId = "job-envelope"
+        )
+        repository.runGenerationJob("job-envelope", nowEpochMillis = 20L)
+
+        val restarted = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Success("Never regenerated"))
+        )
+        val outcome = restarted.runGenerationJob("job-envelope", nowEpochMillis = 30L)
+
+        val completed = outcome as BackgroundGenerationOutcome.Completed
+        assertEquals("assistant-token-envelope", completed.assistantMessageId)
+        assertEquals("w1", completed.structuredOutcome.windowId)
+        assertEquals("probe", completed.structuredOutcome.actionType)
+        assertEquals("factoring", completed.structuredOutcome.knowledgePoint)
+        assertEquals("check-in", completed.structuredOutcome.processSummary)
+        assertFalse(completed.structuredOutcome.processSummary.contains("Use common factors"))
+    }
+
+    @Test
+    fun completedPlainJobRoundTripRecoversEmptyStructuredOutcome() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Success("Plain old reply"))
+        )
+        repository.enqueueGenerationJob(input(token = "token-plain"), nowEpochMillis = 10L, jobId = "job-plain")
+        repository.runGenerationJob("job-plain", nowEpochMillis = 20L)
+
+        val restarted = repository(
+            jobDao = jobDao,
+            messageRepository = messageRepository,
+            runtime = StaticRuntime(LlmGenerationResult.Success("Never regenerated"))
+        )
+        val outcome = restarted.runGenerationJob("job-plain", nowEpochMillis = 30L)
+
+        val completed = outcome as BackgroundGenerationOutcome.Completed
+        assertEquals("assistant-token-plain", completed.assistantMessageId)
+        assertEquals(StructuredTurnOutcome.EMPTY, completed.structuredOutcome)
+        assertFalse(completed.structuredOutcome.processSummary.contains("Plain old reply"))
+    }
+
+    private fun envelope() = LlmAssistantTurnEnvelope(
+        window = LlmWindowContext(windowId = "w1", rootId = "root-1", windowKind = "TASK_ROOT", forkRevision = 7L),
+        turnPlan = LlmTurnPlan(
+            intent = "check-in",
+            actionType = "probe",
+            studentRole = "probing_student",
+            knowledgePoint = "factoring",
+            difficulty = 0.7f
+        )
+    )
 
     private fun repository(
         jobDao: FakeBackgroundJobDao = FakeBackgroundJobDao(),

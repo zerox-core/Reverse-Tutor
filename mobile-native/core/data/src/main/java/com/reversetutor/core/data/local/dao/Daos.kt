@@ -32,6 +32,13 @@ import com.reversetutor.core.data.local.entity.ScopeSignalEntity
 import com.reversetutor.core.data.local.entity.CompanionMemoryVersionEntity
 import com.reversetutor.core.data.local.entity.MemoryObservationEntity
 import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
+import com.reversetutor.core.data.local.entity.AssistantReplyArtifactEntity
+import com.reversetutor.core.data.local.entity.SessionDocumentEntity
+import com.reversetutor.core.data.local.entity.SessionDocumentBlockEntity
+import com.reversetutor.core.data.local.entity.SessionTableEntity
+import com.reversetutor.core.data.local.entity.SessionTableColumnEntity
+import com.reversetutor.core.data.local.entity.SessionTableRowEntity
+import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
 
 @Dao
 interface SpaceDao {
@@ -346,6 +353,9 @@ interface LearningLedgerDao {
     @Query("SELECT * FROM learning_fact_receipts WHERE sourceWindowId = :windowId ORDER BY occurredAtEpochMillis ASC")
     suspend fun listFactsByWindow(windowId: String): List<LearningFactReceiptEntity>
 
+    @Query("SELECT EXISTS(SELECT 1 FROM learning_fact_receipts WHERE sourceWindowId = :windowId AND sourceTurnId = :turnId)")
+    suspend fun hasFactForTurn(windowId: String, turnId: String): Boolean
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertScopeSignal(signal: ScopeSignalEntity): Long
 
@@ -393,4 +403,100 @@ interface WindowHeartbeatDao {
 
     @Query("DELETE FROM window_heartbeats WHERE windowId = :windowId")
     suspend fun deleteHeartbeat(windowId: String): Int
+}
+
+@Dao
+interface SessionAgentDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertArtifact(artifact: AssistantReplyArtifactEntity)
+
+    @Query("SELECT * FROM assistant_reply_artifacts WHERE assistantMessageId = :assistantMessageId AND sessionId = :sessionId")
+    suspend fun getArtifact(sessionId: String, assistantMessageId: String): AssistantReplyArtifactEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertDocument(document: SessionDocumentEntity): Long
+
+    @Query("SELECT * FROM session_documents WHERE id = :documentId AND sessionId = :sessionId")
+    suspend fun getDocument(sessionId: String, documentId: String): SessionDocumentEntity?
+
+    @Query("SELECT * FROM session_document_blocks WHERE id = :blockId AND documentId = :documentId")
+    suspend fun getBlock(documentId: String, blockId: String): SessionDocumentBlockEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertBlock(block: SessionDocumentBlockEntity)
+
+    @Query("SELECT * FROM session_document_blocks WHERE documentId = :documentId ORDER BY ordinal ASC")
+    suspend fun listBlocks(documentId: String): List<SessionDocumentBlockEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTable(table: SessionTableEntity)
+
+    @Query("SELECT session_tables.* FROM session_tables INNER JOIN session_documents ON session_tables.documentId = session_documents.id WHERE session_tables.id = :tableId AND session_documents.sessionId = :sessionId")
+    suspend fun getTable(sessionId: String, tableId: String): SessionTableEntity?
+
+    @Query("SELECT * FROM session_table_columns WHERE tableId = :tableId ORDER BY ordinal ASC")
+    suspend fun listColumns(tableId: String): List<SessionTableColumnEntity>
+
+    @Query("SELECT * FROM session_table_rows WHERE tableId = :tableId ORDER BY rowKey ASC")
+    suspend fun listRows(tableId: String): List<SessionTableRowEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertColumn(column: SessionTableColumnEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRow(row: SessionTableRowEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertReceipt(receipt: ToolCallReceiptEntity): Long
+
+    @Query("SELECT * FROM tool_call_receipts WHERE callId = :callId")
+    suspend fun getReceipt(callId: String): ToolCallReceiptEntity?
+
+    /**
+     * The document and its receipt share one transaction: a failed document
+     * insert must never leave a completed idempotency receipt behind.
+     */
+    @Transaction
+    suspend fun createDocumentWithReceipt(
+        document: SessionDocumentEntity,
+        blocks: List<SessionDocumentBlockEntity>,
+        receipt: ToolCallReceiptEntity
+    ): Boolean {
+        insertDocument(document)
+        blocks.forEach { block -> upsertBlock(block) }
+        insertReceipt(receipt)
+        return true
+    }
+
+    @Transaction
+    suspend fun replaceBlockWithReceipt(
+        block: SessionDocumentBlockEntity,
+        receipt: ToolCallReceiptEntity
+    ): Boolean {
+        upsertBlock(block)
+        insertReceipt(receipt)
+        return true
+    }
+
+    @Transaction
+    suspend fun createTableWithReceipt(
+        table: SessionTableEntity,
+        columns: List<SessionTableColumnEntity>,
+        receipt: ToolCallReceiptEntity
+    ): Boolean {
+        upsertTable(table)
+        columns.forEach { column -> upsertColumn(column) }
+        insertReceipt(receipt)
+        return true
+    }
+
+    @Transaction
+    suspend fun upsertRowWithReceipt(
+        row: SessionTableRowEntity,
+        receipt: ToolCallReceiptEntity
+    ): Boolean {
+        upsertRow(row)
+        insertReceipt(receipt)
+        return true
+    }
 }

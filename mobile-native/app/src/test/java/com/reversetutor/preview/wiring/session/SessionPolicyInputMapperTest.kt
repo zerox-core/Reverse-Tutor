@@ -1,9 +1,13 @@
 package com.reversetutor.preview.wiring.session
 
 import com.reversetutor.core.domain.CorrectionPersistenceWire
+import com.reversetutor.core.domain.ContextMessage
+import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.SessionModeWire
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionPolicyInputMapperTest {
@@ -37,5 +41,69 @@ class SessionPolicyInputMapperTest {
             goal = ""
         ).toSessionPolicyInput("\u4ec0\u4e48\u662f\u89d2")
         assertEquals("\u51e0\u4f55", input.knowledgePoint)
+    }
+
+    @Test
+    fun template_persona_goal_plan_and_dialogue_are_preserved_in_policy_input() {
+        val input = NewSessionConfiguration(
+            title = "高中数学",
+            learnerRole = "谨慎的追问型学生",
+            learnerProfile = "容易漏步骤，喜欢反例",
+            goal = "掌握函数单调性",
+            plan = "先诊断，再例题，最后迁移",
+            dialogueStrategy = "每次只追问一个为什么",
+            speakingTone = "自然"
+        ).toSessionPolicyInput("解释单调性")
+
+        assertEquals("谨慎的追问型学生", input.learnerRole)
+        assertEquals("容易漏步骤，喜欢反例", input.learnerProfile)
+        assertEquals("掌握函数单调性", input.knowledgePoint)
+        assertEquals("先诊断，再例题，最后迁移", input.learningPlan)
+        assertEquals("每次只追问一个为什么", input.dialogueStrategy)
+        assertEquals("自然", input.speakingTone)
+    }
+
+    @Test
+    fun blank_template_fields_use_bounded_safe_defaults() {
+        val input = NewSessionConfiguration().toSessionPolicyInput("问题")
+
+        assertEquals("学习者", input.learnerRole)
+        assertEquals("未设置", input.learnerProfile)
+        assertEquals("未设置", input.learningPlan)
+        assertEquals("自然", input.speakingTone)
+        assertEquals("未设置", input.dialogueStrategy)
+    }
+
+    @Test
+    fun context_evidence_ids_are_derived_from_their_source_values() {
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = listOf("先掌握定义"),
+            relatedMemory = emptyList(),
+            sourceEvidence = emptyList(),
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = listOf("函数单调性"),
+            recentMessages = listOf(
+                ContextMessage("message-a", "user", "第一条", 1L),
+                ContextMessage("message-b", "assistant", "第二条", 2L)
+            ),
+            warnings = emptyList()
+        ).toLlmContextEvidence()
+
+        assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.take(2).map { it.id })
+        assertEquals("gaps-session-1", evidence[2].id)
+        assertEquals("review-session-1", evidence[3].id)
+    }
+
+    @Test
+    fun knowledge_point_is_bounded_and_sensitive_text_is_redacted() {
+        val input = NewSessionConfiguration(
+            title = "https://secret.example/key",
+            goal = "sk-test-secret-value"
+        ).toSessionPolicyInput("问题")
+
+        assertFalse(input.knowledgePoint.contains("sk-test"))
+        assertTrue(input.knowledgePoint.length <= 320)
     }
 }

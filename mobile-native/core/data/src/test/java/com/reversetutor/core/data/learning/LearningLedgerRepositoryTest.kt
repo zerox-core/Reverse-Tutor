@@ -110,6 +110,9 @@ class LearningLedgerRepositoryTest {
         override suspend fun listFactsByWindow(windowId: String): List<LearningFactReceiptEntity> =
             receipts.filter { it.sourceWindowId == windowId }
 
+        override suspend fun hasFactForTurn(windowId: String, turnId: String): Boolean =
+            receipts.any { it.sourceWindowId == windowId && it.sourceTurnId == turnId }
+
         override suspend fun insertScopeSignal(signal: ScopeSignalEntity): Long {
             signals.add(signal)
             return 1L

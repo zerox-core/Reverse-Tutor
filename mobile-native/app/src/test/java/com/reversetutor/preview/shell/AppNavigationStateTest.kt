@@ -8,6 +8,15 @@ import org.junit.Test
 
 class AppNavigationStateTest {
     @Test
+    fun branchHostBackReturnsToCurrentChat() {
+        val state = AppNavigationState()
+            .navigate(AppDestination.Chat)
+            .navigate(AppDestination.WindowBranches)
+
+        assertEquals(AppDestination.Chat, state.handleSystemBack().state.current)
+    }
+
+    @Test
     fun sourceEvidenceTargetSurvivesUntilItsActualConsumerScreen() {
         assertFalse(shouldClearSourceEvidenceTarget(AppDestination.Sources))
         assertFalse(shouldClearSourceEvidenceTarget(AppDestination.SessionSettingsSources))

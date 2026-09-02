@@ -9,13 +9,26 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.reversetutor.core.data.DataModule
+import com.reversetutor.core.data.agent.AssistantReplyArtifactRepository
+import com.reversetutor.core.data.agent.RoomAssistantReplyArtifactStore
+import com.reversetutor.core.data.agent.RoomSessionDocumentStore
+import com.reversetutor.core.data.agent.RoomSessionTableStore
+import com.reversetutor.core.data.agent.RoomToolCallReceiptStore
+import com.reversetutor.core.data.agent.SessionDocumentRepository
+import com.reversetutor.core.data.agent.SessionTableRepository
+import com.reversetutor.core.data.agent.SessionToolExecutionRepository
+import com.reversetutor.core.data.agent.ToolCallReceiptRepository
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
+import com.reversetutor.core.data.learning.LearningLedgerRepository
+import com.reversetutor.core.domain.LearningFactReceipt
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.preview.BuildConfig
 import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
 import com.reversetutor.preview.wiring.HybridLlmRuntimeMode
 import com.reversetutor.preview.wiring.runtimeMode
+import com.reversetutor.preview.wiring.session.PostTurnProjector
+import com.reversetutor.preview.wiring.session.TurnProjectionSink
 
 class BackgroundGenerationWorker(
     appContext: Context,
@@ -36,6 +49,21 @@ class BackgroundGenerationWorker(
         )
         val outcome = repository
             .runGenerationJob(jobId, System.currentTimeMillis())
+        if (outcome is BackgroundGenerationOutcome.Completed) {
+            repository.getJob(jobId)?.let { job ->
+                // The reply is already persisted by ChatGenerationRepository.
+                // Agent tools are non-blocking post-turn work and cannot create
+                // a second assistant message or turn a good reply into failure.
+                runCatching {
+                    completionProcessor(applicationContext).process(
+                        jobId = jobId,
+                        job = job,
+                        outcome = outcome,
+                        nowEpochMillis = System.currentTimeMillis()
+                    )
+                }
+            }
+        }
         BackgroundGenerationOutcomeHandler(applicationContext).handle(
             jobId = jobId,
             outcome = outcome,
@@ -74,6 +102,35 @@ class BackgroundGenerationWorker(
                 )
         }
     }
+}
+
+private fun completionProcessor(context: Context): BackgroundTurnCompletionProcessor {
+    val database = DataModule.database(context)
+    val agentDao = database.sessionAgentDao()
+    val ledger = LearningLedgerRepository(database.learningLedgerDao())
+    return BackgroundTurnCompletionProcessor(
+        artifacts = AssistantReplyArtifactRepository(RoomAssistantReplyArtifactStore(agentDao)),
+        tools = SessionToolExecutionRepository(
+            documents = SessionDocumentRepository(RoomSessionDocumentStore(agentDao)),
+            tables = SessionTableRepository(RoomSessionTableStore(agentDao)),
+            receipts = ToolCallReceiptRepository(RoomToolCallReceiptStore(agentDao))
+        ),
+        projector = PostTurnProjector(
+            TurnProjectionSink { jobId, outcome ->
+                ledger.appendLearningFactIfAbsent(
+                    LearningFactReceipt(
+                        knowledgePoint = outcome.knowledgePoint,
+                        evidenceType = outcome.evidenceType,
+                        result = outcome.evidenceStatus,
+                        confidence = ((outcome.correctness + outcome.depth) / 2f).coerceIn(0f, 1f),
+                        sourceWindowId = requireNotNull(outcome.windowId),
+                        sourceTurnId = "background:$jobId",
+                        occurredAtEpochMillis = System.currentTimeMillis()
+                    )
+                )
+            }
+        )
+    )
 }
 
 internal fun backgroundGenerationRuntimeFor(

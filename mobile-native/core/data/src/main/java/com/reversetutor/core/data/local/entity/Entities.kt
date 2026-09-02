@@ -227,6 +227,79 @@ data class BackgroundJobEntity(
     val assistantTurnEnvelopePayload: String? = null
 )
 
+// ---------------------------------------------------------------------------
+// Session document / rich-reply artifacts (P6 10 -> 11).
+// These rows store validated user-visible content and opaque handles only.
+// ---------------------------------------------------------------------------
+
+@Entity(tableName = "assistant_reply_artifacts", indices = [Index("sessionId")])
+data class AssistantReplyArtifactEntity(
+    @PrimaryKey val assistantMessageId: String,
+    val sessionId: String,
+    val blocksPayload: String,
+    val evidenceReferencesPayload: String,
+    val toolResultsPayload: String,
+    val createdAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_documents", indices = [Index("spaceId"), Index("sessionId")])
+data class SessionDocumentEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val sessionId: String,
+    val title: String,
+    val kind: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_document_blocks", indices = [Index("documentId")])
+data class SessionDocumentBlockEntity(
+    @PrimaryKey val id: String,
+    val documentId: String,
+    val ordinal: Int,
+    val kind: String,
+    val payload: String,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_tables", indices = [Index("documentId")])
+data class SessionTableEntity(
+    @PrimaryKey val id: String,
+    val documentId: String,
+    val title: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_table_columns", indices = [Index("tableId")])
+data class SessionTableColumnEntity(
+    @PrimaryKey val id: String,
+    val tableId: String,
+    val ordinal: Int,
+    val name: String,
+    val valueType: String
+)
+
+@Entity(tableName = "session_table_rows", indices = [Index("tableId")])
+data class SessionTableRowEntity(
+    @PrimaryKey val id: String,
+    val tableId: String,
+    val rowKey: String,
+    val cellsPayload: String,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "tool_call_receipts", indices = [Index("sessionId"), Index("toolName")])
+data class ToolCallReceiptEntity(
+    @PrimaryKey val callId: String,
+    val sessionId: String,
+    val toolName: String,
+    val status: String,
+    val safeResultPayload: String,
+    val completedAtEpochMillis: Long
+)
+
 @Entity(tableName = "import_batches", indices = [Index("spaceId"), Index("status")])
 data class ImportBatchEntity(
     @PrimaryKey val id: String,

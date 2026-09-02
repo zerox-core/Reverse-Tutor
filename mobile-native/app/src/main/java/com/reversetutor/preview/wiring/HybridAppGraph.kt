@@ -2,8 +2,11 @@ package com.reversetutor.preview.wiring
 
 import android.content.Context
 import com.reversetutor.core.data.DataModule
+import com.reversetutor.core.data.agent.AssistantReplyArtifactRepository
+import com.reversetutor.core.data.agent.RoomAssistantReplyArtifactStore
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
+import com.reversetutor.core.data.heartbeat.WindowHeartbeatRepository
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
@@ -27,8 +30,10 @@ import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
+import com.reversetutor.core.data.window.WindowTopologyRepository
 import com.reversetutor.core.domain.ConversationRunCoordinator
 import com.reversetutor.core.domain.SyncCoordinator
+import com.reversetutor.core.domain.WindowKind
 import com.reversetutor.core.remote.AndroidOnlineAuthStateStore
 import com.reversetutor.core.remote.HttpOnlineApi
 import com.reversetutor.core.remote.OnlineAuthSessionManager
@@ -36,6 +41,7 @@ import com.reversetutor.core.remote.OnlineAuthTokenProvider
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.HeartbeatTurnDispatchPort
+import com.reversetutor.feature.chat.SessionRichReplyPort
 import com.reversetutor.preview.wiring.session.DefaultHeartbeatTurnDispatchPort
 import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
 import com.reversetutor.feature.chat.ChatRunsViewModelFactory
@@ -47,6 +53,8 @@ import com.reversetutor.feature.chat.NewSessionCreatePort
 import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.SessionHomePort
 import com.reversetutor.feature.chat.TagLibraryPersistence
+import com.reversetutor.feature.chat.WindowVisibleTimelinePort
+import com.reversetutor.feature.chat.WindowBranchPort
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.WeeklyDashboardPortViewModelFactory
 import com.reversetutor.feature.memory.WeeklyTokenUsageEntry
@@ -59,6 +67,11 @@ import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 import com.reversetutor.preview.wiring.session.BackgroundTurnPreparationCoordinator
 import com.reversetutor.preview.wiring.session.SessionConversationAssembly
+import com.reversetutor.preview.wiring.session.TopologyAwareMessageContextPort
+import com.reversetutor.preview.wiring.session.WindowVisibleHistoryReader
+import com.reversetutor.preview.wiring.session.WindowVisibleTimelinePortAdapter
+import com.reversetutor.preview.wiring.session.WindowBranchCoordinator
+import com.reversetutor.preview.wiring.session.SessionRichReplyPortAdapter
 
 data class HybridFrontendFactories(
     val workspaceViewModelFactory: WorkspaceViewModelFactory,
@@ -123,9 +136,12 @@ class HybridAppGraph private constructor(
     val llmProfileRepository: LlmProfileRepository,
     val chatGenerationRepository: ChatGenerationRepository,
     val sessionConversationAssembly: SessionConversationAssembly,
+    val visibleTimelinePort: WindowVisibleTimelinePort,
+    val windowBranchPort: WindowBranchPort,
     val backgroundGenerationRepository: BackgroundGenerationRepository,
     val backgroundTurnPreparationPort: BackgroundTurnPreparationPort,
     val heartbeatTurnDispatchPort: HeartbeatTurnDispatchPort,
+    val sessionRichReplyPort: SessionRichReplyPort,
     val sourceRepository: SourceRepository,
     val memoryRepository: MemoryRepository,
     val graphRepository: GraphRepository,
@@ -197,6 +213,18 @@ class HybridAppGraph private constructor(
             val sourceRepository = DataModule.sourceRepository(appContext)
             val memoryRepository = DataModule.memoryRepository(appContext)
             val graphRepository = DataModule.graphRepository(appContext)
+            val database = DataModule.database(appContext)
+            val windowTopologyRepository = WindowTopologyRepository(database.windowTopologyDao())
+            val windowHeartbeatRepository = WindowHeartbeatRepository(database.windowHeartbeatDao())
+            val sessionRichReplyPort: SessionRichReplyPort = SessionRichReplyPortAdapter(
+                AssistantReplyArtifactRepository(RoomAssistantReplyArtifactStore(database.sessionAgentDao()))
+            )
+            val newSessionPersistence = SharedPreferencesNewSessionPersistence(appContext)
+            val visibleHistoryReader = WindowVisibleHistoryReader(
+                readWindow = windowTopologyRepository::getWindow,
+                readSnapshot = windowTopologyRepository::getSnapshot,
+                listMessageRecords = messageRepository::listMessageRecords
+            )
             val sessionConversationAssembly = SessionConversationAssembly(
                 chatGenerationRepository = chatGenerationRepository,
                 messageRepository = messageRepository,
@@ -205,7 +233,8 @@ class HybridAppGraph private constructor(
                 memoryRepository = memoryRepository,
                 graphRepository = graphRepository,
                 sourceRepository = sourceRepository,
-                learningRepository = learningRepository
+                learningRepository = learningRepository,
+                messageContextPort = TopologyAwareMessageContextPort(visibleHistoryReader)
             )
             val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =
                 BackgroundTurnPreparationCoordinator(
@@ -219,6 +248,49 @@ class HybridAppGraph private constructor(
                         backgroundGenerationRepository.enqueueGenerationJob(input, now)
                     }
                 )
+            val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(
+                sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },
+                sessionTitle = { sessionId -> sessionRepository.getSession(sessionId)?.title },
+                readWindow = windowTopologyRepository::getWindow,
+                createTaskRoot = { sessionId, nowEpochMillis ->
+                    windowTopologyRepository.createRootWindow(
+                        sessionId = sessionId,
+                        kind = WindowKind.TASK_ROOT,
+                        nowEpochMillis = nowEpochMillis
+                    )
+                },
+                listWindows = windowTopologyRepository::listWindows,
+                loadSessionSnapshot = newSessionPersistence::loadSessionSnapshot,
+                createSession = { snapshot, sessionId, nowEpochMillis ->
+                    sessionRepository.createSession(
+                        input = snapshot.toCoreDraft().toCreationInput(),
+                        nowEpochMillis = nowEpochMillis,
+                        sessionId = sessionId
+                    )
+                    true
+                },
+                saveSessionSnapshot = newSessionPersistence::saveSessionSnapshot,
+                forkChild = { childId, parentId, revision, nowEpochMillis ->
+                    windowTopologyRepository.forkChild(childId, parentId, revision, nowEpochMillis)
+                    Unit
+                },
+                localMessageCount = { sessionId -> messageRepository.listMessageRecords(sessionId).size.toLong() },
+                rollbackChildSession = { sessionId ->
+                    sessionDeletionRepository.deleteSession(
+                        sessionId = sessionId,
+                        deletedAtEpochMillis = System.currentTimeMillis(),
+                        revision = System.currentTimeMillis(),
+                        idempotencyKey = "window-branch-create-rollback-$sessionId"
+                    )
+                    Unit
+                },
+                heartbeatFor = windowHeartbeatRepository::heartbeatFor,
+                enableChildHeartbeat = windowHeartbeatRepository::enableChildHeartbeat,
+                deleteHeartbeat = windowHeartbeatRepository::deleteHeartbeat,
+                cancelSessionGenerationJobs = backgroundGenerationRepository::cancelSessionGenerationJobs,
+                deleteBranch = { },
+                deleteAvailable = false
+            )
             return HybridAppGraph(
                 appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
                 sessionRepository = sessionRepository,
@@ -226,9 +298,12 @@ class HybridAppGraph private constructor(
                 llmProfileRepository = DataModule.llmProfileRepository(appContext),
                 chatGenerationRepository = chatGenerationRepository,
                 sessionConversationAssembly = sessionConversationAssembly,
+                visibleTimelinePort = WindowVisibleTimelinePortAdapter(visibleHistoryReader),
+                windowBranchPort = windowBranchPort,
                 backgroundGenerationRepository = backgroundGenerationRepository,
                 backgroundTurnPreparationPort = backgroundTurnPreparationPort,
                 heartbeatTurnDispatchPort = DefaultHeartbeatTurnDispatchPort(backgroundGenerationRepository),
+                sessionRichReplyPort = sessionRichReplyPort,
                 sourceRepository = sourceRepository,
                 memoryRepository = memoryRepository,
                 graphRepository = graphRepository,
@@ -251,7 +326,8 @@ class HybridAppGraph private constructor(
                     modelConnectionRepository = modelConnectionRepository,
                     learningRepository = learningRepository,
                     runCoordinator = runCoordinator,
-                    sessionConversationAssembly = sessionConversationAssembly
+                    sessionConversationAssembly = sessionConversationAssembly,
+                    newSessionPersistence = newSessionPersistence
                 )
             )
         }
@@ -294,12 +370,12 @@ class HybridAppGraph private constructor(
             modelConnectionRepository: ModelConnectionRepositoryImpl,
             learningRepository: LearningRepositoryImpl,
             runCoordinator: ConversationRunCoordinator,
-            sessionConversationAssembly: SessionConversationAssembly
+            sessionConversationAssembly: SessionConversationAssembly,
+            newSessionPersistence: NewSessionPersistence
         ): HybridFrontendFactories {
             val homePort = RepositoryHomePortAdapter {
                 sessionRepository.listSessions()
             }
-            val newSessionPersistence = SharedPreferencesNewSessionPersistence(context)
             val sessionHomePort = RepositorySessionHomePortAdapter(
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,

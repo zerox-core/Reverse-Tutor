@@ -87,6 +87,11 @@ import com.reversetutor.feature.chat.NewSessionPrefillRequest
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.feature.chat.SessionsRoute
+import com.reversetutor.feature.chat.WindowBranchAction
+import com.reversetutor.feature.chat.WindowBranchPanel
+import com.reversetutor.feature.chat.WindowBranchPresenter
+import com.reversetutor.feature.chat.WindowBranchResult
+import com.reversetutor.feature.chat.WindowBranchUiState
 import com.reversetutor.feature.chat.toSessionListItem
 import com.reversetutor.feature.memory.ContextHubRoute
 import com.reversetutor.feature.memory.GlobalGraphRoute
@@ -923,6 +928,7 @@ private fun DestinationContent(
     var pendingChatEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingGraphEvidenceTarget by remember { mutableStateOf<String?>(null) }
     var pendingSourceEvidenceTarget by remember { mutableStateOf<String?>(null) }
+    var windowBranchUiState by remember(activeSessionId) { mutableStateOf<WindowBranchUiState?>(null) }
     LaunchedEffect(destination) {
         // Evidence targets are one-time: clear them once the consuming screen is left
         // so a stale id cannot re-highlight on a later visit. Navigation is unchanged.
@@ -1121,6 +1127,15 @@ private fun DestinationContent(
         }
     }
 
+    LaunchedEffect(destination, activeSessionId) {
+        val sessionId = activeSessionId
+        if (destination == AppDestination.WindowBranches && sessionId != null) {
+            windowBranchUiState = runCatching {
+                WindowBranchPresenter.present(hybridAppGraph.windowBranchPort.load(sessionId))
+            }.getOrNull()
+        }
+    }
+
     val activeSessionSnapshot = remember(activeSessionId, sessionSettingsRefreshKey) {
         activeSessionId?.let(hybridAppGraph.frontend.newSessionPersistence::loadSessionSnapshot)
     }
@@ -1215,6 +1230,7 @@ private fun DestinationContent(
         if (destination == AppDestination.Chat && activeSessionId != null && activeSessionTitle != null) {
             ChatRoute(
                 messageRepository = messageRepository,
+                visibleTimelinePort = hybridAppGraph.visibleTimelinePort,
                 chatGenerationRepository = chatGenerationRepository,
                 backgroundGenerationRepository = backgroundGenerationRepository,
                 backgroundTurnPreparationPort = hybridAppGraph.backgroundTurnPreparationPort,
@@ -1297,6 +1313,9 @@ private fun DestinationContent(
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
                 onOpenContextHub = onOpenContextHub,
+                onOpenWindowBranches = {
+                    onNavigateDestination(AppDestination.WindowBranches)
+                },
                 onOpenSearch = { onNavigateDestination(AppDestination.ChatReferences) },
                 onOpenSessionSources = { onNavigateDestination(AppDestination.SessionSettingsSources) },
                 onOpenSessionSource = { sourceId ->
@@ -1351,6 +1370,82 @@ private fun DestinationContent(
                 onScrollPositionChanged = { chatScrollMemory.capture(activeSessionId, it) },
                 onBack = onOpenSessions
             )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.WindowBranches && activeSessionId != null) {
+            val state = windowBranchUiState
+            if (state == null) {
+                Text("分支信息暂不可用")
+            } else {
+                WindowBranchPanel(
+                    state = state,
+                    onAction = { action ->
+                        when (action) {
+                            WindowBranchAction.Back -> onOpenChat()
+                            WindowBranchAction.RequestDelete -> {
+                                if (state.deleteEnabled) {
+                                    windowBranchUiState = state.copy(deleteConfirmationVisible = true)
+                                }
+                            }
+                            WindowBranchAction.CancelDelete -> {
+                                windowBranchUiState = state.copy(deleteConfirmationVisible = false)
+                            }
+                            is WindowBranchAction.OpenWindow -> scope.launch {
+                                sessionRepository.getSession(action.windowId)
+                                    ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                                    ?.let(onOpenSession)
+                                    ?: run {
+                                        windowBranchUiState = state.copy(notice = "目标分支不可用，请返回后重试。")
+                                    }
+                            }
+                            WindowBranchAction.Create -> scope.launch {
+                                when (val result = hybridAppGraph.windowBranchPort.createChild(
+                                    com.reversetutor.feature.chat.CreateWindowBranchRequest(
+                                        parentWindowId = state.current.id,
+                                        title = "${state.current.title} · 分支"
+                                    )
+                                )) {
+                                    is WindowBranchResult.Created -> {
+                                        sessionRepository.getSession(result.child.id)
+                                            ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                                            ?.let(onOpenSession)
+                                            ?: run {
+                                                windowBranchUiState = state.copy(notice = "创建分支失败，请重试。")
+                                            }
+                                    }
+                                    else -> windowBranchUiState = state.copy(notice = "创建分支失败，请重试。")
+                                }
+                            }
+                            is WindowBranchAction.SetHeartbeat -> scope.launch {
+                                val result = hybridAppGraph.windowBranchPort.setHeartbeat(
+                                    state.current.id,
+                                    action.enabled
+                                )
+                                windowBranchUiState = if (result == WindowBranchResult.HeartbeatUpdated) {
+                                    WindowBranchPresenter.present(
+                                        hybridAppGraph.windowBranchPort.load(state.current.id)
+                                    )
+                                } else {
+                                    state.copy(notice = "主动对话状态更新失败，请重试。")
+                                }
+                            }
+                            WindowBranchAction.ConfirmDelete -> scope.launch {
+                                val result = hybridAppGraph.windowBranchPort.deleteChild(state.current.id)
+                                if (result is WindowBranchResult.Deleted) {
+                                    sessionRepository.getSession(result.parentWindowId)
+                                        ?.toSessionListItem(appPreferences.globalAvatarVisible)
+                                        ?.let(onOpenSession)
+                                } else {
+                                    windowBranchUiState = state.copy(
+                                        deleteConfirmationVisible = false,
+                                        notice = "删除能力暂不可用"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.ChatReferences && activeSessionId != null) {

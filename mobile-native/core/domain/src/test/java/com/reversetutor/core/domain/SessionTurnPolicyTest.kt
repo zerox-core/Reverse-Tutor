@@ -330,6 +330,37 @@ class SessionTurnPolicyTest {
         assertEquals(ActionTypeWire.EXAMINER_VERIFY, out.action.type)
     }
 
+    @Test
+    fun studyMisconceptionForcesCounterexampleChallenge() {
+        val output = SessionTurnPolicy.normalize(
+            SessionPolicyInput(
+                mode = SessionModeWire.STUDY,
+                userInput = "我确定这个规则永远成立",
+                misconception = "忽略定义域",
+                actionType = ActionTypeWire.ASK
+            )
+        )
+
+        assertEquals(ActionTypeWire.CHALLENGE, output.action.type)
+        assertEquals(StudentRoleWire.CONFUSED_STUDENT, output.action.studentRole)
+    }
+
+    @Test
+    fun understoodClaimRequiresExaminerVerificationWithoutMasteryEvidence() {
+        val output = SessionTurnPolicy.normalize(
+            SessionPolicyInput(
+                mode = SessionModeWire.STUDY,
+                userInput = "我懂了",
+                evidenceType = MasteryEvidenceTypeWire.TRANSFER,
+                evidenceStatus = MasteryEvidenceStatusWire.PASSED
+            )
+        )
+
+        assertEquals(ActionTypeWire.EXAMINER_VERIFY, output.action.type)
+        assertEquals(MasteryEvidenceTypeWire.NONE, output.evaluation.evidence.type)
+        assertEquals(MasteryEvidenceStatusWire.NONE, output.evaluation.evidence.status)
+    }
+
     // --- force probe --------------------------------------------------------
 
     @Test

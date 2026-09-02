@@ -116,17 +116,28 @@ object SessionTurnPolicy {
             warnings.add("action overridden by forceProbe to 'probe'")
         }
 
-        // 5e. no_entry + ask/probe/next/recap → clue
+        // 5e. A declared misconception is always corrected through a
+        // counterexample challenge. Summary-only timing may later turn it
+        // into a recap, preserving the existing deferred-correction rule.
+        if (
+            mode == SessionModeWire.STUDY &&
+            SessionTurnContracts.normalizeMisconception(input.misconception).isNotBlank()
+        ) {
+            actionType = ActionTypeWire.CHALLENGE
+            warnings.add("action overridden by misconception to 'challenge'")
+        }
+
+        // 5f. no_entry + ask/probe/next/recap → clue
         if (entryStatus == EntryStatusWire.NO_ENTRY && actionType in NO_ENTRY_REWRITE_ACTIONS) {
             actionType = ActionTypeWire.CLUE
         }
 
-        // 5f. has_entry + clue/scaffold_example → probe
+        // 5g. has_entry + clue/scaffold_example → probe
         if (entryStatus == EntryStatusWire.HAS_ENTRY && actionType in HAS_ENTRY_REWRITE_ACTIONS) {
             actionType = ActionTypeWire.PROBE
         }
 
-        // 5g. If still not in allowed → fallback
+        // 5h. If still not in allowed → fallback
         if (actionType !in allowed) {
             actionType = fallbackActionForMode(mode, input.userInput, understood)
             warnings.add("action not in whitelist, fallback to '$actionType'")
@@ -173,7 +184,11 @@ object SessionTurnPolicy {
         } else {
             val requestedEvidenceType = SessionTurnContracts.normalizeEvidenceType(input.evidenceType)
             val requestedEvidenceStatus = SessionTurnContracts.normalizeEvidenceStatus(input.evidenceStatus)
-            if (
+            if (actionType == ActionTypeWire.EXAMINER_VERIFY) {
+                evidenceType = MasteryEvidenceTypeWire.NONE
+                evidenceStatus = MasteryEvidenceStatusWire.NONE
+                evidenceReason = "verification turn does not update mastery"
+            } else if (
                 requestedEvidenceType == MasteryEvidenceTypeWire.NONE &&
                 actionType == ActionTypeWire.PROBE &&
                 SessionTurnContracts.clamp01(input.correctness) >= 0.35f &&

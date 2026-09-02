@@ -3,6 +3,7 @@ package com.reversetutor.feature.chat
 import com.reversetutor.core.data.message.MessageQuoteDraft
 import com.reversetutor.core.data.message.MessageRecord
 import com.reversetutor.core.data.message.MessageAttachmentDraft
+import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageRole
 
 data class ChatUiState(
@@ -85,6 +86,54 @@ data class ChatUiState(
                 pendingDeletionRetryRequired = pendingDeletionRetryRequired
             )
         }
+
+        fun fromTimeline(
+            sessionTitle: String,
+            entries: List<WindowVisibleTimelineEntry>,
+            composer: ChatComposerState,
+            generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
+            learnerName: String = "林澈",
+            learnerStatus: String = "正在理解函数",
+            contextPath: String = "基础语法 / 函数 / 参数与返回值",
+            sessionSnapshot: NewSessionConfiguration? = null,
+            sources: List<ChatSourceUi> = emptyList(),
+            currentSessionSourceIds: Set<String> = emptySet(),
+            rememberedMessageIds: Set<String> = emptySet(),
+            pendingDeletion: PendingChatMessageDeletion? = null,
+            pendingDeletionRetryRequired: Boolean = false
+        ): ChatUiState {
+            val resolvedName = sessionSnapshot?.learnerDisplayName?.takeIf(String::isNotBlank) ?: learnerName
+            val resolvedStatus = sessionSnapshot?.learnerRole?.takeIf(String::isNotBlank) ?: learnerStatus
+            return ChatUiState(
+                sessionTitle = sessionTitle,
+                learnerName = resolvedName,
+                learnerStatus = resolvedStatus,
+                contextPath = contextPath,
+                messages = entries.sortedBy { it.createdAtEpochMillis }.map { entry ->
+                    ChatTimelineItem(
+                        id = entry.id,
+                        spaceId = entry.spaceId,
+                        role = entry.role,
+                        roleLabel = entry.role.toChatLabel(resolvedName),
+                        text = entry.text,
+                        createdAtEpochMillis = entry.createdAtEpochMillis,
+                        attachmentLabels = entry.attachmentLabels,
+                        attachments = entry.attachments,
+                        quoteLabel = entry.quoteLabel,
+                        remembered = entry.id in rememberedMessageIds,
+                        inheritedReadOnly = entry.origin == WindowTimelineOrigin.INHERITED_READ_ONLY
+                    )
+                },
+                composer = composer,
+                generation = generation,
+                learnerImageRef = sessionSnapshot?.learnerImageRef,
+                avatarVisible = sessionSnapshot?.avatarVisible ?: true,
+                sources = sources,
+                currentSessionSourceIds = currentSessionSourceIds,
+                pendingDeletion = pendingDeletion,
+                pendingDeletionRetryRequired = pendingDeletionRetryRequired
+            )
+        }
     }
 }
 
@@ -134,6 +183,43 @@ sealed interface ChatGenerationUiState {
     }
 }
 
+/**
+ * Feature-contract mapping from a persisted background job status to the safe
+ * chat generation UI state. Only white-listed failure reasons are surfaced:
+ * any other persisted text (an unknown, legacy or unexpected value) degrades
+ * to a fixed generic label, so URLs, Authorization headers, keys or exception
+ * class names can never reach the chat screen.
+ */
+fun backgroundGenerationUiState(
+    status: BackgroundJobStatus,
+    errorMessage: String?
+): ChatGenerationUiState = when (status) {
+    BackgroundJobStatus.Failed -> when (errorMessage) {
+        NoModelConfiguredReason -> ChatGenerationUiState.NoModel
+        else -> ChatGenerationUiState.Failure(
+            SafeBackgroundFailureLabels[errorMessage] ?: GenericGenerationFailureLabel
+        )
+    }
+    BackgroundJobStatus.Cancelled,
+    BackgroundJobStatus.Discarded,
+    BackgroundJobStatus.Completed -> ChatGenerationUiState.Idle
+    BackgroundJobStatus.Queued,
+    BackgroundJobStatus.Running -> ChatGenerationUiState.Pending
+}
+
+internal const val NoModelConfiguredReason = "No model configured"
+internal const val GenericGenerationFailureLabel = "后台生成失败"
+
+/** Persisted background failure reasons mapped to fixed, user-safe Chinese labels. */
+private val SafeBackgroundFailureLabels: Map<String, String> = mapOf(
+    "background_generation_failed" to "生成失败，请稍后重试",
+    "Session is unavailable" to "会话不可用，生成已取消",
+    "Generation token is stale" to "生成请求已过期",
+    "Initiative plan expired" to "主动消息已过期",
+    "Invalid generation job" to "生成任务无效",
+    "Vision input unsupported" to "当前模型不支持图片输入"
+)
+
 data class ChatTimelineItem(
     val id: String,
     val spaceId: String,
@@ -144,7 +230,8 @@ data class ChatTimelineItem(
     val attachmentLabels: List<String>,
     val attachments: List<ChatAttachmentUi>,
     val quoteLabel: String?,
-    val remembered: Boolean = false
+    val remembered: Boolean = false,
+    val inheritedReadOnly: Boolean = false
 )
 
 data class ChatAttachmentUi(
@@ -263,6 +350,18 @@ enum class ChatMessageAction(
     Remember("记住这条"),
     LocateSource("定位关联资料"),
     Delete("删除消息")
+}
+
+object ChatMessageActionPolicy {
+    fun actionsFor(item: ChatTimelineItem): List<ChatMessageAction> =
+        if (!item.inheritedReadOnly) {
+            ChatMessageAction.entries
+        } else {
+            buildList {
+                add(ChatMessageAction.Copy)
+                if (item.attachments.any { it.sourceId != null }) add(ChatMessageAction.LocateSource)
+            }
+        }
 }
 
 private fun MessageRole.toChatLabel(learnerName: String): String =

@@ -10,6 +10,7 @@ import com.reversetutor.core.data.local.entity.BackgroundJobEntity
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
+import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationRuntime
@@ -110,6 +111,17 @@ class BackgroundGenerationRepository(
 
     suspend fun getJob(jobId: String): BackgroundGenerationJob? =
         backgroundJobDao.getById(jobId)?.toGenerationJob()
+
+    /**
+     * Reattaches a reopened chat screen to its latest still-active job. This is
+     * read-only: startup recovery remains responsible for changing an
+     * interrupted Running row back to Queued and scheduling its Worker.
+     */
+    suspend fun findActiveJobForSession(sessionId: String): BackgroundGenerationJob? =
+        backgroundJobDao.listGenerationBySession(sessionId.trim())
+            .asReversed()
+            .firstOrNull { it.status in ActiveStatuses }
+            ?.toGenerationJob()
 
     suspend fun recoverInterruptedGenerationJobs(nowEpochMillis: Long): List<BackgroundGenerationJob> {
         val runnable = backgroundJobDao.listGenerationByStatuses(
@@ -250,7 +262,8 @@ class BackgroundGenerationRepository(
                 )
                 BackgroundGenerationOutcome.Completed(
                     assistantMessageId = outcome.assistantMessageId,
-                    structuredOutcome = buildStructuredOutcome(job)
+                    structuredOutcome = buildStructuredOutcome(job),
+                    replyEnvelope = outcome.replyEnvelope
                 )
             }
             is ChatGenerationOutcome.ProviderFailed -> fail(running, nowEpochMillis, ProviderFailureReason)
@@ -433,7 +446,9 @@ data class BackgroundGenerationJob(
 sealed interface BackgroundGenerationOutcome {
     data class Completed(
         val assistantMessageId: String,
-        val structuredOutcome: StructuredTurnOutcome = StructuredTurnOutcome.EMPTY
+        val structuredOutcome: StructuredTurnOutcome = StructuredTurnOutcome.EMPTY,
+        /** Ephemeral P3 output; durable artifacts are added only by the P6 slice. */
+        val replyEnvelope: LlmAssistantReplyEnvelope? = null
     ) : BackgroundGenerationOutcome
     data class Failed(val message: String) : BackgroundGenerationOutcome
     data class Discarded(val reason: String) : BackgroundGenerationOutcome

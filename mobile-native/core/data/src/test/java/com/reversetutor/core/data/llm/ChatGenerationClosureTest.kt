@@ -10,6 +10,7 @@ import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.local.entity.LlmProfileEntity
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.llm.LlmCapabilities
+import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationResult
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
@@ -19,6 +20,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -219,6 +221,57 @@ class ChatGenerationClosureTest {
         assertTrue(session1Messages.isEmpty())
     }
 
+    @Test
+    fun noModelConfigurationNeverInvokesRuntime() = runBlocking {
+        val countingRuntime = RouteACountingRuntime(LlmGenerationResult.Success("Should never be generated"))
+        val fixture = fixture(
+            profileDao = RouteAFakeLlmProfileDao(),
+            runtime = countingRuntime
+        )
+        val outcome = fixture.repository.generateReply(
+            input = input(token = "token-no-model"),
+            nowEpochMillis = 1000L,
+            isTokenCurrent = { true }
+        )
+        assertEquals(ChatGenerationOutcome.NoModelConfigured, outcome)
+        assertEquals(0, countingRuntime.callCount)
+        assertTrue(fixture.messageDao.messages.isEmpty())
+    }
+
+    @Test
+    fun richReplyKeepsEvidenceOutOfPersistedAssistantText() = runBlocking {
+        val fixture = fixture(
+            runtime = RouteAStaticRuntime(
+                LlmGenerationResult.Success(
+                    """{"version":"v1","blocks":[{"type":"paragraph","text":"先看定义域。"}],"evidenceReferenceIds":["source-1"],"toolCalls":[],"outcome":{}}"""
+                )
+            )
+        )
+        val outcome = fixture.repository.generateReply(
+            input = input(token = "token-rich").copy(
+                contextEvidence = listOf(
+                    LlmContextEvidence(
+                        id = "source-1",
+                        title = "定义域提示",
+                        body = "先检查变量取值范围。",
+                        kind = "Source"
+                    )
+                )
+            ),
+            nowEpochMillis = 1100L,
+            isTokenCurrent = { true }
+        )
+
+        assertTrue(outcome is ChatGenerationOutcome.Generated)
+        assertEquals(
+            listOf("source-1"),
+            (outcome as ChatGenerationOutcome.Generated).replyEnvelope!!.evidenceReferenceIds
+        )
+        val persisted = fixture.messageRepository.listMessages("session-1").single().text
+        assertEquals("先看定义域。", persisted)
+        assertFalse(persisted.contains("Sources:"))
+    }
+
     private fun fixture(
         profileDao: RouteAFakeLlmProfileDao = RouteAFakeLlmProfileDao.withActiveProfile(),
         runtime: LlmGenerationRuntime = RouteAStaticRuntime(LlmGenerationResult.Success("Mock generation ready"))
@@ -328,6 +381,18 @@ private class RouteAStaticRuntime(
     private val result: LlmGenerationResult
 ) : LlmGenerationRuntime {
     override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult = result
+}
+
+private class RouteACountingRuntime(
+    private val result: LlmGenerationResult
+) : LlmGenerationRuntime {
+    var callCount = 0
+        private set
+
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+        callCount += 1
+        return result
+    }
 }
 
 private class RouteASuspendedRuntime(

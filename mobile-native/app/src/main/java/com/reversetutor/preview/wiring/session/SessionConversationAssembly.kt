@@ -9,6 +9,7 @@ import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.domain.ConversationContextAssembler
 import com.reversetutor.core.domain.ConversationContextContract
+import com.reversetutor.core.domain.MessageContextPort
 import com.reversetutor.core.domain.ConversationRunRepository
 import com.reversetutor.core.domain.ConversationSessionCoordinator
 import com.reversetutor.core.domain.LearningOverviewCoordinator
@@ -50,6 +51,7 @@ class SessionConversationAssembly(
     private val graphRepository: GraphRepository,
     private val sourceRepository: SourceRepository,
     private val learningRepository: LearningRepositoryImpl,
+    private val messageContextPort: MessageContextPort = MessageContextPortAdapter(messageRepository),
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
 
@@ -78,7 +80,7 @@ class SessionConversationAssembly(
         )
 
     private val contextAssembler: ConversationContextAssembler = ConversationContextAssembler(
-        messagePort = MessageContextPortAdapter(messageRepository),
+        messagePort = messageContextPort,
         memoryPort = MemoryContextPortAdapter(memoryRepository),
         errorPort = ErrorContextPortAdapter(memoryRepository),
         graphPort = GraphContextPortAdapter(graphRepository),

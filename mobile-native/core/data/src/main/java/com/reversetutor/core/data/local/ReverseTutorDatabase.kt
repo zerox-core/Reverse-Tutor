@@ -25,6 +25,7 @@ import com.reversetutor.core.data.local.dao.LearningLedgerDao
 import com.reversetutor.core.data.local.dao.CompanionMemoryDao
 import com.reversetutor.core.data.local.dao.WindowHeartbeatDao
 import com.reversetutor.core.data.local.dao.WorldTreeDao
+import com.reversetutor.core.data.local.dao.SessionAgentDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
 import com.reversetutor.core.data.local.entity.ErrorLogEntity
@@ -68,6 +69,13 @@ import com.reversetutor.core.data.local.entity.ScopeSignalEntity
 import com.reversetutor.core.data.local.entity.CompanionMemoryVersionEntity
 import com.reversetutor.core.data.local.entity.MemoryObservationEntity
 import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
+import com.reversetutor.core.data.local.entity.AssistantReplyArtifactEntity
+import com.reversetutor.core.data.local.entity.SessionDocumentEntity
+import com.reversetutor.core.data.local.entity.SessionDocumentBlockEntity
+import com.reversetutor.core.data.local.entity.SessionTableEntity
+import com.reversetutor.core.data.local.entity.SessionTableColumnEntity
+import com.reversetutor.core.data.local.entity.SessionTableRowEntity
+import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
 
 @Database(
     entities = [
@@ -113,7 +121,14 @@ import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
         ScopeSignalEntity::class,
         CompanionMemoryVersionEntity::class,
         MemoryObservationEntity::class,
-        WindowHeartbeatEntity::class
+        WindowHeartbeatEntity::class,
+        AssistantReplyArtifactEntity::class,
+        SessionDocumentEntity::class,
+        SessionDocumentBlockEntity::class,
+        SessionTableEntity::class,
+        SessionTableColumnEntity::class,
+        SessionTableRowEntity::class,
+        ToolCallReceiptEntity::class
     ],
     version = DatabaseSchema.version,
     exportSchema = DatabaseSchema.exportSchema
@@ -142,4 +157,5 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun learningLedgerDao(): LearningLedgerDao
     abstract fun companionMemoryDao(): CompanionMemoryDao
     abstract fun windowHeartbeatDao(): WindowHeartbeatDao
+    abstract fun sessionAgentDao(): SessionAgentDao
 }

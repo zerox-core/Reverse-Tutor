@@ -95,6 +95,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -154,6 +155,7 @@ internal fun ReverseTeachingChatScreen(
     onOpenExternalLink: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit,
     onOpenContextHub: () -> Unit,
+    onOpenWindowBranches: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
@@ -220,6 +222,7 @@ internal fun ReverseTeachingChatScreen(
             state = state,
             onBack = onBack,
             onOpenSettings = onOpenContextHub,
+            onOpenWindowBranches = onOpenWindowBranches,
             onOpenSearch = onOpenSearch,
             onOpenSessionSettings = onOpenSessionSettings,
             onOverflowAction = { action ->
@@ -419,6 +422,7 @@ internal fun ReverseTeachingChatScreen(
             onDismiss = { actionMessage = null },
             onAction = { action ->
                 actionMessage = null
+                if (action !in ChatMessageActionPolicy.actionsFor(item)) return@ChatMessageActionSheet
                 if (action == ChatMessageAction.LocateSource && item.attachments.mapNotNull { it.sourceId }.distinct().size > 1) {
                     locateSourceMessage = item
                 } else {
@@ -470,6 +474,7 @@ private fun ReverseTeachingChatHeader(
     state: ChatUiState,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWindowBranches: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenSessionSettings: () -> Unit,
     onOverflowAction: (ChatOverflowAction) -> Unit
@@ -544,6 +549,14 @@ private fun ReverseTeachingChatHeader(
                 filled = true
             )
             Spacer(Modifier.width(6.dp))
+            FormalHeaderIconButton(
+                imageVector = Icons.Rounded.AccountTree,
+                contentDescription = "管理分支",
+                onClick = onOpenWindowBranches,
+                filled = false,
+                modifier = Modifier.testTag("chat-window-branches")
+            )
+            Spacer(Modifier.width(6.dp))
             Box {
                 FormalHeaderIconButton(
                     imageVector = Icons.Rounded.MoreVert,
@@ -575,11 +588,12 @@ private fun FormalHeaderIconButton(
     imageVector: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    filled: Boolean
+    filled: Boolean,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .size(44.dp)
             .then(
                 if (filled) {
@@ -741,6 +755,7 @@ private fun UserTimelineMessage(
                 item.attachments.forEach {
                     MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
                 }
+                if (item.inheritedReadOnly) InheritedMessageLabel()
                 if (item.remembered) RememberedMessageLabel()
             }
             Spacer(Modifier.width(10.dp))
@@ -818,11 +833,17 @@ private fun LearnerTimelineMessage(
                 item.attachments.forEach {
                     MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
                 }
+                if (item.inheritedReadOnly) InheritedMessageLabel()
                 if (item.remembered) RememberedMessageLabel()
             }
             if (selected) MessageMetadataRow(item)
         }
     }
+}
+
+@Composable
+private fun InheritedMessageLabel() {
+    Text("来自父分支历史", color = ChatMuted, fontSize = 10.sp)
 }
 
 @Composable
@@ -1228,7 +1249,7 @@ private fun ChatMessageActionSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(item.roleLabel, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp), color = ChatMuted, fontSize = 12.sp)
-        ChatMessageAction.entries.forEach { action ->
+        ChatMessageActionPolicy.actionsFor(item).forEach { action ->
             Surface(onClick = { onAction(action) }, modifier = Modifier.fillMaxWidth(), color = Color.Transparent) {
                 Text(
                     action.label,

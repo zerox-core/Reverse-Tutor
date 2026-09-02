@@ -159,6 +159,49 @@ data class StructuredTurnOutcome(
     )
 }
 
+sealed interface LlmRichContentBlock {
+    data class Heading(val level: Int, val text: String) : LlmRichContentBlock
+    data class Paragraph(val text: String) : LlmRichContentBlock
+    data class BulletList(val items: List<String>) : LlmRichContentBlock
+    data class NumberedList(val items: List<String>) : LlmRichContentBlock
+    data class CodeBlock(val language: String?, val code: String) : LlmRichContentBlock
+    data class Callout(val kind: String, val text: String) : LlmRichContentBlock
+    data class SimpleTable(val columns: List<String>, val rows: List<List<String>>) : LlmRichContentBlock
+}
+
+data class LlmToolCall(
+    val callId: String,
+    val name: String,
+    val argumentsJson: String
+)
+
+/**
+ * Validated user-visible reply structure. References are opaque handles only;
+ * tool calls remain unexecuted until the session-scoped registry authorizes
+ * them. This contract never carries retrieval bodies or Provider diagnostics.
+ */
+data class LlmAssistantReplyEnvelope(
+    val blocks: List<LlmRichContentBlock>,
+    val evidenceReferenceIds: List<String> = emptyList(),
+    val toolCalls: List<LlmToolCall> = emptyList(),
+    val outcome: StructuredTurnOutcome = StructuredTurnOutcome.EMPTY
+)
+
+fun LlmAssistantReplyEnvelope.timelineText(): String = blocks.joinToString("\n\n") { block ->
+    when (block) {
+        is LlmRichContentBlock.Heading -> block.text
+        is LlmRichContentBlock.Paragraph -> block.text
+        is LlmRichContentBlock.BulletList -> block.items.joinToString("\n") { "• $it" }
+        is LlmRichContentBlock.NumberedList -> block.items.mapIndexed { index, item -> "${index + 1}. $item" }.joinToString("\n")
+        is LlmRichContentBlock.CodeBlock -> block.code
+        is LlmRichContentBlock.Callout -> block.text
+        is LlmRichContentBlock.SimpleTable -> buildString {
+            append(block.columns.joinToString(" | "))
+            block.rows.forEach { row -> append("\n").append(row.joinToString(" | ")) }
+        }
+    }
+}.trim()
+
 data class LlmContextEvidence(
     val id: String,
     val title: String,

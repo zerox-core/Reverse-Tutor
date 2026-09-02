@@ -4,7 +4,10 @@ import com.reversetutor.core.data.model.ExecutionModelConfiguration
 import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.llm.LlmCapabilities
+import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
 import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
+import com.reversetutor.core.llm.LlmAssistantReplyEnvelopeParser
+import com.reversetutor.core.llm.timelineText
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationBlockReason
 import com.reversetutor.core.llm.LlmGenerationPlan
@@ -71,6 +74,11 @@ class ChatGenerationRepository(
                 if (replyText.isBlank()) {
                     ChatGenerationOutcome.ProviderFailed("Empty response")
                 } else {
+                    val parsedReply = LlmAssistantReplyEnvelopeParser.parseValidated(
+                        rawText = replyText,
+                        allowedEvidenceIds = input.contextEvidence.mapNotNull { it.normalized()?.id }.toSet()
+                    )
+                    val timelineText = parsedReply?.timelineText() ?: replyText
                     val assistantMessageId = "assistant-${input.token.value}"
                     messageRepository.saveMessage(
                         Message(
@@ -78,11 +86,11 @@ class ChatGenerationRepository(
                             spaceId = input.spaceId?.trim()?.ifEmpty { null } ?: activeProfile.spaceId,
                             sessionId = input.sessionId,
                             role = MessageRole.Assistant,
-                            text = replyText.withCitationFooter(input.contextEvidence),
+                            text = timelineText,
                             createdAtEpochMillis = nowEpochMillis
                         )
                     )
-                    ChatGenerationOutcome.Generated(assistantMessageId)
+                    ChatGenerationOutcome.Generated(assistantMessageId, parsedReply)
                 }
             }
             is LlmGenerationResult.Failure -> {
@@ -150,7 +158,10 @@ private fun ModelProtocol.toLegacyProvider(): LlmProviderKind = when (this) {
 }
 
 sealed interface ChatGenerationOutcome {
-    data class Generated(val assistantMessageId: String) : ChatGenerationOutcome
+    data class Generated(
+        val assistantMessageId: String,
+        val replyEnvelope: LlmAssistantReplyEnvelope? = null
+    ) : ChatGenerationOutcome
     data class ProviderFailed(val message: String) : ChatGenerationOutcome
     object NoModelConfigured : ChatGenerationOutcome
     object UnsupportedVision : ChatGenerationOutcome
@@ -164,17 +175,3 @@ private fun LlmGenerationBlockReason.toOutcome(): ChatGenerationOutcome =
         LlmGenerationBlockReason.UnsupportedVision -> ChatGenerationOutcome.UnsupportedVision
         LlmGenerationBlockReason.BlankPrompt -> ChatGenerationOutcome.BlankPrompt
     }
-
-private fun String.withCitationFooter(evidence: List<LlmContextEvidence>): String {
-    val citations = evidence
-        .mapNotNull { it.normalized() }
-        .take(6)
-    if (citations.isEmpty()) return this
-    val footer = citations.mapIndexed { index, item ->
-        val target = listOfNotNull(item.sourceMessageId, item.sourceId)
-            .joinToString(separator = ", ")
-            .ifBlank { item.id }
-        "[${index + 1}] ${item.title} ($target)"
-    }.joinToString(separator = "\n")
-    return trimEnd() + "\n\nSources:\n" + footer
-}

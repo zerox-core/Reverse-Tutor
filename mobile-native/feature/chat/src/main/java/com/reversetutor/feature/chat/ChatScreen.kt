@@ -84,6 +84,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatRoute(
     messageRepository: MessageRepository,
+    visibleTimelinePort: WindowVisibleTimelinePort? = null,
     chatGenerationRepository: ChatGenerationRepository? = null,
     backgroundGenerationRepository: BackgroundGenerationRepository? = null,
     backgroundTurnPreparationPort: BackgroundTurnPreparationPort = BackgroundTurnPreparationPort.Unavailable,
@@ -120,6 +121,7 @@ fun ChatRoute(
     onProviderGenerationFailed: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
+    onOpenWindowBranches: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenSessionSources: () -> Unit = {},
     onOpenSessionSource: (String?) -> Unit = {},
@@ -138,6 +140,7 @@ fun ChatRoute(
 ) {
     val scope = rememberCoroutineScope()
     var records by remember(sessionId) { mutableStateOf(emptyList<MessageRecord>()) }
+    var visibleTimelineEntries by remember(sessionId) { mutableStateOf(emptyList<WindowVisibleTimelineEntry>()) }
     val restoredDraft = remember(sessionId, draftStore) {
         draftStore.load(sessionId) ?: ChatComposerDraft()
     }
@@ -216,10 +219,12 @@ fun ChatRoute(
     }
 
     LaunchedEffect(sessionId, refreshKey) {
-        val loadedRecords = applyStoredAttachmentOrder(
-            messageRepository.listMessageRecords(sessionId),
-            attachmentOrderStore
-        )
+        val loadedRecords = if (visibleTimelinePort == null) {
+            applyStoredAttachmentOrder(messageRepository.listMessageRecords(sessionId), attachmentOrderStore)
+        } else {
+            emptyList()
+        }
+        val loadedTimeline = visibleTimelinePort?.load(sessionId).orEmpty()
         val restoredPending = pendingDeletionStore.load(sessionId)
         if (restoredPending != null && System.currentTimeMillis() >= restoredPending.expiresAtEpochMillis) {
             pendingDeletionRetryRequired = when (
@@ -230,10 +235,12 @@ fun ChatRoute(
             }
             pendingDeletion = pendingDeletionStore.load(sessionId)
             records = loadedRecords.filterNot { it.message.id == restoredPending.messageId }
+            visibleTimelineEntries = loadedTimeline.filterNot { it.id == restoredPending.messageId }
         } else {
             pendingDeletion = restoredPending
             pendingDeletionRetryRequired = false
             records = loadedRecords.filterNot { it.message.id == restoredPending?.messageId }
+            visibleTimelineEntries = loadedTimeline.filterNot { it.id == restoredPending?.messageId }
         }
         sourceItems = sourceRepository?.listSourcesWithChunks()?.map { source ->
             ChatSourceUi(
@@ -251,6 +258,17 @@ fun ChatRoute(
             )
         }.orEmpty()
         rememberedMessageIds = rememberedMessageStore.loadRememberedMessageIds()
+        // The id was previously held only in Compose state. After leaving and
+        // reopening a chat, restore the persisted queued/running job so the
+        // page keeps observing the same Worker-owned turn instead of showing
+        // the already-persisted user message as an orphan.
+        if (activeBackgroundJobId == null) {
+            backgroundGenerationRepository?.findActiveJobForSession(sessionId)?.let { activeJob ->
+                activeGenerationToken = activeJob.token
+                activeBackgroundJobId = activeJob.id
+                generation = backgroundGenerationUiState(activeJob.status, activeJob.errorMessage)
+            }
+        }
     }
 
     LaunchedEffect(pendingDeletion?.messageId, pendingDeletion?.expiresAtEpochMillis) {
@@ -322,8 +340,8 @@ fun ChatRoute(
         }
     }
 
-    ChatScreen(
-        state = buildChatRouteUiState(
+    val routeState = if (visibleTimelinePort == null) {
+        buildChatRouteUiState(
             sessionTitle = sessionTitle,
             records = records,
             composer = composer,
@@ -335,7 +353,25 @@ fun ChatRoute(
             rememberedMessageIds = rememberedMessageIds,
             pendingDeletion = pendingDeletion,
             pendingDeletionRetryRequired = pendingDeletionRetryRequired
-        ),
+        )
+    } else {
+        ChatUiState.fromTimeline(
+            sessionTitle = sessionTitle,
+            entries = visibleTimelineEntries,
+            composer = composer,
+            generation = generation,
+            learnerStatus = learnerRole,
+            sessionSnapshot = sessionSnapshot,
+            sources = sourceItems,
+            currentSessionSourceIds = availableSourceAttachments.mapNotNullTo(linkedSetOf()) { it.sourceId },
+            rememberedMessageIds = rememberedMessageIds,
+            pendingDeletion = pendingDeletion,
+            pendingDeletionRetryRequired = pendingDeletionRetryRequired
+        )
+    }
+
+    ChatScreen(
+        state = routeState,
         sessionContract = sessionContract,
         onAssistantInteraction = { interaction ->
             when (interaction) {
@@ -517,6 +553,7 @@ fun ChatRoute(
                     pendingDeletion = result.pending
                     pendingDeletionRetryRequired = false
                     records = records.filterNot { it.message.id == current.messageId }
+                    visibleTimelineEntries = visibleTimelineEntries.filterNot { it.id == current.messageId }
                     onPendingDeletionChanged()
                 }
                 is ChatDeletionRequestResult.AlreadyPending -> {
@@ -611,6 +648,7 @@ fun ChatRoute(
         onOpenExternalLink = onOpenExternalLink,
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
+        onOpenWindowBranches = onOpenWindowBranches,
         onOpenSearch = onOpenSearch,
         onOpenSources = onOpenSources,
         onExport = onExport,
@@ -721,6 +759,7 @@ fun ChatScreen(
     onOpenExternalLink: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit = {},
+    onOpenWindowBranches: () -> Unit = {},
     onOpenSearch: () -> Unit = {},
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
@@ -772,6 +811,7 @@ fun ChatScreen(
         onOpenExternalLink = onOpenExternalLink,
         onComposerFocusChanged = onComposerFocusChanged,
         onOpenContextHub = onOpenContextHub,
+        onOpenWindowBranches = onOpenWindowBranches,
         onOpenModelSettings = onOpenModelSettings,
         onOpenSources = onOpenSources,
         onExport = onExport,
@@ -1410,15 +1450,4 @@ private val TerminalGenerationStatuses = setOf(
 )
 
 private fun BackgroundJobStatus.toUiState(errorMessage: String?): ChatGenerationUiState =
-    when (this) {
-        BackgroundJobStatus.Failed -> if (errorMessage == "No model configured") {
-            ChatGenerationUiState.NoModel
-        } else {
-            ChatGenerationUiState.Failure(errorMessage ?: "后台生成失败")
-        }
-        BackgroundJobStatus.Cancelled,
-        BackgroundJobStatus.Discarded,
-        BackgroundJobStatus.Completed -> ChatGenerationUiState.Idle
-        BackgroundJobStatus.Queued,
-        BackgroundJobStatus.Running -> ChatGenerationUiState.Pending
-    }
+    backgroundGenerationUiState(this, errorMessage)

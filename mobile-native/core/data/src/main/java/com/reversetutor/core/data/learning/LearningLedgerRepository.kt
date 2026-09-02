@@ -31,6 +31,22 @@ class LearningLedgerRepository(
         return receipt
     }
 
+    /**
+     * Durable post-turn projection guard. The same background job may be
+     * replayed after process death, but it must never create a second learning
+     * fact for the same window and turn id.
+     */
+    suspend fun appendLearningFactIfAbsent(
+        receipt: LearningFactReceipt,
+        spaceId: String = defaultSpaceId
+    ): Boolean {
+        if (dao.hasFactForTurn(receipt.sourceWindowId, receipt.sourceTurnId)) return false
+        return runCatching {
+            dao.insertReceipt(receipt.toEntity(spaceId))
+            true
+        }.getOrDefault(false)
+    }
+
     suspend fun listLearningFacts(spaceId: String = defaultSpaceId): List<LearningFactReceipt> =
         dao.listFactsBySpace(spaceId).map { it.toDomain() }
 

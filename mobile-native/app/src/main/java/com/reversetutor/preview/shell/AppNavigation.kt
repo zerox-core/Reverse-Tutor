@@ -7,6 +7,7 @@ enum class AppDestination(
 ) {
     Sessions("sessions", "会话", "会话列表 · 本地优先"),
     Chat("chat", "聊天", "当前学习会话"),
+    WindowBranches("window-branches", "分支管理", "当前会话分支"),
     ChatReferences("chat-references", "资料与引用", "当前会话查询"),
     ContextHub("brain", "学习大脑", "全局图谱和薄弱节点"),
     WeeklyDashboard("weekly-dashboard", "本周", "跨会话学习概览"),
@@ -81,6 +82,11 @@ data class AppNavigationState(
         val nextStack = when (destination) {
             AppDestination.Sessions -> listOf(AppDestination.Sessions)
             AppDestination.Chat -> listOf(AppDestination.Sessions, AppDestination.Chat)
+            AppDestination.WindowBranches -> listOf(
+                AppDestination.Sessions,
+                AppDestination.Chat,
+                AppDestination.WindowBranches
+            )
             AppDestination.ContextHub -> listOf(
                 AppDestination.Sessions,
                 AppDestination.Chat,
@@ -155,6 +161,13 @@ data class AppNavigationState(
         if (current == AppDestination.Chat) {
             return BackTransition(
                 copy(backStack = listOf(AppDestination.Sessions)),
+                BackResult.Consumed
+            )
+        }
+
+        if (current == AppDestination.WindowBranches) {
+            return BackTransition(
+                copy(backStack = listOf(AppDestination.Sessions, AppDestination.Chat)),
                 BackResult.Consumed
             )
         }

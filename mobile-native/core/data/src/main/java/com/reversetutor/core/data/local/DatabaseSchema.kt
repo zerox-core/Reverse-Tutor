@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 10
+    const val version = 11
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -93,6 +93,14 @@ object DatabaseSchema {
         }
     }
 
+    /** P6 rich-reply artifacts and session-scoped document/table tool state. */
+    val migration10To11: Migration = object : Migration(10, 11) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            sessionAgentTableSql.forEach(db::execSQL)
+            sessionAgentIndexSql.forEach(db::execSQL)
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -102,7 +110,8 @@ object DatabaseSchema {
         migration6To7,
         migration7To8,
         migration8To9,
-        migration9To10
+        migration9To10,
+        migration10To11
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -615,6 +624,96 @@ object DatabaseSchema {
         "CREATE INDEX IF NOT EXISTS index_memory_observations_windowId ON memory_observations(windowId)",
         "CREATE INDEX IF NOT EXISTS index_memory_observations_spaceId ON memory_observations(spaceId)",
         "CREATE INDEX IF NOT EXISTS index_window_heartbeats_spaceId ON window_heartbeats(spaceId)"
+    )
+
+    private val sessionAgentTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS assistant_reply_artifacts (
+            assistantMessageId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            blocksPayload TEXT NOT NULL,
+            evidenceReferencesPayload TEXT NOT NULL,
+            toolResultsPayload TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(assistantMessageId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS session_documents (
+            id TEXT NOT NULL,
+            spaceId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            title TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS session_document_blocks (
+            id TEXT NOT NULL,
+            documentId TEXT NOT NULL,
+            ordinal INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS session_tables (
+            id TEXT NOT NULL,
+            documentId TEXT NOT NULL,
+            title TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS session_table_columns (
+            id TEXT NOT NULL,
+            tableId TEXT NOT NULL,
+            ordinal INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            valueType TEXT NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS session_table_rows (
+            id TEXT NOT NULL,
+            tableId TEXT NOT NULL,
+            rowKey TEXT NOT NULL,
+            cellsPayload TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS tool_call_receipts (
+            callId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            toolName TEXT NOT NULL,
+            status TEXT NOT NULL,
+            safeResultPayload TEXT NOT NULL,
+            completedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(callId)
+        )
+        """.trimIndent()
+    )
+
+    private val sessionAgentIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_assistant_reply_artifacts_sessionId ON assistant_reply_artifacts(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_session_documents_spaceId ON session_documents(spaceId)",
+        "CREATE INDEX IF NOT EXISTS index_session_documents_sessionId ON session_documents(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_session_document_blocks_documentId ON session_document_blocks(documentId)",
+        "CREATE INDEX IF NOT EXISTS index_session_tables_documentId ON session_tables(documentId)",
+        "CREATE INDEX IF NOT EXISTS index_session_table_columns_tableId ON session_table_columns(tableId)",
+        "CREATE INDEX IF NOT EXISTS index_session_table_rows_tableId ON session_table_rows(tableId)",
+        "CREATE INDEX IF NOT EXISTS index_tool_call_receipts_sessionId ON tool_call_receipts(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_tool_call_receipts_toolName ON tool_call_receipts(toolName)"
     )
 }
 

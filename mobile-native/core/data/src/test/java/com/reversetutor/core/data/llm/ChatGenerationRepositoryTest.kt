@@ -26,6 +26,7 @@ import com.reversetutor.core.model.ModelProtocol
 import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -354,7 +355,7 @@ class ChatGenerationRepositoryTest {
     }
 
     @Test
-    fun generatedReplyIncludesVisibleCitationFooterWhenEvidenceExists() = runBlocking {
+    fun generatedReplyKeepsContextEvidenceOutOfVisibleTimelineText() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
         val repository = ChatGenerationRepository(
             messageRepository = messageRepository,
@@ -375,9 +376,10 @@ class ChatGenerationRepositoryTest {
 
         assertEquals(ChatGenerationOutcome.Generated("assistant-token-context"), outcome)
         val text = messageRepository.listMessages("session-1").single().text
-        assertTrue(text.contains("Use factoring."))
-        assertTrue(text.contains("Sources:"))
-        assertTrue(text.contains("[1] Algebra note (message-1, source-1)"))
+        assertEquals("Use factoring.", text)
+        assertFalse(text.contains("Sources:"))
+        assertFalse(text.contains("message-1"))
+        assertFalse(text.contains("source-1"))
     }
 
     @Test

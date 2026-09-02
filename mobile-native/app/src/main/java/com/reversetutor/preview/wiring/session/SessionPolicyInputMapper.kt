@@ -23,7 +23,24 @@ internal fun NewSessionConfiguration?.toSessionPolicyInput(userText: String): Se
     return SessionPolicyInput(
         mode = SessionModeWire.STUDY,
         userInput = userText,
-        knowledgePoint = snapshot?.goal?.ifBlank { snapshot.title }.orEmpty(),
+        knowledgePoint = SessionTurnContracts.sanitizeContractText(
+            snapshot?.goal?.ifBlank { snapshot.title } ?: "", maxLength = 320
+        ),
+        learnerRole = SessionTurnContracts.sanitizeContractText(
+            snapshot?.learnerRole?.ifBlank { "学习者" } ?: "学习者", maxLength = 120
+        ),
+        learnerProfile = SessionTurnContracts.sanitizeContractText(
+            snapshot?.learnerProfile?.ifBlank { "未设置" } ?: "未设置", maxLength = 320
+        ),
+        learningPlan = SessionTurnContracts.sanitizeContractText(
+            snapshot?.plan?.ifBlank { "未设置" } ?: "未设置", maxLength = 320
+        ),
+        dialogueStrategy = SessionTurnContracts.sanitizeContractText(
+            snapshot?.dialogueStrategy?.ifBlank { "未设置" } ?: "未设置", maxLength = 320
+        ),
+        speakingTone = SessionTurnContracts.sanitizeContractText(
+            snapshot?.speakingTone?.ifBlank { "自然" } ?: "自然", maxLength = 64
+        ),
         settings = SessionStrategySettings(
             probingIntensity = snapshot?.probingIntensity ?: 3,
             correctionPersistence = when (snapshot?.correctionPersistence) {
@@ -62,7 +79,7 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
 
     recentMessages.forEach { msg ->
         evidence.add(LlmContextEvidence(
-            id = "msg-\${msg.messageId}",
+            id = "msg-${msg.messageId}",
             title = SessionTurnContracts.sanitizeContractText(msg.role, maxLength = 48),
             body = SessionTurnContracts.sanitizeContractText(msg.text, maxLength = MaxEvidenceBodyChars),
             kind = "Message",
@@ -100,7 +117,7 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
 
     if (prerequisiteGaps.isNotEmpty()) {
         evidence.add(LlmContextEvidence(
-            id = "gaps-\$sessionId",
+            id = "gaps-$sessionId",
             title = "\u77e5\u8bc6\u7f3a\u53e3",
             body = SessionTurnContracts.sanitizeContractText(prerequisiteGaps.joinToString("; "), maxLength = MaxEvidenceBodyChars),
             kind = "Gaps"
@@ -109,7 +126,7 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
 
     if (pendingReviewKnowledgePoints.isNotEmpty()) {
         evidence.add(LlmContextEvidence(
-            id = "review-\$sessionId",
+            id = "review-$sessionId",
             title = "\u5f85\u590d\u4e60",
             body = SessionTurnContracts.sanitizeContractText(pendingReviewKnowledgePoints.joinToString("; "), maxLength = MaxEvidenceBodyChars),
             kind = "Review"
@@ -117,4 +134,28 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
     }
 
     return evidence.take(MaxContextEvidence)
+}
+
+/**
+ * Projects the immutable session template into one bounded evidence item so
+ * the generation runtime receives the same persona/goal constraints that the
+ * policy mapper used. Raw configuration maps and image references are never
+ * forwarded.
+ */
+internal fun NewSessionConfiguration?.toLlmTemplateEvidence(): LlmContextEvidence? {
+    val snapshot = this ?: return null
+    val body = buildString {
+        append("角色=").append(snapshot.learnerRole.ifBlank { "学习者" }).append('\n')
+        append("画像=").append(snapshot.learnerProfile.ifBlank { "未设置" }).append('\n')
+        append("目标=").append(snapshot.goal.ifBlank { snapshot.title }.ifBlank { "未设置" }).append('\n')
+        append("计划=").append(snapshot.plan.ifBlank { "未设置" }).append('\n')
+        append("对话策略=").append(snapshot.dialogueStrategy.ifBlank { "未设置" }).append('\n')
+        append("语气=").append(snapshot.speakingTone.ifBlank { "自然" })
+    }
+    return LlmContextEvidence(
+        id = "template",
+        title = "会话模板",
+        body = SessionTurnContracts.sanitizeContractText(body, maxLength = MaxEvidenceBodyChars),
+        kind = "Template"
+    )
 }

@@ -60,7 +60,8 @@ internal class BackgroundTurnPreparationCoordinator(
                     token = LlmGenerationToken(request.token),
                     quoteExcerpt = request.quoteExcerpt,
                     imageAttachments = request.imageAttachments,
-                    contextEvidence = context.toLlmContextEvidence(),
+                    contextEvidence = listOfNotNull(request.sessionSnapshot.toLlmTemplateEvidence()) +
+                        context.toLlmContextEvidence(),
                     sessionPolicy = policy.toLlmSessionPolicyContext()
                 ),
                 nowEpochMillis()
