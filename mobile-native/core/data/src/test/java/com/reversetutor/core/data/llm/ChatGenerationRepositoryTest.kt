@@ -322,8 +322,8 @@ class ChatGenerationRepositoryTest {
             isTokenCurrent = { true }
         )
 
-        assertEquals(ChatGenerationOutcome.ProviderFailed("Rate limited"), failure)
-        assertEquals(ChatGenerationOutcome.ProviderFailed("Timeout"), timeout)
+        assertEquals(ChatGenerationOutcome.ProviderFailed("llm_provider_request_failed"), failure)
+        assertEquals(ChatGenerationOutcome.ProviderFailed("llm_provider_timeout"), timeout)
     }
 
     @Test

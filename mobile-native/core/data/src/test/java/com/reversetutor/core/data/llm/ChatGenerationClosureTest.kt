@@ -84,7 +84,7 @@ class ChatGenerationClosureTest {
             isTokenCurrent = { true }
         )
         assertTrue(outcome is ChatGenerationOutcome.ProviderFailed)
-        assertEquals("Rate limited", (outcome as ChatGenerationOutcome.ProviderFailed).message)
+        assertEquals("llm_provider_request_failed", (outcome as ChatGenerationOutcome.ProviderFailed).message)
         assertTrue(fixture.messageDao.messages.isEmpty())
     }
 
@@ -99,7 +99,7 @@ class ChatGenerationClosureTest {
             isTokenCurrent = { true }
         )
         assertTrue(outcome is ChatGenerationOutcome.ProviderFailed)
-        assertEquals(LlmGenerationResult.Timeout.message, (outcome as ChatGenerationOutcome.ProviderFailed).message)
+        assertEquals("llm_provider_timeout", (outcome as ChatGenerationOutcome.ProviderFailed).message)
         assertTrue(fixture.messageDao.messages.isEmpty())
     }
 

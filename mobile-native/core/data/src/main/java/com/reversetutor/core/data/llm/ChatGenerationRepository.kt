@@ -3,7 +3,9 @@ package com.reversetutor.core.data.llm
 import com.reversetutor.core.data.model.ExecutionModelConfiguration
 import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.domain.TurnPlan
 import com.reversetutor.core.llm.LlmCapabilities
+import com.reversetutor.core.llm.LlmGuidedTurnPlan
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
 import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelopeParser
@@ -54,6 +56,7 @@ class ChatGenerationRepository(
             contextEvidence = input.contextEvidence,
             sessionPolicy = input.sessionPolicy,
             assistantTurnEnvelope = input.assistantTurnEnvelope,
+            guidedTurnPlan = input.turnPlan?.toLlmGuidedTurnPlan(),
             allowPlanDrivenOpening = input.allowPlanDrivenOpening
         )
 
@@ -94,10 +97,10 @@ class ChatGenerationRepository(
                 }
             }
             is LlmGenerationResult.Failure -> {
-                ChatGenerationOutcome.ProviderFailed(result.message)
+                ChatGenerationOutcome.ProviderFailed(result.message.toSafeProviderFailureCode())
             }
             LlmGenerationResult.Timeout -> {
-                ChatGenerationOutcome.ProviderFailed(LlmGenerationResult.Timeout.message)
+                ChatGenerationOutcome.ProviderFailed("llm_provider_timeout")
             }
         }
     }
@@ -134,8 +137,37 @@ data class ChatGenerationInput(
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
-    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+    /**
+     * Optional bounded teaching plan produced by the domain selector
+     * (NEWMP-V1-002 Task 2.4). It constrains model *expression* only; learning
+     * state remains owned by the local verifier, and a null plan keeps the
+     * exact legacy request shape.
+     */
+    val turnPlan: TurnPlan? = null
 )
+
+/**
+ * Map the domain [TurnPlan] into the wire-only [LlmGuidedTurnPlan] snapshot.
+ * Enum names become canonical lowercase wire tokens; `nextActionOnSuccess` /
+ * `nextActionOnFailure` are deliberately *not* forwarded — they are domain
+ * scheduling data and must never reach the provider prompt.
+ */
+internal fun TurnPlan.toLlmGuidedTurnPlan(): LlmGuidedTurnPlan = LlmGuidedTurnPlan(
+    actionType = actionType.toWireToken(),
+    secondaryAction = secondaryAction?.toWireToken().orEmpty(),
+    learningObjective = learningObjective,
+    conceptKey = conceptKey,
+    expectedUserMove = expectedUserMove,
+    responseFormat = responseFormat.toWireToken(),
+    hintLevel = hintLevel,
+    evidenceRequirement = evidenceRequirement.toWireToken()
+)
+
+/** `WorkedExample` -> `worked_example`: the canonical wire tokens the LLM whitelist accepts. */
+private fun Enum<*>.toWireToken(): String = name
+    .replace(Regex("(?<=[a-z0-9])([A-Z])")) { "_" + it.groupValues[1].lowercase() }
+    .lowercase()
 
 private fun ExecutionModelConfiguration.toExecutionProfile(): LlmProfile =
     LlmProfile(
@@ -175,3 +207,24 @@ private fun LlmGenerationBlockReason.toOutcome(): ChatGenerationOutcome =
         LlmGenerationBlockReason.UnsupportedVision -> ChatGenerationOutcome.UnsupportedVision
         LlmGenerationBlockReason.BlankPrompt -> ChatGenerationOutcome.BlankPrompt
     }
+
+/**
+ * NEWMP-V1-002 Task 2.4: collapse provider diagnostics to stable safe codes.
+ * Canonical runtime messages map to fixed codes; every unexpected diagnostic
+ * collapses to one fixed code so raw exception detail can never reach the UI
+ * or persistence.
+ */
+private fun String.toSafeProviderFailureCode(): String = when (trim().lowercase()) {
+    "provider credential is unavailable." -> "llm_credential_unavailable"
+    "provider rejected the credential." -> "llm_provider_unauthorized"
+    "provider denied access." -> "llm_provider_forbidden"
+    "provider endpoint or model was not found." -> "llm_provider_endpoint_unavailable"
+    "provider request timed out." -> "llm_provider_timeout"
+    "provider rate limit reached." -> "llm_provider_rate_limited"
+    "provider is temporarily unavailable." -> "llm_provider_unavailable"
+    "provider request was rejected." -> "llm_provider_rejected"
+    "provider configuration is invalid." -> "llm_provider_configuration_invalid"
+    "provider returned an invalid response." -> "llm_provider_invalid_response"
+    "provider request failed." -> "llm_provider_request_failed"
+    else -> "llm_provider_request_failed"
+}

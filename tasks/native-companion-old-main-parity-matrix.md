@@ -98,3 +98,26 @@ P3 and P6 were approved separately. The following native paths now exist and car
   writing P6-approved records. The Worker remains the sole Provider/assistant-message writer.
 - Migration instrumentation remains device-blocked (RT-2026-015 analog): 4 migration tests authored and
   `compileDebugAndroidTestKotlin` passed, but no device/emulator was attached, so migrations are not device-verified.
+
+## 6. NEWMP-V1-001 teaching-policy audit (2026-09-02)
+
+This addendum supersedes only the stale source-existence and "uncommitted" wording above. It does not upgrade a
+behavior merely because a wire value exists. The audit compared `main:engine.py` with the current `newmp` production
+path and ran the named JVM tests on the current branch.
+
+| Old teaching behavior | Current native boundary | Status | Evidence |
+|---|---|---|---|
+| Shallow answer can lead to `probe` | `SessionTurnPolicy.normalize` enforces the `has_entry`/high-probing rewrites after a bounded proposal enters the policy. There is no local semantic evaluator that independently infers shallowness from free text. | partial | `SessionTurnPolicyTest.highProbingIntensityConvertsAskToProbe` |
+| Explicit misconception leads to counterexample `challenge` | A nonblank bounded misconception forces `challenge`; the guided plan carries a bounded correction level. | migrated | `studyMisconceptionForcesCounterexampleChallenge`; `GuidedLearningPlanTest.persistentChallengeCarriesBoundedCorrectionPlan` |
+| No method entry leads to `clue` or `scaffold_example` | The policy deterministically rewrites eligible proposed actions to `clue`; `scaffold_example` remains an allowed, bounded proposal, not a locally inferred free-text decision. | partial | `noEntryWithAskBecomesClue`; `noEntryWithProbeBecomesClue` |
+| "I understand" leads to `examiner_verify`, not mastery | The policy forces `examiner_verify` and zero evidence. A separate local verifier must approve any later learning-fact projection. | migrated | `understoodClaimRequiresExaminerVerificationWithoutMasteryEvidence`; `PostTurnProjectorTest.modelCandidateWithoutLocalVerificationDoesNotWriteMastery` |
+| Due review produces `recap` / `delayed_retrieval` | Pending review points are bounded context evidence and the wire vocabulary exists, but no local due-review selector deterministically creates a recap/delayed-retrieval turn. | partial | `SessionPolicyInputMapperTest` review-evidence coverage; no selector test exists by design |
+| Template role, goal, plan, and dialogue strategy reach the turn | The mapper sanitizes these fields and emits one bounded `Template` context evidence item for the queued job. | migrated | `BackgroundTurnPreparationCoordinatorTest.preparation_carries_bounded_template_context_into_generation_evidence` |
+
+Focused verification on this audit: `:core:domain:testDebugUnitTest` for `SessionTurnPolicyTest` and
+`GuidedLearningPlanTest`, plus `:app:testDebugUnitTest` for `BackgroundTurnPreparationCoordinatorTest` and
+`PostTurnProjectorTest`, plus `SessionPolicyInputMapperTest`, completed successfully on 2026-09-02.
+
+The remaining `partial` rows are not safe candidates for a prompt-only shortcut. A future local due-review selector
+or semantic evaluator must first have its own bounded input contract, Red test, and explicit capability review if it
+requires new persistence or generation fields.

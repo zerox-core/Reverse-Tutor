@@ -1,6 +1,7 @@
 package com.reversetutor.feature.chat
 
 import com.reversetutor.core.model.MessageAttachment
+import com.reversetutor.core.domain.TurnPlan
 
 /**
  * Compose-free port for preparing a background turn after one user message is persisted.
@@ -29,7 +30,8 @@ data class BackgroundTurnPreparationRequest(
     val token: String,
     val quoteExcerpt: String?,
     val imageAttachments: List<MessageAttachment>,
-    val sessionSnapshot: NewSessionConfiguration?
+    val sessionSnapshot: NewSessionConfiguration?,
+    val turnPlan: TurnPlan? = null
 )
 
 /**

@@ -19,6 +19,7 @@ import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.llm.LlmTurnPlan
 import com.reversetutor.core.llm.LlmWindowContext
 import com.reversetutor.core.llm.StructuredTurnOutcome
+import com.reversetutor.core.domain.TurnPlan
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageAttachment
 
@@ -43,6 +44,7 @@ class BackgroundGenerationRepository(
         jobId: String = "generation-${input.userMessageId}-${input.token.value}"
     ): BackgroundGenerationJob {
         val modelBindingId = snapshotModelBindingId(input)
+        val persistedEvidence = input.contextEvidence + input.turnPlan.toGuidedPlanEvidence()
         val job = BackgroundJobEntity(
             id = jobId,
             spaceId = input.spaceId,
@@ -56,7 +58,7 @@ class BackgroundGenerationRepository(
             modelBindingId = modelBindingId,
             quoteExcerpt = input.quoteExcerpt,
             imageAttachmentsPayload = input.imageAttachments.toAttachmentPayload(),
-            contextEvidencePayload = input.contextEvidence.toEvidencePayload(),
+            contextEvidencePayload = persistedEvidence.toEvidencePayload(),
             sessionPolicyPayload = input.sessionPolicy.toPayload(),
             assistantTurnEnvelopePayload = input.assistantTurnEnvelope.toEnvelopePayload()
         )
@@ -243,7 +245,8 @@ class BackgroundGenerationRepository(
                 imageAttachments = job.imageAttachments,
                 contextEvidence = job.contextEvidence,
                 sessionPolicy = job.sessionPolicy,
-                assistantTurnEnvelope = job.assistantTurnEnvelope
+                assistantTurnEnvelope = job.assistantTurnEnvelope,
+                turnPlan = job.turnPlan
             ),
             nowEpochMillis = nowEpochMillis,
             isTokenCurrent = { it == job.token },
@@ -337,6 +340,9 @@ class BackgroundGenerationRepository(
         if (kind != GenerationKind && kind != InitiativeKind) return null
         val session = sessionId?.takeIf { it.isNotBlank() } ?: return null
         val tokenValue = generationToken?.takeIf { it.isNotBlank() } ?: return null
+        val persistedEvidence = contextEvidencePayload.toContextEvidence()
+        val guidedTurnPlan = persistedEvidence.firstOrNull { it.kind == GuidedPlanEvidenceKind }
+            ?.toGuidedTurnPlan()
         return BackgroundGenerationJob(
             id = id,
             kind = kind,
@@ -354,9 +360,10 @@ class BackgroundGenerationRepository(
             errorMessage = errorMessage,
             quoteExcerpt = quoteExcerpt,
             imageAttachments = imageAttachmentsPayload.toImageAttachments(),
-            contextEvidence = contextEvidencePayload.toContextEvidence(),
+            contextEvidence = persistedEvidence.filterNot { it.kind == GuidedPlanEvidenceKind },
             sessionPolicy = sessionPolicyPayload.toSessionPolicy(),
-            assistantTurnEnvelope = assistantTurnEnvelopePayload.toEnvelope()
+            assistantTurnEnvelope = assistantTurnEnvelopePayload.toEnvelope(),
+            turnPlan = guidedTurnPlan
         )
     }
 
@@ -406,7 +413,8 @@ data class BackgroundGenerationInput(
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
-    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+    val turnPlan: TurnPlan? = null
 )
 
 /**
@@ -440,7 +448,8 @@ data class BackgroundGenerationJob(
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
-    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+    val turnPlan: TurnPlan? = null
 )
 
 sealed interface BackgroundGenerationOutcome {
@@ -521,6 +530,48 @@ private fun LlmSessionPolicyContext?.toPayload(): String? =
             policy.correctionTiming
         ).joinToString(separator = "\t") { it.encodePayloadField() }
     }
+
+private const val GuidedPlanEvidenceKind = "GuidedTurnPlan"
+
+private fun TurnPlan?.toGuidedPlanEvidence(): List<LlmContextEvidence> {
+    val plan = this?.normalized() ?: return emptyList()
+    val body = listOf(
+        plan.actionType.name,
+        plan.secondaryAction?.name.orEmpty(),
+        plan.learningObjective,
+        plan.conceptKey,
+        plan.expectedUserMove,
+        plan.responseFormat.name,
+        plan.hintLevel.toString(),
+        plan.evidenceRequirement.name
+    ).joinToString("|") { it.encodePayloadField() }
+    return listOf(LlmContextEvidence("guided-turn-plan", "Guided turn plan", body, GuidedPlanEvidenceKind))
+}
+
+private fun LlmContextEvidence.toGuidedTurnPlan(): TurnPlan? {
+    if (kind != GuidedPlanEvidenceKind) return null
+    val fields = body.split('|').map { it.decodePayloadField() }
+    if (fields.size != 8) return null
+    val action = runCatching { com.reversetutor.core.domain.TeachingAction.valueOf(fields[0]) }.getOrNull()
+        ?: return null
+    val secondary = fields[1].takeIf { it.isNotBlank() }?.let {
+        runCatching { com.reversetutor.core.domain.TeachingAction.valueOf(it) }.getOrNull()
+    }
+    val format = runCatching { com.reversetutor.core.domain.ResponseFormat.valueOf(fields[5]) }
+        .getOrDefault(com.reversetutor.core.domain.ResponseFormat.Plain)
+    val evidence = runCatching { com.reversetutor.core.domain.EvidenceRequirement.valueOf(fields[7]) }
+        .getOrDefault(com.reversetutor.core.domain.EvidenceRequirement.None)
+    return TurnPlan(
+        actionType = action,
+        secondaryAction = secondary,
+        learningObjective = fields[2],
+        conceptKey = fields[3],
+        expectedUserMove = fields[4],
+        responseFormat = format,
+        hintLevel = fields[6].toIntOrNull() ?: 0,
+        evidenceRequirement = evidence
+    ).normalized()
+}
 
 private fun String?.toSessionPolicy(): LlmSessionPolicyContext? {
     val fields = this?.split('\t')?.map { it.decodePayloadField() } ?: return null

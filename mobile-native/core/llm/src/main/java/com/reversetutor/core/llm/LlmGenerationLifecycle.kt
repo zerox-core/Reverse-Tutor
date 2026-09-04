@@ -23,7 +23,8 @@ data class LlmGenerationRequest(
     val imageAttachments: List<MessageAttachment> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
-    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+    val guidedTurnPlan: LlmGuidedTurnPlan? = null
 )
 
 /**
@@ -54,6 +55,68 @@ data class LlmSessionPolicyContext(
             evaluationCorrectness = evaluationCorrectness.coerceIn(0f, 1f),
             userEmotion = userEmotion.trim().lowercase().ifEmpty { "neutral" }.take(48),
             correctionTiming = correctionTiming.trim().lowercase().ifEmpty { "immediate" }.take(48)
+        )
+    }
+}
+
+/**
+ * Wire-only bounded guided-learning teaching plan (NEWMP-V1-002 Task 2.4).
+ *
+ * Like [LlmSessionPolicyContext] it deliberately has no `core:domain`
+ * dependency: the application layer maps the domain `TurnPlan` into this
+ * snapshot before generation. It constrains *expression only* — action
+ * vocabulary, objective, expected learner move, format and hint depth. It can
+ * never carry mastery, evidence verdicts or learning-fact mutations, and an
+ * unknown action rejects the whole snapshot so nothing model-suggested slips
+ * into the prompt. [normalized] bounds text and strips secret-like content.
+ */
+data class LlmGuidedTurnPlan(
+    val actionType: String,
+    val secondaryAction: String = "",
+    val learningObjective: String = "",
+    val conceptKey: String = "",
+    val expectedUserMove: String = "",
+    val responseFormat: String = "plain",
+    val hintLevel: Int = 0,
+    val evidenceRequirement: String = "none"
+) {
+    companion object {
+        val AllowedActions = setOf(
+            "diagnose", "socratic_question", "hint", "explain", "worked_example",
+            "counter_example", "practice", "reflect", "summarize", "clarify_goal"
+        )
+        val AllowedFormats = setOf("plain", "steps", "code", "table", "checklist")
+        val AllowedEvidence = setOf("none", "local_check", "user_answer", "tool_receipt")
+        const val OBJECTIVE_MAX = 120
+        const val EXPECTED_MOVE_MAX = 160
+
+        private val sensitivePatterns = listOf(
+            Regex("(?i)sk-[a-z0-9_-]{2,}"),
+            Regex("(?i)authorization\\s*[:=]\\s*\\S*"),
+            Regex("(?i)bearer\\s+[a-z0-9._-]+"),
+            Regex("(?i)https?://[^\\s]+")
+        )
+
+        internal fun boundText(value: String?, maxLength: Int): String {
+            var text = (value ?: "").trim()
+            sensitivePatterns.forEach { pattern -> text = text.replace(pattern, "[redacted]") }
+            return text.replace(Regex("\\s+"), " ").trim().take(maxLength)
+        }
+    }
+
+    fun normalized(): LlmGuidedTurnPlan? {
+        val action = actionType.trim().lowercase()
+        if (action !in AllowedActions) return null
+        val secondary = secondaryAction.trim().lowercase()
+        return copy(
+            actionType = action,
+            secondaryAction = secondary.takeIf { it in AllowedActions && it != action } ?: "",
+            learningObjective = boundText(learningObjective, OBJECTIVE_MAX),
+            conceptKey = boundText(conceptKey, 40).ifEmpty { "unknown" },
+            expectedUserMove = boundText(expectedUserMove, EXPECTED_MOVE_MAX),
+            responseFormat = responseFormat.trim().lowercase().takeIf { it in AllowedFormats } ?: "plain",
+            hintLevel = hintLevel.coerceIn(0, 3),
+            evidenceRequirement = evidenceRequirement.trim().lowercase().takeIf { it in AllowedEvidence } ?: "none"
         )
     }
 }
@@ -250,6 +313,7 @@ object LlmGenerationPlanner {
         contextEvidence: List<LlmContextEvidence> = emptyList(),
         sessionPolicy: LlmSessionPolicyContext? = null,
         assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+        guidedTurnPlan: LlmGuidedTurnPlan? = null,
         allowPlanDrivenOpening: Boolean = false
     ): LlmGenerationPlan {
         val normalizedText = userText.orEmpty().trim()
@@ -290,7 +354,8 @@ object LlmGenerationPlanner {
                 imageAttachments = normalizedImageAttachments,
                 contextEvidence = normalizedEvidence,
                 sessionPolicy = normalizedSessionPolicy,
-                assistantTurnEnvelope = normalizedEnvelope
+                assistantTurnEnvelope = normalizedEnvelope,
+                guidedTurnPlan = guidedTurnPlan?.normalized()
             )
         )
     }
@@ -397,6 +462,7 @@ private fun LlmGenerationRequest.contextualUserText(): String {
     val contextLines = buildList {
         turnPlanPromptBlock()?.let { add(it) }
         sessionPolicyPromptBlock()?.let { add(it) }
+        guidedLearningPlanPromptBlock()?.let { add(it) }
         if (!quoteExcerpt.isNullOrBlank()) {
             add("Quote: $quoteExcerpt")
         }
@@ -436,6 +502,27 @@ private fun LlmGenerationRequest.turnPlanPromptBlock(): String? =
             if (plan.toneConstraints.isNotEmpty()) {
                 append("\nTone constraints: ").append(plan.toneConstraints.joinToString(", "))
             }
+        }
+    }
+
+internal fun LlmGenerationRequest.guidedLearningPlanPromptBlock(): String? =
+    guidedTurnPlan?.normalized()?.let { plan ->
+        buildString {
+            append("Guided learning plan:")
+            append("\nAction: ").append(plan.actionType)
+            if (plan.secondaryAction.isNotBlank()) {
+                append("\nSecondary action: ").append(plan.secondaryAction)
+            }
+            append("\nKnowledge point: ").append(plan.conceptKey)
+            if (plan.learningObjective.isNotBlank()) {
+                append("\nObjective: ").append(plan.learningObjective)
+            }
+            if (plan.expectedUserMove.isNotBlank()) {
+                append("\nExpected learner move: ").append(plan.expectedUserMove)
+            }
+            append("\nResponse format: ").append(plan.responseFormat)
+            append("\nHint level: ").append(plan.hintLevel)
+            append("\nEvidence requirement: ").append(plan.evidenceRequirement)
         }
     }
 

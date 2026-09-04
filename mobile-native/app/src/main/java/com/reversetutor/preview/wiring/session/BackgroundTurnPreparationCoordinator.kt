@@ -47,6 +47,12 @@ internal class BackgroundTurnPreparationCoordinator(
             }
 
             val context = assembleContext(request.spaceId, request.sessionId)
+            val guidedInput = request.sessionSnapshot.toGuidedLearningTurnInput(
+                spaceId = request.spaceId,
+                sessionId = request.sessionId,
+                context = context
+            )
+            val turnPlan = request.turnPlan ?: guidedInput.selectGuidedLearningPlan()
             val policy = SessionTurnPolicy.normalize(
                 request.sessionSnapshot.toSessionPolicyInput(request.userText)
             )
@@ -62,7 +68,8 @@ internal class BackgroundTurnPreparationCoordinator(
                     imageAttachments = request.imageAttachments,
                     contextEvidence = listOfNotNull(request.sessionSnapshot.toLlmTemplateEvidence()) +
                         context.toLlmContextEvidence(),
-                    sessionPolicy = policy.toLlmSessionPolicyContext()
+                    sessionPolicy = policy.toLlmSessionPolicyContext(),
+                    turnPlan = turnPlan
                 ),
                 nowEpochMillis()
             )
