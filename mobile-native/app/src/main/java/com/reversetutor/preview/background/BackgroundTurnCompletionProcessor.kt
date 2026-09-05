@@ -60,8 +60,7 @@ class BackgroundTurnCompletionProcessor(
                 .toSet()
             val checkPlan = envelope.checkPlan?.toDomainCheckPlan(allowedSourceHandles)
             if (checkPlan != null) {
-                val currentRevision = loadCurrentSourceRevision(job.spaceId, checkPlan.sourceHandles.first())
-                    ?: ""
+                val currentRevision = currentRevisionForCheck(job.spaceId, checkPlan.sourceHandles)
                 projector.projectCheck(
                     input = LocalLearningEvidenceInput(
                         jobId = jobId,
@@ -84,7 +83,7 @@ class BackgroundTurnCompletionProcessor(
                     .map { it.id }.toSet()
             )
             if (checkPlan != null) {
-                val currentRevision = loadCurrentSourceRevision(job.spaceId, checkPlan.sourceHandles.first()).orEmpty()
+                val currentRevision = currentRevisionForCheck(job.spaceId, checkPlan.sourceHandles)
                 projector.projectCheck(
                     input = LocalLearningEvidenceInput(
                         jobId = jobId,
@@ -102,7 +101,28 @@ class BackgroundTurnCompletionProcessor(
         projector.project(jobId, outcome.structuredOutcome)
         return results
     }
+
+    /**
+     * Plan Task 1: verify the *current* revision of every source handle that a
+     * check plan references. A drifted, deleted or unreadable handle yields "",
+     * which never equals the plan revision, so the whole plan comes back
+     * Unverified and no learning fact is written. When all handles are current,
+     * the first handle's live revision feeds the version check.
+     */
+    private suspend fun currentRevisionForCheck(
+        spaceId: String,
+        handles: List<String>
+    ): String {
+        if (handles.isEmpty()) return ""
+        handles.forEach { handle ->
+            val embedded = handle.substringAfterLast(":", "")
+            val live = loadCurrentSourceRevision(spaceId, handle) ?: return ""
+            if (embedded.isNotEmpty() && live != embedded) return ""
+        }
+        return loadCurrentSourceRevision(spaceId, handles.first()).orEmpty()
+    }
 }
+
 
 private fun com.reversetutor.core.data.agent.RichDocumentBlock.toCandidateText(): String = when (this) {
     is com.reversetutor.core.data.agent.RichDocumentBlock.Heading -> text

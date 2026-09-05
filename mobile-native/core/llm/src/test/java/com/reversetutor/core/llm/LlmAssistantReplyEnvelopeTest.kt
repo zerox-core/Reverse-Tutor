@@ -76,4 +76,51 @@ class LlmAssistantReplyEnvelopeTest {
         assertTrue(parsed != null)
         assertEquals(null, parsed?.checkPlan)
     }
+
+    // Task 2: all four rule kinds parse into their typed candidates.
+    @Test
+    fun allFourCheckRuleKindsParseWhenReferencesAreWhitelisted() {
+        val rules = listOf(
+            """{"type":"exact_text","normalizedAnswer":"even-function"}""" to "ExactText",
+            """{"type":"numeric_tolerance","expected":4.0,"tolerance":0.5}""" to "NumericTolerance",
+            """{"type":"required_concepts","terms":["root","discriminant"]}""" to "RequiredConcepts",
+            """{"type":"rubric","criteria":["complete explanation"]}""" to "Rubric"
+        )
+        rules.forEach { (ruleJson, _) ->
+            val parsed = LlmAssistantReplyEnvelopeParser.parseValidated(
+                rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"recap"}],"evidenceReferenceIds":["source:book:rev-1"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-rule","sourceRevision":"rev-1","sourceReferenceIds":["source:book:rev-1"],"prompt":"explain definition","expectedAnswer":"answer","rule":$ruleJson,"conceptKey":"function"}}""",
+                allowedEvidenceIds = setOf("source:book:rev-1")
+            )
+            org.junit.Assert.assertNotNull("rule kind must parse: $ruleJson", parsed?.checkPlan?.rule)
+        }
+    }
+
+    // Task 2: an unknown rule kind drops the plan, never the chat reply.
+    @Test
+    fun unknownCheckRuleKindDropsPlanButKeepsChat() {
+        val parsed = LlmAssistantReplyEnvelopeParser.parseValidated(
+            rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"recap"}],"evidenceReferenceIds":["source:book:rev-1"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-bad","sourceRevision":"rev-1","sourceReferenceIds":["source:book:rev-1"],"prompt":"explain definition","expectedAnswer":"answer","rule":{"type":"guarantee_mastery","value":"passed"},"conceptKey":"function"}}""",
+            allowedEvidenceIds = setOf("source:book:rev-1")
+        )
+        assertTrue(parsed != null)
+        assertEquals(null, parsed?.checkPlan)
+        assertEquals("recap", parsed?.blocks?.single()?.let { (it as LlmRichContentBlock.Paragraph).text })
+    }
+
+    // Task 2: secret-like fields in the plan reject the plan without failing the reply.
+    @Test
+    fun sensitiveFieldsInCheckPlanAreRejected() {
+        for (needle in listOf(
+            "see https://leak.invalid/x",
+            "key sk-abcdef123456",
+            "Authorization: Bearer tok-1"
+        )) {
+            val parsed = LlmAssistantReplyEnvelopeParser.parseValidated(
+                rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"recap"}],"evidenceReferenceIds":["source:book:rev-1"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-secret","sourceRevision":"rev-1","sourceReferenceIds":["source:book:rev-1"],"prompt":"$needle","expectedAnswer":"answer","rule":{"type":"exact_text","normalizedAnswer":"answer"},"conceptKey":"function"}}""",
+                allowedEvidenceIds = setOf("source:book:rev-1")
+            )
+            assertTrue("reply must survive", parsed != null)
+            assertEquals("sensitive plan must be dropped: $needle", null, parsed?.checkPlan)
+        }
+    }
 }

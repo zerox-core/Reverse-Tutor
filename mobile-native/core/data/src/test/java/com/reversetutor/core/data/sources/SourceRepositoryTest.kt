@@ -157,6 +157,9 @@ class SourceRepositoryTest {
         val result = repository.reprocessSource("source-text", nowEpochMillis = 200L)
 
         assertEquals(SourceParserStatus.FullyLocal, result?.source?.parserStatus)
+        // Task 1 (hot-update): reprocessing stamps a newer creation time, so the
+        // adapter-derived revision (rev-<id>-<createdAt>) changes for the next turn.
+        assertEquals(200L, result?.source?.createdAtEpochMillis)
         assertEquals(listOf("First"), dao.listChunksForSource("source-text").map { it.text })
     }
 }
