@@ -471,6 +471,51 @@ class BackgroundGenerationRepositoryTest {
         userEmotion = "neutral",
         correctionTiming = "immediate"
     )
+    // Plan Task 6: a queued job keeps its enqueue-time source snapshot.
+    @Test
+    fun queuedJobKeepsEnqueueTimeSourceSnapshotAcrossMaterialChange() = runBlocking {
+        val runtime = CapturingRuntime()
+        val jobDao = FakeBackgroundJobDao()
+        val firstRepository = repository(jobDao = jobDao, runtime = runtime)
+        firstRepository.enqueueGenerationJob(
+            input(token = "token-snap-a").copy(
+                contextEvidence = listOf(
+                    LlmContextEvidence(
+                        id = "source:src-1:rev-src-1-1000",
+                        title = "单调性讲义",
+                        body = "资料A正文",
+                        kind = "Source",
+                        sourceId = "src-1"
+                    )
+                )
+            ),
+            nowEpochMillis = 10L,
+            jobId = "job-snap-a"
+        )
+        // Simulates app exit + material re-import (new revision) before recovery:
+        // the queued job must still generate against revision 1000.
+        val restarted = repository(jobDao = jobDao, runtime = runtime)
+        restarted.recoverInterruptedGenerationJobs(nowEpochMillis = 20L)
+        restarted.runGenerationJob("job-snap-a", nowEpochMillis = 30L)
+        val evidence = runtime.requests.single().contextEvidence
+        assertEquals(listOf("source:src-1:rev-src-1-1000"), evidence.map { it.id })
+        assertEquals("资料A正文", evidence.single().body)
+    }
+
+    // Plan Task 6: re-running a completed job replays without a second assistant write.
+    @Test
+    fun rerunningCompletedJobDoesNotWriteAssistantAgain() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val runtime = CapturingRuntime()
+        val repository = repository(messageRepository = messageRepository, runtime = runtime)
+        repository.enqueueGenerationJob(input(token = "token-replay"), nowEpochMillis = 10L, jobId = "job-replay")
+        repository.runGenerationJob("job-replay", nowEpochMillis = 20L)
+        val replay = repository.runGenerationJob("job-replay", nowEpochMillis = 30L)
+        assertTrue(replay is BackgroundGenerationOutcome.Completed)
+        assertEquals(1, runtime.requests.size)
+        val assistantMessages = messageRepository.listMessages("session-1").count { it.role == MessageRole.Assistant }
+        assertEquals(1, assistantMessages)
+    }
 }
 
 private class FakeBackgroundJobDao : BackgroundJobDao {

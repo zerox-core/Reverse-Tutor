@@ -16,7 +16,12 @@ import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.llm.LlmRichContentBlock
 import com.reversetutor.core.llm.LlmToolCall
+import com.reversetutor.core.llm.LlmTurnPlan
+import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
+import com.reversetutor.core.llm.LlmWindowContext
 import com.reversetutor.core.llm.StructuredTurnOutcome
+import com.reversetutor.core.llm.LlmSourceCheckRule
+import com.reversetutor.core.llm.LlmSourceGroundedCheckPlan
 import com.reversetutor.preview.wiring.session.PostTurnProjector
 import com.reversetutor.preview.wiring.session.TurnProjectionSink
 import kotlinx.coroutines.runBlocking
@@ -79,6 +84,49 @@ class BackgroundTurnCompletionProcessorTest {
 
         assertEquals("document:document-tool-1", retry.single().let { (it.safeResult as com.reversetutor.core.domain.ToolSafeResult.Document).let { result -> "document:${result.documentId}" } })
         assertEquals(listOf("document:document-tool-1"), artifacts.read("session-1", "assistant-1")!!.toolResultCodes)
+    }
+
+    @Test
+    fun sourceCheckUsesAssistantCandidateAndProjectsOnlyVerifiedEvidence() = runBlocking {
+        val received = mutableListOf<StructuredTurnOutcome>()
+        val processor = BackgroundTurnCompletionProcessor(
+            artifacts = AssistantReplyArtifactRepository(InMemoryAssistantReplyArtifactStore()),
+            tools = SessionToolExecutionRepository(
+                SessionDocumentRepository(InMemorySessionDocumentStore()),
+                SessionTableRepository(InMemorySessionTableStore()),
+                ToolCallReceiptRepository(InMemoryToolCallReceiptStore())
+            ),
+            projector = PostTurnProjector(TurnProjectionSink { _, outcome -> received += outcome }),
+            loadCurrentSourceRevision = { _, _ -> "rev-book-1" }
+        )
+        val handle = "source:book:rev-book-1"
+        val completion = BackgroundGenerationOutcome.Completed(
+            assistantMessageId = "assistant-1",
+            structuredOutcome = StructuredTurnOutcome(windowId = "window-1", knowledgePoint = "函数"),
+            replyEnvelope = LlmAssistantReplyEnvelope(
+                blocks = listOf(LlmRichContentBlock.Paragraph("偶函数")),
+                evidenceReferenceIds = listOf(handle),
+                checkPlan = LlmSourceGroundedCheckPlan(
+                    id = "check-1", sourceRevision = "rev-book-1", sourceReferenceIds = listOf(handle),
+                    prompt = "说明定义", expectedAnswer = "偶函数",
+                    rule = LlmSourceCheckRule.ExactText("偶函数"), conceptKey = "函数"
+                )
+            )
+        )
+
+        processor.process(
+            jobId = "job-check", job = job().copy(
+                contextEvidence = listOf(com.reversetutor.core.llm.LlmContextEvidence(handle, "书", "定义", "Source")),
+                assistantTurnEnvelope = LlmAssistantTurnEnvelope(
+                    window = LlmWindowContext("window-1", "window-1"),
+                    turnPlan = LlmTurnPlan(intent = "verify", actionType = "practice", studentRole = "student", knowledgePoint = "函数")
+                )
+            ), outcome = completion, nowEpochMillis = 100L
+        )
+
+        assertEquals(1, received.size)
+        assertEquals("passed", received.single().evidenceStatus)
+        assertEquals(1f, received.single().correctness, 0.0001f)
     }
 
     private fun job() = BackgroundGenerationJob(

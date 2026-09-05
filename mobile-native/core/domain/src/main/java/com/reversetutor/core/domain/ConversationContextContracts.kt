@@ -39,13 +39,23 @@ data class ErrorReferenceContract(
     val timestampEpochMillis: Long
 )
 
-/** A source evidence reference safe for UI display. */
+/**
+ * A source evidence reference safe for UI display.
+ *
+ * [sourceRevision] is a local, privacy-safe version token derived from the
+ * source's identity and its (re-)import timestamp. Reprocessing or importing
+ * the same logical source stamps a new revision so later turns can bind to the
+ * newer material while already-captured snapshots keep the revision — and
+ * therefore the content — they were built with. Defaulted so every pre-existing
+ * construction site stays source-compatible.
+ */
 data class SourceReferenceContract(
     val id: String,
     val title: String,
     val excerpt: String,
     val sourceType: String,
-    val relevanceScore: Float
+    val relevanceScore: Float,
+    val sourceRevision: String = ""
 )
 
 /** A safe warning emitted when a context source degrades. */

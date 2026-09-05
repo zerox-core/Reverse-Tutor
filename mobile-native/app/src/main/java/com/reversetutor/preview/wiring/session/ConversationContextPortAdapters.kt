@@ -117,6 +117,10 @@ class SourceContextPortAdapter(
         limit: Int
     ): List<SourceReferenceContract> =
         sourceRepository.listSourcesWithChunks(spaceId)
+            // Imports and reprocessing stamp a new local creation time. Reading
+            // newest-first makes a just-added chat/source document available to
+            // the next turn without altering an already snapshotted job.
+            .sortedByDescending { it.source.createdAtEpochMillis }
             .take(limit)
             .map { entry ->
                 SourceReferenceContract(
@@ -124,7 +128,11 @@ class SourceContextPortAdapter(
                     title = entry.source.title,
                     excerpt = entry.chunks.firstOrNull()?.text ?: "",
                     sourceType = entry.source.type.name,
-                    relevanceScore = 0f
+                    relevanceScore = 0f,
+                    // Local version token: import/reprocessing stamps a new
+                    // createdAt, so the next turn binds the newer revision while
+                    // already-saved snapshots keep the revision they captured.
+                    sourceRevision = "rev-${entry.source.id}-${entry.source.createdAtEpochMillis}"
                 )
             }
 }

@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 11
+    const val version = 12
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -101,6 +101,12 @@ object DatabaseSchema {
         }
     }
 
+    val migration11To12: Migration = object : Migration(11, 12) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE assistant_reply_artifacts ADD COLUMN checkPlanPayload TEXT")
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -111,7 +117,8 @@ object DatabaseSchema {
         migration7To8,
         migration8To9,
         migration9To10,
-        migration10To11
+        migration10To11,
+        migration11To12
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -634,6 +641,7 @@ object DatabaseSchema {
             blocksPayload TEXT NOT NULL,
             evidenceReferencesPayload TEXT NOT NULL,
             toolResultsPayload TEXT NOT NULL,
+            checkPlanPayload TEXT,
             createdAtEpochMillis INTEGER NOT NULL,
             PRIMARY KEY(assistantMessageId)
         )

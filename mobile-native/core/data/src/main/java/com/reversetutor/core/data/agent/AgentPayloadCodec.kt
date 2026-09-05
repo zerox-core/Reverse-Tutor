@@ -1,10 +1,44 @@
 package com.reversetutor.core.data.agent
 
+import com.reversetutor.core.llm.LlmSourceCheckRule
+import com.reversetutor.core.llm.LlmSourceGroundedCheckPlan
+
 /**
  * Small, deterministic codec for validated user-visible content. It deliberately
  * has no field for Provider output, retrieval body, URL, secret, or tool args.
  */
 internal object AgentPayloadCodec {
+    fun encodeCheckPlan(plan: LlmSourceGroundedCheckPlan): String = buildString {
+        val normalized = plan.normalized() ?: return ""
+        append(normalized.id.escape()).append('\t')
+            .append(normalized.sourceRevision.escape()).append('\t')
+            .append(encodeList(normalized.sourceReferenceIds)).append('\t')
+            .append(normalized.prompt.escape()).append('\t')
+            .append(normalized.expectedAnswer.escape()).append('\t')
+            .append(normalized.conceptKey.escape()).append('\t')
+        when (val rule = normalized.rule) {
+            is LlmSourceCheckRule.ExactText -> append("exact_text\t").append(rule.normalizedAnswer.escape())
+            is LlmSourceCheckRule.NumericTolerance -> append("numeric_tolerance\t").append(rule.expected).append(',').append(rule.tolerance)
+            is LlmSourceCheckRule.RequiredConcepts -> append("required_concepts\t").append(encodeList(rule.terms))
+            is LlmSourceCheckRule.Rubric -> append("rubric\t").append(encodeList(rule.criteria))
+        }
+    }
+
+    fun decodeCheckPlan(payload: String): LlmSourceGroundedCheckPlan? = runCatching {
+        val parts = payload.split('\t')
+        if (parts.size < 8) return null
+        val rule = when (parts[6]) {
+            "exact_text" -> LlmSourceCheckRule.ExactText(parts[7].unescape())
+            "numeric_tolerance" -> parts[7].split(',').let { LlmSourceCheckRule.NumericTolerance(it[0].toDouble(), it[1].toDouble()) }
+            "required_concepts" -> LlmSourceCheckRule.RequiredConcepts(decodeList(parts[7]))
+            "rubric" -> LlmSourceCheckRule.Rubric(decodeList(parts[7]))
+            else -> return null
+        }
+        LlmSourceGroundedCheckPlan(
+            id = parts[0].unescape(), sourceRevision = parts[1].unescape(), sourceReferenceIds = decodeList(parts[2]),
+            prompt = parts[3].unescape(), expectedAnswer = parts[4].unescape(), conceptKey = parts[5].unescape(), rule = rule
+        ).normalized()
+    }.getOrNull()
     fun encodeBlocks(blocks: List<RichDocumentBlock>): String = blocks.joinToString("\n") { block ->
         when (block) {
             is RichDocumentBlock.Heading -> "heading\t${block.level}\t${block.text.escape()}"

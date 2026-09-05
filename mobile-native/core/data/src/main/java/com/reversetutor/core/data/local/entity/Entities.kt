@@ -239,6 +239,7 @@ data class AssistantReplyArtifactEntity(
     val blocksPayload: String,
     val evidenceReferencesPayload: String,
     val toolResultsPayload: String,
+    val checkPlanPayload: String? = null,
     val createdAtEpochMillis: Long
 )
 

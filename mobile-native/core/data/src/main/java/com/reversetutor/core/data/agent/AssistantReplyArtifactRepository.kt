@@ -1,6 +1,7 @@
 package com.reversetutor.core.data.agent
 
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
+import com.reversetutor.core.llm.LlmSourceGroundedCheckPlan
 import com.reversetutor.core.data.local.dao.SessionAgentDao
 import com.reversetutor.core.data.local.entity.AssistantReplyArtifactEntity
 
@@ -10,6 +11,7 @@ data class AssistantReplyArtifact(
     val blocks: List<RichDocumentBlock>,
     val evidenceReferenceIds: List<String>,
     val toolResultCodes: List<String> = emptyList(),
+    val checkPlan: LlmSourceGroundedCheckPlan? = null,
     val createdAtEpochMillis: Long
 )
 
@@ -36,6 +38,7 @@ class AssistantReplyArtifactRepository(private val store: AssistantReplyArtifact
                 blocks = envelope.blocks.take(24).map { it.toDocumentBlock() },
                 evidenceReferenceIds = envelope.evidenceReferenceIds.map { it.trim().take(120) }.filter { it.isNotEmpty() }.distinct().take(6),
                 toolResultCodes = toolResultCodes.map { it.trim().take(80) }.filter { it.isNotEmpty() }.distinct().take(8),
+                checkPlan = envelope.checkPlan?.normalized(),
                 createdAtEpochMillis = nowEpochMillis
             )
         )
@@ -65,6 +68,7 @@ class RoomAssistantReplyArtifactStore(private val dao: SessionAgentDao) : Assist
                 blocksPayload = AgentPayloadCodec.encodeBlocks(artifact.blocks),
                 evidenceReferencesPayload = AgentPayloadCodec.encodeList(artifact.evidenceReferenceIds),
                 toolResultsPayload = AgentPayloadCodec.encodeList(artifact.toolResultCodes),
+                checkPlanPayload = artifact.checkPlan?.let(AgentPayloadCodec::encodeCheckPlan),
                 createdAtEpochMillis = artifact.createdAtEpochMillis
             )
         )
@@ -78,6 +82,7 @@ class RoomAssistantReplyArtifactStore(private val dao: SessionAgentDao) : Assist
                 blocks = AgentPayloadCodec.decodeBlocks(entity.blocksPayload),
                 evidenceReferenceIds = AgentPayloadCodec.decodeList(entity.evidenceReferencesPayload),
                 toolResultCodes = AgentPayloadCodec.decodeList(entity.toolResultsPayload),
+                checkPlan = entity.checkPlanPayload?.let(AgentPayloadCodec::decodeCheckPlan),
                 createdAtEpochMillis = entity.createdAtEpochMillis
             )
         }

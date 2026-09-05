@@ -125,6 +125,34 @@ class BackgroundGenerationRepository(
             .firstOrNull { it.status in ActiveStatuses }
             ?.toGenerationJob()
 
+    /**
+     * Returns only the bounded, structured plans of this window's completed
+     * user turns.  This is deliberately not a general job-history API: caller
+     * code never receives user text, assistant text, context evidence, model
+     * bindings, or Provider errors.
+     */
+    suspend fun listCompletedTurnPlans(
+        sessionId: String,
+        limit: Int = RecentTurnPlanLimit
+    ): List<CompletedTurnPlanSnapshot> =
+        backgroundJobDao.listGenerationBySession(sessionId.trim())
+            .asSequence()
+            .filter { entity ->
+                entity.kind == GenerationKind &&
+                    entity.status == BackgroundJobStatus.Completed.name
+            }
+            .mapNotNull { entity ->
+                val plan = entity.toGenerationJob()?.turnPlan?.normalized() ?: return@mapNotNull null
+                val completedAt = entity.completedAtEpochMillis ?: return@mapNotNull null
+                CompletedTurnPlanSnapshot(
+                    jobId = entity.id,
+                    completedAtEpochMillis = completedAt,
+                    turnPlan = plan
+                )
+            }
+            .toList()
+            .takeLast(limit.coerceIn(0, RecentTurnPlanLimit))
+
     suspend fun recoverInterruptedGenerationJobs(nowEpochMillis: Long): List<BackgroundGenerationJob> {
         val runnable = backgroundJobDao.listGenerationByStatuses(
             listOf(BackgroundJobStatus.Queued.name, BackgroundJobStatus.Running.name)
@@ -396,6 +424,7 @@ class BackgroundGenerationRepository(
         const val StaleTokenReason = "Generation token is stale"
         const val InitiativeExpiredReason = "Initiative plan expired"
         const val ProviderFailureReason = "background_generation_failed"
+        const val RecentTurnPlanLimit = 8
         val ActiveStatuses = setOf(BackgroundJobStatus.Queued.name, BackgroundJobStatus.Running.name)
     }
 }
@@ -450,6 +479,16 @@ data class BackgroundGenerationJob(
     val sessionPolicy: LlmSessionPolicyContext? = null,
     val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
     val turnPlan: TurnPlan? = null
+)
+
+/**
+ * Privacy-safe historical plan observation used by the guided-learning
+ * coordinator. It intentionally omits every transcript and Provider field.
+ */
+data class CompletedTurnPlanSnapshot(
+    val jobId: String,
+    val completedAtEpochMillis: Long,
+    val turnPlan: TurnPlan
 )
 
 sealed interface BackgroundGenerationOutcome {

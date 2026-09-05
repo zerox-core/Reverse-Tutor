@@ -168,6 +168,7 @@ private fun buildGeminiPayload(request: LlmGenerationRequest): LlmProviderPayloa
 
 private fun LlmGenerationRequest.productionUserText(): String {
     val context = buildList {
+        reverseTutorStudentPromptBlock()?.let { add(it) }
         sessionPolicyPromptBlock()?.let { add(it) }
         guidedLearningPlanPromptBlock()?.let { add(it) }
         quoteExcerpt?.takeIf { it.isNotBlank() }?.let { add("Quote: ${it.trim()}") }

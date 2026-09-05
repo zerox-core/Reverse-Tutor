@@ -247,8 +247,85 @@ data class LlmAssistantReplyEnvelope(
     val blocks: List<LlmRichContentBlock>,
     val evidenceReferenceIds: List<String> = emptyList(),
     val toolCalls: List<LlmToolCall> = emptyList(),
-    val outcome: StructuredTurnOutcome = StructuredTurnOutcome.EMPTY
+    val outcome: StructuredTurnOutcome = StructuredTurnOutcome.EMPTY,
+    val checkPlan: LlmSourceGroundedCheckPlan? = null
 )
+
+/**
+ * Provider-facing candidate for a source-grounded check. It is deliberately
+ * wire-only; the application layer must map it through the domain policy
+ * before it can influence a learning receipt.
+ */
+data class LlmSourceGroundedCheckPlan(
+    val id: String,
+    val sourceRevision: String,
+    val sourceReferenceIds: List<String>,
+    val prompt: String,
+    val expectedAnswer: String,
+    val rule: LlmSourceCheckRule,
+    val conceptKey: String = ""
+) {
+    fun normalized(): LlmSourceGroundedCheckPlan? {
+        val normalizedId = id.trim().take(80)
+        val revision = sourceRevision.trim().take(120)
+        val refs = sourceReferenceIds.map { it.trim().take(160) }
+            .filter { it.isNotEmpty() }.distinct().take(6)
+        val normalizedPrompt = prompt.trim().replace(Regex("\\s+"), " ").take(400)
+        val expected = expectedAnswer.trim().replace(Regex("\\s+"), " ").take(200)
+        val concept = conceptKey.trim().replace(Regex("\\s+"), " ").take(40)
+        if (normalizedId.isEmpty() || revision.isEmpty() || refs.isEmpty() || normalizedPrompt.isEmpty()) return null
+        if (listOf(normalizedId, revision, normalizedPrompt, expected, concept).any(::containsSensitive)) return null
+        val normalizedRule = rule.normalized() ?: return null
+        if (normalizedRule.fields().any(::containsSensitive)) return null
+        return copy(
+            id = normalizedId,
+            sourceRevision = revision,
+            sourceReferenceIds = refs,
+            prompt = normalizedPrompt,
+            expectedAnswer = expected,
+            rule = normalizedRule,
+            conceptKey = concept
+        )
+    }
+
+    private companion object {
+        val sensitive = listOf(
+            Regex("(?i)sk-[a-z0-9_-]{2,}"),
+            Regex("(?i)authorization\\s*[:=]"),
+            Regex("(?i)bearer\\s+[a-z0-9._-]+"),
+            Regex("(?i)https?://[^\\s]+")
+        )
+        fun containsSensitive(value: String): Boolean = sensitive.any { it.containsMatchIn(value) }
+    }
+}
+
+sealed interface LlmSourceCheckRule {
+    fun normalized(): LlmSourceCheckRule?
+    fun fields(): List<String>
+
+    data class ExactText(val normalizedAnswer: String) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule? = copy(normalizedAnswer = normalizedAnswer.trim().replace(Regex("\\s+"), " ").take(200))
+            .takeIf { it.normalizedAnswer.isNotEmpty() }
+        override fun fields(): List<String> = listOf(normalizedAnswer)
+    }
+
+    data class NumericTolerance(val expected: Double, val tolerance: Double) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule = copy(expected = expected.coerceIn(-1e9, 1e9), tolerance = tolerance.coerceIn(0.0, 1e6))
+        override fun fields(): List<String> = emptyList()
+    }
+
+    data class RequiredConcepts(val terms: List<String>) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule? = copy(terms = terms.map { it.trim().replace(Regex("\\s+"), " ").take(48) }.filter { it.isNotEmpty() }.distinct().take(12))
+            .takeIf { it.terms.isNotEmpty() }
+        override fun fields(): List<String> = terms
+    }
+
+    data class Rubric(val criteria: List<String>) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule? = copy(criteria = criteria.map { it.trim().replace(Regex("\\s+"), " ").take(160) }.filter { it.isNotEmpty() }.distinct().take(8))
+            .takeIf { it.criteria.isNotEmpty() }
+        override fun fields(): List<String> = criteria
+    }
+}
 
 fun LlmAssistantReplyEnvelope.timelineText(): String = blocks.joinToString("\n\n") { block ->
     when (block) {
@@ -460,6 +537,7 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
 
 private fun LlmGenerationRequest.contextualUserText(): String {
     val contextLines = buildList {
+        reverseTutorStudentPromptBlock()?.let { add(it) }
         turnPlanPromptBlock()?.let { add(it) }
         sessionPolicyPromptBlock()?.let { add(it) }
         guidedLearningPlanPromptBlock()?.let { add(it) }
@@ -488,6 +566,25 @@ private fun LlmGenerationRequest.contextualUserText(): String {
     return (contextLines + listOfNotNull(userText?.takeIf { it.isNotBlank() }))
         .joinToString(separator = "\n\n")
 }
+
+/**
+ * The teaching algorithm remains an internal decision layer. This boundary
+ * turns its output into the product's public role: the assistant is always the
+ * student and the user is the teacher. It is emitted only for turns that carry
+ * a session policy or guided plan, so legacy unplanned generation is unchanged.
+ */
+internal fun LlmGenerationRequest.reverseTutorStudentPromptBlock(): String? =
+    if (guidedTurnPlan?.normalized() == null && sessionPolicy?.normalized() == null) {
+        null
+    } else {
+        """
+            Reverse Tutor response contract:
+            - The user is the teacher. You are the student AI.
+            - Keep the teaching strategy invisible. Reply naturally as a student who is asking, testing an understanding, or reflecting on what the teacher said.
+            - Do not announce the plan, grade the teacher, switch into a lecturer voice, or give a complete authoritative solution in place of the teacher.
+            - If you use an example, present it as your own tentative attempt and ask the teacher to confirm or correct it.
+        """.trimIndent()
+    }
 
 private fun LlmGenerationRequest.turnPlanPromptBlock(): String? =
     assistantTurnEnvelope?.turnPlan?.normalized()?.let { plan ->
@@ -518,11 +615,18 @@ internal fun LlmGenerationRequest.guidedLearningPlanPromptBlock(): String? =
                 append("\nObjective: ").append(plan.learningObjective)
             }
             if (plan.expectedUserMove.isNotBlank()) {
-                append("\nExpected learner move: ").append(plan.expectedUserMove)
+                append("\nExpected teacher move: ").append(plan.expectedUserMove)
             }
+            append("\nStudent expression: ")
+                .append(LlmStudentExpressionPolicy.directiveFor(plan.actionType))
             append("\nResponse format: ").append(plan.responseFormat)
             append("\nHint level: ").append(plan.hintLevel)
             append("\nEvidence requirement: ").append(plan.evidenceRequirement)
+            if (plan.evidenceRequirement == "local_check") {
+                append("\nIf a source check is possible, include an optional checkPlan object in the JSON reply.")
+                append(" It must reference only the supplied source evidence ids and use one rule: exact_text, numeric_tolerance, required_concepts, or rubric.")
+                append(" Never include URLs, credentials, diagnostics, or mastery claims.")
+            }
         }
     }
 

@@ -3,6 +3,7 @@ package com.reversetutor.preview.wiring.session
 import com.reversetutor.core.data.background.BackgroundGenerationInput
 import com.reversetutor.core.data.background.BackgroundGenerationJob
 import com.reversetutor.core.domain.ConversationContextContract
+import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTurnPolicy
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
@@ -30,6 +31,7 @@ internal class BackgroundTurnPreparationCoordinator(
     private val isSessionDeleted: suspend (String) -> Boolean,
     private val assembleContext: suspend (String, String) -> ConversationContextContract,
     private val enqueueJob: suspend (BackgroundGenerationInput, Long) -> BackgroundGenerationJob,
+    private val loadRecentTurnSignals: suspend (String, String) -> RecentTurnSignals = { _, _ -> RecentTurnSignals() },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val loadMessages: (String) -> List<ConversationMessageContract> = { emptyList() },
     private val facade: SessionConversationFacade = SessionConversationFacade()
@@ -47,11 +49,25 @@ internal class BackgroundTurnPreparationCoordinator(
             }
 
             val context = assembleContext(request.spaceId, request.sessionId)
-            val guidedInput = request.sessionSnapshot.toGuidedLearningTurnInput(
+            val baseGuidedInput = request.sessionSnapshot.toGuidedLearningTurnInput(
                 spaceId = request.spaceId,
                 sessionId = request.sessionId,
-                context = context
+                context = context,
+                // userText is passed only so the mapper's deterministic intent
+                // classifier can categorize this turn; the guided input stores
+                // just the categorized enum, never the raw text.
+                userText = request.userText
             )
+            val recentSignals = try {
+                loadRecentTurnSignals(request.sessionId, baseGuidedInput.conceptKey)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // A read-only signal lookup can improve the next plan, but it
+                // must never prevent a valid user turn from being queued.
+                RecentTurnSignals()
+            }
+            val guidedInput = baseGuidedInput.copy(recentSignals = recentSignals).normalized()
             val turnPlan = request.turnPlan ?: guidedInput.selectGuidedLearningPlan()
             val policy = SessionTurnPolicy.normalize(
                 request.sessionSnapshot.toSessionPolicyInput(request.userText)

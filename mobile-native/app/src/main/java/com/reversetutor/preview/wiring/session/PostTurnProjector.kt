@@ -77,6 +77,37 @@ class PostTurnProjector(
         sink.record(jobId, locallyVerified)
         return true
     }
+
+    /**
+     * NEWMP-V1-002 plan Task 4 · source-grounded projection.
+     *
+     * Evidence fields come exclusively from [verifier] running the deterministic
+     * SourceGroundedCheckPolicy over the saved plan and the current source
+     * revision; [outcome] contributes only window/knowledge-point identity.
+     * Undecidable checks (rubric, version drift) and rejected plans write nothing.
+     * Both entry points dedupe by the same job-id set, so replays after restart
+     * or retry cannot double-write the ledger.
+     */
+    suspend fun projectCheck(
+        input: LocalLearningEvidenceInput,
+        outcome: StructuredTurnOutcome,
+        verifier: SourceGroundedEvidenceVerifier
+    ): Boolean {
+        if (outcome == StructuredTurnOutcome.EMPTY) return false
+        val normalized = outcome.normalized()
+        val verification = verifier.verifySourceGrounded(input) ?: return false
+        if (!verification.isAccepted()) return false
+        val locallyVerified = normalized.copy(
+            correctness = verification.correctness.coerceIn(0f, 1f),
+            depth = verification.depth.coerceIn(0f, 1f),
+            evidenceType = verification.evidenceType,
+            evidenceStatus = verification.evidenceStatus
+        ).normalized()
+        if (!locallyVerified.isLearningOutcome()) return false
+        if (!projectedJobIds.add(input.jobId)) return false
+        sink.record(input.jobId, locallyVerified)
+        return true
+    }
 }
 
 /**

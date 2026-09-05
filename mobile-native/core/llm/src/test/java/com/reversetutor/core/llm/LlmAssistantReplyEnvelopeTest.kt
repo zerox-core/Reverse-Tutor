@@ -54,4 +54,26 @@ class LlmAssistantReplyEnvelopeTest {
         assertTrue(parsed.toolCalls.isEmpty())
         assertTrue(parsed.blocks.single() is LlmRichContentBlock.Paragraph)
     }
+
+    @Test
+    fun parserKeepsBoundedSourceCheckOnlyWhenReferencesAreWhitelisted() {
+        val parsed = LlmAssistantReplyEnvelopeParser.parseValidated(
+            rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"复述"}],"evidenceReferenceIds":["source:book:rev-1"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-1","sourceRevision":"rev-1","sourceReferenceIds":["source:book:rev-1"],"prompt":"说明定义","expectedAnswer":"偶函数","rule":{"type":"exact_text","normalizedAnswer":"偶函数"},"conceptKey":"函数"}}""",
+            allowedEvidenceIds = setOf("source:book:rev-1")
+        )
+
+        assertEquals("rev-1", parsed?.checkPlan?.sourceRevision)
+        assertTrue(parsed?.checkPlan?.rule is LlmSourceCheckRule.ExactText)
+    }
+
+    @Test
+    fun parserDropsSourceCheckWithUnknownReferenceWithoutDroppingChat() {
+        val parsed = LlmAssistantReplyEnvelopeParser.parseValidated(
+            rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"复述"}],"evidenceReferenceIds":[],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-1","sourceRevision":"rev-1","sourceReferenceIds":["source:book:rev-1"],"prompt":"说明定义","expectedAnswer":"偶函数","rule":{"type":"exact_text","normalizedAnswer":"偶函数"},"conceptKey":"函数"}}""",
+            allowedEvidenceIds = setOf("source:other:rev-2")
+        )
+
+        assertTrue(parsed != null)
+        assertEquals(null, parsed?.checkPlan)
+    }
 }

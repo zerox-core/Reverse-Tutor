@@ -7,6 +7,7 @@ import com.reversetutor.core.data.agent.RoomAssistantReplyArtifactStore
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.heartbeat.WindowHeartbeatRepository
+import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
@@ -66,6 +67,7 @@ import com.reversetutor.preview.shell.ChallengeRuntimeCoordinator
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 import com.reversetutor.preview.wiring.session.BackgroundTurnPreparationCoordinator
+import com.reversetutor.preview.wiring.session.RecentTurnSignalsReader
 import com.reversetutor.preview.wiring.session.SessionConversationAssembly
 import com.reversetutor.preview.wiring.session.TopologyAwareMessageContextPort
 import com.reversetutor.preview.wiring.session.WindowVisibleHistoryReader
@@ -216,6 +218,10 @@ class HybridAppGraph private constructor(
             val database = DataModule.database(appContext)
             val windowTopologyRepository = WindowTopologyRepository(database.windowTopologyDao())
             val windowHeartbeatRepository = WindowHeartbeatRepository(database.windowHeartbeatDao())
+            val recentTurnSignalsReader = RecentTurnSignalsReader(
+                loadCompletedPlans = backgroundGenerationRepository::listCompletedTurnPlans,
+                loadLearningFacts = LearningLedgerRepository(database.learningLedgerDao())::listLearningFactsForWindow
+            )
             val sessionRichReplyPort: SessionRichReplyPort = SessionRichReplyPortAdapter(
                 AssistantReplyArtifactRepository(RoomAssistantReplyArtifactStore(database.sessionAgentDao()))
             )
@@ -246,7 +252,8 @@ class HybridAppGraph private constructor(
                     },
                     enqueueJob = { input, now ->
                         backgroundGenerationRepository.enqueueGenerationJob(input, now)
-                    }
+                    },
+                    loadRecentTurnSignals = recentTurnSignalsReader::read
                 )
             val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(
                 sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },

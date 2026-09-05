@@ -170,4 +170,72 @@ class BackgroundTurnPreparationCoordinatorTest {
         assertTrue(body.contains("掌握函数单调性"))
         assertTrue(body.contains("每次追问一个为什么"))
     }
+
+    // Task 5: a failing signal read must never block a legitimate user turn.
+    @Test
+    fun signal_reader_failure_still_queues_with_empty_signals() = runBlocking {
+        queuedInputs.clear()
+        val flaky = BackgroundTurnPreparationCoordinator(
+            isSessionDeleted = { false },
+            assembleContext = { _, _ -> ConversationContextContract.empty("space-1", "session-1") },
+            enqueueJob = { input, now ->
+                queuedInputs.add(input)
+                BackgroundGenerationJob(
+                    id = "job-sig", spaceId = input.spaceId, sessionId = input.sessionId,
+                    userMessageId = input.userMessageId, userText = input.userText,
+                    token = input.token, modelBindingId = null,
+                    status = BackgroundJobStatus.Queued, createdAtEpochMillis = now,
+                    startedAtEpochMillis = null, completedAtEpochMillis = null,
+                    errorMessage = null, capabilities = null, quoteExcerpt = null,
+                    imageAttachments = input.imageAttachments,
+                    contextEvidence = input.contextEvidence, sessionPolicy = input.sessionPolicy
+                )
+            },
+            nowEpochMillis = { 1000L },
+            loadRecentTurnSignals = { _, _ -> error("store unavailable") }
+        )
+        val result = flaky.prepareAndEnqueue(request("给我一点提示"))
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+        // empty signals on failure: no forced hint-streak switch; the selector falls back
+        // to its normal scoring path (unknown concept -> Diagnose first)
+        assertEquals(com.reversetutor.core.domain.TeachingAction.Diagnose, queuedInputs.single().turnPlan!!.actionType)
+    }
+
+    // Task 5: consecutive-hint signals recovered from completed plans switch strategy.
+    @Test
+    fun consecutive_hint_signals_switch_the_current_plan_away_from_hint() = runBlocking {
+        queuedInputs.clear()
+        val withSignals = BackgroundTurnPreparationCoordinator(
+            isSessionDeleted = { false },
+            assembleContext = { _, _ -> ConversationContextContract.empty("space-1", "session-1") },
+            enqueueJob = { input, now ->
+                queuedInputs.add(input)
+                BackgroundGenerationJob(
+                    id = "job-hint", spaceId = input.spaceId, sessionId = input.sessionId,
+                    userMessageId = input.userMessageId, userText = input.userText,
+                    token = input.token, modelBindingId = null,
+                    status = BackgroundJobStatus.Queued, createdAtEpochMillis = now,
+                    startedAtEpochMillis = null, completedAtEpochMillis = null,
+                    errorMessage = null, capabilities = null, quoteExcerpt = null,
+                    imageAttachments = input.imageAttachments,
+                    contextEvidence = input.contextEvidence, sessionPolicy = input.sessionPolicy
+                )
+            },
+            nowEpochMillis = { 1000L },
+            loadRecentTurnSignals = { _, _ ->
+                com.reversetutor.core.domain.RecentTurnSignals(
+                    lastAction = com.reversetutor.core.domain.TeachingAction.Hint,
+                    askedForHintCount = 2
+                )
+            }
+        )
+        val result = withSignals.prepareAndEnqueue(request("给我一点提示"))
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+        val action = queuedInputs.single().turnPlan!!.actionType
+        assertTrue(
+            "hint streak must switch strategy, got $action",
+            action == com.reversetutor.core.domain.TeachingAction.SocraticQuestion ||
+                action == com.reversetutor.core.domain.TeachingAction.WorkedExample
+        )
+    }
 }

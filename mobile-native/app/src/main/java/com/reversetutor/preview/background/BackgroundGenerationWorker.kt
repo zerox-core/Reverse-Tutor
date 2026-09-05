@@ -20,6 +20,7 @@ import com.reversetutor.core.data.agent.SessionToolExecutionRepository
 import com.reversetutor.core.data.agent.ToolCallReceiptRepository
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
 import com.reversetutor.core.data.learning.LearningLedgerRepository
+import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.domain.LearningFactReceipt
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationRuntime
@@ -108,6 +109,7 @@ private fun completionProcessor(context: Context): BackgroundTurnCompletionProce
     val database = DataModule.database(context)
     val agentDao = database.sessionAgentDao()
     val ledger = LearningLedgerRepository(database.learningLedgerDao())
+    val sources = DataModule.sourceRepository(context)
     return BackgroundTurnCompletionProcessor(
         artifacts = AssistantReplyArtifactRepository(RoomAssistantReplyArtifactStore(agentDao)),
         tools = SessionToolExecutionRepository(
@@ -129,8 +131,24 @@ private fun completionProcessor(context: Context): BackgroundTurnCompletionProce
                     )
                 )
             }
-        )
+        ),
+        loadCurrentSourceRevision = { spaceId, sourceHandle ->
+            currentSourceRevision(sources, spaceId, sourceHandle)
+        }
     )
+}
+
+private suspend fun currentSourceRevision(
+    sources: SourceRepository,
+    spaceId: String,
+    sourceHandle: String
+): String? {
+    val sourceId = sourceHandle.removePrefix("source:")
+        .substringBeforeLast(':')
+        .takeIf { it.isNotBlank() } ?: return null
+    return sources.listSourcesWithChunks(spaceId)
+        .firstOrNull { it.source.id == sourceId }
+        ?.let { "rev-${it.source.id}-${it.source.createdAtEpochMillis}" }
 }
 
 internal fun backgroundGenerationRuntimeFor(

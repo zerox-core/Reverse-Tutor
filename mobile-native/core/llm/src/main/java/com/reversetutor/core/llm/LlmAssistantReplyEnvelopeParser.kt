@@ -36,7 +36,8 @@ object LlmAssistantReplyEnvelopeParser {
         val blocks = parseBlocks(root["blocks"] as? JsonValue.Array) ?: return fallback(rawText)
         val references = parseReferences(root["evidenceReferenceIds"] as? JsonValue.Array, allowedEvidenceIds) ?: return fallback(rawText)
         val calls = parseToolCalls(root["toolCalls"] as? JsonValue.Array) ?: return fallback(rawText)
-        return ParseResult(LlmAssistantReplyEnvelope(blocks, references, calls, parseOutcome(root["outcome"] as? JsonValue.Object)), true)
+        val checkPlan = parseCheckPlan(root["checkPlan"] as? JsonValue.Object, references.toSet())
+        return ParseResult(LlmAssistantReplyEnvelope(blocks, references, calls, parseOutcome(root["outcome"] as? JsonValue.Object), checkPlan), true)
     }
 
     private fun parseBlocks(value: JsonValue.Array?): List<LlmRichContentBlock>? {
@@ -118,6 +119,31 @@ object LlmAssistantReplyEnvelopeParser {
         ).normalized()
     }
 
+    private fun parseCheckPlan(value: JsonValue.Object?, allowedReferenceIds: Set<String>): LlmSourceGroundedCheckPlan? {
+        val plan = value ?: return null
+        if (!plan.hasOnly(setOf("id", "sourceRevision", "sourceReferenceIds", "prompt", "expectedAnswer", "rule", "conceptKey"))) return null
+        val id = safeText(plan["id"].stringValue(), 80) ?: return null
+        val revision = safeText(plan["sourceRevision"].stringValue(), 120) ?: return null
+        val refs = (plan["sourceReferenceIds"] as? JsonValue.Array)?.values?.map { safeText(it.stringValue(), 160) ?: return null } ?: return null
+        if (refs.isEmpty() || refs.any { it !in allowedReferenceIds }) return null
+        val prompt = safeText(plan["prompt"].stringValue(), 400) ?: return null
+        val expected = plan["expectedAnswer"].stringValue()?.trim()?.take(200).orEmpty()
+        val concept = plan["conceptKey"].stringValue()?.trim()?.take(40).orEmpty()
+        val ruleObject = plan["rule"] as? JsonValue.Object ?: return null
+        val rule = when (ruleObject["type"].stringValue()?.trim()?.lowercase()) {
+            "exact_text" -> ruleObject["normalizedAnswer"].stringValue()?.let(LlmSourceCheckRule::ExactText)
+            "numeric_tolerance" -> {
+                val number = ruleObject["expected"].numberValue()?.toDoubleOrNull() ?: return null
+                val tolerance = ruleObject["tolerance"].numberValue()?.toDoubleOrNull() ?: return null
+                LlmSourceCheckRule.NumericTolerance(number, tolerance)
+            }
+            "required_concepts" -> (ruleObject["terms"] as? JsonValue.Array)?.values?.map { it.stringValue() ?: return null }?.let(LlmSourceCheckRule::RequiredConcepts)
+            "rubric" -> (ruleObject["criteria"] as? JsonValue.Array)?.values?.map { it.stringValue() ?: return null }?.let(LlmSourceCheckRule::Rubric)
+            else -> null
+        } ?: return null
+        return LlmSourceGroundedCheckPlan(id, revision, refs, prompt, expected, rule, concept).normalized()
+    }
+
     private fun parseTextList(value: JsonValue.Array?, maxSize: Int, maxText: Int): List<String>? {
         if (value == null || value.values.isEmpty() || value.values.size > maxSize) return null
         return value.values.map { safeText(it.stringValue(), maxText) ?: return null }
@@ -131,7 +157,7 @@ object LlmAssistantReplyEnvelopeParser {
     private fun JsonValue.Object.hasOnly(fields: Set<String>): Boolean = values.keys.all(fields::contains)
 
     private data class ParseResult(val envelope: LlmAssistantReplyEnvelope, val isEnvelope: Boolean)
-    private val ROOT_FIELDS = setOf("version", "blocks", "evidenceReferenceIds", "toolCalls", "outcome")
+    private val ROOT_FIELDS = setOf("version", "blocks", "evidenceReferenceIds", "toolCalls", "outcome", "checkPlan")
     private val OUTCOME_FIELDS = setOf("windowId", "actionType", "studentRole", "knowledgePoint", "correctness", "depth", "evidenceType", "evidenceStatus", "processSummary", "initiativeSource")
 }
 

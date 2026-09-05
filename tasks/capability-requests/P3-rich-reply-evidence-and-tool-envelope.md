@@ -47,8 +47,28 @@ data class LlmToolCall(
 - 已有调用者缺省新字段时，planner 不注入新内容，完成结果的 envelope 为 `null` 或安全空值。
 - 资料脚注从 assistant timeline 文本中移除；资料引用以后作为 sideband artifact 交给 feature contract，前端可独立展示、打开或关闭。
 
-## 5. 不在本申请中的内容
+## 2.1 追加申请（2026-09-05，NEWMP 计划 Task 3）：可选资料检查计划快照
 
+在已批准的"可选字段"机制内，追加一个请求方向字段 `checkPlan`（`LlmGenerationRequest` 与 `ChatGenerationInput` 各一个可选、默认 `null` 字段；旧调用零变化）：
+
+```kotlin
+data class LlmCheckPlan(
+    val id: String,            // ≤80，本地检查计划标识
+    val sourceRevision: String,// ≤120，绑定的资料版本 token
+    val prompt: String,        // ≤400，检查题题目（有界、脱敏）
+    val ruleSummary: String    // 白名单: exact_text|numeric_tolerance|required_concepts|rubric
+)
+```
+
+安全边界：
+
+- prompt 块只携带**题目文本与规则类型摘要**；`expectedAnswer`、评分结果、掌握度、台账字段一律不进入 Provider 请求。
+- 计划句柄必须落在本轮上下文证据白名单内；未知规则类型、空版本或含 URL/Authorization/Bearer/`sk-` 片段的字段整体 fail-closed 丢弃（`normalized() = null`），不产生部分块。
+- 三条 Provider 路径（OpenAI-compatible、Anthropic-compatible、Gemini）注入同一个块，保持行为一致。
+- 不新增 assistant 写入路径；不新增第二条 Provider 调用路径；Worker 仍是唯一调用者与写入者。
+- 原始用户消息保持不变，检查计划是附加结构化上下文，不改写 user text。
+
+## 5. 不在本申请中的内容
 - 不修改 `core:model`、`core:protocol`、SecretStore、导入导出、签名、PWA/Capacitor。
 - 不创建 Room entity、DAO、schema 或 migration；工件、文档、表格、工具回执的持久化仅由独立 P6 申请授权。
 - 不接入 DeepSeek Harness 运行时、第三方插件、文件/网络/shell 工具，也不调用真实 Provider。
@@ -63,3 +83,4 @@ data class LlmToolCall(
 
 - [x] 用户已于 2026-09-01 单独批准 P3：允许上述生成协议、富回复、独立资料引用和工具调用信封能力。
 - [ ] 批准后先提交受影响字段、兼容性、测试与回滚说明，再进入 Task 3 实现。
+- [ ] §2.1 `checkPlan` 可选快照字段：**待用户批准**。批准前不修改 `core:llm` 生成协议与 `ChatGenerationRepository`；资料驱动检查的领域契约与本地验证策略（`SourceGroundedCheck*`）不受影响、已在 `core:domain` 落地。

@@ -98,7 +98,10 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
 
     sourceEvidence.forEach { src ->
         evidence.add(LlmContextEvidence(
-            id = src.id,
+            // The evidence id embeds the source revision, so a snapshot taken
+            // before a re-import keeps its old, version-pinned id while the
+            // next turn naturally binds to the new revision.
+            id = "source:${src.id}:${src.sourceRevision.ifBlank { "legacy" }}",
             title = SessionTurnContracts.sanitizeContractText(src.title, maxLength = 120),
             body = SessionTurnContracts.sanitizeContractText(src.excerpt, maxLength = MaxEvidenceBodyChars),
             kind = "Source",

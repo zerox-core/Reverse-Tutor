@@ -7,7 +7,12 @@ import com.reversetutor.core.data.background.BackgroundGenerationOutcome
 import com.reversetutor.core.domain.SessionToolCall
 import com.reversetutor.core.domain.SessionToolResult
 import com.reversetutor.core.domain.ToolSafeResult
+import com.reversetutor.core.llm.timelineText
 import com.reversetutor.preview.wiring.session.PostTurnProjector
+import com.reversetutor.preview.wiring.session.SourceGroundedEvidenceVerifier
+import com.reversetutor.preview.wiring.session.SourceGroundedLocalVerifier
+import com.reversetutor.preview.wiring.session.toDomainCheckPlan
+import com.reversetutor.preview.wiring.session.LocalLearningEvidenceInput
 
 /**
  * Runs only after the existing generation repository has written the assistant
@@ -16,7 +21,9 @@ import com.reversetutor.preview.wiring.session.PostTurnProjector
 class BackgroundTurnCompletionProcessor(
     private val artifacts: AssistantReplyArtifactRepository,
     private val tools: SessionToolExecutionRepository,
-    private val projector: PostTurnProjector
+    private val projector: PostTurnProjector,
+    private val sourceGroundedVerifier: SourceGroundedEvidenceVerifier = SourceGroundedLocalVerifier(),
+    private val loadCurrentSourceRevision: suspend (String, String) -> String? = { _, _ -> null }
 ) {
     suspend fun process(
         jobId: String,
@@ -25,6 +32,11 @@ class BackgroundTurnCompletionProcessor(
         nowEpochMillis: Long
     ): List<SessionToolResult> {
         val envelope = outcome.replyEnvelope
+        val storedArtifact = if (envelope == null) {
+            artifacts.read(job.sessionId, outcome.assistantMessageId)
+        } else {
+            null
+        }
         val results = envelope?.toolCalls.orEmpty().map { call ->
             tools.execute(
                 spaceId = job.spaceId,
@@ -42,10 +54,64 @@ class BackgroundTurnCompletionProcessor(
                 toolResultCodes = results.map(SessionToolResult::toArtifactCode),
                 nowEpochMillis = nowEpochMillis
             )
+            val allowedSourceHandles = job.contextEvidence
+                .filter { it.kind.equals("Source", ignoreCase = true) }
+                .map { it.id }
+                .toSet()
+            val checkPlan = envelope.checkPlan?.toDomainCheckPlan(allowedSourceHandles)
+            if (checkPlan != null) {
+                val currentRevision = loadCurrentSourceRevision(job.spaceId, checkPlan.sourceHandles.first())
+                    ?: ""
+                projector.projectCheck(
+                    input = LocalLearningEvidenceInput(
+                        jobId = jobId,
+                        plan = checkPlan,
+                        candidateAnswer = envelope.timelineText(),
+                        currentSourceRevision = currentRevision
+                    ),
+                    outcome = outcome.structuredOutcome.copy(
+                        knowledgePoint = outcome.structuredOutcome.knowledgePoint.ifBlank { checkPlan.conceptKey }
+                    ),
+                    verifier = sourceGroundedVerifier
+                )
+            }
+        } else if (storedArtifact != null) {
+            // A completed job can be replayed after process death. The durable
+            // artifact is the source of the bounded check plan and candidate
+            // blocks; no Provider call or second assistant write is needed.
+            val checkPlan = storedArtifact.checkPlan?.toDomainCheckPlan(
+                job.contextEvidence.filter { it.kind.equals("Source", ignoreCase = true) }
+                    .map { it.id }.toSet()
+            )
+            if (checkPlan != null) {
+                val currentRevision = loadCurrentSourceRevision(job.spaceId, checkPlan.sourceHandles.first()).orEmpty()
+                projector.projectCheck(
+                    input = LocalLearningEvidenceInput(
+                        jobId = jobId,
+                        plan = checkPlan,
+                        candidateAnswer = storedArtifact.blocks.joinToString("\n") { it.toCandidateText() },
+                        currentSourceRevision = currentRevision
+                    ),
+                    outcome = outcome.structuredOutcome.copy(
+                        knowledgePoint = outcome.structuredOutcome.knowledgePoint.ifBlank { checkPlan.conceptKey }
+                    ),
+                    verifier = sourceGroundedVerifier
+                )
+            }
         }
         projector.project(jobId, outcome.structuredOutcome)
         return results
     }
+}
+
+private fun com.reversetutor.core.data.agent.RichDocumentBlock.toCandidateText(): String = when (this) {
+    is com.reversetutor.core.data.agent.RichDocumentBlock.Heading -> text
+    is com.reversetutor.core.data.agent.RichDocumentBlock.Paragraph -> text
+    is com.reversetutor.core.data.agent.RichDocumentBlock.BulletList -> items.joinToString("\n")
+    is com.reversetutor.core.data.agent.RichDocumentBlock.NumberedList -> items.joinToString("\n")
+    is com.reversetutor.core.data.agent.RichDocumentBlock.CodeBlock -> code
+    is com.reversetutor.core.data.agent.RichDocumentBlock.Callout -> text
+    is com.reversetutor.core.data.agent.RichDocumentBlock.SimpleTable -> rows.joinToString("\n") { it.joinToString(" | ") }
 }
 
 private fun SessionToolResult.toArtifactCode(): String = when (val value = safeResult) {
