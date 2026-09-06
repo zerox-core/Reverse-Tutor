@@ -19,6 +19,7 @@ class CompositeLlmGenerationRuntime(
         fun production(
             transport: ProviderHttpTransport,
             secretResolver: LlmSecretResolver,
+            imagePayloadResolver: LlmImagePayloadResolver? = null,
             timeoutMillis: Int = DefaultProviderTimeoutMillis
         ): CompositeLlmGenerationRuntime =
             CompositeLlmGenerationRuntime(
@@ -26,19 +27,22 @@ class CompositeLlmGenerationRuntime(
                     LlmProviderProtocol.OpenAiCompatible,
                     transport,
                     secretResolver,
-                    timeoutMillis
+                    timeoutMillis,
+                    imagePayloadResolver
                 ),
                 anthropicCompatible = ProductionLlmGenerationRuntime(
                     LlmProviderProtocol.AnthropicCompatible,
                     transport,
                     secretResolver,
-                    timeoutMillis
+                    timeoutMillis,
+                    imagePayloadResolver
                 ),
                 geminiNative = ProductionLlmGenerationRuntime(
                     LlmProviderProtocol.GeminiNative,
                     transport,
                     secretResolver,
-                    timeoutMillis
+                    timeoutMillis,
+                    imagePayloadResolver
                 )
             )
     }
@@ -48,7 +52,8 @@ class ProductionLlmGenerationRuntime(
     private val protocol: LlmProviderProtocol,
     private val transport: ProviderHttpTransport,
     private val secretResolver: LlmSecretResolver,
-    private val timeoutMillis: Int = DefaultProviderTimeoutMillis
+    private val timeoutMillis: Int = DefaultProviderTimeoutMillis,
+    private val imagePayloadResolver: LlmImagePayloadResolver? = null
 ) : LlmGenerationRuntime {
     override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
         val secretRef = request.secretRef?.trim().orEmpty()
@@ -58,7 +63,19 @@ class ProductionLlmGenerationRuntime(
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?: return MissingCredential
-        val providerRequest = buildHttpRequest(request, secret)
+        val executionRequest = if (request.imageAttachments.isEmpty()) {
+            request
+        } else {
+            val resolver = imagePayloadResolver ?: return LlmGenerationResult.Failure(
+                message = "Provider configuration is invalid.", retryable = false
+            )
+            val images = request.imageAttachments.map { resolver.resolve(it) }
+            if (images.any { it == null }) return LlmGenerationResult.Failure(
+                message = "Provider configuration is invalid.", retryable = false
+            )
+            request.copy(resolvedImages = images.filterNotNull())
+        }
+        val providerRequest = buildHttpRequest(executionRequest, secret)
             ?: return LlmGenerationResult.Failure(
                 message = "Provider configuration is invalid.",
                 retryable = false
@@ -169,7 +186,18 @@ private fun buildGeminiPayload(request: LlmGenerationRequest): LlmProviderPayloa
             "contents" to listOf(
                 mapOf(
                     "role" to "user",
-                    "parts" to listOf(mapOf("text" to request.productionUserText()))
+                    "parts" to buildList {
+                        add(mapOf("text" to request.productionUserText()))
+                        request.resolvedImages.forEach { image ->
+                            add(mapOf(
+                                "inline_data" to mapOf(
+                                    "mime_type" to image.mimeType,
+                                    "data" to image.base64Data
+                                )
+                            ))
+                            Unit
+                        }
+                    }
                 )
             )
         )

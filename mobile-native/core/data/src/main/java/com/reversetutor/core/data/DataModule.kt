@@ -9,6 +9,7 @@ import com.reversetutor.core.data.background.GenerationPartialStore
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.learning.WidgetLayoutRepositoryImpl
 import com.reversetutor.core.data.llm.AndroidKeystoreSecretStore
+import com.reversetutor.core.data.llm.AndroidImagePayloadResolver
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.llm.LlmProfileRepository
 import com.reversetutor.core.data.llm.SecretStore
@@ -120,7 +121,8 @@ object DataModule {
         val secretStore = secretStore(context.applicationContext)
         return CompositeLlmGenerationRuntime.production(
             transport = UrlConnectionProviderHttpTransport(),
-            secretResolver = LlmSecretResolver(secretStore::get)
+            secretResolver = LlmSecretResolver(secretStore::get),
+            imagePayloadResolver = AndroidImagePayloadResolver(context.applicationContext)
         )
     }
 

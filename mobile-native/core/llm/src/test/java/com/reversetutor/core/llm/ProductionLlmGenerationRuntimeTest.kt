@@ -1,6 +1,7 @@
 package com.reversetutor.core.llm
 
 import com.reversetutor.core.model.LlmProviderKind
+import com.reversetutor.core.model.MessageAttachment
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -95,6 +96,37 @@ class ProductionLlmGenerationRuntimeTest {
 
         assertEquals(listOf("A", "B"), emitted)
         assertEquals("AB", result.visibleText)
+    }
+
+    @Test
+    fun localImageUriIsResolvedToProviderPayloadWithoutLeakingItsUri() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(200, """{"choices":[{"message":{"content":"OK"}}]}""")
+        )
+        val runtime = ProductionLlmGenerationRuntime(
+            protocol = LlmProviderProtocol.OpenAiCompatible,
+            transport = transport,
+            secretResolver = LlmSecretResolver { "resolved-value" },
+            imagePayloadResolver = LlmImagePayloadResolver {
+                LlmResolvedImage("image/png", "aW1hZ2U=")
+            }
+        )
+
+        runtime.generate(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                streaming = false,
+                imageAttachments = listOf(
+                    MessageAttachment(
+                        id = "image-1", spaceId = "space-1", messageId = "message-1",
+                        name = "question.png", mimeType = "image/png", uri = "content://private/image"
+                    )
+                )
+            )
+        )
+
+        val payload = transport.singleRequest().jsonBody
+        assertTrue(payload.contains("data:image/png;base64,aW1hZ2U="))
+        assertFalse(payload.contains("content://private/image"))
     }
 
     @Test

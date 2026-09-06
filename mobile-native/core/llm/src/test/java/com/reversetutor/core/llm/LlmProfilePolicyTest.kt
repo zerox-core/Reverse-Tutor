@@ -52,6 +52,19 @@ class LlmProfilePolicyTest {
     }
 
     @Test
+    fun approvedQwenFlashVisionProfileIsRecognizedWithoutEnablingAllQwenModels() {
+        val approved = LlmProfileCapabilityResolver.infer(
+            profile(LlmProviderKind.OpenAiCompatible, "qwen3.7-flash-2026-07-15")
+        )
+        val unmarked = LlmProfileCapabilityResolver.infer(
+            profile(LlmProviderKind.OpenAiCompatible, "qwen-text-only")
+        )
+
+        assertTrue(approved.supportsVision)
+        assertFalse(unmarked.supportsVision)
+    }
+
+    @Test
     fun validatorRejectsIncompleteProfilesAndRawSecretMetadata() {
         val result = LlmProfileValidator.validate(
             LlmProfileDraft(

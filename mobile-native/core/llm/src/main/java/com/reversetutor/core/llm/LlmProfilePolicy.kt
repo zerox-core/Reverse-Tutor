@@ -63,7 +63,8 @@ object LlmProfileCapabilityResolver {
             LlmProviderKind.OpenAiCompatible -> model.contains("gpt-4o") ||
                 model.contains("gpt-4.1") ||
                 model.contains("gpt-5") ||
-                model.contains("vision")
+                model.contains("vision") ||
+                model.startsWith("qwen3.7-flash")
             LlmProviderKind.AnthropicCompatible -> model.contains("claude-3") ||
                 model.contains("claude-4")
             LlmProviderKind.Gemini -> true

@@ -900,6 +900,7 @@ private fun DestinationContent(
     var sessionSettingsSources by remember(activeSessionId) { mutableStateOf(emptyList<SessionSource>()) }
     var pickedSessionSource by remember(activeSessionId) { mutableStateOf<PickedSessionSource?>(null) }
     var sessionSettingsPickerActive by remember { mutableStateOf(false) }
+    var chatSourcePickerActive by remember { mutableStateOf(false) }
     var sessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
     var failedSessionSettingsReplaceTarget by remember { mutableStateOf<String?>(null) }
     var invalidChatSourceReselectRequest by remember {
@@ -1029,6 +1030,30 @@ private fun DestinationContent(
                                 }
                             }
                         }
+                    } else if (chatSourcePickerActive) {
+                        context.tryPersistReadPermission(uri)
+                        val imported = sourceRepository.importSource(input, requestId)
+                        val sessionId = activeSessionId
+                        val usable = sessionId != null && imported.isUsable &&
+                            (!imported.source.extractedText.isNullOrBlank() ||
+                                imported.chunks.any { it.text.isNotBlank() })
+                        if (usable) {
+                            val currentSessionId = requireNotNull(sessionId)
+                            val persistence = hybridAppGraph.frontend.newSessionPersistence
+                            val snapshot = persistence.loadSessionSnapshot(currentSessionId)
+                            if (snapshot != null) {
+                                persistence.saveSessionSnapshot(
+                                    currentSessionId,
+                                    snapshot.copy(
+                                        sourceSelections = (snapshot.sourceSelections + imported.source.id).distinct()
+                                    )
+                                )
+                                sessionSettingsRefreshKey += 1
+                                pendingChatAttachmentNotice = "资料已加入本会话，将用于后续回复。"
+                            }
+                        } else {
+                            pendingChatAttachmentNotice = "资料未能解析为可用内容，请换一个文件。"
+                        }
                     } else {
                         pendingSourceImport = input
                     }
@@ -1036,13 +1061,17 @@ private fun DestinationContent(
                     if (sessionSettingsPickerActive) {
                         sessionSettingsImportError = "资料导入失败，请重试。"
                         failedSessionSettingsReplaceTarget = sessionSettingsReplaceTarget
+                    } else if (chatSourcePickerActive) {
+                        pendingChatAttachmentNotice = "资料导入失败，请重试。"
                     }
                 }
                 sessionSettingsPickerActive = false
+                chatSourcePickerActive = false
                 sessionSettingsReplaceTarget = null
             }
         } else {
             sessionSettingsPickerActive = false
+            chatSourcePickerActive = false
             sessionSettingsReplaceTarget = null
         }
     }
@@ -1256,6 +1285,17 @@ private fun DestinationContent(
                 evidenceTargetMessageId = pendingChatEvidenceTarget,
                 onPickImage = {
                     chatImageLauncher.launch(arrayOf("image/*"))
+                },
+                onPickLocalSource = {
+                    chatSourcePickerActive = true
+                    sourceFileLauncher.launch(
+                        arrayOf(
+                            "text/plain", "text/markdown", "text/html", "application/pdf",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                            "application/epub+zip", "image/*", "*/*"
+                        )
+                    )
                 },
                 onTakePhoto = { chatCameraLauncher.launch(null) },
                 onRequestCameraPermission = {

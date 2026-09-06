@@ -21,6 +21,8 @@ data class LlmGenerationRequest(
     val streaming: Boolean = true,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
+    /** Provider-ready image bytes, resolved only at execution time. */
+    val resolvedImages: List<LlmResolvedImage> = emptyList(),
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
     val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
@@ -404,6 +406,15 @@ private val InternalVisibleControlLine = Regex(
     "(?i)^(teaching policy|guided learning plan|initiative plan|action|secondary action|student role|knowledge point|objective|expected teacher move|student expression|response format|hint level|evidence requirement|evaluation correctness|learner emotion|correction timing|turn intent)\\s*:\\s*.*$"
 )
 
+data class LlmResolvedImage(
+    val mimeType: String,
+    val base64Data: String
+)
+
+fun interface LlmImagePayloadResolver {
+    suspend fun resolve(attachment: MessageAttachment): LlmResolvedImage?
+}
+
 sealed interface LlmGenerationPlan {
     data class Ready(val request: LlmGenerationRequest) : LlmGenerationPlan
     data class Blocked(val reason: LlmGenerationBlockReason) : LlmGenerationPlan
@@ -704,17 +715,21 @@ private fun LlmGenerationRequest.openAiUserContent(): Any =
     } else {
         buildList<Map<String, Any?>> {
             add(mapOf("type" to "text", "text" to contextualUserText()))
-            imageAttachments.forEach { attachment ->
+            if (resolvedImages.isNotEmpty()) resolvedImages.forEach { image ->
                 add(
                     mapOf(
                         "type" to "image_url",
                         "image_url" to mapOf(
-                            "url" to attachment.uri.orEmpty(),
+                            "url" to "data:${image.mimeType};base64,${image.base64Data}",
                             "detail" to "auto"
-                        ),
-                        "metadata" to attachment.toPayloadMetadata()
+                        )
                     )
                 )
+            } else imageAttachments.forEach { attachment ->
+                add(mapOf(
+                    "type" to "image_url",
+                    "image_url" to mapOf("url" to attachment.uri.orEmpty(), "detail" to "auto")
+                ))
             }
         }
     }
@@ -725,30 +740,31 @@ private fun LlmGenerationRequest.anthropicUserContent(): Any =
     } else {
         buildList<Map<String, Any?>> {
             add(mapOf("type" to "text", "text" to contextualUserText()))
-            imageAttachments.forEach { attachment ->
+            if (resolvedImages.isNotEmpty()) resolvedImages.forEach { image ->
                 add(
                     mapOf(
                         "type" to "image",
                         "source" to mapOf(
                             "type" to "base64",
-                            "media_type" to (attachment.mimeType ?: "image/*"),
-                            "data" to attachment.uri.orEmpty()
-                        ),
-                        "metadata" to attachment.toPayloadMetadata()
+                            "media_type" to image.mimeType,
+                            "data" to image.base64Data
+                        )
                     )
                 )
+            } else imageAttachments.forEach { attachment ->
+                add(mapOf(
+                    "type" to "image",
+                    "source" to mapOf(
+                        "type" to "base64",
+                        "media_type" to (attachment.mimeType ?: "image/*"),
+                        "data" to attachment.uri.orEmpty()
+                    )
+                ))
             }
         }
     }
 
+
 private fun MessageAttachment.isImageAttachment(): Boolean =
     mimeType?.startsWith("image/") == true || uri?.startsWith("content://") == true
 
-private fun MessageAttachment.toPayloadMetadata(): Map<String, String?> =
-    mapOf(
-        "id" to id,
-        "name" to name,
-        "mimeType" to mimeType,
-        "uri" to uri,
-        "sourceId" to sourceId
-    )

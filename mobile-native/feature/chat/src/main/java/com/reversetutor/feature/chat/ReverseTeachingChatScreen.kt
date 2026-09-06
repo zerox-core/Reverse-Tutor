@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.MoreVert
@@ -165,6 +166,7 @@ internal fun ReverseTeachingChatScreen(
     cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     onOpenSearch: () -> Unit = {},
     onPickImages: () -> Unit = onCreateImageDraft,
+    onPickLocalSource: () -> Unit = {},
     onSelectSource: (ChatDraftAttachment) -> Unit = {},
     onTakePhoto: () -> Unit = {},
     onRequestCameraPermission: () -> Unit = {},
@@ -396,6 +398,10 @@ internal fun ReverseTeachingChatScreen(
             onPickImages = {
                 showAttachmentActions = false
                 onPickImages()
+            },
+            onPickLocalSource = {
+                showAttachmentActions = false
+                onPickLocalSource()
             },
             onPickSource = {
                 showAttachmentActions = false
@@ -1704,6 +1710,7 @@ private fun ChatAttachmentActionSheet(
     permissionState: ChatPermissionState,
     onDismiss: () -> Unit,
     onPickImages: () -> Unit,
+    onPickLocalSource: () -> Unit,
     onPickSource: () -> Unit,
     onTakePhoto: () -> Unit,
     onOpenSessionSources: () -> Unit
@@ -1717,6 +1724,7 @@ private fun ChatAttachmentActionSheet(
         )
         AttachmentSheetAction(Icons.Rounded.Collections, "选择图片", null, onPickImages)
         AttachmentSheetAction(Icons.Rounded.Description, "选择应用内资料", null, onPickSource)
+        AttachmentSheetAction(Icons.Rounded.FolderOpen, "从手机选择资料", null, onPickLocalSource)
         AttachmentSheetAction(
             Icons.Rounded.CameraAlt,
             "拍照",
