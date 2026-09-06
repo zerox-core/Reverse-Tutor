@@ -121,7 +121,7 @@ object LlmAssistantReplyEnvelopeParser {
 
     private fun parseCheckPlan(value: JsonValue.Object?, allowedReferenceIds: Set<String>): LlmSourceGroundedCheckPlan? {
         val plan = value ?: return null
-        if (!plan.hasOnly(setOf("id", "sourceRevision", "sourceReferenceIds", "prompt", "expectedAnswer", "rule", "conceptKey"))) return null
+        if (!plan.hasOnly(setOf("id", "sourceRevision", "sourceReferenceIds", "sourceRevisions", "prompt", "expectedAnswer", "rule", "conceptKey"))) return null
         val id = safeText(plan["id"].stringValue(), 80) ?: return null
         val revision = safeText(plan["sourceRevision"].stringValue(), 120) ?: return null
         val refs = (plan["sourceReferenceIds"] as? JsonValue.Array)?.values?.map { safeText(it.stringValue(), 160) ?: return null } ?: return null
@@ -141,7 +141,17 @@ object LlmAssistantReplyEnvelopeParser {
             "rubric" -> (ruleObject["criteria"] as? JsonValue.Array)?.values?.map { it.stringValue() ?: return null }?.let(LlmSourceCheckRule::Rubric)
             else -> null
         } ?: return null
-        return LlmSourceGroundedCheckPlan(id, revision, refs, prompt, expected, rule, concept).normalized()
+        val revisions = (plan["sourceRevisions"] as? JsonValue.Object)?.values
+            ?.let { entries ->
+                buildMap {
+                    for ((handle, value) in entries) {
+                        val key = safeText(handle, 160) ?: return null
+                        val revision = safeText(value.stringValue(), 120) ?: return null
+                        put(key, revision)
+                    }
+                }
+            } ?: emptyMap()
+        return LlmSourceGroundedCheckPlan(id, revision, refs, revisions, prompt, expected, rule, concept).normalized()
     }
 
     private fun parseTextList(value: JsonValue.Array?, maxSize: Int, maxText: Int): List<String>? {

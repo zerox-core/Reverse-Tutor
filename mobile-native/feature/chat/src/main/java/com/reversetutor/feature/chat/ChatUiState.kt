@@ -178,6 +178,10 @@ sealed interface ChatGenerationUiState {
         override val statusLabel: String = "正在生成回复..."
     }
 
+    data class Streaming(val text: String) : ChatGenerationUiState {
+        override val statusLabel: String = "正在生成回复..."
+    }
+
     data class Failure(val message: String) : ChatGenerationUiState {
         override val statusLabel: String = "生成失败：$message"
     }

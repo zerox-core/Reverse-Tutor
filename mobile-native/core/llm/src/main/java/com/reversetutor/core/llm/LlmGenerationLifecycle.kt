@@ -24,7 +24,9 @@ data class LlmGenerationRequest(
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
     val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
-    val guidedTurnPlan: LlmGuidedTurnPlan? = null
+    val guidedTurnPlan: LlmGuidedTurnPlan? = null,
+    /** Process-local preview only; never persisted or sent to a provider. */
+    val onStreamChunk: ((String) -> Unit)? = null
 )
 
 /**
@@ -260,6 +262,12 @@ data class LlmSourceGroundedCheckPlan(
     val id: String,
     val sourceRevision: String,
     val sourceReferenceIds: List<String>,
+    /**
+     * NEWMP-V1-004 Task 1: optional explicit handle -> revision bindings. When
+     * present it must cover every referenced handle; an empty map keeps the
+     * legacy single-revision semantics for old candidates and payloads.
+     */
+    val sourceRevisions: Map<String, String> = emptyMap(),
     val prompt: String,
     val expectedAnswer: String,
     val rule: LlmSourceCheckRule,
@@ -277,10 +285,20 @@ data class LlmSourceGroundedCheckPlan(
         if (listOf(normalizedId, revision, normalizedPrompt, expected, concept).any(::containsSensitive)) return null
         val normalizedRule = rule.normalized() ?: return null
         if (normalizedRule.fields().any(::containsSensitive)) return null
+        val explicitRevisions = sourceRevisions
+            .mapKeys { (handle, _) -> handle.trim().take(160) }
+            .mapValues { (_, revision) -> revision.trim().take(120) }
+        if (explicitRevisions.isNotEmpty() &&
+            (explicitRevisions.values.any { it.isEmpty() || containsSensitive(it) } ||
+                explicitRevisions.size != refs.size || refs.any { !explicitRevisions.containsKey(it) })
+        ) {
+            return null
+        }
         return copy(
             id = normalizedId,
             sourceRevision = revision,
             sourceReferenceIds = refs,
+            sourceRevisions = explicitRevisions,
             prompt = normalizedPrompt,
             expectedAnswer = expected,
             rule = normalizedRule,
@@ -327,6 +345,8 @@ sealed interface LlmSourceCheckRule {
     }
 }
 
+const val MaxVisibleTimelineCharacters = 1_200
+
 fun LlmAssistantReplyEnvelope.timelineText(): String = blocks.joinToString("\n\n") { block ->
     when (block) {
         is LlmRichContentBlock.Heading -> block.text
@@ -340,7 +360,7 @@ fun LlmAssistantReplyEnvelope.timelineText(): String = blocks.joinToString("\n\n
             block.rows.forEach { row -> append("\n").append(row.joinToString(" | ")) }
         }
     }
-}.trim()
+}.toVisibleTimelineText()
 
 data class LlmContextEvidence(
     val id: String,
@@ -365,6 +385,24 @@ data class LlmContextEvidence(
         )
     }
 }
+
+/**
+ * Final boundary before assistant text becomes a persisted chat message. The
+ * generation prompt may contain internal teaching controls, but those controls
+ * never form part of the student-facing conversation. This deliberately keeps
+ * Markdown-like prose and code intact while discarding only known control rows.
+ */
+fun String.toVisibleTimelineText(): String =
+    lineSequence()
+        .filterNot { it.trim().matches(InternalVisibleControlLine) }
+        .joinToString("\n")
+        .trim()
+        .take(MaxVisibleTimelineCharacters)
+        .ifBlank { "我还没整理好这一步，能再给我一点提示吗？" }
+
+private val InternalVisibleControlLine = Regex(
+    "(?i)^(teaching policy|guided learning plan|initiative plan|action|secondary action|student role|knowledge point|objective|expected teacher move|student expression|response format|hint level|evidence requirement|evaluation correctness|learner emotion|correction timing|turn intent)\\s*:\\s*.*$"
+)
 
 sealed interface LlmGenerationPlan {
     data class Ready(val request: LlmGenerationRequest) : LlmGenerationPlan
@@ -391,6 +429,7 @@ object LlmGenerationPlanner {
         sessionPolicy: LlmSessionPolicyContext? = null,
         assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
         guidedTurnPlan: LlmGuidedTurnPlan? = null,
+        onStreamChunk: ((String) -> Unit)? = null,
         allowPlanDrivenOpening: Boolean = false
     ): LlmGenerationPlan {
         val normalizedText = userText.orEmpty().trim()
@@ -432,7 +471,8 @@ object LlmGenerationPlanner {
                 contextEvidence = normalizedEvidence,
                 sessionPolicy = normalizedSessionPolicy,
                 assistantTurnEnvelope = normalizedEnvelope,
-                guidedTurnPlan = guidedTurnPlan?.normalized()
+                guidedTurnPlan = guidedTurnPlan?.normalized(),
+                onStreamChunk = onStreamChunk
             )
         )
     }
@@ -476,8 +516,19 @@ class FakeLlmGenerationRuntime(
     var realProviderCallCount: Int = 0
         private set
 
-    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
-        outcomes[request.token] ?: defaultResult
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+        val result = outcomes[request.token] ?: defaultResult
+        when (result) {
+            is LlmGenerationResult.Streamed -> {
+                result.chunks.forEach { chunk -> request.onStreamChunk?.invoke(chunk) }
+            }
+            is LlmGenerationResult.Success -> {
+                if (result.text.isNotBlank()) request.onStreamChunk?.invoke(result.text)
+            }
+            else -> Unit
+        }
+        return result
+    }
 }
 
 enum class LlmProviderProtocol {
@@ -583,6 +634,8 @@ internal fun LlmGenerationRequest.reverseTutorStudentPromptBlock(): String? =
             - Keep the teaching strategy invisible. Reply naturally as a student who is asking, testing an understanding, or reflecting on what the teacher said.
             - Do not announce the plan, grade the teacher, switch into a lecturer voice, or give a complete authoritative solution in place of the teacher.
             - If you use an example, present it as your own tentative attempt and ask the teacher to confirm or correct it.
+            - Complete exactly one teaching move in this turn. Keep it to at most three short paragraphs or four short lines.
+            - Stop after at most one clear question for the teacher; do not continue by answering that question yourself.
         """.trimIndent()
     }
 

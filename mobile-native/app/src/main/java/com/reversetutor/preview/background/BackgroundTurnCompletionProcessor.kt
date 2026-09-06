@@ -60,13 +60,12 @@ class BackgroundTurnCompletionProcessor(
                 .toSet()
             val checkPlan = envelope.checkPlan?.toDomainCheckPlan(allowedSourceHandles)
             if (checkPlan != null) {
-                val currentRevision = currentRevisionForCheck(job.spaceId, checkPlan.sourceHandles)
                 projector.projectCheck(
                     input = LocalLearningEvidenceInput(
                         jobId = jobId,
                         plan = checkPlan,
                         candidateAnswer = envelope.timelineText(),
-                        currentSourceRevision = currentRevision
+                        currentSourceRevisions = liveRevisionsFor(job.spaceId, checkPlan.sourceHandles)
                     ),
                     outcome = outcome.structuredOutcome.copy(
                         knowledgePoint = outcome.structuredOutcome.knowledgePoint.ifBlank { checkPlan.conceptKey }
@@ -83,13 +82,12 @@ class BackgroundTurnCompletionProcessor(
                     .map { it.id }.toSet()
             )
             if (checkPlan != null) {
-                val currentRevision = currentRevisionForCheck(job.spaceId, checkPlan.sourceHandles)
                 projector.projectCheck(
                     input = LocalLearningEvidenceInput(
                         jobId = jobId,
                         plan = checkPlan,
                         candidateAnswer = storedArtifact.blocks.joinToString("\n") { it.toCandidateText() },
-                        currentSourceRevision = currentRevision
+                        currentSourceRevisions = liveRevisionsFor(job.spaceId, checkPlan.sourceHandles)
                     ),
                     outcome = outcome.structuredOutcome.copy(
                         knowledgePoint = outcome.structuredOutcome.knowledgePoint.ifBlank { checkPlan.conceptKey }
@@ -103,23 +101,16 @@ class BackgroundTurnCompletionProcessor(
     }
 
     /**
-     * Plan Task 1: verify the *current* revision of every source handle that a
-     * check plan references. A drifted, deleted or unreadable handle yields "",
-     * which never equals the plan revision, so the whole plan comes back
-     * Unverified and no learning fact is written. When all handles are current,
-     * the first handle's live revision feeds the version check.
+     * V1-004 Task 1: resolve the live revision of every referenced handle. A
+     * deleted or unreadable source resolves to "" which can never match the
+     * plan's bound revision, so the whole plan comes back Unverified — no
+     * partial-source validation and no learning failure is recorded.
      */
-    private suspend fun currentRevisionForCheck(
+    private suspend fun liveRevisionsFor(
         spaceId: String,
         handles: List<String>
-    ): String {
-        if (handles.isEmpty()) return ""
-        handles.forEach { handle ->
-            val embedded = handle.substringAfterLast(":", "")
-            val live = loadCurrentSourceRevision(spaceId, handle) ?: return ""
-            if (embedded.isNotEmpty() && live != embedded) return ""
-        }
-        return loadCurrentSourceRevision(spaceId, handles.first()).orEmpty()
+    ): Map<String, String> = handles.associateWith { handle ->
+        loadCurrentSourceRevision(spaceId, handle).orEmpty()
     }
 }
 

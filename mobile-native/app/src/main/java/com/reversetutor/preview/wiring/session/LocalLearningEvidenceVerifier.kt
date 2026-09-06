@@ -26,7 +26,9 @@ data class LocalLearningEvidenceInput(
     val jobId: String,
     val plan: SourceGroundedCheckPlan,
     val candidateAnswer: String,
-    val currentSourceRevision: String
+    /// Live revisions per handle (V1-004 Task 1): a missing or drifted handle makes the
+    /// whole plan Unverified.
+    val currentSourceRevisions: Map<String, String>
 )
 
 /**
@@ -54,7 +56,7 @@ class SourceGroundedLocalVerifier : SourceGroundedEvidenceVerifier {
         val decision = SourceGroundedCheckPolicy.validateAnswer(
             plan = input.plan,
             candidateAnswer = input.candidateAnswer,
-            currentSourceRevision = input.currentSourceRevision
+            currentSourceRevisions = input.currentSourceRevisions
         )
         val status = when (decision) {
             CheckVerification.VerifiedPassed -> MasteryEvidenceStatusWire.PASSED

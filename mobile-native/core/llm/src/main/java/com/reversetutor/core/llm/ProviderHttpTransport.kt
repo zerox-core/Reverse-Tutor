@@ -22,6 +22,12 @@ sealed interface ProviderHttpResult {
 
 fun interface ProviderHttpTransport {
     suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult
+
+    /** Optional line callback for streaming responses; legacy transports keep one-shot behavior. */
+    suspend fun executeStreaming(
+        request: ProviderHttpRequest,
+        onLine: (String) -> Unit
+    ): ProviderHttpResult = execute(request)
 }
 
 fun interface LlmSecretResolver {

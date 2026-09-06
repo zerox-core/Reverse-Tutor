@@ -64,7 +64,17 @@ class ProductionLlmGenerationRuntime(
                 retryable = false
             )
 
-        return when (val result = runCatching { transport.execute(providerRequest) }.getOrNull()) {
+        return when (val result = runCatching {
+            if (request.streaming) {
+                transport.executeStreaming(providerRequest) { line ->
+                    line.sseData().mapNotNull(::parseText).forEach { text ->
+                        request.onStreamChunk?.invoke(text)
+                    }
+                }
+            } else {
+                transport.execute(providerRequest)
+            }
+        }.getOrNull()) {
             is ProviderHttpResult.Response -> parseResponse(result, request.streaming)
             ProviderHttpResult.Timeout -> LlmGenerationResult.Timeout
             ProviderHttpResult.Failure, null -> LlmGenerationResult.Failure(

@@ -17,11 +17,23 @@ data class SourceGroundedCheckPlan(
     val id: String,
     val sourceRevision: String,
     val sourceHandles: List<String>,
+    /**
+     * NEWMP-V1-004 Task 1: explicit per-handle revision bindings. An empty map
+     * means the legacy single-revision format: every handle is validated
+     * against [sourceRevision]. A non-empty map must cover **every** handle in
+     * [sourceHandles] with a non-blank revision, so no referenced source can be
+     * validated less strictly than the others.
+     */
+    val sourceRevisions: Map<String, String> = emptyMap(),
     val prompt: String,
     val expectedAnswer: String,
     val rule: CheckRule,
     val conceptKey: String
-)
+) {
+    /** The revision this plan requires for one handle (explicit binding wins; legacy plans share [sourceRevision]). */
+    fun revisionFor(handle: String): String =
+        sourceRevisions[handle]?.takeIf { it.isNotBlank() } ?: sourceRevision
+}
 
 sealed interface CheckRule {
     /** Normalized exact-string decision. */

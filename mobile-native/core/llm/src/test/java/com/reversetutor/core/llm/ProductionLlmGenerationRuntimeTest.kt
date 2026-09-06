@@ -81,6 +81,23 @@ class ProductionLlmGenerationRuntimeTest {
     }
 
     @Test
+    fun streamingRuntimeReportsSseChunksBeforeReturningFinalResult() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(
+                200,
+                "data: {\"choices\":[{\"delta\":{\"content\":\"A\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"B\"}}]}\n\ndata: [DONE]"
+            )
+        )
+        val emitted = mutableListOf<String>()
+        val result = productionRuntime(LlmProviderProtocol.OpenAiCompatible, transport).generate(
+            request(LlmProviderKind.OpenAiCompatible).copy(onStreamChunk = emitted::add)
+        )
+
+        assertEquals(listOf("A", "B"), emitted)
+        assertEquals("AB", result.visibleText)
+    }
+
+    @Test
     fun productionRuntimeIncludesSessionPolicyInProviderPayload() = runBlocking {
         val transport = FakeProviderHttpTransport(
             ProviderHttpResult.Response(200, """{"choices":[{"message":{"content":"OK"}}]}""")
@@ -291,6 +308,15 @@ private class FakeProviderHttpTransport(
 
     override suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult {
         requests += request
+        return result
+    }
+
+    override suspend fun executeStreaming(
+        request: ProviderHttpRequest,
+        onLine: (String) -> Unit
+    ): ProviderHttpResult {
+        requests += request
+        (result as? ProviderHttpResult.Response)?.body?.lineSequence()?.forEach(onLine)
         return result
     }
 

@@ -233,6 +233,33 @@ class ChatGenerationRepositoryTest {
     }
 
     @Test
+    fun streamedReplyReportsChunksInOrderButPersistsOneAssistantMessage() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val previews = mutableListOf<String>()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = FakeLlmGenerationRuntime(
+                defaultResult = LlmGenerationResult.Streamed(listOf("先看", "第一步。"))
+            )
+        )
+
+        repository.generateReply(
+            input = input("token-preview"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true },
+            onChunk = previews::add
+        )
+
+        assertEquals(listOf("先看", "第一步。"), previews)
+        assertEquals(1, messageRepository.listMessages("session-1").size)
+        assertEquals("先看第一步。", messageRepository.listMessages("session-1").single().text)
+    }
+
+    @Test
     fun staleGenerationTokenDoesNotPersistAssistantMessage() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
         val repository = ChatGenerationRepository(
@@ -380,6 +407,35 @@ class ChatGenerationRepositoryTest {
         assertFalse(text.contains("Sources:"))
         assertFalse(text.contains("message-1"))
         assertFalse(text.contains("source-1"))
+    }
+
+    @Test
+    fun plainProviderReplyIsSanitizedBeforeVisiblePersistence() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = FakeLlmGenerationRuntime(
+                defaultResult = LlmGenerationResult.Success(
+                    "Teaching policy:\nAction: probe\nKnowledge point: factoring\n" + "y".repeat(2_000)
+                )
+            )
+        )
+
+        repository.generateReply(
+            input = input("token-visible-sanitize"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        val visible = messageRepository.listMessages("session-1").single().text
+        assertFalse(visible.contains("Teaching policy:"))
+        assertFalse(visible.contains("Action: probe"))
+        assertFalse(visible.contains("Knowledge point: factoring"))
+        assertTrue(visible.length <= 1_200)
     }
 
     @Test

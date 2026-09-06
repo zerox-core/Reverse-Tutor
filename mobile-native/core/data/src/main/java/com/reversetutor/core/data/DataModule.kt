@@ -5,6 +5,7 @@ import androidx.room.Room
 import androidx.datastore.preferences.preferencesDataStore
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
+import com.reversetutor.core.data.background.GenerationPartialStore
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.learning.WidgetLayoutRepositoryImpl
 import com.reversetutor.core.data.llm.AndroidKeystoreSecretStore
@@ -42,6 +43,7 @@ private val Context.appPreferencesDataStore by preferencesDataStore(
 object DataModule {
     const val databaseName = "reverse_tutor_native.db"
     @Volatile private var databaseInstance: ReverseTutorDatabase? = null
+    private val generationPartialStore = GenerationPartialStore()
 
     fun appPreferencesRepository(context: Context): AppPreferencesRepository =
         AppPreferencesRepository(context.applicationContext.appPreferencesDataStore)
@@ -109,7 +111,8 @@ object DataModule {
             messageRepository = messageRepository(appContext),
             llmProfileRepository = llmProfileRepository(appContext),
             runtime = runtime ?: productionGenerationRuntime(appContext),
-            modelConnectionRepository = modelConnectionRepository(appContext)
+            modelConnectionRepository = modelConnectionRepository(appContext),
+            partialStore = generationPartialStore
         )
     }
 

@@ -324,4 +324,49 @@ class BackgroundTurnCompletionProcessorTest {
             (artifact!!.blocks.single() as com.reversetutor.core.data.agent.RichDocumentBlock.Paragraph).text
         )
     }
+
+    // V1-004 Task 1: end-to-end — an explicit handle->revision plan verifies
+    // per handle; when any source drifted the whole turn writes no ledger.
+    @Test
+    fun explicitMapPlanProjectsOnlyWhenEveryHandleIsCurrent() = runBlocking {
+        val received = mutableListOf<StructuredTurnOutcome>()
+        val handles = listOf("source:book:rev-a", "source:map:rev-b")
+        fun processorWith(live: (String) -> String?) = BackgroundTurnCompletionProcessor(
+            artifacts = AssistantReplyArtifactRepository(InMemoryAssistantReplyArtifactStore()),
+            tools = SessionToolExecutionRepository(
+                SessionDocumentRepository(InMemorySessionDocumentStore()),
+                SessionTableRepository(InMemorySessionTableStore()),
+                ToolCallReceiptRepository(InMemoryToolCallReceiptStore())
+            ),
+            projector = PostTurnProjector(TurnProjectionSink { _, outcome -> received += outcome }),
+            loadCurrentSourceRevision = { _, handle -> live(handle) }
+        )
+        val job = job().copy(
+            contextEvidence = handles.map {
+                com.reversetutor.core.llm.LlmContextEvidence(it, "资料", "定义", "Source")
+            }
+        )
+        val completion = BackgroundGenerationOutcome.Completed(
+            assistantMessageId = "assistant-map",
+            structuredOutcome = StructuredTurnOutcome(windowId = "window-1", knowledgePoint = "函数"),
+            replyEnvelope = LlmAssistantReplyEnvelope(
+                blocks = listOf(LlmRichContentBlock.Paragraph("偶函数")),
+                evidenceReferenceIds = handles,
+                checkPlan = LlmSourceGroundedCheckPlan(
+                    id = "check-explicit", sourceRevision = "rev-a", sourceReferenceIds = handles,
+                    sourceRevisions = mapOf(handles[0] to "rev-a", handles[1] to "rev-b"),
+                    prompt = "联合定义", expectedAnswer = "偶函数",
+                    rule = LlmSourceCheckRule.ExactText("偶函数"), conceptKey = "函数"
+                )
+            )
+        )
+        processorWith { handle -> if (handle == handles[0]) "rev-a" else "rev-b" }
+            .process("job-map-ok", job, completion, 100L)
+        assertEquals(1, received.size)
+
+        // map handle drifted (reprocessed material) -> the whole plan is Unverified
+        processorWith { handle -> if (handle == handles[0]) "rev-a" else "rev-b-v2" }
+            .process("job-map-drift", job, completion, 101L)
+        assertEquals(1, received.size)
+    }
 }

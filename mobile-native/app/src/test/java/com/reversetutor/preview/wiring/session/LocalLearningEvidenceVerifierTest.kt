@@ -50,7 +50,7 @@ class LocalLearningEvidenceVerifierTest {
                 jobId = "job-1",
                 plan = plan,
                 candidateAnswer = " 有一个重根 ",
-                currentSourceRevision = plan.sourceRevision
+                currentSourceRevisions = plan.sourceHandles.associateWith { plan.sourceRevision }
             )
         )
         assertTrue(evidence?.isAccepted() == true)
@@ -63,11 +63,11 @@ class LocalLearningEvidenceVerifierTest {
         val plan = groundedRule(CheckRule.NumericTolerance(expected = 4.0, tolerance = 0.5))
         val verifier = SourceGroundedLocalVerifier()
         val pass = verifier.verifySourceGrounded(
-            LocalLearningEvidenceInput("j", plan, "4.5", plan.sourceRevision)
+            LocalLearningEvidenceInput("j", plan, "4.5", plan.sourceHandles.associateWith { plan.sourceRevision })
         )
         assertEquals(MasteryEvidenceStatusWire.PASSED, pass?.evidenceStatus)
         val fail = verifier.verifySourceGrounded(
-            LocalLearningEvidenceInput("j", plan, "4.51", plan.sourceRevision)
+            LocalLearningEvidenceInput("j", plan, "4.51", plan.sourceHandles.associateWith { plan.sourceRevision })
         )
         assertEquals(MasteryEvidenceStatusWire.FAILED, fail?.evidenceStatus)
     }
@@ -76,7 +76,7 @@ class LocalLearningEvidenceVerifierTest {
     fun requiredConceptsMapToPartial() = runBlocking {
         val plan = groundedRule(CheckRule.RequiredConcepts(listOf("重根", "判别式")))
         val partial = SourceGroundedLocalVerifier().verifySourceGrounded(
-            LocalLearningEvidenceInput("j", plan, "这里判别式有点问题", plan.sourceRevision)
+            LocalLearningEvidenceInput("j", plan, "这里判别式有点问题", plan.sourceHandles.associateWith { plan.sourceRevision })
         )
         assertEquals(MasteryEvidenceStatusWire.PARTIAL, partial?.evidenceStatus)
     }
@@ -86,7 +86,7 @@ class LocalLearningEvidenceVerifierTest {
         val plan = groundedRule(CheckRule.Rubric(listOf("解释完整")))
         assertNull(
             SourceGroundedLocalVerifier().verifySourceGrounded(
-                LocalLearningEvidenceInput("j", plan, "我自认为讲清楚了", plan.sourceRevision)
+                LocalLearningEvidenceInput("j", plan, "我自认为讲清楚了", plan.sourceHandles.associateWith { plan.sourceRevision })
             )
         )
     }
@@ -96,7 +96,7 @@ class LocalLearningEvidenceVerifierTest {
         val plan = groundedRule(CheckRule.ExactText("有一个重根"))
         assertNull(
             SourceGroundedLocalVerifier().verifySourceGrounded(
-                LocalLearningEvidenceInput("j", plan, "有一个重根", currentSourceRevision = "rev-src-1-2000")
+                LocalLearningEvidenceInput("j", plan, "有一个重根", currentSourceRevisions = plan.sourceHandles.associateWith { "rev-src-1-2000" })
             )
         )
     }
@@ -109,7 +109,7 @@ class LocalLearningEvidenceVerifierTest {
                 jobId = "job-9",
                 plan = plan,
                 candidateAnswer = "有一个重根，这是一大段老师原文，含 https://api.invalid/x",
-                currentSourceRevision = plan.sourceRevision
+                currentSourceRevisions = plan.sourceHandles.associateWith { plan.sourceRevision }
             )
         )!!
         assertFalse(evidence.evidenceType.contains("重根"))
@@ -125,7 +125,7 @@ class LocalLearningEvidenceVerifierTest {
             sink = TurnProjectionSink { _, outcome -> sink += outcome }
         )
         val plan = groundedRule(CheckRule.ExactText("有一个重根"))
-        val input = LocalLearningEvidenceInput("job-x", plan, "有一个重根", plan.sourceRevision)
+        val input = LocalLearningEvidenceInput("job-x", plan, "有一个重根", plan.sourceHandles.associateWith { plan.sourceRevision })
         val outcome = com.reversetutor.core.llm.StructuredTurnOutcome(
             windowId = "window-1", knowledgePoint = "判别式"
         )

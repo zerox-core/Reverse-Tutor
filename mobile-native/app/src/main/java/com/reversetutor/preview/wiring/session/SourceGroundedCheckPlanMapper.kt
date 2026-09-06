@@ -22,6 +22,7 @@ internal fun LlmSourceGroundedCheckPlan.toDomainCheckPlan(
             id = normalized.id,
             sourceRevision = normalized.sourceRevision,
             sourceHandles = normalized.sourceReferenceIds,
+            sourceRevisions = normalized.sourceRevisions,
             prompt = normalized.prompt,
             expectedAnswer = normalized.expectedAnswer,
             rule = rule,

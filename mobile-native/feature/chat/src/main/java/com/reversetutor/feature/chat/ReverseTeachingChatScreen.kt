@@ -299,14 +299,24 @@ internal fun ReverseTeachingChatScreen(
             }
             state.generationStatusLabel?.let { label ->
                 item {
-                    GenerationRow(
-                        learnerName = state.learnerName,
-                        learnerAvatarReference = state.learnerAvatarReference,
-                        avatarVisible = state.avatarVisible,
-                        label = label,
-                        onOpenSettings = onOpenModelSettings,
-                        onRetry = null
-                    )
+                    val partial = (state.generation as? ChatGenerationUiState.Streaming)?.text
+                    if (partial.isNullOrBlank()) {
+                        GenerationRow(
+                            learnerName = state.learnerName,
+                            learnerAvatarReference = state.learnerAvatarReference,
+                            avatarVisible = state.avatarVisible,
+                            label = label,
+                            onOpenSettings = onOpenModelSettings,
+                            onRetry = null
+                        )
+                    } else {
+                        StreamingGenerationRow(
+                            learnerName = state.learnerName,
+                            learnerAvatarReference = state.learnerAvatarReference,
+                            avatarVisible = state.avatarVisible,
+                            text = partial
+                        )
+                    }
                 }
             }
             sessionContract?.let { contract ->
@@ -1542,6 +1552,33 @@ private fun GenerationRow(
                 Text("重试", color = Color(0xFF4264C7), fontSize = 11.sp)
             }
             else -> Text("•••", color = Color(0xFF6077B3), fontSize = 12.sp)
+        }
+    }
+}
+
+@Composable
+private fun StreamingGenerationRow(
+    learnerName: String,
+    learnerAvatarReference: LearnerAvatarReference?,
+    avatarVisible: Boolean,
+    text: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        if (avatarVisible) LearnerAvatar(learnerName, learnerAvatarReference)
+        Surface(
+            color = Color(0xFFF7F8FC),
+            contentColor = ChatInk,
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFFDCE2EC))
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                Text(text, fontSize = 14.sp, lineHeight = 21.sp)
+                Text("正在输入…", color = ChatMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+            }
         }
     }
 }

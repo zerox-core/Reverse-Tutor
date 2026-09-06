@@ -10,6 +10,7 @@ import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
 import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelopeParser
 import com.reversetutor.core.llm.timelineText
+import com.reversetutor.core.llm.toVisibleTimelineText
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationBlockReason
 import com.reversetutor.core.llm.LlmGenerationPlan
@@ -36,7 +37,8 @@ class ChatGenerationRepository(
         input: ChatGenerationInput,
         nowEpochMillis: Long,
         isTokenCurrent: (LlmGenerationToken) -> Boolean,
-        canPersistResult: suspend () -> Boolean = { true }
+        canPersistResult: suspend () -> Boolean = { true },
+        onChunk: (String) -> Unit = {}
     ): ChatGenerationOutcome {
         if (!isTokenCurrent(input.token)) {
             return ChatGenerationOutcome.Stale
@@ -57,6 +59,9 @@ class ChatGenerationRepository(
             sessionPolicy = input.sessionPolicy,
             assistantTurnEnvelope = input.assistantTurnEnvelope,
             guidedTurnPlan = input.turnPlan?.toLlmGuidedTurnPlan(),
+            onStreamChunk = { chunk ->
+                if (isTokenCurrent(input.token)) onChunk(chunk.toVisibleTimelineText())
+            },
             allowPlanDrivenOpening = input.allowPlanDrivenOpening
         )
 
@@ -81,7 +86,7 @@ class ChatGenerationRepository(
                         rawText = replyText,
                         allowedEvidenceIds = input.contextEvidence.mapNotNull { it.normalized()?.id }.toSet()
                     )
-                    val timelineText = parsedReply?.timelineText() ?: replyText
+                    val timelineText = parsedReply?.timelineText() ?: replyText.toVisibleTimelineText()
                     val assistantMessageId = "assistant-${input.token.value}"
                     messageRepository.saveMessage(
                         Message(

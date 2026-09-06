@@ -16,7 +16,9 @@ internal object AgentPayloadCodec {
             .append(normalized.prompt.escape()).append('\t')
             .append(normalized.expectedAnswer.escape()).append('\t')
             .append(normalized.conceptKey.escape()).append('\t')
+        append(encodeList(normalized.sourceRevisions.map { (handle, revision) -> "$handle=$revision" })).append('\t')
         when (val rule = normalized.rule) {
+
             is LlmSourceCheckRule.ExactText -> append("exact_text\t").append(rule.normalizedAnswer.escape())
             is LlmSourceCheckRule.NumericTolerance -> append("numeric_tolerance\t").append(rule.expected).append(',').append(rule.tolerance)
             is LlmSourceCheckRule.RequiredConcepts -> append("required_concepts\t").append(encodeList(rule.terms))
@@ -34,10 +36,19 @@ internal object AgentPayloadCodec {
             "rubric" -> LlmSourceCheckRule.Rubric(decodeList(parts[7]))
             else -> return null
         }
+        val revisions = parts.getOrNull(8)?.let { token ->
+            decodeList(token).mapNotNull { entry ->
+                val split = entry.indexOf('=')
+                if (split <= 0 || split == entry.length - 1) return null
+                entry.substring(0, split) to entry.substring(split + 1)
+            }.toMap()
+        } ?: emptyMap()
         LlmSourceGroundedCheckPlan(
             id = parts[0].unescape(), sourceRevision = parts[1].unescape(), sourceReferenceIds = decodeList(parts[2]),
+            sourceRevisions = revisions,
             prompt = parts[3].unescape(), expectedAnswer = parts[4].unescape(), conceptKey = parts[5].unescape(), rule = rule
         ).normalized()
+
     }.getOrNull()
     fun encodeBlocks(blocks: List<RichDocumentBlock>): String = blocks.joinToString("\n") { block ->
         when (block) {

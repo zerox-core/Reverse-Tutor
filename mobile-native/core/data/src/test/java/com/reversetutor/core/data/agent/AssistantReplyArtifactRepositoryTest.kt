@@ -56,4 +56,35 @@ class AssistantReplyArtifactRepositoryTest {
         val restored = repository.read("session-1", "assistant-check")!!.checkPlan
         assertEquals(plan.normalized(), restored)
     }
+
+    // V1-004 Task 1: the artifact payload round-trips explicit handle ->
+    // revision bindings; legacy payloads (without the field) still decode.
+    @Test
+    fun artifactRoundTripsExplicitRevisionMap() = kotlinx.coroutines.runBlocking {
+        val repository = AssistantReplyArtifactRepository(InMemoryAssistantReplyArtifactStore())
+        val plan = LlmSourceGroundedCheckPlan(
+            id = "check-2",
+            sourceRevision = "rev-primary",
+            sourceReferenceIds = listOf("source:book:rev-a", "source:map:rev-b"),
+            sourceRevisions = mapOf("source:book:rev-a" to "rev-a", "source:map:rev-b" to "rev-b"),
+            prompt = "联合检查",
+            expectedAnswer = "答案",
+            rule = LlmSourceCheckRule.RequiredConcepts(listOf("答案")),
+            conceptKey = "函数"
+        )
+        repository.save(
+            assistantMessageId = "assistant-map",
+            sessionId = "session-1",
+            envelope = LlmAssistantReplyEnvelope(
+                blocks = listOf(LlmRichContentBlock.Paragraph("答案在此")),
+                checkPlan = plan
+            ),
+            nowEpochMillis = 100L
+        )
+        val restored = repository.read("session-1", "assistant-map")!!.checkPlan!!
+        assertEquals(
+            mapOf("source:book:rev-a" to "rev-a", "source:map:rev-b" to "rev-b"),
+            restored.sourceRevisions
+        )
+    }
 }

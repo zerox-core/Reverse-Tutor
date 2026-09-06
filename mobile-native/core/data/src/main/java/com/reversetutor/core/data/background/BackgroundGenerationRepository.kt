@@ -29,7 +29,8 @@ class BackgroundGenerationRepository(
     messageRepository: MessageRepository,
     llmProfileRepository: LlmProfileRepository,
     runtime: LlmGenerationRuntime,
-    private val modelConnectionRepository: ExecutionModelResolver? = null
+    private val modelConnectionRepository: ExecutionModelResolver? = null,
+    private val partialStore: GenerationPartialStore = GenerationPartialStore()
 ) {
     private val chatGenerationRepository = ChatGenerationRepository(
         messageRepository = messageRepository,
@@ -280,11 +281,15 @@ class BackgroundGenerationRepository(
             isTokenCurrent = { it == job.token },
             canPersistResult = {
                 isSessionAvailable(job) && isGenerationTokenCurrent(job)
+            },
+            onChunk = { chunk ->
+                partialStore.append(job.id, job.token.value, chunk)
             }
         )
 
         return when (outcome) {
             is ChatGenerationOutcome.Generated -> {
+                partialStore.clear(job.id, job.token.value)
                 backgroundJobDao.upsert(
                     running.copy(
                         status = BackgroundJobStatus.Completed.name,
@@ -297,11 +302,11 @@ class BackgroundGenerationRepository(
                     replyEnvelope = outcome.replyEnvelope
                 )
             }
-            is ChatGenerationOutcome.ProviderFailed -> fail(running, nowEpochMillis, ProviderFailureReason)
-            ChatGenerationOutcome.NoModelConfigured -> fail(running, nowEpochMillis, "No model configured")
-            ChatGenerationOutcome.UnsupportedVision -> fail(running, nowEpochMillis, "Vision input unsupported")
-            ChatGenerationOutcome.BlankPrompt -> fail(running, nowEpochMillis, "Blank prompt")
-            ChatGenerationOutcome.Stale -> discard(running, nowEpochMillis, currentDiscardReason(job))
+            is ChatGenerationOutcome.ProviderFailed -> { partialStore.clear(job.id, job.token.value); fail(running, nowEpochMillis, ProviderFailureReason) }
+            ChatGenerationOutcome.NoModelConfigured -> { partialStore.clear(job.id, job.token.value); fail(running, nowEpochMillis, "No model configured") }
+            ChatGenerationOutcome.UnsupportedVision -> { partialStore.clear(job.id, job.token.value); fail(running, nowEpochMillis, "Vision input unsupported") }
+            ChatGenerationOutcome.BlankPrompt -> { partialStore.clear(job.id, job.token.value); fail(running, nowEpochMillis, "Blank prompt") }
+            ChatGenerationOutcome.Stale -> { partialStore.clear(job.id, job.token.value); discard(running, nowEpochMillis, currentDiscardReason(job)) }
         }
     }
 
@@ -415,6 +420,9 @@ class BackgroundGenerationRepository(
             initiativeSource = job.assistantTurnEnvelope.initiativeSource
         ).normalized()
     }
+
+    suspend fun getGenerationPreview(jobId: String, token: LlmGenerationToken): String? =
+        partialStore.get(jobId, token.value)
 
     private companion object {
         const val GenerationKind = "Generation"

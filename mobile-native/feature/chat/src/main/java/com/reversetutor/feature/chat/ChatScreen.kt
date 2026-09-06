@@ -327,6 +327,11 @@ fun ChatRoute(
         while (activeBackgroundJobId == jobId) {
             delay(250L)
             val job = repository.getJob(jobId) ?: return@LaunchedEffect
+            repository.getGenerationPreview(jobId, job.token)?.let { preview ->
+                if (job.status in setOf(BackgroundJobStatus.Queued, BackgroundJobStatus.Running)) {
+                    generation = ChatGenerationUiState.Streaming(preview)
+                }
+            }
             if (job.status in TerminalGenerationStatuses) {
                 if (activeGenerationToken == job.token) {
                     activeGenerationToken = null

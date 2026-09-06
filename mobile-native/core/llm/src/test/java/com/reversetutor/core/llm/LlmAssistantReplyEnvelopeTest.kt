@@ -1,6 +1,7 @@
 package com.reversetutor.core.llm
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -122,5 +123,52 @@ class LlmAssistantReplyEnvelopeTest {
             assertTrue("reply must survive", parsed != null)
             assertEquals("sensitive plan must be dropped: $needle", null, parsed?.checkPlan)
         }
+    }
+
+    // V1-004 Task 1: explicit per-handle revisions parse; a partial map drops
+    // the plan while the chat reply survives untouched.
+    @Test
+    fun parserHandlesExplicitRevisionMapAndPartialMapFailsClosed() {
+        val base = """"version":"v1","blocks":[{"type":"paragraph","text":"复述"}","""
+        val full = LlmAssistantReplyEnvelopeParser.parseValidated(
+            rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"复述"}],"evidenceReferenceIds":["source:book","source:map"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-map","sourceRevision":"rev-primary","sourceReferenceIds":["source:book","source:map"],"sourceRevisions":{"source:book":"rev-a","source:map":"rev-b"},"prompt":"联合定义","expectedAnswer":"答案","rule":{"type":"exact_text","normalizedAnswer":"答案"},"conceptKey":"函数"}}""",
+            allowedEvidenceIds = setOf("source:book", "source:map")
+        )
+        assertEquals("rev-a", full?.checkPlan?.sourceRevisions?.get("source:book"))
+        assertEquals("rev-b", full?.checkPlan?.sourceRevisions?.get("source:map"))
+
+        val partial = LlmAssistantReplyEnvelopeParser.parseValidated(
+            rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"复述"}],"evidenceReferenceIds":["source:book","source:map"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-map","sourceRevision":"rev-primary","sourceReferenceIds":["source:book","source:map"],"sourceRevisions":{"source:book":"rev-a"},"prompt":"联合定义","expectedAnswer":"答案","rule":{"type":"exact_text","normalizedAnswer":"答案"},"conceptKey":"函数"}}""",
+            allowedEvidenceIds = setOf("source:book", "source:map")
+        )
+        assertTrue("chat must survive a dropped plan", partial != null)
+        assertEquals(null, partial?.checkPlan)
+    }
+
+    @Test
+    fun visibleTimelineTextDropsInternalTeachingLabelsAndBoundsLongTurns() {
+        val envelope = LlmAssistantReplyEnvelope(
+            blocks = listOf(
+                LlmRichContentBlock.Paragraph(
+                    "Teaching policy:\nAction: probe\nKnowledge point: factoring\n先说第一步。\n" +
+                        "x".repeat(2_000)
+                )
+            ),
+            outcome = StructuredTurnOutcome(
+                windowId = "window-1",
+                actionType = "probe",
+                knowledgePoint = "factoring",
+                evidenceType = "explanation",
+                evidenceStatus = "passed"
+            )
+        )
+
+        val visible = envelope.timelineText()
+
+        assertTrue(visible.contains("先说第一步。"))
+        assertFalse(visible.contains("Teaching policy:"))
+        assertFalse(visible.contains("Action: probe"))
+        assertFalse(visible.contains("Knowledge point: factoring"))
+        assertTrue(visible.length <= 1_200)
     }
 }

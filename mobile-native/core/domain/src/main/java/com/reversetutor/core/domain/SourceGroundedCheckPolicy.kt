@@ -60,6 +60,18 @@ object SourceGroundedCheckPolicy {
         if (handles.isEmpty()) return null
         if (handles.any { it.length > HANDLE_MAX || !allowedSourceHandles.contains(it) }) return null
 
+        // Task 1: an explicit handle->revision map must cover every handle with a
+        // non-blank, bounded revision; a partial map could silently weaken the
+        // version check for unmapped sources.
+        val explicitRevisions = plan.sourceRevisions.entries
+            .filter { it.value.isNotBlank() }
+            .associate { (handle, revision) -> handle.trim().take(HANDLE_MAX) to revision.trim().take(REVISION_MAX) }
+        if (plan.sourceRevisions.isNotEmpty() &&
+            (explicitRevisions.size != handles.size || handles.any { !explicitRevisions.containsKey(it) })
+        ) {
+            return null
+        }
+
         val id = plan.id.trim().take(PLAN_ID_MAX)
         val prompt = collapseSpaces(plan.prompt).take(PROMPT_MAX)
         val expected = collapseSpaces(plan.expectedAnswer).take(EXPECTED_ANSWER_MAX)
@@ -96,6 +108,10 @@ object SourceGroundedCheckPolicy {
         val scanFields = buildList {
             add(id); add(revision); add(prompt); add(expected); add(conceptKey)
             addAll(handles)
+            explicitRevisions.forEach { (handle, boundRevision) ->
+                add(handle)
+                add(boundRevision)
+            }
             when (rule) {
                 is CheckRule.ExactText -> add(rule.normalizedAnswer)
                 is CheckRule.RequiredConcepts -> addAll(rule.terms)
@@ -109,6 +125,7 @@ object SourceGroundedCheckPolicy {
             id = id,
             sourceRevision = revision,
             sourceHandles = handles,
+            sourceRevisions = explicitRevisions,
             prompt = prompt,
             expectedAnswer = expected,
             rule = rule,
@@ -124,9 +141,26 @@ object SourceGroundedCheckPolicy {
         plan: SourceGroundedCheckPlan,
         candidateAnswer: String,
         currentSourceRevision: String
+    ): CheckVerification = validateAnswer(
+        plan,
+        candidateAnswer,
+        plan.sourceHandles.associateWith { currentSourceRevision.trim() }
+    )
+
+    fun validateAnswer(
+        plan: SourceGroundedCheckPlan,
+        candidateAnswer: String,
+        currentSourceRevisions: Map<String, String>
     ): CheckVerification {
-        if (plan.sourceRevision.isBlank() || currentSourceRevision.trim() != plan.sourceRevision) {
+        // Task 1: every referenced handle must still resolve, unchanged. Any
+        // missing handle (deleted/unreadable) or drifted revision makes the
+        // whole plan Unverified; nothing here writes or judges learning facts.
+        if (plan.sourceRevision.isBlank() && plan.sourceRevisions.isEmpty()) {
             return CheckVerification.Unverified
+        }
+        for (handle in plan.sourceHandles) {
+            val live = currentSourceRevisions[handle]?.trim() ?: return CheckVerification.Unverified
+            if (live != plan.revisionFor(handle).trim()) return CheckVerification.Unverified
         }
         return when (val rule = plan.rule) {
             is CheckRule.ExactText ->

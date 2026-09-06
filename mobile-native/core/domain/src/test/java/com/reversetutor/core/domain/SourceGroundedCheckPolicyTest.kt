@@ -163,4 +163,99 @@ class SourceGroundedCheckPolicyTest {
             SourceGroundedCheckPolicy.validateAnswer(grounded, "我不知道怎么算", rev)
         )
     }
+
+    // ---- V1-004 Task 1: explicit handle -> revision map ----
+
+    private val handleA = "source:book:rev-a"
+    private val handleB = "source:map:rev-b"
+    private val dualWhitelist = setOf(handleA, handleB)
+
+    private fun explicitPlan(revisions: Map<String, String>) = SourceGroundedCheckPlan(
+        id = "check-explicit",
+        sourceRevision = "rev-a",
+        sourceHandles = listOf(handleA, handleB),
+        sourceRevisions = revisions,
+        prompt = "两份资料联合定义",
+        expectedAnswer = "偶函数",
+        rule = CheckRule.ExactText("偶函数"),
+        conceptKey = "函数"
+    )
+
+    @Test
+    fun legacySingleRevisionPlanValidatesEveryHandleAgainstThePrimaryRevision() {
+        val plan = SourceGroundedCheckPolicy.normalize(
+            SourceGroundedCheckPlan(
+                id = "check-legacy", sourceRevision = "rev-1",
+                sourceHandles = listOf("source:book:rev-1", "source:map:rev-1"),
+                prompt = "题目", expectedAnswer = "答案",
+                rule = CheckRule.ExactText("答案"), conceptKey = "函数"
+            ),
+            setOf("source:book:rev-1", "source:map:rev-1")
+        )!!
+        assertEquals(
+            CheckVerification.VerifiedPassed,
+            SourceGroundedCheckPolicy.validateAnswer(
+                plan, "答案",
+                mapOf("source:book:rev-1" to "rev-1", "source:map:rev-1" to "rev-1")
+            )
+        )
+        assertEquals(
+            CheckVerification.Unverified,
+            SourceGroundedCheckPolicy.validateAnswer(
+                plan, "答案",
+                mapOf("source:book:rev-1" to "rev-1", "source:map:rev-1" to "rev-DRIFTED")
+            )
+        )
+    }
+
+    @Test
+    fun multiSourcePlanWithDistinctRevisionsVerifiesWhenAllAreCurrent() {
+        val plan = SourceGroundedCheckPolicy.normalize(
+            explicitPlan(mapOf(handleA to "rev-a", handleB to "rev-b")), dualWhitelist
+        )!!
+        assertEquals(
+            CheckVerification.VerifiedPassed,
+            SourceGroundedCheckPolicy.validateAnswer(plan, "偶函数", mapOf(handleA to "rev-a", handleB to "rev-b"))
+        )
+    }
+
+    @Test
+    fun anyDriftedRevisionUnverifiesTheWholePlan() {
+        val plan = SourceGroundedCheckPolicy.normalize(
+            explicitPlan(mapOf(handleA to "rev-a", handleB to "rev-b")), dualWhitelist
+        )!!
+        assertEquals(
+            CheckVerification.Unverified,
+            SourceGroundedCheckPolicy.validateAnswer(plan, "偶函数", mapOf(handleA to "rev-a", handleB to "rev-b-v2"))
+        )
+    }
+
+    @Test
+    fun deletedSourceUnverifiesTheWholePlan() {
+        val plan = SourceGroundedCheckPolicy.normalize(
+            explicitPlan(mapOf(handleA to "rev-a", handleB to "rev-b")), dualWhitelist
+        )!!
+        assertEquals(
+            CheckVerification.Unverified,
+            SourceGroundedCheckPolicy.validateAnswer(plan, "偶函数", mapOf(handleA to "rev-a"))
+        )
+    }
+
+    @Test
+    fun partialExplicitRevisionMapIsRejectedByNormalize() {
+        assertNull(SourceGroundedCheckPolicy.normalize(explicitPlan(mapOf(handleA to "rev-a")), dualWhitelist))
+        assertNull(SourceGroundedCheckPolicy.normalize(explicitPlan(mapOf(handleA to "rev-a", handleB to " ")), dualWhitelist))
+    }
+
+    @Test
+    fun sensitiveExplicitRevisionIsRejectedEvenWhenPlanTextIsSafe() {
+        assertNull(
+            SourceGroundedCheckPolicy.normalize(
+                explicitPlan(
+                    mapOf(handleA to "rev-a", handleB to "Authorization: Bearer sk-fake-token")
+                ),
+                dualWhitelist
+            )
+        )
+    }
 }
