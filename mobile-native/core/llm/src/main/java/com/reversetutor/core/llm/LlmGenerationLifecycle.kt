@@ -767,4 +767,3 @@ private fun LlmGenerationRequest.anthropicUserContent(): Any =
 
 private fun MessageAttachment.isImageAttachment(): Boolean =
     mimeType?.startsWith("image/") == true || uri?.startsWith("content://") == true
-
