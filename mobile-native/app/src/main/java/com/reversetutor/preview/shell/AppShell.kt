@@ -174,6 +174,8 @@ fun AppShell(
     firstLaunchImportPromptState: FirstLaunchImportPromptUiState = FirstLaunchImportPromptUiState.preview(),
     initialImportText: String? = null,
     initialImportFileName: String? = null,
+    pendingOpenSessionId: String? = null,
+    onOpenSessionConsumed: () -> Unit = {},
     onExitRequested: () -> Unit
 ) {
     var navigationState by remember { mutableStateOf(AppNavigationState()) }
@@ -181,6 +183,18 @@ fun AppShell(
     var activeSessionTitle by remember { mutableStateOf<String?>(null) }
     var activeSessionLearnerRole by remember { mutableStateOf("学习者") }
     var activeArticleSlug by remember { mutableStateOf("") }
+    LaunchedEffect(pendingOpenSessionId) {
+        val sessionId = pendingOpenSessionId ?: return@LaunchedEffect
+        sessionRepository.getSession(sessionId)
+            ?.toSessionListItem(appPreferences.globalAvatarVisible)
+            ?.let { session ->
+                activeSessionId = session.id
+                activeSessionTitle = session.title
+                activeSessionLearnerRole = session.learnerRole
+                navigationState = navigationState.navigate(AppDestination.Chat)
+            }
+        onOpenSessionConsumed()
+    }
     val chatScrollMemory = remember { ChatScrollMemory() }
     var figmaUiState by remember { mutableStateOf(FigmaAppUiState()) }
     var challengeEntryGeneration by remember { mutableStateOf(0L) }
@@ -1033,26 +1047,31 @@ private fun DestinationContent(
                     } else if (chatSourcePickerActive) {
                         context.tryPersistReadPermission(uri)
                         val imported = sourceRepository.importSource(input, requestId)
-                        val sessionId = activeSessionId
-                        val usable = sessionId != null && imported.isUsable &&
-                            (!imported.source.extractedText.isNullOrBlank() ||
-                                imported.chunks.any { it.text.isNotBlank() })
-                        if (usable) {
-                            val currentSessionId = requireNotNull(sessionId)
-                            val persistence = hybridAppGraph.frontend.newSessionPersistence
-                            val snapshot = persistence.loadSessionSnapshot(currentSessionId)
-                            if (snapshot != null) {
-                                persistence.saveSessionSnapshot(
+                        val currentSessionSnapshot = activeSessionId?.let { sessionId ->
+                            hybridAppGraph.frontend.newSessionPersistence.loadSessionSnapshot(sessionId)
+                        }
+                        // NEWMP-V1-006 Task 3: the pick-import projection is
+                        // extracted to mapChatSourcePickImport so JVM tests
+                        // pin the session-binding and notice contracts.
+                        when (
+                            val outcome = mapChatSourcePickImport(
+                                imported = imported,
+                                sessionId = activeSessionId,
+                                currentSnapshot = currentSessionSnapshot
+                            )
+                        ) {
+                            is ChatSourcePickImportOutcome.Bound -> {
+                                val currentSessionId = requireNotNull(activeSessionId)
+                                hybridAppGraph.frontend.newSessionPersistence.saveSessionSnapshot(
                                     currentSessionId,
-                                    snapshot.copy(
-                                        sourceSelections = (snapshot.sourceSelections + imported.source.id).distinct()
-                                    )
+                                    outcome.snapshot
                                 )
                                 sessionSettingsRefreshKey += 1
-                                pendingChatAttachmentNotice = "资料已加入本会话，将用于后续回复。"
+                                pendingChatAttachmentNotice = outcome.notice
                             }
-                        } else {
-                            pendingChatAttachmentNotice = "资料未能解析为可用内容，请换一个文件。"
+                            is ChatSourcePickImportOutcome.Rejected ->
+                                pendingChatAttachmentNotice = outcome.notice
+                            null -> Unit
                         }
                     } else {
                         pendingSourceImport = input

@@ -30,6 +30,17 @@ class BackgroundGenerationOutcomeHandler(
     },
     private val clock: () -> Long = System::currentTimeMillis
 ) {
+    private val notificationDispatcher = BackgroundGenerationNotificationDispatcher(
+        notificationEnabled = {
+            preferencesRepository.preferences.first().backgroundGenerationNotificationEnabled
+        },
+        notificationsPermissionGranted = notificationsPermissionGranted,
+        notifierSupplier = { notifierFactory(appContext) },
+        resolveJobSessionId = { jobId ->
+            DataModule.backgroundGenerationRepository(appContext).getJob(jobId)?.sessionId
+        }
+    )
+
     suspend fun handle(
         jobId: String,
         outcome: BackgroundGenerationOutcome,
@@ -62,20 +73,6 @@ class BackgroundGenerationOutcomeHandler(
         jobId: String,
         outcome: BackgroundGenerationOutcome
     ) {
-        val preferences = preferencesRepository.preferences.first()
-        val kind = BackgroundGenerationNotificationPolicy.resolve(
-            outcome = outcome,
-            notificationEnabled = preferences.backgroundGenerationNotificationEnabled,
-            notificationsPermissionGranted = notificationsPermissionGranted()
-        )
-        if (kind == BackgroundGenerationNotificationPolicy.NotificationKind.None) return
-        val notifier = notifierFactory(appContext)
-        when (kind) {
-            BackgroundGenerationNotificationPolicy.NotificationKind.Completed ->
-                notifier.notifyCompleted(jobId)
-            BackgroundGenerationNotificationPolicy.NotificationKind.Failed ->
-                notifier.notifyFailed(jobId)
-            BackgroundGenerationNotificationPolicy.NotificationKind.None -> Unit
-        }
+        notificationDispatcher.dispatch(jobId = jobId, outcome = outcome)
     }
 }

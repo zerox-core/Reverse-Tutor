@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.reversetutor.core.data.preferences.AppPreferences
+import com.reversetutor.preview.background.AndroidBackgroundGenerationNotifier
 import com.reversetutor.preview.background.BackgroundGenerationStartupRecovery
 import com.reversetutor.preview.background.BackgroundGenerationWorker
 import com.reversetutor.preview.shell.AppShell
@@ -28,6 +29,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var receivedImportPayload by mutableStateOf<ReceivedImportPayload?>(null)
+    private var pendingOpenSessionId by mutableStateOf<String?>(null)
 
     private val debugLlmConfig by lazy {
         DebugLlmBootstrapConfig.from(
@@ -52,6 +54,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         configureSystemBars()
         receivedImportPayload = readImportPayload(intent)
+        pendingOpenSessionId = readOpenSessionId(intent)
         if (BuildConfig.DEBUG) {
             lifecycleScope.launch {
                 DebugGraphScenarioSeeder(appGraph).ensureSeeded(System.currentTimeMillis())
@@ -93,6 +96,8 @@ class MainActivity : ComponentActivity() {
                     graphRepository = appGraph.graphRepository,
                     initialImportText = receivedImport?.text,
                     initialImportFileName = receivedImport?.fileName,
+                    pendingOpenSessionId = pendingOpenSessionId,
+                    onOpenSessionConsumed = { pendingOpenSessionId = null },
                     onExitRequested = ::finish
                 )
             }
@@ -114,6 +119,13 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         receivedImportPayload = readImportPayload(intent)
+        pendingOpenSessionId = readOpenSessionId(intent)
+    }
+
+    private fun readOpenSessionId(intent: Intent?): String? {
+        if (intent == null) return null
+        return intent.getStringExtra(AndroidBackgroundGenerationNotifier.EXTRA_OPEN_SESSION_ID)
+            ?.takeIf { it.isNotBlank() }
     }
 
     private fun readImportPayload(intent: Intent?): ReceivedImportPayload? {

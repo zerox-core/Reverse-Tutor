@@ -19,8 +19,8 @@ import com.reversetutor.preview.R
  * API keys or any secret material.
  */
 interface BackgroundGenerationNotifier {
-    fun notifyCompleted(jobId: String)
-    fun notifyFailed(jobId: String)
+    fun notifyCompleted(jobId: String, sessionId: String? = null)
+    fun notifyFailed(jobId: String, sessionId: String? = null)
 }
 
 class AndroidBackgroundGenerationNotifier(
@@ -48,29 +48,35 @@ class AndroidBackgroundGenerationNotifier(
         }
     }
 
-    override fun notifyCompleted(jobId: String) {
+    override fun notifyCompleted(jobId: String, sessionId: String?) {
         post(
             jobId = jobId,
+            sessionId = sessionId,
             title = "后台生成完成",
             text = "一个后台生成任务已完成，可在应用中查看结果。"
         )
     }
 
-    override fun notifyFailed(jobId: String) {
+    override fun notifyFailed(jobId: String, sessionId: String?) {
         post(
             jobId = jobId,
+            sessionId = sessionId,
             title = "后台生成失败",
             text = "一个后台生成任务未能完成，请稍后重试。"
         )
     }
 
-    private fun post(jobId: String, title: String, text: String) {
+    private fun post(jobId: String, sessionId: String?, title: String, text: String) {
         val notificationId = BackgroundGenerationNotificationPolicy.notificationIdFor(jobId)
         val tapIntent = PendingIntent.getActivity(
             appContext,
             notificationId,
             Intent(appContext, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                if (sessionId != null) {
+                    putExtra(EXTRA_OPEN_SESSION_ID, sessionId)
+                }
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -91,5 +97,6 @@ class AndroidBackgroundGenerationNotifier(
     companion object {
         const val CHANNEL_ID = "background_generation"
         const val CHANNEL_NAME = "后台生成"
+        const val EXTRA_OPEN_SESSION_ID = "com.reversetutor.preview.extra.OPEN_SESSION_ID"
     }
 }
