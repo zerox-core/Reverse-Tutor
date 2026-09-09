@@ -1704,6 +1704,34 @@ private fun ComposerAttachmentStrip(
     }
 }
 
+internal data class ChatAttachmentSheetActionSpec(
+    val label: String,
+    val subtitle: String?
+)
+
+/**
+ * NEWMP-V1-006 Task 3: camera entry subtitle guidance, extracted so JVM
+ * tests can pin the permission-state copy without Compose.
+ */
+internal fun chatCameraPermissionSubtitle(permissionState: ChatPermissionState): String? = when (permissionState) {
+    ChatPermissionState.Denied -> "相机权限被拒绝，可重新授权"
+    ChatPermissionState.PermanentlyDenied -> "相机权限已关闭，前往系统设置"
+    else -> null
+}
+
+/**
+ * NEWMP-V1-006 Task 3: the attachment sheet entry list as a single source of
+ * truth. The Compose sheet renders these specs in order; JVM tests pin the
+ * phone-source entry ("从手机选择资料") contract here.
+ */
+internal fun chatAttachmentSheetActionSpecs(cameraSubtitle: String?): List<ChatAttachmentSheetActionSpec> = listOf(
+    ChatAttachmentSheetActionSpec("选择图片", null),
+    ChatAttachmentSheetActionSpec("选择应用内资料", null),
+    ChatAttachmentSheetActionSpec("从手机选择资料", null),
+    ChatAttachmentSheetActionSpec("拍照", cameraSubtitle),
+    ChatAttachmentSheetActionSpec("查看本会话资料", null)
+)
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun ChatAttachmentActionSheet(
@@ -1722,20 +1750,21 @@ private fun ChatAttachmentActionSheet(
             fontSize = 17.sp,
             fontWeight = FontWeight.SemiBold
         )
-        AttachmentSheetAction(Icons.Rounded.Collections, "选择图片", null, onPickImages)
-        AttachmentSheetAction(Icons.Rounded.Description, "选择应用内资料", null, onPickSource)
-        AttachmentSheetAction(Icons.Rounded.FolderOpen, "从手机选择资料", null, onPickLocalSource)
-        AttachmentSheetAction(
+        // NEWMP-V1-006 Task 3: entries are driven by
+        // chatAttachmentSheetActionSpecs so JVM tests can pin the
+        // phone-source entry contract without Compose.
+        val entryIcons = listOf(
+            Icons.Rounded.Collections,
+            Icons.Rounded.Description,
+            Icons.Rounded.FolderOpen,
             Icons.Rounded.CameraAlt,
-            "拍照",
-            when (permissionState) {
-                ChatPermissionState.Denied -> "相机权限被拒绝，可重新授权"
-                ChatPermissionState.PermanentlyDenied -> "相机权限已关闭，前往系统设置"
-                else -> null
-            },
-            onTakePhoto
+            Icons.Rounded.Description
         )
-        AttachmentSheetAction(Icons.Rounded.Description, "查看本会话资料", null, onOpenSessionSources)
+        val entryActions = listOf(onPickImages, onPickSource, onPickLocalSource, onTakePhoto, onOpenSessionSources)
+        chatAttachmentSheetActionSpecs(chatCameraPermissionSubtitle(permissionState))
+            .forEachIndexed { index, spec ->
+                AttachmentSheetAction(entryIcons[index], spec.label, spec.subtitle, entryActions[index])
+            }
         Spacer(Modifier.height(24.dp))
     }
 }

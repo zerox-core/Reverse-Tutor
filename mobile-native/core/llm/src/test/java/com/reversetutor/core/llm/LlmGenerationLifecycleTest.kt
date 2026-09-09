@@ -232,6 +232,42 @@ class LlmGenerationLifecycleTest {
         assertEquals(0, runtime.realProviderCallCount)
     }
 
+
+
+    // NEWMP-V1-006 Task 1: single-turn rhythm contract — the student prompt
+    // block must keep locking one teaching move per turn, bounded paragraphs,
+    // and exactly one question so the interaction space stays with the teacher.
+    @Test
+    fun reverseTutorStudentPromptBlockLocksSingleTurnRhythmAndInteractionSpace() {
+        val request = LlmGenerationRequest(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Help",
+            profileId = "profile-1",
+            provider = LlmProviderKind.OpenAiCompatible,
+            model = "model",
+            baseUrl = "https://api.example.test/v1",
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-rhythm"),
+            sessionPolicy = LlmSessionPolicyContext(
+                actionType = "probe",
+                studentRole = "probing_student",
+                knowledgePoint = "factoring",
+                difficulty = 0.7f,
+                processSummary = "ask for a justification",
+                evaluationCorrectness = 0.4f,
+                userEmotion = "engaged",
+                correctionTiming = "summary_only"
+            )
+        )
+
+        val block = request.reverseTutorStudentPromptBlock()
+        assertTrue(block != null)
+        assertTrue(block!!.contains("exactly one teaching move"))
+        assertTrue(block.contains("at most three short paragraphs or four short lines"))
+        assertTrue(block.contains("at most one clear question"))
+    }
+
     private fun request(provider: LlmProviderKind): LlmGenerationRequest =
         LlmGenerationRequest(
             sessionId = "session-1",

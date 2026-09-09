@@ -238,4 +238,79 @@ class BackgroundTurnPreparationCoordinatorTest {
                 action == com.reversetutor.core.domain.TeachingAction.WorkedExample
         )
     }
+
+    // NEWMP-V1-006 Task 3: a turn already queued must keep the source
+    // revision it snapshotted at enqueue time; only turns enqueued after an
+    // import bind the new revision.
+    @Test
+    fun queued_turns_keep_snapshotted_source_revision_while_later_turns_bind_new_one() = runBlocking {
+        queuedInputs.clear()
+        var sourceRevision = "rev-src-1-100"
+        val revisionAware = BackgroundTurnPreparationCoordinator(
+            isSessionDeleted = { false },
+            assembleContext = { _, _ ->
+                ConversationContextContract(
+                    spaceId = "space-1",
+                    sessionId = "session-1",
+                    prerequisiteGaps = emptyList(),
+                    relatedMemory = emptyList(),
+                    sourceEvidence = listOf(
+                        com.reversetutor.core.domain.SourceReferenceContract(
+                            id = "src-1",
+                            title = "讲义",
+                            excerpt = "片段",
+                            sourceType = "Text",
+                            relevanceScore = 0f,
+                            sourceRevision = sourceRevision
+                        )
+                    ),
+                    historicalErrors = emptyList(),
+                    pendingReviewKnowledgePoints = emptyList(),
+                    recentMessages = emptyList(),
+                    warnings = emptyList()
+                )
+            },
+            enqueueJob = { input, now ->
+                queuedInputs.add(input)
+                BackgroundGenerationJob(
+                    id = "job-rev-${queuedInputs.size}",
+                    spaceId = input.spaceId,
+                    sessionId = input.sessionId,
+                    userMessageId = input.userMessageId,
+                    userText = input.userText,
+                    token = input.token,
+                    modelBindingId = null,
+                    status = BackgroundJobStatus.Queued,
+                    createdAtEpochMillis = now,
+                    startedAtEpochMillis = null,
+                    completedAtEpochMillis = null,
+                    errorMessage = null,
+                    capabilities = null,
+                    quoteExcerpt = null,
+                    imageAttachments = input.imageAttachments,
+                    contextEvidence = input.contextEvidence,
+                    sessionPolicy = input.sessionPolicy
+                )
+            },
+            nowEpochMillis = { 1000L }
+        )
+
+        assertTrue(revisionAware.prepareAndEnqueue(request("第一问")) is BackgroundTurnPreparationResult.Queued)
+        val firstEvidence = queuedInputs[0].contextEvidence
+
+        // 模拟聊天内导入/重解析：同一份资料产生新 revision
+        sourceRevision = "rev-src-1-900"
+        assertTrue(
+            revisionAware.prepareAndEnqueue(request("第二问").copy(userMessageId = "msg-2")) is
+                BackgroundTurnPreparationResult.Queued
+        )
+        val secondEvidence = queuedInputs[1].contextEvidence
+
+        // 已排队回合锁定入队时快照的旧 revision
+        assertTrue(firstEvidence.any { it.id == "source:src-1:rev-src-1-100" })
+        assertTrue(firstEvidence.none { it.id.contains("rev-src-1-900") })
+        // 后续回合绑定导入后的新 revision
+        assertTrue(secondEvidence.any { it.id == "source:src-1:rev-src-1-900" })
+        assertTrue(secondEvidence.none { it.id == "source:src-1:rev-src-1-100" })
+    }
 }

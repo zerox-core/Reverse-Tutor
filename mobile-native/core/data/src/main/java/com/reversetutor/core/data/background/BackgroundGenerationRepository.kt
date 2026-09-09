@@ -189,6 +189,9 @@ class BackgroundGenerationRepository(
                     errorMessage = "Generation cancelled for session"
                 )
             )
+            // NEWMP-V1-006 Task 2: cancellation must not leave stale streaming
+            // previews behind; drop the process-local fragment immediately.
+            partialStore.clear(entity.id)
         }
         return active.size
     }

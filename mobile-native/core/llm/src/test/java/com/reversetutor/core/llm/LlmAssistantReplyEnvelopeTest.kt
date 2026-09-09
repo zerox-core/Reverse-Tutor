@@ -129,7 +129,6 @@ class LlmAssistantReplyEnvelopeTest {
     // the plan while the chat reply survives untouched.
     @Test
     fun parserHandlesExplicitRevisionMapAndPartialMapFailsClosed() {
-        val base = """"version":"v1","blocks":[{"type":"paragraph","text":"复述"}","""
         val full = LlmAssistantReplyEnvelopeParser.parseValidated(
             rawText = """{"version":"v1","blocks":[{"type":"paragraph","text":"复述"}],"evidenceReferenceIds":["source:book","source:map"],"toolCalls":[],"outcome":{},"checkPlan":{"id":"check-map","sourceRevision":"rev-primary","sourceReferenceIds":["source:book","source:map"],"sourceRevisions":{"source:book":"rev-a","source:map":"rev-b"},"prompt":"联合定义","expectedAnswer":"答案","rule":{"type":"exact_text","normalizedAnswer":"答案"},"conceptKey":"函数"}}""",
             allowedEvidenceIds = setOf("source:book", "source:map")
@@ -170,5 +169,123 @@ class LlmAssistantReplyEnvelopeTest {
         assertFalse(visible.contains("Action: probe"))
         assertFalse(visible.contains("Knowledge point: factoring"))
         assertTrue(visible.length <= 1_200)
+    }
+
+    // NEWMP-V1-006 Task 1: every internal structured field label must be
+    // filtered from the visible chat projection, while genuine student prose
+    // on either side of the labels stays visible.
+    @Test
+    fun visibleTimelineTextHidesOutcomeCheckPlanCorrectnessAndMasteryLabels() {
+        val envelope = LlmAssistantReplyEnvelope(
+            blocks = listOf(
+                LlmRichContentBlock.Paragraph(
+                    "老师，我卡在第三步了。\n" +
+                        "Outcome: failed\n" +
+                        "Correctness: 0.35\n" +
+                        "Mastery: 0.2\n" +
+                        "Depth: 0.4\n" +
+                        "Evidence type: explanation\n" +
+                        "Evidence status: partial\n" +
+                        "Process summary: learner is confused about factoring\n" +
+                        "checkPlan: {\"id\":\"check-1\"}\n" +
+                        "Initiative source: heartbeat\n" +
+                        "Window id: window-1\n" +
+                        "你先帮我看看这一步好吗？"
+                )
+            ),
+            outcome = StructuredTurnOutcome(
+                windowId = "window-1",
+                actionType = "probe",
+                knowledgePoint = "factoring",
+                evidenceType = "explanation",
+                evidenceStatus = "passed"
+            )
+        )
+
+        val visible = envelope.timelineText()
+
+        assertTrue(visible.contains("老师，我卡在第三步了。"))
+        assertTrue(visible.contains("你先帮我看看这一步好吗？"))
+        assertFalse(visible.contains("Outcome"))
+        assertFalse(visible.contains("Correctness"))
+        assertFalse(visible.contains("Mastery"))
+        assertFalse(visible.contains("Depth"))
+        assertFalse(visible.contains("Evidence type"))
+        assertFalse(visible.contains("Evidence status"))
+        assertFalse(visible.contains("Process summary"))
+        assertFalse(visible.contains("checkPlan"))
+        assertFalse(visible.contains("Initiative source"))
+        assertFalse(visible.contains("Window id"))
+    }
+
+    // NEWMP-V1-006 Task 1: envelope sidebands (outcome/checkPlan objects) are
+    // background data only and can never appear in the visible timeline.
+    @Test
+    fun envelopeSidebandsNeverLeakIntoTimelineText() {
+        val envelope = LlmAssistantReplyEnvelope(
+            blocks = listOf(LlmRichContentBlock.Paragraph("我先说说我的理解。")),
+            outcome = StructuredTurnOutcome(
+                windowId = "window-leak",
+                actionType = "probe",
+                knowledgePoint = "leak-point",
+                processSummary = "internal summary leak"
+            ),
+            checkPlan = LlmSourceGroundedCheckPlan(
+                id = "check-leak",
+                sourceRevision = "rev-leak",
+                sourceReferenceIds = listOf("source:leak"),
+                prompt = "leak prompt",
+                expectedAnswer = "leak answer",
+                rule = LlmSourceCheckRule.ExactText("leak answer")
+            )
+        )
+
+        val visible = envelope.timelineText()
+
+        assertEquals("我先说说我的理解。", visible)
+        assertFalse(visible.contains("window-leak"))
+        assertFalse(visible.contains("leak-point"))
+        assertFalse(visible.contains("internal summary leak"))
+        assertFalse(visible.contains("check-leak"))
+    }
+
+    // NEWMP-V1-006 Task 1: a raw envelope-shaped JSON reply (parse failure on
+    // the plain path, or the parser's own fallback paragraph) must collapse to
+    // the generic student-style text instead of leaking raw JSON.
+    @Test
+    fun rawEnvelopeShapedJsonFallsBackToStudentTextInsteadOfLeaking() {
+        val rawJson = """{"version":"v1","unknownField":true,"blocks":[{"type":"paragraph","text":"老师好"}],"outcome":{}}"""
+
+        val plainPathVisible = rawJson.toVisibleTimelineText()
+        val parserFallbackVisible = LlmAssistantReplyEnvelopeParser.parse(rawJson, emptySet()).timelineText()
+
+        assertEquals("我还没整理好这一步，能再给我一点提示吗？", plainPathVisible)
+        assertEquals("我还没整理好这一步，能再给我一点提示吗？", parserFallbackVisible)
+        assertFalse(plainPathVisible.contains("{"))
+        assertFalse(plainPathVisible.contains("blocks"))
+    }
+
+    // NEWMP-V1-006 Task 1: legitimate Markdown-style rich content (headings,
+    // prose, code, tables, bullets) must remain fully visible.
+    @Test
+    fun normalMarkdownCodeTablesAndBulletsRemainVisible() {
+        val envelope = LlmAssistantReplyEnvelope(
+            blocks = listOf(
+                LlmRichContentBlock.Heading(2, "我的理解"),
+                LlmRichContentBlock.Paragraph("函数就像一台机器，输入原料输出结果。"),
+                LlmRichContentBlock.CodeBlock("python", "def f(x):\n    return x + 1"),
+                LlmRichContentBlock.SimpleTable(listOf("输入", "输出"), listOf(listOf("1", "2"))),
+                LlmRichContentBlock.BulletList(listOf("第一个要点", "第二个要点"))
+            )
+        )
+
+        val visible = envelope.timelineText()
+
+        assertTrue(visible.contains("我的理解"))
+        assertTrue(visible.contains("函数就像一台机器"))
+        assertTrue(visible.contains("def f(x):"))
+        assertTrue(visible.contains("输入 | 输出"))
+        assertTrue(visible.contains("第一个要点"))
+        assertTrue(visible.contains("第二个要点"))
     }
 }

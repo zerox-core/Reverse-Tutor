@@ -1,6 +1,8 @@
 package com.reversetutor.preview.wiring
 
+import com.reversetutor.core.data.background.BackgroundGenerationJob
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.feature.chat.sessionCardGenerationLabel
 import com.reversetutor.core.data.run.ConversationRunRepositoryImpl
 import com.reversetutor.core.data.session.SessionCreationInput
 import com.reversetutor.core.data.session.SessionDeletionRepository
@@ -55,6 +57,7 @@ class RepositorySessionHomePortAdapter(
     private val persistence: SessionHomePersistence,
     private val loadSessionSnapshot: (String) -> NewSessionConfiguration? = { null },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val findActiveJobForSession: suspend (String) -> BackgroundGenerationJob? = { null },
     private val deletionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : SessionHomePort {
     private val deletionCoordinator = DurableSessionDeletionCoordinator(
@@ -106,7 +109,9 @@ class RepositorySessionHomePortAdapter(
                     title = session.title,
                     updatedAtEpochMillis = latestMessageAt,
                     pinned = session.pinned,
-                    statusLabel = latestSummary,
+                    statusLabel = sessionCardGenerationLabel(
+                        findActiveJobForSession(session.id)
+                    ) ?: latestSummary,
                     unreadCount = 0,
                     avatarLabel = session.title.trim().take(1),
                     learnerRole = learnerRole,

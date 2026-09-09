@@ -308,6 +308,96 @@ class ProductionLlmGenerationRuntimeTest {
         }
     }
 
+    @Test
+    fun anthropicImageAttachmentUsesProtocolBase64SourceWithoutLeakingUri() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(200, """{"content":[{"type":"text","text":"OK"}]}""")
+        )
+        val runtime = ProductionLlmGenerationRuntime(
+            protocol = LlmProviderProtocol.AnthropicCompatible,
+            transport = transport,
+            secretResolver = LlmSecretResolver { "resolved-value" },
+            imagePayloadResolver = LlmImagePayloadResolver {
+                LlmResolvedImage("image/png", "aW1hZ2U=")
+            }
+        )
+
+        runtime.generate(
+            request(LlmProviderKind.AnthropicCompatible).copy(
+                streaming = false,
+                imageAttachments = listOf(localImageAttachment())
+            )
+        )
+
+        val payload = transport.singleRequest().jsonBody
+        assertTrue(payload.contains("\"type\":\"base64\""))
+        assertTrue(payload.contains("\"media_type\":\"image/png\""))
+        assertTrue(payload.contains("aW1hZ2U="))
+        assertFalse(payload.contains("content://private/image"))
+    }
+
+    @Test
+    fun geminiImageAttachmentUsesInlineDataWithoutLeakingUri() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(200, """{"candidates":[{"content":{"parts":[{"text":"OK"}]}}]}""")
+        )
+        val runtime = ProductionLlmGenerationRuntime(
+            protocol = LlmProviderProtocol.GeminiNative,
+            transport = transport,
+            secretResolver = LlmSecretResolver { "resolved-value" },
+            imagePayloadResolver = LlmImagePayloadResolver {
+                LlmResolvedImage("image/png", "aW1hZ2U=")
+            }
+        )
+
+        runtime.generate(
+            request(LlmProviderKind.Gemini).copy(
+                streaming = false,
+                imageAttachments = listOf(localImageAttachment())
+            )
+        )
+
+        val payload = transport.singleRequest().jsonBody
+        assertTrue(payload.contains("inline_data"))
+        assertTrue(payload.contains("\"mime_type\":\"image/png\""))
+        assertTrue(payload.contains("aW1hZ2U="))
+        assertFalse(payload.contains("content://private/image"))
+    }
+
+    @Test
+    fun oversizedOrUnresolvableImageFailsSafelyWithoutTransportExecution() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(200, """{"choices":[{"message":{"content":"OK"}}]}""")
+        )
+        val runtime = ProductionLlmGenerationRuntime(
+            protocol = LlmProviderProtocol.OpenAiCompatible,
+            transport = transport,
+            secretResolver = LlmSecretResolver { "resolved-value" },
+            imagePayloadResolver = LlmImagePayloadResolver { null }
+        )
+
+        val result = runtime.generate(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                streaming = false,
+                imageAttachments = listOf(localImageAttachment())
+            )
+        )
+
+        assertEquals(
+            LlmGenerationResult.Failure(
+                message = "Provider configuration is invalid.",
+                retryable = false
+            ),
+            result
+        )
+        assertTrue(transport.requests.isEmpty())
+    }
+
+    private fun localImageAttachment(): MessageAttachment = MessageAttachment(
+        id = "image-1", spaceId = "space-1", messageId = "message-1",
+        name = "question.png", mimeType = "image/png", uri = "content://private/image"
+    )
+
     private fun productionRuntime(
         protocol: LlmProviderProtocol,
         transport: ProviderHttpTransport

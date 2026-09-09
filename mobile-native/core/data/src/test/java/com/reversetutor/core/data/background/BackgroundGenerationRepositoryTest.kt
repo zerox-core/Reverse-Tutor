@@ -220,6 +220,28 @@ class BackgroundGenerationRepositoryTest {
         assertTrue(messageRepository.listMessages("session-1").isEmpty())
     }
 
+    // NEWMP-V1-006 Task 2: cancelling a session's generation must also drop the
+    // in-memory streaming preview so no stale partial fragment can survive.
+    @Test
+    fun cancellingSessionJobsDropsPartialPreviewFragments() = runBlocking {
+        val partialStore = GenerationPartialStore()
+        val repository = BackgroundGenerationRepository(
+            backgroundJobDao = FakeBackgroundJobDao(),
+            sessionDao = FakeSessionDao(),
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(FakeLlmProfileDao.withActiveProfile(), FakeSecretStore()),
+            runtime = StaticRuntime(LlmGenerationResult.Success("Mock generation ready")),
+            partialStore = partialStore
+        )
+        repository.enqueueGenerationJob(input(token = "token-preview"), nowEpochMillis = 10L, jobId = "job-preview")
+        assertEquals("正在想", partialStore.append("job-preview", "token-preview", "正在想"))
+
+        assertEquals(1, repository.cancelSessionGenerationJobs("session-1", nowEpochMillis = 20L))
+
+        assertNull(repository.getGenerationPreview("job-preview", LlmGenerationToken("token-preview")))
+        assertNull(partialStore.get("job-preview", "token-preview"))
+    }
+
     @Test
     fun archivedSessionDiscardsJobBeforeWritingAssistantMessage() = runBlocking {
         val jobDao = FakeBackgroundJobDao()

@@ -4,6 +4,7 @@ import android.content.Context
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.agent.AssistantReplyArtifactRepository
 import com.reversetutor.core.data.agent.RoomAssistantReplyArtifactStore
+import com.reversetutor.core.data.background.BackgroundGenerationJob
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.heartbeat.WindowHeartbeatRepository
@@ -334,7 +335,8 @@ class HybridAppGraph private constructor(
                     learningRepository = learningRepository,
                     runCoordinator = runCoordinator,
                     sessionConversationAssembly = sessionConversationAssembly,
-                    newSessionPersistence = newSessionPersistence
+                    newSessionPersistence = newSessionPersistence,
+                    findActiveJobForSession = backgroundGenerationRepository::findActiveJobForSession
                 )
             )
         }
@@ -378,7 +380,8 @@ class HybridAppGraph private constructor(
             learningRepository: LearningRepositoryImpl,
             runCoordinator: ConversationRunCoordinator,
             sessionConversationAssembly: SessionConversationAssembly,
-            newSessionPersistence: NewSessionPersistence
+            newSessionPersistence: NewSessionPersistence,
+            findActiveJobForSession: suspend (String) -> BackgroundGenerationJob?
         ): HybridFrontendFactories {
             val homePort = RepositoryHomePortAdapter {
                 sessionRepository.listSessions()
@@ -389,6 +392,7 @@ class HybridAppGraph private constructor(
                 sessionDeletionRepository = sessionDeletionRepository,
                 conversationRunRepository = conversationRunRepository,
                 persistence = SharedPreferencesSessionHomePersistence(context),
+                findActiveJobForSession = findActiveJobForSession,
                 loadSessionSnapshot = newSessionPersistence::loadSessionSnapshot
             )
             val tagLibraryPersistence = SharedPreferencesTagLibraryPersistence(context)

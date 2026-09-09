@@ -394,16 +394,36 @@ data class LlmContextEvidence(
  * never form part of the student-facing conversation. This deliberately keeps
  * Markdown-like prose and code intact while discarding only known control rows.
  */
-fun String.toVisibleTimelineText(): String =
-    lineSequence()
+fun String.toVisibleTimelineText(): String {
+    if (looksLikeAssistantReplyEnvelopeJson()) return VisibleTimelineFallbackText
+    return lineSequence()
         .filterNot { it.trim().matches(InternalVisibleControlLine) }
         .joinToString("\n")
         .trim()
         .take(MaxVisibleTimelineCharacters)
-        .ifBlank { "我还没整理好这一步，能再给我一点提示吗？" }
+        .ifBlank { VisibleTimelineFallbackText }
+}
+
+internal const val VisibleTimelineFallbackText = "我还没整理好这一步，能再给我一点提示吗？"
+
+/**
+ * Detects machine-shaped assistant reply envelopes (raw JSON carrying the
+ * internal blocks/outcome/checkPlan contract) before any of their contents can
+ * reach the student-facing bubble. A whole-text shape check is intentional: it
+ * only fires when the entire candidate text is a JSON object with envelope
+ * keys, never for ordinary prose that merely mentions braces.
+ */
+private fun String.looksLikeAssistantReplyEnvelopeJson(): Boolean {
+    val trimmed = trim()
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false
+    return AssistantReplyEnvelopeJsonKeyHint.containsMatchIn(trimmed)
+}
+
+private val AssistantReplyEnvelopeJsonKeyHint =
+    Regex("\"(blocks|version|outcome|checkPlan)\"\\s*:")
 
 private val InternalVisibleControlLine = Regex(
-    "(?i)^(teaching policy|guided learning plan|initiative plan|action|secondary action|student role|knowledge point|objective|expected teacher move|student expression|response format|hint level|evidence requirement|evaluation correctness|learner emotion|correction timing|turn intent)\\s*:\\s*.*$"
+    "(?i)^(teaching policy|guided learning plan|initiative plan|action|secondary action|student role|knowledge point|objective|expected teacher move|student expression|response format|hint level|evidence requirement|evaluation correctness|learner emotion|correction timing|turn intent|outcome|correctness|mastery|depth|evidence type|evidence status|process summary|checkplan|initiative source|window id)\\s*:\\s*.*$"
 )
 
 data class LlmResolvedImage(
