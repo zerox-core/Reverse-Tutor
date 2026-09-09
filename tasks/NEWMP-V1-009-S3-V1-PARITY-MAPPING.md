@@ -19,8 +19,8 @@
 | 9 | 锚点（anchors：记录需求/目标，供系统提示引用） | 无 Anchor 持久化 | ❌ 缺口 |
 | 10 | KG 抽取 + kg_context + clue 检索注入 + 引用纪律（fake_citation/no_citation） | core:data/graph + `SourceGroundedCheckPolicy` 部分存在；引用纪律需核 | ⚠️ 部分 |
 | 11 | Web 检索导入（websearch → add_document → chunk → 注入） | 无 web_search | ❌ 缺口 |
-| 12 | 开场轮（run_opening_turn） | `ConversationRunCoordinator` / core:data/run | ⚠️ 待核 |
-| 13 | 运行时记忆提示（runtime_memory_hint） | `CompanionMemory*` / `ConversationContextAssembler` | ⚠️ 待核 |
+| 12 | 开场轮（run_opening_turn） | NewSession「开场消息」字段（确定性模板，创建即落首条 Assistant 消息） | ⚠️ 形态不同（模板 vs LLM 生成） |
+| 13 | 运行时记忆提示（runtime_memory_hint） | `ConversationContextAssembler`（聚合记忆/错误/图谱缺口/复习点/来源证据） | ⚠️ 形态不同（聚合式，已精读确认） |
 
 ## 二、判定依据（可追溯）
 
@@ -35,7 +35,7 @@
 - 缺口 8（摘要压缩）：长会话防漂移能力，建议作为 V1 收尾增强项单独立一小任务。
 - 缺口 9（锚点）：属系统提示上下文管理，随 V2 记忆拓扑一并处理。
 - 缺口 10/11（检索注入/引用纪律、Web 导入）：属增强件，优先级低于核心闭环；引用纪律需单独取证。
-- 待核 12/13：开场轮与运行时记忆提示的落地度，下一轮做一次定点读取即可定性。
+- 定性 12/13（2026-09-09 定点核对，见 NEWMP-V1-010 第 3 节）：开场轮 = NewSession「开场消息」确定性模板（默认「准备好后，请开始讲给我听吧。」、预设为角色自述+剧情，UI 可编辑），创建会话即落首条 Assistant 消息——与 engine.py LLM 生成开场为形态差异而非缺失；运行时记忆提示 = `ConversationContextAssembler` 聚合近况消息/记忆引用/历史错误/图谱缺口/待复习点/来源证据六类进回合上下文，较 engine.py 分散注入组织更聚合。
 
 ## 四、本轮结论
 
