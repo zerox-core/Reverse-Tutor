@@ -22,6 +22,8 @@
 
 **诚实声明**：TDD Red 未单独跑（首次运行即被 AppShell 编译错误挡住，该错误已当场修复）；Green 证据为上述全量构建。接口默认参数保证 `FormalDiagnosticsDeviceTest.NoOpNotifier` 等 androidTest 既有实现源码兼容，无需改动。
 
+> **2026-09-09 更新**：用户已授权自主推进，S2 设备验收不再单独派单，并入最终统一验收（清单保留供届时使用）。
+
 ## 二、S0 收口
 
 - F1（V1-006 修改冻结层）：用户已裁决——以快速推进 MVP 为主，速度指令优先，冻结约束由用户指令豁免。不再追补 capability-requests。
