@@ -9,7 +9,7 @@
 1. **MVP 核心已落地**：反转教学「单会话回合环」（用户消息 → 结构化 evaluation/action 决策 → 教学动作 → 错误日志落库 → 后台生成 + 通知回流）在 mobile-native 完整可用，与 engine.py 决策语义对齐（词表 100% 迁移进 `SessionTurnContracts`）。
 2. **S0–S7 全部收口**：S1（通知精确路由）由我开发并测试；S3（V1 parity 映射）由我取证完成；S4–S7（Codex 声明已完成）经我三重证据核查**实质成立，未发现欺骗**。
 3. **测试全绿**：全模块 `gradle_test` BUILD SUCCESSFUL（2026-09-09，`:app:testDebugUnitTest` 实际执行，含本轮新增 4 个通知路由测试）。
-4. **一项治理发现（G1）需你追溯确认**：S4–S7 的冻结层持久化（Room version 12、migration 6→12、topology/memory/heartbeat/learning 仓库）在能力申请仍为「proposed，未批准」、审批门禁全未勾选的情况下已实施并提交（详见第五节）。
+4. **治理发现（G1）已追溯确认关闭**：S4–S7 的冻结层持久化（Room version 12、migration 6→12、topology/memory/heartbeat/learning 仓库）曾在能力申请未批准状态下实施，用户 2026-09-09 回「同意」完成追溯确认（详见第五节）。
 5. **唯一阻塞项是设备通道**：MCP 四条设备通道全受阻，S2 设备级真实生成闭环证据只能由你或 Codex 在 Windows 本机执行（清单在第八节），已并入统一验收。
 
 ## 二、阶段执行记录（S0–S7）
@@ -51,7 +51,7 @@
 
 ## 五、治理发现
 
-- **G1（重要）冻结层实施先于批准**：`tasks/capability-requests/P6-window-topology-memory-and-heartbeat.md` 状态仍为「proposed，未批准，不得实施」，§5 审批门禁三项勾选全空；而 `DatabaseSchema.version = 12`、migration 6→7→8→9（正是该申请规划的窗口树/学习账本/记忆/心跳表）及 9→10→11→12 已全部实施并提交，相关仓库（topology/heartbeat/learning）已在产线接线。按你的速度指令我不回滚，但**需要你在统一验收时追溯确认**（含 V1-006 对 `core/llm` 的改动，即 V1-007 F1 旧账，合并确认即可）。
+- **G1（重要）冻结层实施先于批准**：`tasks/capability-requests/P6-window-topology-memory-and-heartbeat.md` 状态仍为「proposed，未批准，不得实施」，§5 审批门禁三项勾选全空；而 `DatabaseSchema.version = 12`、migration 6→7→8→9（正是该申请规划的窗口树/学习账本/记忆/心跳表）及 9→10→11→12 已全部实施并提交，相关仓库（topology/heartbeat/learning）已在产线接线。按你的速度指令我不回滚；**用户 2026-09-09 已回「同意」完成追溯确认（含 V1-006 对 `core/llm` 的改动，即 V1-007 F1 旧账），G1 关闭，追认记录已补入 P6 申请文档**。
 - **G2（保留）Codex 未提交改动 26 份**：13 修改（HybridAppGraph、HybridFrontendPortAdapters、ReverseTeachingChatScreen、BackgroundGenerationRepository(+Test)、LlmGenerationLifecycle + 3 个 core:llm 测试、BackgroundTurnPreparationCoordinatorTest、V1-006 TASK1–3 报告）+ 13 新增（ChatSourcePickImportMapper(+Test)、SessionCardGeneration(+Test)、ChatAttachmentSheetContractsTest、V1-006 交接/验收/清单/设备报告等 8 份文档）。我的三次提交（9ad0175/c40fceb/b7f40d5）与本次均未卷入其中任何一份。**决策项 D4：按 V1-006 批次提交，还是留 Codex 收口。**
 - **G3（轻微）git autocrlf 行尾告警**：仓库既有行为，非本轮引入。
 - **G4（诚实记录）S1 TDD Red 阶段**：首次运行被一个编译错误（`AppShell` 误用 `learnerRole`，domain `Session` 无该字段）阻塞，就地修复后测试与实现同轮跑绿；未单独观察到 Red，已在 V1-008 如实登记。
@@ -67,13 +67,14 @@
 
 | # | 事项 | 我的建议 | 状态（2026-09-09 用户反馈后） |
 |---|---|---|---|
-| D1 | G1+G2 冻结层追溯确认（S4–S7 持久化 + V1-006 core/llm） | 确认，并在 capability-requests 补一条追认记录 | 已向用户解释含义，待确认 |
+| D1 | G1+G2 冻结层追溯确认（S4–S7 持久化 + V1-006 core/llm） | 确认，并在 capability-requests 补一条追认记录 | ✅ 用户 2026-09-09 回「同意」追认，记录已补入 P6 申请 |
 | D2 | 是否建 API ≤ 34 AVD（仅 Room migration instrumentation 需要） | 不急建，标 blocked 即可，后续有迁移风险再建 | 已向用户解释用途（数据库迁移验证，非业务功能模块），待决策 |
 | D3 | 是否补 LLM 生成开场轮（现为确定性模板） | 暂不补 | ✅ 用户拍板：暂时不补 |
 | D4 | Codex 26 份未提交文件处置 | 由我收口安全合并 | ✅ 已完成：提交 `53e43fd`（见第十节） |
 
 ## 十、决策落实记录（2026-09-09）
 
+- **D1（已追认，2026-09-09 用户回「同意」）**：冻结层追溯确认完成——S4–S7 持久化（Room v12、migration 6→12、topology/memory/heartbeat/learning 仓库）与 V1-006 对 core/llm 的改动一并追认，G1 关闭；追认记录已写入 `tasks/capability-requests/P6-window-topology-memory-and-heartbeat.md`。
 - **D3（已决）**：不补 LLM 生成开场轮，保留 NewSession「开场消息」确定性模板现状。
 - **D4（已执行）**：Codex 26 份未提交文件由我收口合并，流程与门禁：
   1. **范围审查**：`git diff` 全量过目——13 修改文件合计约 +642/−83 行，内容全部落在 V1-006 批次范围（富回复信封、流式生命周期、资料导入、多模态、首页卡片、附件菜单），无越界改动；
@@ -81,7 +82,7 @@
   3. **测试门禁**：提交前全模块 `gradle_test` 复跑，BUILD SUCCESSFUL（465 tasks，工作树与上次全绿状态一致）；
   4. **原子提交**：26 份文件一次提交，提交 `53e43fd`（26 files changed, +1722/−83），消息中显式标注含冻结层文件（core:llm + core:data）且 D1 追溯确认待定；
   5. **推送验证**：`f5db8f6..53e43fd → origin/newmp`；提交后 `git status` 零残留，工作树干净。
-  - 注意：该批次包含 G1/G2 涉及的冻结层文件（`LlmGenerationLifecycle.kt`、`BackgroundGenerationRepository.kt` 等），**提交不等于批准**——治理追认仍待 D1。
+  - 注意：该批次包含 G1/G2 涉及的冻结层文件（`LlmGenerationLifecycle.kt`、`BackgroundGenerationRepository.kt` 等），**提交不等于批准**——治理追认由用户 2026-09-09「同意」完成（D1 关闭）。
 
 ## 八、统一验收清单（设备级，由你或 Codex 本机执行；虚拟机 = Pixel_8_Pro · API 36 · emulator-5554）
 

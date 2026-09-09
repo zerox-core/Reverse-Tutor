@@ -1,6 +1,6 @@
 # 冻结层能力申请：P6 窗口拓扑、内存与心跳持久化
 
-> 状态：**proposed，未批准，不得实施**
+> 状态：**已于 2026-09-09 由用户追溯确认批准**（原状态「proposed，未批准，不得实施」关闭；见文末追认记录）
 >
 > 对应切片：`newmp` 原生 Android 生产分支 —— `native-companion-memory-topology`（Task 10/12）
 > 申请日期：2026-08-24
@@ -92,12 +92,19 @@ F. heartbeat jobs: WindowHeartbeatEntity(windowId PK, spaceId, enabled, minCoold
 
 ## 5. 审批门禁
 
-- [ ] 用户批准该 P6 持久化变更方向（本申请）
-- [ ] 与 P3 申请分开批准（本申请不含生成协议载荷）
-- [ ] 审批后：按本文 §2.1 迁移顺序，单独提交每个 aggregate 的变更说明（受影响文件、schema、兼容、测试、回滚）后，才进入 Task 10/12 实现
+- [x] 用户批准该 P6 持久化变更方向（本申请）——2026-09-09 用户回「同意」追溯确认
+- [x] 与 P3 申请分开批准（本申请不含生成协议载荷）——同次追认确认；V1-006 对 core/llm 的改动另记于 NEWMP-V1-011 §十 D1
+- [x] 审批后：按本文 §2.1 迁移顺序，单独提交每个 aggregate 的变更说明（受影响文件、schema、兼容、测试、回滚）后，才进入 Task 10/12 实现——实际未按序执行（实施先于批准），由 2026-09-09 追溯确认补正；实施对照见 NEWMP-V1-011 §五 G1 与 §二 S4–S7
 
 在上述勾选完成前，`WindowConversationAssembly` 的 `prepareDispatch` 保持「尚未持久化 until P6」，同 Session 只读端口/假运行时不写入任何新表。
 
 ## 6. 计划自检（本申请是否完全冻结外行为）
 
 本申请不包含：`WindowTopologyPolicy`/`CompanionMemoryEvolutionPolicy`/`LearningScopeGuard`/`InitiativeEligibilityPolicy`（core:domain，非冻结，Package A 已实现）、`WindowConversationContract`/`WindowConversationFacade`（feature:chat，非冻结，Package B 已实现）、`WindowConversationAssembly`（app wiring，非冻结，Package B 已实现）。本申请只为把这些领域契约提供**经批准的正规持久化**，避免 UI 绕过 Repository 直接读 DAO/Entity。
+
+## 7. 追认记录（2026-09-09）
+
+- **追认方式**：用户在飞书任务（task_7683206190716701666）评论中回「同意」，追溯确认本申请规划的持久化变更。
+- **追认范围**：S4–S7 已实施的持久化——`DatabaseSchema.version` 12、migration 6→7→8→9→10→11→12、topology/heartbeat/learning 仓库及产线接线；即本申请 §2 列表 A–F 的落地形态。
+- **背景**：实施先于批准（治理发现 G1，见 NEWMP-V1-011 §五）。代码经三重证据核查与全模块 `gradle_test` 全绿（465 tasks）验证，未发现质量问题，故不回滚，由用户追认补正治理账。
+- **遗留**：§4 测试计划中 Room migration instrumentation 证据因 API 36 平台限制（RT-2026-031）仍 blocked，需 API ≤ 34 AVD（决策项 D2，不急）；不影响本追认效力。
