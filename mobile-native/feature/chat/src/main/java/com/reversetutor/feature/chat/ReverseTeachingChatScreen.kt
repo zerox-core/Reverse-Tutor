@@ -968,13 +968,13 @@ private fun MessageImageAttachment(
     ) {
         val uri = attachment.uri
         value = if (uri.isNullOrBlank()) {
-            ChatImageLoadState.Failed
+            ChatImageLoadState.Failed("消息里没有图片地址")
         } else {
             withContext(Dispatchers.IO) {
-                runCatching { ChatImageLoader.load(context, Uri.parse(uri), ChatImageTargets.Thumbnail) }
-                    .getOrNull()
-                    ?.let(ChatImageLoadState::Ready)
-                    ?: ChatImageLoadState.Failed
+                when (val loaded = ChatImageLoader.load(context, Uri.parse(uri), ChatImageTargets.Thumbnail)) {
+                    is ChatImageLoadResult.Ready -> ChatImageLoadState.Ready(loaded.bitmap)
+                    is ChatImageLoadResult.Failed -> ChatImageLoadState.Failed(loaded.reason)
+                }
             }
         }
     }
@@ -998,11 +998,11 @@ private fun MessageImageAttachment(
             ChatImageLoadState.Loading -> Box(contentAlignment = Alignment.Center) {
                 Text("正在读取图片…", fontSize = 11.sp)
             }
-            ChatImageLoadState.Failed -> Row(
+            is ChatImageLoadState.Failed -> Row(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("图片暂时无法显示 · ${attachment.name}", modifier = Modifier.weight(1f), fontSize = 11.sp)
+                Text("图片暂时无法显示 · ${attachment.name}\n${current.reason}", modifier = Modifier.weight(1f), fontSize = 11.sp)
                 TextButton(onClick = { retryKey += 1 }) { Text("重试") }
             }
             is ChatImageLoadState.Ready -> Image(
@@ -1053,7 +1053,7 @@ private fun AttachmentReference(
 
 private sealed interface ChatImageLoadState {
     data object Loading : ChatImageLoadState
-    data object Failed : ChatImageLoadState
+    data class Failed(val reason: String) : ChatImageLoadState
     data class Ready(val bitmap: androidx.compose.ui.graphics.ImageBitmap) : ChatImageLoadState
 }
 
@@ -1437,10 +1437,10 @@ private fun ChatImageViewer(
         retryKey
     ) {
         value = withContext(Dispatchers.IO) {
-            runCatching { ChatImageLoader.load(context, Uri.parse(attachment.uri), viewerTarget) }
-                .getOrNull()
-                ?.let(ChatImageLoadState::Ready)
-                ?: ChatImageLoadState.Failed
+            when (val loaded = ChatImageLoader.load(context, Uri.parse(attachment.uri), viewerTarget)) {
+                is ChatImageLoadResult.Ready -> ChatImageLoadState.Ready(loaded.bitmap)
+                is ChatImageLoadResult.Failed -> ChatImageLoadState.Failed(loaded.reason)
+            }
         }
     }
     var scale by remember(attachment.uri) { mutableStateOf(1f) }
@@ -1452,8 +1452,8 @@ private fun ChatImageViewer(
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         when (val current = imageState) {
             ChatImageLoadState.Loading -> Text("正在读取图片…", modifier = Modifier.align(Alignment.Center), color = Color.White)
-            ChatImageLoadState.Failed -> Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("图片暂时无法显示", color = Color.White)
+            is ChatImageLoadState.Failed -> Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("图片暂时无法显示\n${current.reason}", color = Color.White)
                 TextButton(onClick = { retryKey += 1 }) { Icon(Icons.Filled.Refresh, contentDescription = null); Text("重试") }
             }
             is ChatImageLoadState.Ready -> Image(

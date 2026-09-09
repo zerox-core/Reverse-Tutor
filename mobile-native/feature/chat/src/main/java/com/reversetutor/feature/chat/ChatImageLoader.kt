@@ -85,17 +85,38 @@ internal class ChatImageLruCache<T>(private val maxPixelCount: Long) {
     }
 }
 
+internal sealed interface ChatImageLoadResult {
+    data class Ready(val bitmap: ImageBitmap) : ChatImageLoadResult
+    data class Failed(val reason: String) : ChatImageLoadResult
+}
+
 internal object ChatImageLoader {
     private const val CachePixelBudget = 8_000_000L
     private val cache = ChatImageLruCache<ImageBitmap>(CachePixelBudget)
 
+    private sealed interface ChatImageStreamOutcome {
+        data class Opened(val stream: InputStream) : ChatImageStreamOutcome
+        data class Failed(val reason: String) : ChatImageStreamOutcome
+    }
+
     @Synchronized
-    fun load(context: Context, uri: Uri, target: ChatImageTarget): ImageBitmap? {
+    fun load(context: Context, uri: Uri, target: ChatImageTarget): ChatImageLoadResult {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        openFeatureChatImageStream(context, uri)?.use { input ->
-            BitmapFactory.decodeStream(input, null, bounds)
-        } ?: return null
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        when (val input = openChatImageStream(context, uri)) {
+            is ChatImageStreamOutcome.Failed -> return ChatImageLoadResult.Failed(input.reason)
+            is ChatImageStreamOutcome.Opened -> input.stream.use { stream ->
+                runCatching { BitmapFactory.decodeStream(stream, null, bounds) }
+                    .exceptionOrNull()
+                    ?.let { error ->
+                        return ChatImageLoadResult.Failed(
+                            "图片文件读取失败：${error.message ?: error.javaClass.simpleName}"
+                        )
+                    }
+            }
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return ChatImageLoadResult.Failed("图片格式无法识别（${describeUri(uri)}）")
+        }
 
         val sampleSize = calculateChatImageSampleSize(
             sourceWidth = bounds.outWidth,
@@ -104,12 +125,22 @@ internal object ChatImageLoader {
             targetHeight = target.heightPixels
         )
         val uriKey = uri.toString()
-        cache.get(uriKey, sampleSize)?.let { return it.value }
+        cache.get(uriKey, sampleSize)?.let { return ChatImageLoadResult.Ready(it.value) }
 
         val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        val bitmap = openFeatureChatImageStream(context, uri)?.use { input ->
-            BitmapFactory.decodeStream(input, null, decodeOptions)
-        } ?: return null
+        val decoded = when (val input = openChatImageStream(context, uri)) {
+            is ChatImageStreamOutcome.Failed -> return ChatImageLoadResult.Failed(input.reason)
+            is ChatImageStreamOutcome.Opened -> input.stream.use { stream ->
+                runCatching { BitmapFactory.decodeStream(stream, null, decodeOptions) }
+                    .getOrElse { error ->
+                        return ChatImageLoadResult.Failed(
+                            "图片解码失败：${error.message ?: error.javaClass.simpleName}"
+                        )
+                    }
+            }
+        }
+        val bitmap = decoded
+            ?: return ChatImageLoadResult.Failed("图片解码返回空结果（${describeUri(uri)}），文件可能已损坏或丢失")
         val image = bitmap.asImageBitmap()
         cache.put(
             CachedChatImage(
@@ -120,7 +151,34 @@ internal object ChatImageLoader {
                 value = image
             )
         )
-        return image
+        return ChatImageLoadResult.Ready(image)
+    }
+
+    private fun describeUri(uri: Uri): String = uri.lastPathSegment ?: uri.toString()
+
+    private fun openChatImageStream(context: Context, uri: Uri): ChatImageStreamOutcome {
+        if (uri.scheme != "file") {
+            return runCatching { context.contentResolver.openInputStream(uri) }.fold(
+                onSuccess = { stream ->
+                    stream?.let(ChatImageStreamOutcome::Opened)
+                        ?: ChatImageStreamOutcome.Failed("内容提供器未返回图片流（${describeUri(uri)}）")
+                },
+                onFailure = { error ->
+                    ChatImageStreamOutcome.Failed(
+                        "图片流打开失败：${error.message ?: error.javaClass.simpleName}（${describeUri(uri)}）"
+                    )
+                }
+            )
+        }
+        val path = uri.path ?: return ChatImageStreamOutcome.Failed("图片地址缺少文件路径（$uri）")
+        return runCatching { FileInputStream(File(path)) }.fold(
+            onSuccess = { ChatImageStreamOutcome.Opened(it) },
+            onFailure = { error ->
+                ChatImageStreamOutcome.Failed(
+                    "图片文件打开失败：${error.message ?: error.javaClass.simpleName}"
+                )
+            }
+        )
     }
 }
 

@@ -134,6 +134,27 @@ class BackgroundTurnPreparationCoordinatorTest {
     }
 
     @Test
+    fun image_only_turn_is_queued_not_rejected_as_blank() = runBlocking {
+        val result = coordinator.prepareAndEnqueue(
+            request(" ").copy(
+                imageAttachments = listOf(
+                    MessageAttachment(
+                        id = "attachment-1",
+                        spaceId = "space-1",
+                        messageId = "msg-1",
+                        name = "camera-test.jpg",
+                        mimeType = "image/jpeg",
+                        uri = "file:///data/local/tmp/chat-camera/camera-test.jpg"
+                    )
+                )
+            )
+        )
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+        assertEquals(1, queuedInputs.size)
+        assertEquals(1, queuedInputs.single().imageAttachments.size)
+    }
+
+    @Test
     fun blank_or_deleted_never_enqueues() = runBlocking {
         assertEquals(
             BackgroundTurnPreparationResult.BlankInput,
