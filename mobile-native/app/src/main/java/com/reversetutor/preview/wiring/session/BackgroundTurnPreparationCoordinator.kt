@@ -41,7 +41,7 @@ internal class BackgroundTurnPreparationCoordinator(
         request: BackgroundTurnPreparationRequest
     ): BackgroundTurnPreparationResult {
         try {
-            if (request.userText.isBlank()) {
+            if (request.userText.isBlank() && request.imageAttachments.isEmpty()) {
                 return BackgroundTurnPreparationResult.BlankInput
             }
             if (isSessionDeleted(request.sessionId)) {

@@ -117,6 +117,10 @@ class ProductionLlmGenerationRuntime(
         val headers = buildMap<String, String> {
             put("Content-Type", "application/json")
             put("Accept", if (request.streaming) "text/event-stream" else "application/json")
+            // Disable HttpURLConnection transparent gzip for SSE: a gzip layer
+            // can buffer the whole event stream and only deliver it when the
+            // connection completes, which defeats incremental streaming.
+            if (request.streaming) put("Accept-Encoding", "identity")
             when (protocol) {
                 LlmProviderProtocol.OpenAiCompatible -> {
                     put("Authorization", "Bearer $secret")

@@ -7,6 +7,10 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import android.os.Build
+import android.content.pm.ServiceInfo
+import androidx.core.app.NotificationCompat
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.agent.AssistantReplyArtifactRepository
@@ -25,6 +29,7 @@ import com.reversetutor.core.domain.LearningFactReceipt
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.preview.BuildConfig
+import com.reversetutor.preview.R
 import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
 import com.reversetutor.preview.wiring.HybridLlmRuntimeMode
 import com.reversetutor.preview.wiring.runtimeMode
@@ -48,6 +53,10 @@ class BackgroundGenerationWorker(
                 ).runtimeMode()
             )
         )
+        // Promote to a foreground service while generating so the process is
+        // not frozen when the app is backgrounded; completion then persists and
+        // the outcome notification can be posted even off-screen.
+        runCatching { setForeground(createForegroundInfo()) }
         val outcome = repository
             .runGenerationJob(jobId, System.currentTimeMillis())
         if (outcome is BackgroundGenerationOutcome.Completed) {
@@ -80,7 +89,33 @@ class BackgroundGenerationWorker(
         }
     }
 
+    private fun createForegroundInfo(): ForegroundInfo {
+        // Ensure the shared channel exists before building the notification.
+        runCatching { AndroidBackgroundGenerationNotifier(applicationContext) }
+        val notification = NotificationCompat.Builder(
+            applicationContext,
+            AndroidBackgroundGenerationNotifier.CHANNEL_ID
+        )
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("正在生成回复")
+            .setContentText("小岚正在思考，生成完成后会通知你。")
+            .setOngoing(true)
+            .setSilent(true)
+            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(
+                GenerationForegroundNotificationId,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            ForegroundInfo(GenerationForegroundNotificationId, notification)
+        }
+    }
+
     companion object {
+        private const val GenerationForegroundNotificationId = 73201
+
         const val InputJobId = "background_generation_job_id"
 
         fun request(jobId: String): OneTimeWorkRequest =

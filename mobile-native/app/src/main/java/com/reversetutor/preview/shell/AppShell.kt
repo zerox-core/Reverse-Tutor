@@ -1137,6 +1137,32 @@ private fun DestinationContent(
         )
         if (granted) chatCameraLauncher.launch(null)
     }
+    val notificationStartupPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        scope.launch {
+            hybridAppGraph.appPreferencesRepository
+                .setBackgroundGenerationNotificationEnabled(granted)
+        }
+    }
+    LaunchedEffect(Unit) {
+        // Ask for the notification permission once on first launch so that
+        // background generation completion notices can actually reach the user.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED &&
+            !chatPermissionPreferences.getBoolean("notification-permission-requested", false)
+        ) {
+            chatPermissionPreferences.edit()
+                .putBoolean("notification-permission-requested", true)
+                .apply()
+            notificationStartupPermissionLauncher.launch(
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+        }
+    }
     val llmProfileState = LlmProfileSettingsUiState.from(
         profiles = llmProfiles,
         presets = LlmProviderPreset.defaults,

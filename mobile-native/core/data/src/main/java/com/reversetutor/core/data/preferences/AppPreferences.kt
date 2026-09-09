@@ -8,7 +8,7 @@ data class AppPreferences(
     val primaryMemo: String = "",
     val secondaryMemo: String = "",
     val scratchMemo: String = "",
-    val backgroundGenerationNotificationEnabled: Boolean = false
+    val backgroundGenerationNotificationEnabled: Boolean = true
 ) {
     companion object {
         val defaults = AppPreferences()
