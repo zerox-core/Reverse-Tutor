@@ -328,11 +328,9 @@ fun ChatRoute(
         while (activeBackgroundJobId == jobId) {
             delay(250L)
             val job = repository.getJob(jobId) ?: return@LaunchedEffect
-            repository.getGenerationPreview(jobId, job.token)?.let { preview ->
-                if (job.status in setOf(BackgroundJobStatus.Queued, BackgroundJobStatus.Running)) {
-                    generation = ChatGenerationUiState.Streaming(preview)
-                }
-            }
+            // Background generation intentionally shows no streaming preview:
+            // the pending indicator covers the whole run and the terminal
+            // branch below publishes the full reply once (design confirmed 2026-09-10).
             if (job.status in TerminalGenerationStatuses) {
                 if (activeGenerationToken == job.token) {
                     activeGenerationToken = null
