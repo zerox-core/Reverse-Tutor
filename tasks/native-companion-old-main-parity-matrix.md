@@ -34,7 +34,7 @@ user message
 
 The Worker consumes **`contextEvidence`** (bounded memory/source/message evidence list) and **`sessionPolicy`**
 (a `LlmSessionPolicyContext` wire payload derived from `SessionPolicyOutput`). It does **not** run old `engine.py`
-prompt assembly, post-turn memory curation, or mastery projection. Those remain `unavailable`/`proposed`.
+It does **not** run old `engine.py` prompt assembly, post-turn memory curation, or write-side mastery upsert. Prompt assembly and post-turn curation remain `unavailable`; the mastery read-model landed 2026-09-10 (NEWMP-V1-013, see §7) and feeds context evidence, but write-side upsert remains `proposed`.
 
 The old single-turn loop (`engine.run_turn`): `load -> maybe_summarize -> retrieve_kg_context -> runtime_memory_hint ->
 build_system_prompt -> citable_clues -> build_messages -> llm.chat_json -> _normalize_turn_payload -> discipline_reply ->
@@ -50,7 +50,7 @@ persist user+assistant -> upsert_mastery -> upsert_error_log -> anchor_updates -
 | 4 | action/role selection | `engine._normalize_turn_payload` + `engine._student_role_for_action` + `engine._fallback_action_for_mode`; `test_engine.py::test_no_entry_routes_to_clue_student`, `::test_understood_triggers_examiner_without_mastery_increase` | `domain` `SessionTurnPolicy.normalize(input)` 鈫?`SessionActionContract` (+ `SessionPolicyOutput`); out of `core:domain` | `SessionTurnPolicyTest` | `ChatGenerationPortAdapter` 鈫?`LlmSessionPolicyContext` | **migrated** 鈥?`SessionTurnPolicy` reproduces entry-status derivation, understood鈫抏xaminer, no_entry鈫抍lue, has_entry鈫抪robe probe-intensity/low-correctness鈫抯mall_lecture, summary_only鈫抮ecap, and student-role derivation. This is the migrated old policy. |
 | 5 | evidence normalization | `engine._normalize_evidence`; `test_engine.py::test_understood_triggers_examiner_without_mastery_increase` | `domain` `SessionTurnContracts`/`MasteryEvidenceContract` (`type/status/error_type/reason`) | `SessionTurnPolicyTest` | `SessionPolicyOutput` 鈫?`LlmSessionPolicyContext` | **migrated** 鈥?non-study forces `none`; probe+correctness/depth threshold 鈫?`explanation` passed/partial; bounded sanitization. |
 | 6 | process summary | `engine._build_process_summary`; (no direct test) | `domain` `SessionPolicyOutput.processSummary` | `SessionTurnPolicyTest` (summary assertions) | `SessionPolicyOutput` 鈫?meta | **migrated** 鈥?`SessionTurnPolicy.buildProcessSummary` emits the `mode`-scoped summary string (goal/companion/study branches). |
-| 7 | mastery projection | `engine.run_turn` mastery block (`db.upsert_mastery`, `upsert_error_log`, `resolve_error_pattern`) | `domain` `MasteryEvidenceContract`; `frozen` `MemoryRepository`/mastery write is **not** owned by the Worker | `ChatGenerationPortAdapterTest` (evidence only) | `BackgroundGenerationRepository` | **unavailable** 鈥?old mastery/error-log projection happens **inside** the old loop. The native Worker persists an assistant message and evidence meta, but there is **no** native post-turn mastery upsert. Mastery projection is future `PostTurnProjector` work 鈫?`proposed`. |
+| 7 | mastery projection | `engine.run_turn` mastery block (`db.upsert_mastery`, `upsert_error_log`, `resolve_error_pattern`) | `domain` `MasteryEvidenceContract`; `frozen` `MemoryRepository`/mastery write is **not** owned by the Worker | `ChatGenerationPortAdapterTest` (evidence only) | `BackgroundGenerationRepository` | **partial (read-model, 2026-09-10)** — mastery read-model migrated via NEWMP-V1-013 (see §7): deterministic fold over the `LearningFactReceipt` ledger, wired into context evidence; write-side `upsert_mastery`/error-log upsert **not** claimed. |
 | 8 | graph/context retrieval | `engine.run_turn` (`retrieve_kg_context`, `make_default_retriever`, `_should_inject_clue_retrieval`, `_format_citable_clues`); `test_engine.py` (no direct test) | `frozen` `contextEvidence` (injected evidence); `domain` evidence handles | `ChatGenerationPortAdapterTest` | `BackgroundGenerationRepository` | **partial** 鈥?the Worker accepts bounded `contextEvidence`, so a source/message evidence projection is reachable. The old `retrieve_kg_context` + citable-clue injection heuristic and graph/persona-trait/preference hinting are **not** reproduced as a native contract. |
 | 9 | post-turn memory review | `engine.run_turn` (`kg_extractor.extract_from_turn`, `kg_gate.should_extract`, `mark_review_pending`, anchor_updates) | `domain` `CompanionMemoryEvolutionPolicy`/`LearningScopeGuard` (proposed); `frozen` no post-turn contract | (none yet) | None | **unavailable** 鈥?the old loop ran `kg_extract` and `mark_review_pending` after a turn. The native Worker does **no** post-turn curation. Companion-memory curation and learning-scope guard are new, `proposed` contracts in this topology plan. |
 
@@ -121,3 +121,23 @@ Focused verification on this audit: `:core:domain:testDebugUnitTest` for `Sessio
 The remaining `partial` rows are not safe candidates for a prompt-only shortcut. A future local due-review selector
 or semantic evaluator must first have its own bounded input contract, Red test, and explicit capability review if it
 requires new persistence or generation fields.
+
+## 7. NEWMP-V1-013 mastery read-model (2026-09-10)
+
+Gap 6 / row 7 upgraded: mastery is now a deterministic read-model (pure fold) over the append-only
+`LearningFactReceipt` ledger — `core/domain/.../MasteryLedgerProjection.kt`. Replay semantics match old
+`engine.upsert_mastery`: evidence gate (`none`/unknown → no score change), EMA `round2(0.65·old + 0.35·target)`
+clamped [0,100], partial → target×0.75, failed → rollback 8 only when score>50 (else unchanged), review
+ladder [1,3,7,14]d with `nextReviewAt` anchored to fact.occurredAt (pure/replayable, no wall clock), band codes
+stable English (untouched/intuitive_entry/guided_example/basic_application/variant_handling/transferable;
+Chinese labels stay in the UI layer). Wiring: `MasteryFactContextPort` (core:domain) → adapter (space-scoped,
+same caveat as Memory/Source adapters) → `ConversationContextAssembler.safeRead` → `masteryProjections` on the
+contract → `SessionPolicyInputMapper` maps to `kind="Mastery"` evidence under the existing MaxContextEvidence=6
+cap. Frozen layers untouched; zero new Room tables.
+
+Tests (TDD Red→Green, BUILD SUCCESSFUL): `MasteryLedgerProjectionTest` 15/15, `ConversationContextAssemblerTest`
+14/14 (+3), `SessionPolicyInputMapperTest` 8/8 (+1). Task doc: `tasks/NEWMP-V1-013-MASTERY-LEDGER-PROJECTION.md`.
+
+Explicitly not claimed: write-side `upsert_mastery`, error-log upsert/resolve, session-scoped fact filtering
+(space-scoped only), `review_frequency` high ladder [1,2,4,7].
+

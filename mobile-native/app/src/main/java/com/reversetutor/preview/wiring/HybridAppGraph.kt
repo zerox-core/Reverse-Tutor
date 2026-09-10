@@ -219,9 +219,10 @@ class HybridAppGraph private constructor(
             val database = DataModule.database(appContext)
             val windowTopologyRepository = WindowTopologyRepository(database.windowTopologyDao())
             val windowHeartbeatRepository = WindowHeartbeatRepository(database.windowHeartbeatDao())
+            val learningLedgerRepository = LearningLedgerRepository(database.learningLedgerDao())
             val recentTurnSignalsReader = RecentTurnSignalsReader(
                 loadCompletedPlans = backgroundGenerationRepository::listCompletedTurnPlans,
-                loadLearningFacts = LearningLedgerRepository(database.learningLedgerDao())::listLearningFactsForWindow
+                loadLearningFacts = learningLedgerRepository::listLearningFactsForWindow
             )
             val sessionRichReplyPort: SessionRichReplyPort = SessionRichReplyPortAdapter(
                 AssistantReplyArtifactRepository(RoomAssistantReplyArtifactStore(database.sessionAgentDao()))
@@ -241,6 +242,7 @@ class HybridAppGraph private constructor(
                 graphRepository = graphRepository,
                 sourceRepository = sourceRepository,
                 learningRepository = learningRepository,
+                learningLedgerRepository = learningLedgerRepository,
                 messageContextPort = TopologyAwareMessageContextPort(visibleHistoryReader)
             )
             val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =

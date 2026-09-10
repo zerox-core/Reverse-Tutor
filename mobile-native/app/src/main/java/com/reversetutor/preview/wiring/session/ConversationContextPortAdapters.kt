@@ -1,6 +1,7 @@
 package com.reversetutor.preview.wiring.session
 
 import com.reversetutor.core.data.graph.GraphRepository
+import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.memory.MemoryRepository
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.sources.SourceRepository
@@ -8,6 +9,8 @@ import com.reversetutor.core.domain.ContextMessage
 import com.reversetutor.core.domain.ErrorContextPort
 import com.reversetutor.core.domain.ErrorReferenceContract
 import com.reversetutor.core.domain.GraphContextPort
+import com.reversetutor.core.domain.LearningFactReceipt
+import com.reversetutor.core.domain.MasteryFactContextPort
 import com.reversetutor.core.domain.MemoryContextPort
 import com.reversetutor.core.domain.MemoryReferenceContract
 import com.reversetutor.core.domain.MessageContextPort
@@ -135,4 +138,21 @@ class SourceContextPortAdapter(
                     sourceRevision = "rev-${entry.source.id}-${entry.source.createdAtEpochMillis}"
                 )
             }
+}
+
+class MasteryFactContextPortAdapter(
+    private val learningLedgerRepository: LearningLedgerRepository
+) : MasteryFactContextPort {
+    override suspend fun listMasteryFacts(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<LearningFactReceipt> =
+        learningLedgerRepository.listLearningFacts(spaceId)
+            // Space-scoped like Memory/Source adapters: the append-only ledger
+            // is keyed by space, and the deterministic mastery fold isolates
+            // scores per knowledge point. Newest receipts first so the bounded
+            // read keeps the most recent evidence.
+            .sortedByDescending { it.occurredAtEpochMillis }
+            .take(limit)
 }

@@ -19,12 +19,15 @@ class ConversationContextAssembler(
     private val errorPort: ErrorContextPort,
     private val graphPort: GraphContextPort,
     private val sourcePort: SourceContextPort,
+    private val masteryFactPort: MasteryFactContextPort? = null,
     private val messageLimit: Int = 10,
     private val memoryLimit: Int = 5,
     private val errorLimit: Int = 5,
     private val gapLimit: Int = 5,
     private val sourceLimit: Int = 5,
     private val reviewLimit: Int = 5,
+    private val masteryFactLimit: Int = 200,
+    private val masterySnapshotLimit: Int = 10,
     private val textCap: Int = 200
 ) {
 
@@ -86,6 +89,16 @@ class ConversationContextAssembler(
                 }
         }
 
+        // Optional mastery read-model: absent port => empty projections with
+        // no warning; failing port => empty projections + warning, like every
+        // other category.
+        val mastery = masteryFactPort?.let { port ->
+            safeRead("mastery", warnings) {
+                MasteryLedgerProjection(snapshotLimit = masterySnapshotLimit)
+                    .project(port.listMasteryFacts(spaceId, sessionId, masteryFactLimit))
+            }
+        } ?: emptyList()
+
         return ConversationContextContract(
             spaceId = spaceId,
             sessionId = sessionId,
@@ -95,7 +108,8 @@ class ConversationContextAssembler(
             historicalErrors = errors,
             pendingReviewKnowledgePoints = reviewPoints,
             recentMessages = messages,
-            warnings = warnings
+            warnings = warnings,
+            masteryProjections = mastery
         )
     }
 

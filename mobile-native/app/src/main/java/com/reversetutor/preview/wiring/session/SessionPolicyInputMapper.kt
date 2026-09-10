@@ -71,8 +71,9 @@ internal fun SessionPolicyOutput.toLlmSessionPolicyContext(): LlmSessionPolicyCo
 
 /**
  * Converts a [ConversationContextContract] into bounded [LlmContextEvidence].
- * Uses only recent messages, memory, sources, gaps, review points, and
- * historical errors. Text is capped with [SessionTurnContracts.sanitizeContractText].
+ * Uses only recent messages, memory, mastery projections, sources, gaps,
+ * review points, and historical errors. Text is capped with
+ * [SessionTurnContracts.sanitizeContractText].
  */
 internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContextEvidence> {
     val evidence = mutableListOf<LlmContextEvidence>()
@@ -93,6 +94,18 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
             title = "Memory",
             body = SessionTurnContracts.sanitizeContractText(mem.summary, maxLength = MaxEvidenceBodyChars),
             kind = "Memory"
+        ))
+    }
+
+    masteryProjections.forEach { mastery ->
+        evidence.add(LlmContextEvidence(
+            id = "mastery-${mastery.knowledgePoint}",
+            title = "Mastery",
+            body = SessionTurnContracts.sanitizeContractText(
+                "${mastery.knowledgePoint} ${mastery.score.toInt()}/100",
+                maxLength = MaxEvidenceBodyChars
+            ),
+            kind = "Mastery"
         ))
     }
 

@@ -74,6 +74,20 @@ class ConversationContextAssemblerTest {
         }
     }
 
+    private class FakeMasteryFactPort(
+        val items: List<LearningFactReceipt> = emptyList(),
+        val shouldFail: Boolean = false
+    ) : MasteryFactContextPort {
+        override suspend fun listMasteryFacts(
+            spaceId: String,
+            sessionId: String,
+            limit: Int
+        ): List<LearningFactReceipt> {
+            if (shouldFail) throw RuntimeException("ledger unreadable")
+            return items.take(limit)
+        }
+    }
+
     // --- Tests --------------------------------------------------------------
 
     @Test
@@ -287,5 +301,64 @@ class ConversationContextAssemblerTest {
         assertEquals("se1", empty.sessionId)
         assertTrue(empty.prerequisiteGaps.isEmpty())
         assertTrue(empty.warnings.isEmpty())
+    }
+
+    @Test
+    fun masteryFactsAreProjectedWhenPortWired() = runBlocking {
+        val facts = listOf(
+            LearningFactReceipt(
+                knowledgePoint = "因式分解",
+                evidenceType = "explanation",
+                result = "passed",
+                confidence = 0.8f,
+                sourceWindowId = "w1",
+                sourceTurnId = "t1",
+                occurredAtEpochMillis = 1L
+            )
+        )
+        val assembler = ConversationContextAssembler(
+            messagePort = FakeMessagePort(),
+            memoryPort = FakeMemoryPort(),
+            errorPort = FakeErrorPort(),
+            graphPort = FakeGraphPort(),
+            sourcePort = FakeSourcePort(),
+            masteryFactPort = FakeMasteryFactPort(items = facts)
+        )
+        val ctx = assembler.assemble("s", "se")
+        assertEquals(1, ctx.masteryProjections.size)
+        assertEquals("因式分解", ctx.masteryProjections[0].knowledgePoint)
+        // 0.35 * 35 = 12.25, mirroring the legacy upsert_mastery fold.
+        assertEquals(12.25f, ctx.masteryProjections[0].score, 0.001f)
+        assertTrue(ctx.warnings.none { it.source == "mastery" })
+    }
+
+    @Test
+    fun masteryPortFailureDegradesOnlyMastery() = runBlocking {
+        val assembler = ConversationContextAssembler(
+            messagePort = FakeMessagePort(items = listOf(ContextMessage("m1", "user", "hi", 1))),
+            memoryPort = FakeMemoryPort(),
+            errorPort = FakeErrorPort(),
+            graphPort = FakeGraphPort(),
+            sourcePort = FakeSourcePort(),
+            masteryFactPort = FakeMasteryFactPort(shouldFail = true)
+        )
+        val ctx = assembler.assemble("s", "se")
+        assertTrue(ctx.masteryProjections.isEmpty())
+        assertEquals(1, ctx.recentMessages.size)
+        assertTrue(ctx.warnings.any { it.source == "mastery" })
+    }
+
+    @Test
+    fun masteryPortAbsentYieldsEmptyProjectionsWithoutWarning() = runBlocking {
+        val assembler = ConversationContextAssembler(
+            messagePort = FakeMessagePort(),
+            memoryPort = FakeMemoryPort(),
+            errorPort = FakeErrorPort(),
+            graphPort = FakeGraphPort(),
+            sourcePort = FakeSourcePort()
+        )
+        val ctx = assembler.assemble("s", "se")
+        assertTrue(ctx.masteryProjections.isEmpty())
+        assertTrue(ctx.warnings.none { it.source == "mastery" })
     }
 }

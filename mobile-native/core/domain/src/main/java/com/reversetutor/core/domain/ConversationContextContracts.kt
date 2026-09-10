@@ -67,6 +67,10 @@ data class ContextWarning(
 /**
  * The full conversation context contract consumed by the side-panel.
  * Every list is bounded and deterministically sorted.
+ *
+ * [masteryProjections] carries the deterministic mastery read-model derived
+ * from the append-only learning ledger (see [MasteryLedgerProjection]).
+ * Defaulted so every pre-existing construction site stays compatible.
  */
 data class ConversationContextContract(
     val spaceId: String,
@@ -77,7 +81,8 @@ data class ConversationContextContract(
     val historicalErrors: List<ErrorReferenceContract>,
     val pendingReviewKnowledgePoints: List<String>,
     val recentMessages: List<ContextMessage>,
-    val warnings: List<ContextWarning>
+    val warnings: List<ContextWarning>,
+    val masteryProjections: List<MasterySnapshot> = emptyList()
 ) {
     companion object {
         fun empty(spaceId: String, sessionId: String): ConversationContextContract =
@@ -148,4 +153,21 @@ interface SourceContextPort {
         sessionId: String,
         limit: Int
     ): List<SourceReferenceContract>
+}
+
+/**
+ * Returns recent learning-fact receipts backing the mastery read-model.
+ *
+ * The append-only ledger is space-scoped (mirroring [MemoryContextPort] and
+ * [SourceContextPort] scoping caveats); adapters must translate repository
+ * results into the domain [LearningFactReceipt] contract before returning.
+ * The deterministic fold itself ([MasteryLedgerProjection]) isolates scores
+ * per knowledge point.
+ */
+interface MasteryFactContextPort {
+    suspend fun listMasteryFacts(
+        spaceId: String,
+        sessionId: String,
+        limit: Int
+    ): List<LearningFactReceipt>
 }

@@ -1,6 +1,7 @@
 package com.reversetutor.preview.wiring.session
 
 import com.reversetutor.core.data.graph.GraphRepository
+import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.memory.MemoryRepository
@@ -51,6 +52,7 @@ class SessionConversationAssembly(
     private val graphRepository: GraphRepository,
     private val sourceRepository: SourceRepository,
     private val learningRepository: LearningRepositoryImpl,
+    private val learningLedgerRepository: LearningLedgerRepository? = null,
     private val messageContextPort: MessageContextPort = MessageContextPortAdapter(messageRepository),
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
@@ -84,7 +86,8 @@ class SessionConversationAssembly(
         memoryPort = MemoryContextPortAdapter(memoryRepository),
         errorPort = ErrorContextPortAdapter(memoryRepository),
         graphPort = GraphContextPortAdapter(graphRepository),
-        sourcePort = SourceContextPortAdapter(sourceRepository)
+        sourcePort = SourceContextPortAdapter(sourceRepository),
+        masteryFactPort = learningLedgerRepository?.let { MasteryFactContextPortAdapter(it) }
     )
 
     private val coordinator: ConversationSessionCoordinator = ConversationSessionCoordinator(

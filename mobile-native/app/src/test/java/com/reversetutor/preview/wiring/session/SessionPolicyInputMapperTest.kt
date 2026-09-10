@@ -3,6 +3,7 @@ package com.reversetutor.preview.wiring.session
 import com.reversetutor.core.domain.CorrectionPersistenceWire
 import com.reversetutor.core.domain.ContextMessage
 import com.reversetutor.core.domain.ConversationContextContract
+import com.reversetutor.core.domain.MasterySnapshot
 import com.reversetutor.core.domain.SessionModeWire
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import org.junit.Assert.assertEquals
@@ -94,6 +95,39 @@ class SessionPolicyInputMapperTest {
         assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.take(2).map { it.id })
         assertEquals("gaps-session-1", evidence[2].id)
         assertEquals("review-session-1", evidence[3].id)
+    }
+
+    @Test
+    fun mastery_projections_map_to_evidence_after_messages() {
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = emptyList(),
+            relatedMemory = emptyList(),
+            sourceEvidence = emptyList(),
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = emptyList(),
+            recentMessages = listOf(ContextMessage("message-a", "user", "第一条", 1L)),
+            warnings = emptyList(),
+            masteryProjections = listOf(
+                MasterySnapshot(
+                    knowledgePoint = "因式分解",
+                    score = 51.98f,
+                    reviewIntervalDays = 3,
+                    nextReviewAtEpochMillis = 10L,
+                    attempts = 2,
+                    band = "basic_application"
+                )
+            )
+        ).toLlmContextEvidence()
+
+        assertEquals(2, evidence.size)
+        assertEquals("msg-message-a", evidence[0].id)
+        assertEquals("mastery-因式分解", evidence[1].id)
+        assertEquals("Mastery", evidence[1].kind)
+        assertEquals("Mastery", evidence[1].title)
+        assertTrue(evidence[1].body.contains("因式分解"))
+        assertTrue(evidence[1].body.contains("51/100"))
     }
 
     @Test
