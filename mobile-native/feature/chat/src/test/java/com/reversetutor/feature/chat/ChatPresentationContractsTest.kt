@@ -8,9 +8,9 @@ import org.junit.Test
 class ChatPresentationContractsTest {
     @Test
     fun composerKeepsSendButtonInsideStableBounds() {
-        assertEquals(54.dp, ChatComposerLayout.Height)
+        assertEquals(48.dp, ChatComposerLayout.Height)
         assertEquals(40.dp, ChatComposerLayout.SendSize)
-        assertEquals(7.dp, ChatComposerLayout.TrailingInset)
+        assertEquals(8.dp, ChatComposerLayout.Gap)
         assertTrue(ChatComposerLayout.SendSize < ChatComposerLayout.Height)
     }
 

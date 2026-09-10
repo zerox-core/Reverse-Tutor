@@ -116,9 +116,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 internal object ChatComposerLayout {
-    val Height = 54.dp
+    val Height = 48.dp
     val SendSize = 40.dp
-    val TrailingInset = 7.dp
+    val Gap = 8.dp
 }
 
 enum class ChatOverflowAction(val label: String) {
@@ -1839,34 +1839,40 @@ private fun ReverseTeachingComposer(
     onSend: () -> Unit,
     onFocusChanged: (Boolean) -> Unit
 ) {
-    Surface(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 12.dp)
-            .heightIn(min = ChatComposerLayout.Height, max = 136.dp),
-        color = Color(0xFFF2F6FC),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, Color(0xFFC7D8EA))
+            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp),
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(ChatComposerLayout.Gap)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 8.dp, end = ChatComposerLayout.TrailingInset),
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            onClick = onAdd,
+            modifier = Modifier.size(ChatComposerLayout.SendSize),
+            color = Color.Transparent,
+            contentColor = Color(0xFF577394),
+            shape = CircleShape
         ) {
-            Surface(
-                onClick = onAdd,
-                modifier = Modifier.size(44.dp),
-                color = Color.Transparent,
-                contentColor = Color(0xFF577394),
-                shape = CircleShape
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Add, contentDescription = "添加图片或资料", modifier = Modifier.size(19.dp))
-                }
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.Add, contentDescription = "添加图片或资料", modifier = Modifier.size(20.dp))
             }
-            Box(modifier = Modifier.weight(1f)) {
+        }
+        Surface(
+            modifier = Modifier
+                .weight(1f)
+                .heightIn(min = ChatComposerLayout.Height, max = 136.dp),
+            color = Color(0xFFF2F6FC),
+            shape = RoundedCornerShape(24.dp),
+            border = BorderStroke(1.dp, Color(0xFFC7D8EA))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = ChatComposerLayout.Height, max = 136.dp)
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
                 BasicTextField(
                     value = text,
                     onValueChange = onTextChange,
@@ -1883,28 +1889,26 @@ private fun ReverseTeachingComposer(
                     Text(
                         text = "继续讲解，或提出一个问题",
                         color = Color(0xFF8A96A9),
-                        fontSize = 11.sp,
-                        lineHeight = 18.sp
+                        fontSize = 12.sp,
+                        lineHeight = 20.sp
                     )
                 }
             }
-            Surface(
-                onClick = onSend,
-                enabled = canSend,
-                modifier = Modifier
-                    .size(ChatComposerLayout.SendSize)
-                    .shadow(4.dp, CircleShape),
-                color = if (canSend) Color(0xFF4287E8) else Color(0xFFAFB9C8),
-                contentColor = Color.White,
-                shape = CircleShape
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowUpward,
-                        contentDescription = if (isSending) "正在发送" else "发送",
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
+        }
+        Surface(
+            onClick = onSend,
+            enabled = canSend,
+            modifier = Modifier.size(ChatComposerLayout.SendSize),
+            color = if (canSend) Color(0xFF4287E8) else Color(0xFFAFB9C8),
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.ArrowUpward,
+                    contentDescription = if (isSending) "正在发送" else "发送",
+                    modifier = Modifier.size(19.dp)
+                )
             }
         }
     }
