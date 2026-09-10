@@ -660,6 +660,7 @@ fun ChatRoute(
         availableSourceAttachments = availableSourceAttachments,
         cameraPermissionState = cameraPermissionState,
         onPickImages = onPickImage,
+        onPickLocalSource = onPickLocalSource,
         onSelectSource = ::addAttachment,
         onTakePhoto = onTakePhoto,
         onRequestCameraPermission = onRequestCameraPermission,

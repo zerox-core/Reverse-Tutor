@@ -7,27 +7,24 @@ import org.junit.Test
 
 /**
  * NEWMP-V1-006 Task 3: JVM contracts for the in-chat attachment action sheet.
- * The sheet must expose the phone-document entry ("从手机选择资料") so the
+ * The sheet must expose the phone-document entry ("文件") so the
  * learner can import local material without leaving the conversation, and
  * entry subtitles must stay limited to safe user-facing guidance.
  */
 class ChatAttachmentSheetContractsTest {
 
     @Test
-    fun attachmentSheetExposesPhoneSourceEntry() {
-        val entries = chatAttachmentSheetActionSpecs(cameraSubtitle = null)
+    fun attachmentSheetExposesPhoneDocumentEntry() {
+        val entries = chatAttachmentSheetActionSpecs()
 
-        assertEquals(
-            listOf("选择图片", "选择应用内资料", "从手机选择资料", "拍照", "查看本会话资料"),
-            entries.map { it.label }
-        )
-        val phoneEntry = entries.single { it.label == "从手机选择资料" }
-        assertNull(phoneEntry.subtitle)
+        assertEquals(listOf("相册", "文件"), entries.map { it.label })
+        val documentEntry = entries.single { it.label == "文件" }
+        assertNull(documentEntry.subtitle)
     }
 
     @Test
     fun attachmentSheetEntriesNeverLeakPathsOrInternalIdentifiers() {
-        val entries = chatAttachmentSheetActionSpecs(cameraSubtitle = null)
+        val entries = chatAttachmentSheetActionSpecs()
 
         entries.forEach { spec ->
             assertTrue("label must be non-blank: $spec", spec.label.isNotBlank())
@@ -44,14 +41,5 @@ class ChatAttachmentSheetContractsTest {
         assertEquals("相机权限已关闭，前往系统设置", chatCameraPermissionSubtitle(ChatPermissionState.PermanentlyDenied))
         assertNull(chatCameraPermissionSubtitle(ChatPermissionState.Granted))
         assertNull(chatCameraPermissionSubtitle(ChatPermissionState.Requestable))
-    }
-
-    @Test
-    fun cameraSubtitleIsCarriedOnlyByTheTakePhotoEntry() {
-        val entries = chatAttachmentSheetActionSpecs(cameraSubtitle = "相机权限已关闭，前往系统设置")
-
-        val withSubtitle = entries.filter { it.subtitle != null }
-        assertEquals(listOf("拍照"), withSubtitle.map { it.label })
-        assertEquals("相机权限已关闭，前往系统设置", withSubtitle.single().subtitle)
     }
 }

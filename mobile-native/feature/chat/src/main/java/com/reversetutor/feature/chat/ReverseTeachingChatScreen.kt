@@ -1,7 +1,19 @@
 package com.reversetutor.feature.chat
 
+import android.Manifest
+import android.content.ContentUris
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Size
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -52,10 +64,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.MoreVert
@@ -350,15 +361,44 @@ internal fun ReverseTeachingChatScreen(
                     onDismiss = onCancelQuote
                 )
             }
+            // Douyin-style attachment panel: the media strip rides above
+            // the composer and the action row replaces the keyboard area
+            // below it while the panel is open.
+            val focusManager = LocalFocusManager.current
+            if (showAttachmentActions) {
+                ChatAttachmentMediaStrip()
+            }
             ReverseTeachingComposer(
                 text = state.composer.text,
                 canSend = state.composer.canSend,
                 isSending = state.composer.isSending,
                 onTextChange = onComposerTextChange,
-                onAdd = { showAttachmentActions = true },
+                onAdd = {
+                    if (showAttachmentActions) {
+                        showAttachmentActions = false
+                    } else {
+                        focusManager.clearFocus()
+                        showAttachmentActions = true
+                    }
+                },
                 onSend = onSendMessage,
-                onFocusChanged = onComposerFocusChanged
+                onFocusChanged = { focused ->
+                    if (focused) showAttachmentActions = false
+                    onComposerFocusChanged(focused)
+                }
             )
+            if (showAttachmentActions) {
+                ChatAttachmentPanelActions(
+                    onPickImages = {
+                        showAttachmentActions = false
+                        onPickImages()
+                    },
+                    onPickLocalSource = {
+                        showAttachmentActions = false
+                        onPickLocalSource()
+                    }
+                )
+            }
             state.composer.sendFailure?.let { failure ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
@@ -391,37 +431,7 @@ internal fun ReverseTeachingChatScreen(
         }
     }
 
-    if (showAttachmentActions) {
-        ChatAttachmentActionSheet(
-            permissionState = cameraPermissionState,
-            onDismiss = { showAttachmentActions = false },
-            onPickImages = {
-                showAttachmentActions = false
-                onPickImages()
-            },
-            onPickLocalSource = {
-                showAttachmentActions = false
-                onPickLocalSource()
-            },
-            onPickSource = {
-                showAttachmentActions = false
-                showSourcePicker = true
-            },
-            onTakePhoto = {
-                showAttachmentActions = false
-                when (cameraPermissionState) {
-                    ChatPermissionState.Granted -> onTakePhoto()
-                    ChatPermissionState.PermanentlyDenied -> onOpenCameraSettings()
-                    ChatPermissionState.Requestable,
-                    ChatPermissionState.Denied -> onRequestCameraPermission()
-                }
-            },
-            onOpenSessionSources = {
-                showAttachmentActions = false
-                onOpenSessionSources()
-            }
-        )
-    }
+
     if (showSourcePicker) {
         ChatSourcePickerSheet(
             sources = availableSourceAttachments,
@@ -1720,73 +1730,195 @@ internal fun chatCameraPermissionSubtitle(permissionState: ChatPermissionState):
 }
 
 /**
- * NEWMP-V1-006 Task 3: the attachment sheet entry list as a single source of
- * truth. The Compose sheet renders these specs in order; JVM tests pin the
- * phone-source entry ("从手机选择资料") contract here.
+ * Douyin-style attachment panel: the action row entry list as a single
+ * source of truth. Tentatively 相册 (system image picker) and 文件 (phone
+ * document picker), rendered flush-left in add order; JVM tests pin the
+ * phone-document entry ("文件") contract here. More entries will be
+ * appended incrementally.
  */
-internal fun chatAttachmentSheetActionSpecs(cameraSubtitle: String?): List<ChatAttachmentSheetActionSpec> = listOf(
-    ChatAttachmentSheetActionSpec("选择图片", null),
-    ChatAttachmentSheetActionSpec("选择应用内资料", null),
-    ChatAttachmentSheetActionSpec("从手机选择资料", null),
-    ChatAttachmentSheetActionSpec("拍照", cameraSubtitle),
-    ChatAttachmentSheetActionSpec("查看本会话资料", null)
+internal fun chatAttachmentSheetActionSpecs(): List<ChatAttachmentSheetActionSpec> = listOf(
+    ChatAttachmentSheetActionSpec("相册", null),
+    ChatAttachmentSheetActionSpec("文件", null)
 )
 
+/**
+ * Media strip shown above the composer while the attachment panel is
+ * open. Auto-reads the device gallery (most recent first); falls back to
+ * placeholder frames when the read permission is missing or the gallery
+ * is empty.
+ */
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun ChatAttachmentActionSheet(
-    permissionState: ChatPermissionState,
-    onDismiss: () -> Unit,
-    onPickImages: () -> Unit,
-    onPickLocalSource: () -> Unit,
-    onPickSource: () -> Unit,
-    onTakePhoto: () -> Unit,
-    onOpenSessionSources: () -> Unit
+private fun ChatAttachmentMediaStrip(
+    modifier: Modifier = Modifier
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Text(
-            "添加到消息",
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold
+    val context = LocalContext.current
+    var hasPermission by remember {
+        mutableStateOf(
+            context.checkSelfPermission(readImagesPermission()) == PackageManager.PERMISSION_GRANTED
         )
-        // NEWMP-V1-006 Task 3: entries are driven by
-        // chatAttachmentSheetActionSpecs so JVM tests can pin the
-        // phone-source entry contract without Compose.
-        val entryIcons = listOf(
-            Icons.Rounded.Collections,
-            Icons.Rounded.Description,
-            Icons.Rounded.FolderOpen,
-            Icons.Rounded.CameraAlt,
-            Icons.Rounded.Description
-        )
-        val entryActions = listOf(onPickImages, onPickSource, onPickLocalSource, onTakePhoto, onOpenSessionSources)
-        chatAttachmentSheetActionSpecs(chatCameraPermissionSubtitle(permissionState))
-            .forEachIndexed { index, spec ->
-                AttachmentSheetAction(entryIcons[index], spec.label, spec.subtitle, entryActions[index])
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> hasPermission = granted }
+    LaunchedEffect(Unit) {
+        if (!hasPermission) permissionLauncher.launch(readImagesPermission())
+    }
+    val images by produceState(initialValue = emptyList<Uri>(), hasPermission, context) {
+        value = if (hasPermission) queryRecentGalleryImages(context, 12) else emptyList()
+    }
+    LazyRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        if (images.isEmpty()) {
+            items(4) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(Color(0xFFF2F6FC), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFC7D8EA), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Rounded.Image,
+                        contentDescription = null,
+                        tint = ChatMuted,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
-        Spacer(Modifier.height(24.dp))
+        } else {
+            items(images, key = { it.toString() }) { uri ->
+                GalleryMediaThumbnail(uri)
+            }
+        }
+    }
+}
+
+private fun readImagesPermission(): String =
+    if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
+    else Manifest.permission.READ_EXTERNAL_STORAGE
+
+private fun queryRecentGalleryImages(context: Context, limit: Int): List<Uri> {
+    val uris = ArrayList<Uri>(limit)
+    runCatching {
+        context.contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Images.Media._ID),
+            null,
+            null,
+            "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            while (cursor.moveToNext() && uris.size < limit) {
+                uris += ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    cursor.getLong(idColumn)
+                )
+            }
+        }
+    }
+    return uris
+}
+
+@Composable
+private fun GalleryMediaThumbnail(uri: Uri) {
+    val context = LocalContext.current
+    val bitmap by produceState<Bitmap?>(null, uri) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                if (Build.VERSION.SDK_INT >= 29) {
+                    context.contentResolver.loadThumbnail(uri, Size(160, 160), null)
+                } else {
+                    context.contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+                }
+            }.getOrNull()
+        }
+    }
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFF2F6FC), RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                Icons.Rounded.Image,
+                contentDescription = null,
+                tint = ChatMuted,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Flush-left action row rendered below the composer while the attachment
+ * panel is open, replacing the keyboard area. Entries stay in list order
+ * and new ones can simply be appended.
+ */
+@Composable
+private fun ChatAttachmentPanelActions(
+    onPickImages: () -> Unit,
+    onPickLocalSource: () -> Unit
+) {
+    // Entries are driven by chatAttachmentSheetActionSpecs so JVM tests
+    // can pin the phone-document entry ("文件") contract without Compose.
+    val entryIcons = listOf(Icons.Rounded.Collections, Icons.Rounded.Description)
+    val entryActions = listOf(onPickImages, onPickLocalSource)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        chatAttachmentSheetActionSpecs().forEachIndexed { index, spec ->
+            AttachmentPanelAction(
+                icon = entryIcons[index],
+                label = spec.label,
+                onClick = entryActions[index]
+            )
+        }
     }
 }
 
 @Composable
-private fun AttachmentSheetAction(
+private fun AttachmentPanelAction(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String?,
+    label: String,
     onClick: () -> Unit
 ) {
-    Surface(onClick = onClick, color = Color.Transparent, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+    Surface(onClick = onClick, color = Color.Transparent) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(vertical = 4.dp)
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text(title, fontSize = 15.sp)
-                if (subtitle != null) Text(subtitle, color = ChatMuted, fontSize = 11.sp)
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(Color(0xFFF2F6FC), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = label,
+                    tint = Color(0xFF4287E8),
+                    modifier = Modifier.size(24.dp)
+                )
             }
+            Spacer(Modifier.height(6.dp))
+            Text(label, fontSize = 13.sp)
         }
     }
 }
