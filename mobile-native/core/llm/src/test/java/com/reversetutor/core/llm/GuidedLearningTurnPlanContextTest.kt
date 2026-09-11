@@ -79,9 +79,9 @@ class GuidedLearningTurnPlanContextTest {
         assertTrue(content.contains("Guided learning plan:"))
         assertTrue(content.contains("Action: diagnose"))
         assertTrue(content.contains("Secondary action: worked_example"))
-        assertTrue(content.contains("The user is the teacher. You are the student AI."))
-        assertTrue(content.contains("Complete exactly one teaching move in this turn."))
-        assertTrue(content.contains("Stop after at most one clear question for the teacher"))
+        assertTrue(content.contains("用户是老师，你是学生 AI"))
+        assertTrue(content.contains("本轮只做一个教学动作"))
+        assertTrue(content.contains("最多问老师一个问题"))
         assertTrue(content.contains("Student expression: State one precise point"))
         assertTrue(content.contains("Expected teacher move:"))
         // user message is appended unchanged at the end

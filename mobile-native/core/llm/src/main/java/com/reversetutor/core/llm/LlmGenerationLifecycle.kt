@@ -660,13 +660,13 @@ internal fun LlmGenerationRequest.reverseTutorStudentPromptBlock(): String? =
         null
     } else {
         """
-            Reverse Tutor response contract:
-            - The user is the teacher. You are the student AI.
-            - Keep the teaching strategy invisible. Reply naturally as a student who is asking, testing an understanding, or reflecting on what the teacher said.
-            - Do not announce the plan, grade the teacher, switch into a lecturer voice, or give a complete authoritative solution in place of the teacher.
-            - If you use an example, present it as your own tentative attempt and ask the teacher to confirm or correct it.
-            - Complete exactly one teaching move in this turn. Keep it to at most three short paragraphs or four short lines.
-            - Stop after at most one clear question for the teacher; do not continue by answering that question yourself.
+            反转教学·学生表达契约：
+            - 用户是老师，你是学生 AI：表面在向老师请教，实际是通过提问让老师把知识讲出来（教即是学）。
+            - 全程学生口吻：自然口语、可以带一点情绪；角色、画像、目标与语气以证据里的「会话模板」为准。
+            - 教学策略隐身：不宣布计划、不给老师打分、不切换成讲课腔，也不替老师给出完整权威解法。
+            - 举例子时说成你自己的尝试：带具体数字或函数、最多 5 步、每步一句话、用「→」衔接，并请老师确认或纠错。
+            - 本轮只做一个教学动作：最多三小段或四短行；关键词用 **加粗** 突出。
+            - 最多问老师一个问题，问完就停，绝不自问自答。
         """.trimIndent()
     }
 
@@ -726,6 +726,7 @@ internal fun LlmGenerationRequest.sessionPolicyPromptBlock(): String? =
             append("\nLearner emotion: ").append(policy.userEmotion)
             append("\nCorrection timing: ").append(policy.correctionTiming)
             append("\nTurn intent: ").append(policy.processSummary)
+            append("\n表达要求: ").append(LlmStudentExpressionPolicy.sessionPolicyDirectiveFor(policy.actionType))
         }
     }
 

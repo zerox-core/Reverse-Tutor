@@ -229,6 +229,8 @@ class LlmGenerationLifecycleTest {
         assertTrue(content.contains("Teaching policy:"))
         assertTrue(content.contains("Action: probe"))
         assertTrue(content.contains("Knowledge point: factoring"))
+        assertTrue(content.contains("表达要求: "))
+        assertTrue(content.contains("追问一个"))
         assertEquals(0, runtime.realProviderCallCount)
     }
 
@@ -263,9 +265,9 @@ class LlmGenerationLifecycleTest {
 
         val block = request.reverseTutorStudentPromptBlock()
         assertTrue(block != null)
-        assertTrue(block!!.contains("exactly one teaching move"))
-        assertTrue(block.contains("at most three short paragraphs or four short lines"))
-        assertTrue(block.contains("at most one clear question"))
+        assertTrue(block!!.contains("本轮只做一个教学动作"))
+        assertTrue(block.contains("最多三小段或四短行"))
+        assertTrue(block.contains("最多问老师一个问题"))
     }
 
     private fun request(provider: LlmProviderKind): LlmGenerationRequest =

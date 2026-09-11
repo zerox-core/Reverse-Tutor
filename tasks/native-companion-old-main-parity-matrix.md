@@ -141,3 +141,19 @@ Tests (TDD Red→Green, BUILD SUCCESSFUL): `MasteryLedgerProjectionTest` 15/15, 
 Explicitly not claimed: write-side `upsert_mastery`, error-log upsert/resolve, session-scoped fact filtering
 (space-scoped only), `review_frequency` high ladder [1,2,4,7].
 
+
+## 8. NEWMP-V1-014 output expression layer (2026-09-11)
+
+Row 1's persona gap is now closed at the prompt-contract level (approved
+frozen-layer change; user decision 2026-09-11): `reverseTutorStudentPromptBlock()`
+is a Chinese 反转教学·学生表达契约 (student persona, invisible strategy, one
+teaching move, one question, bold keywords, example discipline), and
+`sessionPolicyPromptBlock()` appends `表达要求:` via the new
+`LlmStudentExpressionPolicy.sessionPolicyDirectiveFor()` covering the legacy
+action vocabulary (ask/probe/challenge/clue/scaffold_example/small_lecture/
+examiner_verify/emote/persuade/next/recap + goal-companion actions) with the
+old engine's clue/challenge discipline rules baked into the directives.
+`_discipline_reply_for_role` post-generation rewriting remains NOT migrated.
+Task doc: `tasks/NEWMP-V1-014-OUTPUT-EXPRESSION.md`. Tests: full-project
+gradle test green; `LlmStudentExpressionPolicyTest` 3/3.
+
