@@ -110,16 +110,73 @@ class ChatGenerationRepository(
         }
     }
 
-    private suspend fun resolveExecutionProfile(input: ChatGenerationInput): LlmProfile? {
-        val resolver = modelConnectionRepository ?: return activeLegacyProfile()
-        val resolved = resolver.resolveForExecution(
+    /**
+     * NEWMP-V1-017: auxiliary summarizer entry point. Runs the same planner /
+     * runtime pipeline as [generateReply] but never persists an assistant
+     * message — the caller owns storing the summary text. The prompt travels
+     * as a raw user turn with no session policy, guided plan, or evidence, so
+     * the reverse-tutor student persona block is never attached and the
+     * summarizer persona stays fully separated from the teaching persona.
+     */
+    suspend fun generateSessionSummary(
+        sessionId: String,
+        promptText: String
+    ): SessionSummaryOutcome {
+        val profile = resolveProfileForSession(sessionId, requestedBindingId = null)
+            ?: return SessionSummaryOutcome.NoModelConfigured
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = sessionId,
+            userMessageId = null,
+            userText = promptText,
+            profile = profile,
+            capabilities = LlmProfileCapabilityResolver.infer(profile),
+            token = LlmGenerationToken("summary-" + profile.id + "-" + System.nanoTime())
+        )
+        val request = when (plan) {
+            is LlmGenerationPlan.Blocked -> return plan.reason.toSummaryOutcome()
+            is LlmGenerationPlan.Ready -> plan.request.copy(streaming = false)
+        }
+        return when (val result = runtime.generate(request)) {
+            is LlmGenerationResult.Success,
+            is LlmGenerationResult.Streamed -> {
+                val summaryText = result.visibleText
+                if (summaryText.isBlank()) {
+                    SessionSummaryOutcome.ProviderFailed("llm_provider_invalid_response")
+                } else {
+                    SessionSummaryOutcome.Generated(summaryText)
+                }
+            }
+            is LlmGenerationResult.Failure ->
+                SessionSummaryOutcome.ProviderFailed(result.message.toSafeProviderFailureCode())
+            LlmGenerationResult.Timeout ->
+                SessionSummaryOutcome.ProviderFailed("llm_provider_timeout")
+        }
+    }
+
+    private suspend fun resolveExecutionProfile(input: ChatGenerationInput): LlmProfile? =
+        resolveProfileForSession(
             sessionId = input.sessionId,
             requestedBindingId = input.modelBindingId
         )
+
+    /**
+     * Session-level profile resolution shared by [generateReply] and
+     * [generateSessionSummary]: the execution resolver first, then the legacy
+     * enabled profile when no new-style configuration exists.
+     */
+    private suspend fun resolveProfileForSession(
+        sessionId: String,
+        requestedBindingId: String?
+    ): LlmProfile? {
+        val resolver = modelConnectionRepository ?: return activeLegacyProfile()
+        val resolved = resolver.resolveForExecution(
+            sessionId = sessionId,
+            requestedBindingId = requestedBindingId
+        )
         if (resolved != null) return resolved.toExecutionProfile()
 
-        val hasExplicitRequest = !input.modelBindingId.isNullOrBlank()
-        if (hasExplicitRequest || resolver.hasNewConfigurationForSession(input.sessionId)) {
+        val hasExplicitRequest = !requestedBindingId.isNullOrBlank()
+        if (hasExplicitRequest || resolver.hasNewConfigurationForSession(sessionId)) {
             return null
         }
         return activeLegacyProfile()
@@ -205,6 +262,26 @@ sealed interface ChatGenerationOutcome {
     object BlankPrompt : ChatGenerationOutcome
     object Stale : ChatGenerationOutcome
 }
+
+/**
+ * NEWMP-V1-017: outcome of the auxiliary session-summary generation call.
+ * Mirrors [ChatGenerationOutcome] block/failure semantics, but the Generated
+ * branch carries the summary text itself because nothing is persisted here.
+ */
+sealed interface SessionSummaryOutcome {
+    data class Generated(val summaryText: String) : SessionSummaryOutcome
+    data class ProviderFailed(val message: String) : SessionSummaryOutcome
+    object NoModelConfigured : SessionSummaryOutcome
+    object UnsupportedVision : SessionSummaryOutcome
+    object BlankPrompt : SessionSummaryOutcome
+}
+
+private fun LlmGenerationBlockReason.toSummaryOutcome(): SessionSummaryOutcome =
+    when (this) {
+        LlmGenerationBlockReason.NoModelConfigured -> SessionSummaryOutcome.NoModelConfigured
+        LlmGenerationBlockReason.UnsupportedVision -> SessionSummaryOutcome.UnsupportedVision
+        LlmGenerationBlockReason.BlankPrompt -> SessionSummaryOutcome.BlankPrompt
+    }
 
 private fun LlmGenerationBlockReason.toOutcome(): ChatGenerationOutcome =
     when (this) {

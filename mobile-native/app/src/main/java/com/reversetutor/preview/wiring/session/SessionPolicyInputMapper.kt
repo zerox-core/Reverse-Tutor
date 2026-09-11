@@ -86,6 +86,22 @@ internal fun SessionPolicyOutput.toLlmSessionPolicyContext(): LlmSessionPolicyCo
 internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContextEvidence> {
     val evidence = mutableListOf<LlmContextEvidence>()
 
+    // NEWMP-V1-017 old parity: the legacy engine injected the compressed
+    // early-history digest into the system prompt ahead of everything else
+    // ("# 早期对话摘要（已压缩，其后附最近原文）"), so the digest goes FIRST —
+    // ahead of even the aggregates — and therefore always survives the cap.
+    if (earlyHistoryDigest.isNotBlank()) {
+        evidence.add(LlmContextEvidence(
+            id = "summary-" + sessionId,
+            title = "\u65e9\u671f\u5bf9\u8bdd\u6458\u8981",
+            body = SessionTurnContracts.sanitizeContractText(
+                "\uff08\u5df2\u538b\u7f29\u7684\u65e9\u671f\u5bf9\u8bdd\uff0c\u5176\u540e\u4e3a\u6700\u8fd1\u539f\u6587\uff09\n" + earlyHistoryDigest,
+                maxLength = MaxEvidenceBodyChars
+            ),
+            kind = "Summary"
+        ))
+    }
+
     // Old-parity ordering: the legacy engine injected prerequisite gaps and
     // due reviews into the system prompt ahead of per-item evidence, so the
     // aggregates go FIRST here too — this also guarantees they survive the

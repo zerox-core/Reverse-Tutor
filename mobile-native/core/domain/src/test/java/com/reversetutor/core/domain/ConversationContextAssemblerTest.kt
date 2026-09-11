@@ -88,6 +88,16 @@ class ConversationContextAssemblerTest {
         }
     }
 
+    private class FakeDigestPort(
+        val digest: String = "",
+        val shouldFail: Boolean = false
+    ) : SessionDigestContextPort {
+        override suspend fun loadEarlyHistoryDigest(spaceId: String, sessionId: String): String {
+            if (shouldFail) throw RuntimeException("prefs unreadable")
+            return digest
+        }
+    }
+
     // --- Tests --------------------------------------------------------------
 
     @Test
@@ -360,5 +370,36 @@ class ConversationContextAssemblerTest {
         val ctx = assembler.assemble("s", "se")
         assertTrue(ctx.masteryProjections.isEmpty())
         assertTrue(ctx.warnings.none { it.source == "mastery" })
+    }
+
+    @Test
+    fun digestPortSuppliesSanitizedEarlyHistoryDigest() = runBlocking {
+        val assembler = ConversationContextAssembler(
+            messagePort = FakeMessagePort(),
+            memoryPort = FakeMemoryPort(),
+            errorPort = FakeErrorPort(),
+            graphPort = FakeGraphPort(),
+            sourcePort = FakeSourcePort(),
+            digestPort = FakeDigestPort(digest = "x".repeat(2_000)),
+            digestCap = 1_200
+        )
+        val ctx = assembler.assemble("s", "se")
+        assertTrue(ctx.earlyHistoryDigest.length <= 1_200)
+        assertTrue(ctx.warnings.none { it.source == "digest" })
+    }
+
+    @Test
+    fun digestPortFailureDegradesToEmptyDigestWithWarning() = runBlocking {
+        val assembler = ConversationContextAssembler(
+            messagePort = FakeMessagePort(),
+            memoryPort = FakeMemoryPort(),
+            errorPort = FakeErrorPort(),
+            graphPort = FakeGraphPort(),
+            sourcePort = FakeSourcePort(),
+            digestPort = FakeDigestPort(shouldFail = true)
+        )
+        val ctx = assembler.assemble("s", "se")
+        assertEquals("", ctx.earlyHistoryDigest)
+        assertTrue(ctx.warnings.any { it.source == "digest" })
     }
 }

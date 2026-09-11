@@ -58,6 +58,7 @@ class RepositorySessionHomePortAdapter(
     private val loadSessionSnapshot: (String) -> NewSessionConfiguration? = { null },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val findActiveJobForSession: suspend (String) -> BackgroundGenerationJob? = { null },
+    private val clearSessionSummary: (String) -> Unit = {},
     private val deletionScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : SessionHomePort {
     private val deletionCoordinator = DurableSessionDeletionCoordinator(
@@ -72,6 +73,9 @@ class RepositorySessionHomePortAdapter(
             )
         },
         completeConfirmedDeletion = { sessionId ->
+            // NEWMP-V1-017: drop the stored early-history digest together
+            // with the session so a recreated id never inherits it.
+            clearSessionSummary(sessionId)
             persistence.completeConfirmedDeletion(
                 sessionId = sessionId,
                 suppressWelcome = sessionId == WelcomeMockSessionId

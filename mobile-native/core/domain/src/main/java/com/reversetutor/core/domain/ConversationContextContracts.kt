@@ -82,7 +82,14 @@ data class ConversationContextContract(
     val pendingReviewKnowledgePoints: List<String>,
     val recentMessages: List<ContextMessage>,
     val warnings: List<ContextWarning>,
-    val masteryProjections: List<MasterySnapshot> = emptyList()
+    val masteryProjections: List<MasterySnapshot> = emptyList(),
+    /**
+     * NEWMP-V1-017: compressed digest of the early conversation history
+     * (legacy engine's early-dialogue summary). Defaulted so every
+     * pre-existing construction site stays source-compatible; blank means
+     * no summary has been generated yet.
+     */
+    val earlyHistoryDigest: String = ""
 ) {
     companion object {
         fun empty(spaceId: String, sessionId: String): ConversationContextContract =
@@ -170,4 +177,17 @@ interface MasteryFactContextPort {
         sessionId: String,
         limit: Int
     ): List<LearningFactReceipt>
+}
+
+/**
+ * NEWMP-V1-017: returns the stored early-history digest for a session —
+ * the compressed summary of the conversation prefix that is no longer
+ * replayed verbatim. Adapters back it with lightweight local storage and
+ * return an empty string when nothing is stored.
+ */
+interface SessionDigestContextPort {
+    suspend fun loadEarlyHistoryDigest(
+        spaceId: String,
+        sessionId: String
+    ): String
 }

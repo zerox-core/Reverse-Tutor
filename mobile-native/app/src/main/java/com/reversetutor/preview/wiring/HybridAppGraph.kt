@@ -70,6 +70,7 @@ import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 import com.reversetutor.preview.wiring.session.BackgroundTurnPreparationCoordinator
 import com.reversetutor.preview.wiring.session.RecentTurnSignalsReader
 import com.reversetutor.preview.wiring.session.SessionConversationAssembly
+import com.reversetutor.preview.wiring.session.SharedPreferencesSessionSummaryStore
 import com.reversetutor.preview.wiring.session.TopologyAwareMessageContextPort
 import com.reversetutor.preview.wiring.session.WindowVisibleHistoryReader
 import com.reversetutor.preview.wiring.session.WindowVisibleTimelinePortAdapter
@@ -233,6 +234,7 @@ class HybridAppGraph private constructor(
                 readSnapshot = windowTopologyRepository::getSnapshot,
                 listMessageRecords = messageRepository::listMessageRecords
             )
+            val sessionSummaryStore = SharedPreferencesSessionSummaryStore(appContext)
             val sessionConversationAssembly = SessionConversationAssembly(
                 chatGenerationRepository = chatGenerationRepository,
                 messageRepository = messageRepository,
@@ -243,7 +245,8 @@ class HybridAppGraph private constructor(
                 sourceRepository = sourceRepository,
                 learningRepository = learningRepository,
                 learningLedgerRepository = learningLedgerRepository,
-                messageContextPort = TopologyAwareMessageContextPort(visibleHistoryReader)
+                messageContextPort = TopologyAwareMessageContextPort(visibleHistoryReader),
+                sessionSummaryStore = sessionSummaryStore
             )
             val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =
                 BackgroundTurnPreparationCoordinator(
@@ -338,7 +341,8 @@ class HybridAppGraph private constructor(
                     runCoordinator = runCoordinator,
                     sessionConversationAssembly = sessionConversationAssembly,
                     newSessionPersistence = newSessionPersistence,
-                    findActiveJobForSession = backgroundGenerationRepository::findActiveJobForSession
+                    findActiveJobForSession = backgroundGenerationRepository::findActiveJobForSession,
+                    clearSessionSummary = sessionSummaryStore::clear
                 )
             )
         }
@@ -383,7 +387,8 @@ class HybridAppGraph private constructor(
             runCoordinator: ConversationRunCoordinator,
             sessionConversationAssembly: SessionConversationAssembly,
             newSessionPersistence: NewSessionPersistence,
-            findActiveJobForSession: suspend (String) -> BackgroundGenerationJob?
+            findActiveJobForSession: suspend (String) -> BackgroundGenerationJob?,
+            clearSessionSummary: (String) -> Unit
         ): HybridFrontendFactories {
             val homePort = RepositoryHomePortAdapter {
                 sessionRepository.listSessions()
@@ -395,7 +400,8 @@ class HybridAppGraph private constructor(
                 conversationRunRepository = conversationRunRepository,
                 persistence = SharedPreferencesSessionHomePersistence(context),
                 findActiveJobForSession = findActiveJobForSession,
-                loadSessionSnapshot = newSessionPersistence::loadSessionSnapshot
+                loadSessionSnapshot = newSessionPersistence::loadSessionSnapshot,
+                clearSessionSummary = clearSessionSummary
             )
             val tagLibraryPersistence = SharedPreferencesTagLibraryPersistence(context)
             val newSessionCreatePort = RepositoryNewSessionCreatePortAdapter(

@@ -167,4 +167,29 @@ class SessionPolicyInputMapperTest {
         assertFalse(input.knowledgePoint.contains("sk-test"))
         assertTrue(input.knowledgePoint.length <= 320)
     }
+
+    @Test
+    fun early_history_digest_is_emitted_first_as_summary_evidence() {
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = listOf("先掌握定义"),
+            relatedMemory = emptyList(),
+            sourceEvidence = emptyList(),
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = listOf("函数单调性"),
+            recentMessages = listOf(ContextMessage("message-a", "user", "第一条", 1L)),
+            warnings = emptyList(),
+            earlyHistoryDigest = "用户已掌握因式分解基础"
+        ).toLlmContextEvidence()
+
+        assertEquals(4, evidence.size)
+        assertEquals("summary-session-1", evidence[0].id)
+        assertEquals("Summary", evidence[0].kind)
+        assertTrue(evidence[0].body.contains("已压缩"))
+        assertTrue(evidence[0].body.contains("用户已掌握因式分解基础"))
+        assertEquals("gaps-session-1", evidence[1].id)
+        assertEquals("review-session-1", evidence[2].id)
+        assertEquals("msg-message-a", evidence[3].id)
+    }
 }

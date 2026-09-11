@@ -27,6 +27,7 @@ import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -491,6 +492,71 @@ class ChatGenerationRepositoryTest {
         )
 
         assertEquals(ChatGenerationOutcome.NoModelConfigured, outcome)
+    }
+
+    @Test
+    fun sessionSummaryGeneratesWithoutPersistingAnAssistantMessage() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        val outcome = repository.generateSessionSummary(
+            sessionId = "session-1",
+            promptText = "  总结这段对话  "
+        )
+
+        assertEquals(SessionSummaryOutcome.Generated("Bound model reply"), outcome)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+        val request = runtime.requests.single()
+        assertEquals("总结这段对话", request.userText)
+        assertNull(request.sessionPolicy)
+        assertTrue(request.contextEvidence.isEmpty())
+        assertFalse(request.streaming)
+    }
+
+    @Test
+    fun sessionSummaryWithoutActiveProfileIsNoModelConfigured() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        assertEquals(
+            SessionSummaryOutcome.NoModelConfigured,
+            repository.generateSessionSummary("session-1", "总结")
+        )
+        assertTrue(runtime.requests.isEmpty())
+    }
+
+    @Test
+    fun blankSummaryPromptIsRejected() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        assertEquals(
+            SessionSummaryOutcome.BlankPrompt,
+            repository.generateSessionSummary("session-1", "   ")
+        )
+        assertTrue(runtime.requests.isEmpty())
     }
 
     private fun input(token: String): ChatGenerationInput =

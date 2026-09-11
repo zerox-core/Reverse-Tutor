@@ -54,6 +54,7 @@ class SessionConversationAssembly(
     private val learningRepository: LearningRepositoryImpl,
     private val learningLedgerRepository: LearningLedgerRepository? = null,
     private val messageContextPort: MessageContextPort = MessageContextPortAdapter(messageRepository),
+    private val sessionSummaryStore: SessionSummaryStore? = null,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
 
@@ -81,6 +82,20 @@ class SessionConversationAssembly(
             }
         )
 
+    /**
+     * NEWMP-V1-017: early-history summarizer. Old-parity trigger — the legacy
+     * engine compressed early dialogue at the start of every turn; the native
+     * production path funnels each turn's context preparation through
+     * [assembleContext], so the trigger lives on that single choke point.
+     */
+    private val sessionSummarizer: SessionSummarizer? = sessionSummaryStore?.let { store ->
+        SessionSummarizer(
+            generateSummary = chatGenerationRepository::generateSessionSummary,
+            listMessages = messageRepository::listMessages,
+            store = store
+        )
+    }
+
     private val contextAssembler: ConversationContextAssembler = ConversationContextAssembler(
         messagePort = messageContextPort,
         memoryPort = MemoryContextPortAdapter(memoryRepository),
@@ -91,7 +106,8 @@ class SessionConversationAssembly(
             nowEpochMillis
         ),
         sourcePort = SourceContextPortAdapter(sourceRepository),
-        masteryFactPort = learningLedgerRepository?.let { MasteryFactContextPortAdapter(it) }
+        masteryFactPort = learningLedgerRepository?.let { MasteryFactContextPortAdapter(it) },
+        digestPort = sessionSummaryStore
     )
 
     private val coordinator: ConversationSessionCoordinator = ConversationSessionCoordinator(
@@ -127,8 +143,14 @@ class SessionConversationAssembly(
     suspend fun assembleContext(
         spaceId: String,
         sessionId: String
-    ): ConversationContextContract =
-        contextAssembler.assemble(spaceId, sessionId)
+    ): ConversationContextContract {
+        // NEWMP-V1-017: compress early history first so this very turn's
+        // assembled contract — and the evidence built from it — already
+        // carries the fresh digest. Failures are swallowed inside and
+        // retried on the next turn (old-parity behavior).
+        sessionSummarizer?.maybeSummarize(sessionId)
+        return contextAssembler.assemble(spaceId, sessionId)
+    }
 
     /**
      * Run a single conversation turn and return the immutable

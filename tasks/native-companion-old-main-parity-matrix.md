@@ -192,3 +192,28 @@ GraphContextPortAdapterTest 4/4 (new), SessionPolicyInputMapperTest 9/9
 `tasks/NEWMP-V1-016-DUE-REVIEW-REMINDER.md`.
 
 
+## 11. NEWMP-V1-017 chat summary (2026-09-11)
+
+Early-dialogue compression with old-engine parity (engine.py maybe_summarize
+semantics: threshold 30, keep recent 12, previous-summary merge, per-batch
+count). The frozen core:data layer was opened once with explicit user
+approval: ChatGenerationRepository gained a persona-free
+`generateSessionSummary` entry point (no chat-record writes, non-streaming,
+dedicated summary token, new SessionSummaryOutcome). core:domain gained the
+defaulted `earlyHistoryDigest` contract field + `SessionDigestContextPort`;
+the assembler reads it through the same safeRead degradation as every other
+optional port. App wiring: pure-Kotlin SessionSummarizer (threshold semantics
+identical to engine.py), SharedPreferences-backed store implementing the new
+port, triggered from SessionConversationAssembly.assembleContext before
+assembly; session deletion clears the stored summary. The mapper emits the
+digest FIRST as Summary-kind evidence (old engine injected the early-history
+summary ahead of item evidence). Documented deviations: markdown bullets
+instead of the old JSON {"summary"} envelope; provider failures are NOT
+stored as summary text (the old engine stored failure text as the summary —
+old defect, not replicated); exceptions swallowed; no force-summarize
+endpoint (old server.py:369); the legacy executeTurn path does not trigger.
+Tests: ChatGenerationRepositoryTest 17/17 (3 new),
+ConversationContextAssemblerTest 16/16 (2 new), SessionSummarizerTest 8/8
+(new), SessionPolicyInputMapperTest 10/10 (1 new); full-project gradle test
+green. Task doc: `tasks/NEWMP-V1-017-CHAT-SUMMARY.md`.
+

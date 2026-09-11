@@ -20,6 +20,7 @@ class ConversationContextAssembler(
     private val graphPort: GraphContextPort,
     private val sourcePort: SourceContextPort,
     private val masteryFactPort: MasteryFactContextPort? = null,
+    private val digestPort: SessionDigestContextPort? = null,
     private val messageLimit: Int = 10,
     private val memoryLimit: Int = 5,
     private val errorLimit: Int = 5,
@@ -28,7 +29,8 @@ class ConversationContextAssembler(
     private val reviewLimit: Int = 5,
     private val masteryFactLimit: Int = 200,
     private val masterySnapshotLimit: Int = 10,
-    private val textCap: Int = 200
+    private val textCap: Int = 200,
+    private val digestCap: Int = 1200
 ) {
 
     suspend fun assemble(spaceId: String, sessionId: String): ConversationContextContract {
@@ -99,6 +101,18 @@ class ConversationContextAssembler(
             }
         } ?: emptyList()
 
+        // Optional early-history digest (NEWMP-V1-017): absent port => blank
+        // digest without warning; failing port => blank digest + warning,
+        // mirroring the mastery degradation contract.
+        val digest = digestPort?.let { port ->
+            safeReadValue("digest", warnings) {
+                SessionTurnContracts.sanitizeContractText(
+                    port.loadEarlyHistoryDigest(spaceId, sessionId),
+                    digestCap
+                )
+            }
+        } ?: ""
+
         return ConversationContextContract(
             spaceId = spaceId,
             sessionId = sessionId,
@@ -109,7 +123,8 @@ class ConversationContextAssembler(
             pendingReviewKnowledgePoints = reviewPoints,
             recentMessages = messages,
             warnings = warnings,
-            masteryProjections = mastery
+            masteryProjections = mastery,
+            earlyHistoryDigest = digest
         )
     }
 
@@ -126,5 +141,20 @@ class ConversationContextAssembler(
     } catch (_: Exception) {
         warnings += ContextWarning(source, "source_unavailable")
         emptyList()
+    }
+
+    /**
+     * Value-level sibling of [safeRead] for the digest source: returns the
+     * block result, or an empty string + warning on failure.
+     */
+    private suspend fun safeReadValue(
+        source: String,
+        warnings: MutableList<ContextWarning>,
+        block: suspend () -> String
+    ): String = try {
+        block()
+    } catch (_: Exception) {
+        warnings += ContextWarning(source, "source_unavailable")
+        ""
     }
 }
