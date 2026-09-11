@@ -173,4 +173,22 @@ is deferred by user decision and will inherit this pipeline automatically.
 Tests: ChatMessageActionsTask3BTest 21/21 (4 new bold tests); full-project
 gradle test green. Task doc: `tasks/NEWMP-V1-015-RICH-BOLD.md`.
 
+## 10. NEWMP-V1-016 due-review reminder wiring (2026-09-11)
+
+Gap 7 closed without touching frozen layers: the V1-013
+`MasteryLedgerProjection.projectDue` selector is now wired into production
+reads. `GraphContextPortAdapter.listPendingReviewPoints` merges
+ladder-due knowledge points (earliest-due first, snapshotLimit widened to 50
+so low-score due points are not starved by the score sort) with graph
+NeedsReview labels, deduplicated and bounded. `toLlmContextEvidence` was
+reordered so the aggregate Gaps/Review evidence is emitted FIRST (old-parity:
+the legacy engine injected these into the system prompt ahead of per-item
+evidence) — this also fixes a starvation defect where the 6-item evidence
+cap was always consumed by message evidence. The Review evidence body now
+carries the legacy soft hint (不打断当前推进，是否带回视用户回复决定). Not claimed: `mark_review_pending`
+deferral, process_summary injection, local push notifications. Tests:
+GraphContextPortAdapterTest 4/4 (new), SessionPolicyInputMapperTest 9/9
+(1 updated + 1 new), full-project gradle test green. Task doc:
+`tasks/NEWMP-V1-016-DUE-REVIEW-REMINDER.md`.
+
 

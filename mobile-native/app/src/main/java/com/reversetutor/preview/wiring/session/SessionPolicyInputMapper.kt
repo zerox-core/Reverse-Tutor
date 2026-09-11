@@ -15,6 +15,14 @@ private const val MaxContextEvidence = 6
 private const val MaxEvidenceBodyChars = 900
 
 /**
+ * Legacy engine's due-review soft hint (old `build_system_prompt`): a due
+ * review must not interrupt the current teaching step; whether the student
+ * weaves the point back in depends on the teacher's reply.
+ */
+private const val DueReviewSoftHint =
+    "（到期复习软提示：不强制打断当前推进，是否带回视用户回复决定）"
+
+/**
  * Maps a [NewSessionConfiguration] snapshot to a [SessionPolicyInput] with
  * a fixed study mode. Never infers mode from free-text dialogueStrategy.
  */
@@ -78,6 +86,32 @@ internal fun SessionPolicyOutput.toLlmSessionPolicyContext(): LlmSessionPolicyCo
 internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContextEvidence> {
     val evidence = mutableListOf<LlmContextEvidence>()
 
+    // Old-parity ordering: the legacy engine injected prerequisite gaps and
+    // due reviews into the system prompt ahead of per-item evidence, so the
+    // aggregates go FIRST here too — this also guarantees they survive the
+    // bounded evidence cap below instead of being starved by message
+    // evidence.
+    if (prerequisiteGaps.isNotEmpty()) {
+        evidence.add(LlmContextEvidence(
+            id = "gaps-$sessionId",
+            title = "\u77e5\u8bc6\u7f3a\u53e3",
+            body = SessionTurnContracts.sanitizeContractText(prerequisiteGaps.joinToString("; "), maxLength = MaxEvidenceBodyChars),
+            kind = "Gaps"
+        ))
+    }
+
+    if (pendingReviewKnowledgePoints.isNotEmpty()) {
+        evidence.add(LlmContextEvidence(
+            id = "review-$sessionId",
+            title = "\u5f85\u590d\u4e60",
+            body = SessionTurnContracts.sanitizeContractText(
+                pendingReviewKnowledgePoints.joinToString("; ") + DueReviewSoftHint,
+                maxLength = MaxEvidenceBodyChars
+            ),
+            kind = "Review"
+        ))
+    }
+
     recentMessages.forEach { msg ->
         evidence.add(LlmContextEvidence(
             id = "msg-${msg.messageId}",
@@ -128,24 +162,6 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
             title = SessionTurnContracts.sanitizeContractText(err.errorType, maxLength = 48),
             body = SessionTurnContracts.sanitizeContractText(err.description, maxLength = MaxEvidenceBodyChars),
             kind = "Error"
-        ))
-    }
-
-    if (prerequisiteGaps.isNotEmpty()) {
-        evidence.add(LlmContextEvidence(
-            id = "gaps-$sessionId",
-            title = "\u77e5\u8bc6\u7f3a\u53e3",
-            body = SessionTurnContracts.sanitizeContractText(prerequisiteGaps.joinToString("; "), maxLength = MaxEvidenceBodyChars),
-            kind = "Gaps"
-        ))
-    }
-
-    if (pendingReviewKnowledgePoints.isNotEmpty()) {
-        evidence.add(LlmContextEvidence(
-            id = "review-$sessionId",
-            title = "\u5f85\u590d\u4e60",
-            body = SessionTurnContracts.sanitizeContractText(pendingReviewKnowledgePoints.joinToString("; "), maxLength = MaxEvidenceBodyChars),
-            kind = "Review"
         ))
     }
 

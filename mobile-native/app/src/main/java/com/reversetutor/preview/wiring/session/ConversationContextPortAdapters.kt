@@ -11,6 +11,7 @@ import com.reversetutor.core.domain.ErrorReferenceContract
 import com.reversetutor.core.domain.GraphContextPort
 import com.reversetutor.core.domain.LearningFactReceipt
 import com.reversetutor.core.domain.MasteryFactContextPort
+import com.reversetutor.core.domain.MasteryLedgerProjection
 import com.reversetutor.core.domain.MemoryContextPort
 import com.reversetutor.core.domain.MemoryReferenceContract
 import com.reversetutor.core.domain.MessageContextPort
@@ -78,7 +79,9 @@ class ErrorContextPortAdapter(
 }
 
 class GraphContextPortAdapter(
-    private val graphRepository: GraphRepository
+    private val graphRepository: GraphRepository,
+    private val learningLedgerRepository: LearningLedgerRepository? = null,
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) : GraphContextPort {
 
     private suspend fun sessionNodes(sessionId: String): List<com.reversetutor.core.model.GraphNode> =
@@ -103,12 +106,34 @@ class GraphContextPortAdapter(
         spaceId: String,
         sessionId: String,
         limit: Int
-    ): List<String> =
-        sessionNodes(sessionId)
+    ): List<String> {
+        // Old-parity due-review selection (legacy `list_due_reviews`): the
+        // deterministic mastery ladder decides which knowledge points are due
+        // at read time; no persisted schedule and no new write side. Due
+        // points come first (earliest-due ordering), then graph NeedsReview
+        // labels, deduplicated and bounded by [limit].
+        val due = learningLedgerRepository
+            ?.let { repo ->
+                MasteryLedgerProjection(snapshotLimit = DueProjectionSnapshotLimit)
+                    .projectDue(repo.listLearningFacts(spaceId), nowEpochMillis())
+            }
+            .orEmpty()
+        val graphLabels = sessionNodes(sessionId)
             .filter { it.status == GraphNodeStatus.NeedsReview }
             .map { it.label }
+        return (due + graphLabels)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
             .distinct()
             .take(limit)
+    }
+
+    private companion object {
+        // Wider than the assembler's top-10 evidence cap so low-score but
+        // due knowledge points are not starved by the score sort before the
+        // due filter runs; the caller still bounds the final list.
+        const val DueProjectionSnapshotLimit = 50
+    }
 }
 
 class SourceContextPortAdapter(

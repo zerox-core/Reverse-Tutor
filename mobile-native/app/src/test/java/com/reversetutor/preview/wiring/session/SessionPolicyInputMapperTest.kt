@@ -92,9 +92,36 @@ class SessionPolicyInputMapperTest {
             warnings = emptyList()
         ).toLlmContextEvidence()
 
-        assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.take(2).map { it.id })
-        assertEquals("gaps-session-1", evidence[2].id)
-        assertEquals("review-session-1", evidence[3].id)
+        assertEquals("gaps-session-1", evidence[0].id)
+        assertEquals("review-session-1", evidence[1].id)
+        assertEquals("msg-message-a", evidence[2].id)
+        assertEquals("msg-message-b", evidence[3].id)
+    }
+
+    @Test
+    fun review_evidence_survives_cap_and_carries_the_soft_hint() {
+        val messages = (1..10).map { index ->
+            ContextMessage("message-$index", "user", "第$index 条", index.toLong())
+        }
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = emptyList(),
+            relatedMemory = emptyList(),
+            sourceEvidence = emptyList(),
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = listOf("因式分解", "勾股定理"),
+            recentMessages = messages,
+            warnings = emptyList()
+        ).toLlmContextEvidence()
+
+        assertEquals(6, evidence.size)
+        val review = evidence.first { it.kind == "Review" }
+        assertEquals("review-session-1", review.id)
+        assertTrue(review.body.contains("因式分解"))
+        assertTrue(review.body.contains("勾股定理"))
+        assertTrue(review.body.contains("软提示"))
+        assertTrue(review.body.contains("不强制打断"))
     }
 
     @Test

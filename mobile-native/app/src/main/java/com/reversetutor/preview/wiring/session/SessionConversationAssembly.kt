@@ -85,7 +85,11 @@ class SessionConversationAssembly(
         messagePort = messageContextPort,
         memoryPort = MemoryContextPortAdapter(memoryRepository),
         errorPort = ErrorContextPortAdapter(memoryRepository),
-        graphPort = GraphContextPortAdapter(graphRepository),
+        graphPort = GraphContextPortAdapter(
+            graphRepository,
+            learningLedgerRepository,
+            nowEpochMillis
+        ),
         sourcePort = SourceContextPortAdapter(sourceRepository),
         masteryFactPort = learningLedgerRepository?.let { MasteryFactContextPortAdapter(it) }
     )
