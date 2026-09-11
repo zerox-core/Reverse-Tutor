@@ -108,3 +108,9 @@ Verification: settings file greps 0 WebSearch refs; full-project gradle test
 BUILD SUCCESSFUL (465 tasks, 465 actionable: 42 executed).
 
 Next feature proceeds with web search OFF by default: 知识锚点.
+
+## Follow-up 2026-09-12（紧凑化与弹窗精修）
+- 发送键与输入框 Gap 8→4dp；输入框 Height 52→60dp；加号图标 24→28dp、发送箭头 23→26dp。契约测试同步断言 60/52/4。
+- 联网搜索胶囊下移贴紧输入框：去掉胶囊 bottom padding、composer Row top 8→3dp。实测发现 Material3 可点击 Surface 的 48dp 最小热区会把布局上下各撑 ~9dp（胶囊视觉仅 ~30dp 高），改用普通 Surface + Modifier.clickable 后视觉间距从 ~18.5dp 收窄到 ~9dp。
+- 额度提示弹窗重做为 iOS 风格：320dp 宽、24dp 大圆角、白底、标题/正文居中、开启(蓝 #3478F6)/取消(灰) 文字按钮。
+- 真机复验：胶囊点按弹窗、取消恢复均正常；gradle 全量测试通过。

@@ -1,4 +1,4 @@
-package com.reversetutor.feature.chat
+﻿package com.reversetutor.feature.chat
 
 import android.Manifest
 import android.content.ContentUris
@@ -128,9 +128,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 internal object ChatComposerLayout {
-    val Height = 52.dp
-    val SendSize = 46.dp
-    val Gap = 8.dp
+    val Height = 60.dp
+    val SendSize = 52.dp
+    val Gap = 4.dp
 }
 
 enum class ChatOverflowAction(val label: String) {
@@ -404,18 +404,58 @@ internal fun ReverseTeachingChatScreen(
             if (showWebSearchConfirm) {
                 AlertDialog(
                     onDismissRequest = { showWebSearchConfirm = false },
-                    title = { Text("开启联网搜索") },
+                    modifier = Modifier.width(320.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    containerColor = Color.White,
+                    tonalElevation = 0.dp,
+                    title = {
+                        Text(
+                            text = "开启联网搜索",
+                            fontSize = 17.sp,
+                            lineHeight = 24.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = ChatInk,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
                     text = {
-                        Text("联网搜索会大幅增加额度消耗，每次提问的消耗可能增加到原来的几十倍。确定要开启吗？")
+                        Text(
+                            text = "联网搜索会大幅增加额度消耗，每次提问的消耗可能增加到原来的几十倍。确定要开启吗？",
+                            fontSize = 14.sp,
+                            lineHeight = 21.sp,
+                            color = Color(0xFF5A6478),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     },
                     confirmButton = {
-                        TextButton(onClick = {
-                            showWebSearchConfirm = false
-                            onWebSearchChange(true)
-                        }) { Text("开启") }
+                        TextButton(
+                            onClick = {
+                                showWebSearchConfirm = false
+                                onWebSearchChange(true)
+                            },
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "开启",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF3478F6)
+                            )
+                        }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showWebSearchConfirm = false }) { Text("取消") }
+                        TextButton(
+                            onClick = { showWebSearchConfirm = false },
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "取消",
+                                fontSize = 16.sp,
+                                color = ChatMuted
+                            )
+                        }
                     }
                 )
             }
@@ -2012,12 +2052,13 @@ private fun WebSearchToggle(
     onToggle: (Boolean) -> Unit
 ) {
     Surface(
-        onClick = { onToggle(!enabled) },
         color = if (enabled) Color(0xFFE4EEFC) else Color(0xFFF6F8FD),
         contentColor = if (enabled) Color(0xFF2E66C7) else ChatMuted,
         shape = RoundedCornerShape(999.dp),
         border = BorderStroke(1.dp, if (enabled) Color(0xFF4283D9) else Color(0xFFC7D8EA)),
-        modifier = Modifier.padding(start = 14.dp, top = 4.dp, bottom = 2.dp)
+        modifier = Modifier
+            .padding(start = 14.dp, top = 10.dp)
+            .clickable { onToggle(!enabled) }
     ) {
         Row(
             modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
@@ -2052,7 +2093,7 @@ private fun ReverseTeachingComposer(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp),
+            .padding(start = 14.dp, end = 14.dp, top = 3.dp, bottom = 10.dp),
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(ChatComposerLayout.Gap)
     ) {
@@ -2064,7 +2105,7 @@ private fun ReverseTeachingComposer(
             shape = CircleShape
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Add, contentDescription = "添加图片或资料", modifier = Modifier.size(24.dp))
+                Icon(Icons.Filled.Add, contentDescription = "添加图片或资料", modifier = Modifier.size(28.dp))
             }
         }
         Surface(
@@ -2116,7 +2157,7 @@ private fun ReverseTeachingComposer(
                 Icon(
                     imageVector = Icons.Filled.ArrowUpward,
                     contentDescription = if (isSending) "正在发送" else "发送",
-                    modifier = Modifier.size(23.dp)
+                    modifier = Modifier.size(26.dp)
                 )
             }
         }
