@@ -1397,6 +1397,13 @@ private fun DestinationContent(
                     }
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
+                webSearchEnabled = appPreferences.webSearchEnabled,
+                onWebSearchChange = { enabled ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setWebSearchEnabled(enabled)
+                    }
+                },
                 onOpenContextHub = onOpenContextHub,
                 onOpenWindowBranches = {
                     onNavigateDestination(AppDestination.WindowBranches)
@@ -1787,13 +1794,6 @@ private fun DestinationContent(
                     scope.launch {
                         hybridAppGraph.appPreferencesRepository
                             .setHapticFeedbackEnabled(enabled)
-                    }
-                },
-                webSearchEnabled = appPreferences.webSearchEnabled,
-                onWebSearchChanged = { enabled ->
-                    scope.launch {
-                        hybridAppGraph.appPreferencesRepository
-                            .setWebSearchEnabled(enabled)
                     }
                 },
                 backgroundGenerationNotificationEnabled = appPreferences.backgroundGenerationNotificationEnabled,

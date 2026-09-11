@@ -80,3 +80,31 @@ service is deferred until the built-in-model + subscription phase.
 - 回答出处 (answer citations) remains blocked on the compatible interface
   (no source list returned); revisit at the deferred search-service phase.
 - Next feature in the queue: 知识锚点 (old-engine parity check first).
+
+## Follow-up 2026-09-11: toggle relocated above the chat input box
+
+用户拍板（评论 7684290720114428898）：联网开关从设置页挪到聊天输入框正上方，
+默认关闭、仅手动开启，开启前弹额度消耗确认框，设置页入口撤掉，其余不变。
+
+Changes:
+
+- ReverseTeachingChatScreen.kt:
+  - new `WebSearchToggle` pill composable (globe icon + label, states
+    联网搜索 / 联网搜索·已开启) rendered directly above ReverseTeachingComposer;
+  - tapping when OFF opens an AlertDialog warning 联网搜索会大幅增加额度消耗
+    (每次提问的消耗可能增加到原来的几十倍)，确认后才真正开启；tapping when ON
+    closes immediately, no dialog;
+  - new params webSearchEnabled / onWebSearchChange threaded through
+    ChatRoute -> ChatScreen -> ReverseTeachingChatScreen.
+- AppShell.kt: settings-page wiring removed; ChatRoute call site now feeds
+  appPreferences.webSearchEnabled and persists via
+  AppPreferencesRepository.setWebSearchEnabled.
+- FormalSettingsScreen.kt: 联网搜索 row fully reverted (imports, UiState field,
+  from() factory, both signature params, row spec, enum entry, icon map,
+  callbacks map, forwarding line). Storage plumbing untouched.
+- FormalSettingsScreenModelTest.kt: reverted expectations for the removed row.
+
+Verification: settings file greps 0 WebSearch refs; full-project gradle test
+BUILD SUCCESSFUL (465 tasks, 465 actionable: 42 executed).
+
+Next feature proceeds with web search OFF by default: 知识锚点.

@@ -70,6 +70,7 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -166,6 +167,8 @@ internal fun ReverseTeachingChatScreen(
     onReselectInvalidSource: (String, String) -> Unit = { _, _ -> },
     onOpenExternalLink: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit,
+    webSearchEnabled: Boolean = false,
+    onWebSearchChange: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit,
     onOpenWindowBranches: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
@@ -197,6 +200,7 @@ internal fun ReverseTeachingChatScreen(
     var locateSourceMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
     var viewerAttachment by remember(state.sessionTitle) { mutableStateOf<ChatAttachmentUi?>(null) }
     var showAttachmentActions by remember(state.sessionTitle) { mutableStateOf(false) }
+    var showWebSearchConfirm by remember(state.sessionTitle) { mutableStateOf(false) }
     var showSourcePicker by remember(state.sessionTitle) { mutableStateOf(false) }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = initialScrollPosition.index,
@@ -368,6 +372,16 @@ internal fun ReverseTeachingChatScreen(
             if (showAttachmentActions) {
                 ChatAttachmentMediaStrip()
             }
+            WebSearchToggle(
+                enabled = webSearchEnabled,
+                onToggle = { wantEnabled ->
+                    if (wantEnabled) {
+                        showWebSearchConfirm = true
+                    } else {
+                        onWebSearchChange(false)
+                    }
+                }
+            )
             ReverseTeachingComposer(
                 text = state.composer.text,
                 canSend = state.composer.canSend,
@@ -387,6 +401,24 @@ internal fun ReverseTeachingChatScreen(
                     onComposerFocusChanged(focused)
                 }
             )
+            if (showWebSearchConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showWebSearchConfirm = false },
+                    title = { Text("开启联网搜索") },
+                    text = {
+                        Text("联网搜索会大幅增加额度消耗，每次提问的消耗可能增加到原来的几十倍。确定要开启吗？")
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showWebSearchConfirm = false
+                            onWebSearchChange(true)
+                        }) { Text("开启") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showWebSearchConfirm = false }) { Text("取消") }
+                    }
+                )
+            }
             if (showAttachmentActions) {
                 ChatAttachmentPanelActions(
                     onPickImages = {
@@ -1971,6 +2003,38 @@ private fun ChatSourcePickerSheet(
             }
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun WebSearchToggle(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Surface(
+        onClick = { onToggle(!enabled) },
+        color = if (enabled) Color(0xFFE4EEFC) else Color(0xFFF6F8FD),
+        contentColor = if (enabled) Color(0xFF2E66C7) else ChatMuted,
+        shape = RoundedCornerShape(999.dp),
+        border = BorderStroke(1.dp, if (enabled) Color(0xFF4283D9) else Color(0xFFC7D8EA)),
+        modifier = Modifier.padding(start = 14.dp, top = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                Icons.Rounded.Public,
+                contentDescription = null,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = if (enabled) "联网搜索·已开启" else "联网搜索",
+                fontSize = 11.sp,
+                lineHeight = 14.sp
+            )
+        }
     }
 }
 
