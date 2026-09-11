@@ -19,6 +19,8 @@ data class LlmGenerationRequest(
     val token: LlmGenerationToken,
     val secretRef: String? = null,
     val streaming: Boolean = true,
+    /** NEWMP-V1-018: channel web-search switch; honored by Bailian-style OpenAI-compatible channels. */
+    val webSearchEnabled: Boolean = false,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
     /** Provider-ready image bytes, resolved only at execution time. */
@@ -461,7 +463,8 @@ object LlmGenerationPlanner {
         assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
         guidedTurnPlan: LlmGuidedTurnPlan? = null,
         onStreamChunk: ((String) -> Unit)? = null,
-        allowPlanDrivenOpening: Boolean = false
+        allowPlanDrivenOpening: Boolean = false,
+        webSearchEnabled: Boolean = false
     ): LlmGenerationPlan {
         val normalizedText = userText.orEmpty().trim()
         val normalizedImageAttachments = imageAttachments.filter { it.isImageAttachment() }
@@ -503,7 +506,8 @@ object LlmGenerationPlanner {
                 sessionPolicy = normalizedSessionPolicy,
                 assistantTurnEnvelope = normalizedEnvelope,
                 guidedTurnPlan = guidedTurnPlan?.normalized(),
-                onStreamChunk = onStreamChunk
+                onStreamChunk = onStreamChunk,
+                webSearchEnabled = webSearchEnabled
             )
         )
     }
@@ -588,7 +592,12 @@ class OpenAiCompatibleGenerationRuntime : LlmGenerationRuntime {
                     mapOf("role" to "user", "content" to request.openAiUserContent())
                 ),
                 "stream" to request.streaming
-            )
+            ) + if (request.webSearchEnabled) {
+                // NEWMP-V1-018: Bailian compatible-mode server-side web search.
+                mapOf("enable_search" to true)
+            } else {
+                emptyMap()
+            }
         )
 
     override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =

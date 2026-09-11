@@ -31,7 +31,9 @@ class ChatGenerationRepository(
     private val messageRepository: MessageRepository,
     private val llmProfileRepository: LlmProfileRepository,
     private val runtime: LlmGenerationRuntime,
-    private val modelConnectionRepository: ExecutionModelResolver? = null
+    private val modelConnectionRepository: ExecutionModelResolver? = null,
+    /** NEWMP-V1-018: consulted per generateReply call; summaries deliberately stay offline. */
+    private val webSearchPreference: suspend () -> Boolean = { false }
 ) {
     suspend fun generateReply(
         input: ChatGenerationInput,
@@ -62,7 +64,8 @@ class ChatGenerationRepository(
             onStreamChunk = { chunk ->
                 if (isTokenCurrent(input.token)) onChunk(chunk.toVisibleTimelineText())
             },
-            allowPlanDrivenOpening = input.allowPlanDrivenOpening
+            allowPlanDrivenOpening = input.allowPlanDrivenOpening,
+            webSearchEnabled = webSearchPreference()
         )
 
         val request = when (plan) {

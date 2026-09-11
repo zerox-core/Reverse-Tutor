@@ -8,7 +8,9 @@ data class AppPreferences(
     val primaryMemo: String = "",
     val secondaryMemo: String = "",
     val scratchMemo: String = "",
-    val backgroundGenerationNotificationEnabled: Boolean = true
+    val backgroundGenerationNotificationEnabled: Boolean = true,
+    /** NEWMP-V1-018: off by default — web search inflates prompt tokens. */
+    val webSearchEnabled: Boolean = false
 ) {
     companion object {
         val defaults = AppPreferences()

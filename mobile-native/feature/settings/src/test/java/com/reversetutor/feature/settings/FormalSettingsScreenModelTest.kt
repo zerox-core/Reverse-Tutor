@@ -44,6 +44,7 @@ class FormalSettingsScreenModelTest {
                 "默认布局大小",
                 "触感反馈",
                 "LLM API 配置",
+                "联网搜索",
                 "同步与备份",
                 "存储空间",
                 "导入与导出",
@@ -59,6 +60,7 @@ class FormalSettingsScreenModelTest {
             listOf(
                 FormalSettingsAction.ToggleHapticFeedback,
                 FormalSettingsAction.OpenLlmConfiguration,
+                FormalSettingsAction.ToggleWebSearch,
                 FormalSettingsAction.OpenStorage,
                 FormalSettingsAction.OpenImportExport,
                 FormalSettingsAction.ToggleChallengeReminder,

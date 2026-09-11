@@ -17,6 +17,8 @@ class AppPreferencesPolicyTest {
         assertEquals("", defaults.scratchMemo)
         assertEquals(true, defaults.challengeReminderEnabled)
         assertEquals(true, defaults.hapticFeedbackEnabled)
+        // NEWMP-V1-018: web search defaults to off to protect token budgets.
+        assertEquals(false, defaults.webSearchEnabled)
     }
 
     @Test
@@ -32,5 +34,6 @@ class AppPreferencesPolicyTest {
     fun settingsToggleKeysArePartOfThePersistedPreferenceContract() {
         assertTrue(AppPreferenceKeys.challengeReminderEnabled.name in AppPreferenceKeys.persistedNames)
         assertTrue(AppPreferenceKeys.hapticFeedbackEnabled.name in AppPreferenceKeys.persistedNames)
+        assertTrue(AppPreferenceKeys.webSearchEnabled.name in AppPreferenceKeys.persistedNames)
     }
 }

@@ -202,11 +202,23 @@ class HybridAppGraph private constructor(
             )
 
             val previewRuntime = FakeLlmGenerationRuntime()
+            // NEWMP-V1-018: consult the web-search preference per reply so the
+            // settings toggle takes effect without rebuilding the graph.
+            val appPreferencesRepository = DataModule.appPreferencesRepository(appContext)
+            val webSearchPreference: suspend () -> Boolean =
+                appPreferencesRepository::currentWebSearchEnabled
             val chatGenerationRepository = when (llmRuntimeMode) {
                 HybridLlmRuntimeMode.Fake ->
-                    DataModule.chatGenerationRepository(appContext, runtime = previewRuntime)
+                    DataModule.chatGenerationRepository(
+                        context = appContext,
+                        runtime = previewRuntime,
+                        webSearchPreference = webSearchPreference
+                    )
                 HybridLlmRuntimeMode.Production ->
-                    DataModule.chatGenerationRepository(appContext)
+                    DataModule.chatGenerationRepository(
+                        context = appContext,
+                        webSearchPreference = webSearchPreference
+                    )
             }
             val backgroundGenerationRepository = when (llmRuntimeMode) {
                 HybridLlmRuntimeMode.Fake ->
@@ -305,7 +317,7 @@ class HybridAppGraph private constructor(
                 deleteAvailable = false
             )
             return HybridAppGraph(
-                appPreferencesRepository = DataModule.appPreferencesRepository(appContext),
+                appPreferencesRepository = appPreferencesRepository,
                 sessionRepository = sessionRepository,
                 messageRepository = messageRepository,
                 llmProfileRepository = DataModule.llmProfileRepository(appContext),

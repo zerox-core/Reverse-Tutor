@@ -13,6 +13,7 @@ object AppPreferenceKeys {
     val scratchMemo = stringPreferencesKey("memo_scratch")
     val backgroundGenerationNotificationEnabled =
         booleanPreferencesKey("background_generation_notification_enabled")
+    val webSearchEnabled = booleanPreferencesKey("web_search_enabled")
 
     val persistedNames = listOf(
         theme.name,
@@ -22,6 +23,7 @@ object AppPreferenceKeys {
         primaryMemo.name,
         secondaryMemo.name,
         scratchMemo.name,
-        backgroundGenerationNotificationEnabled.name
+        backgroundGenerationNotificationEnabled.name,
+        webSearchEnabled.name
     )
 }

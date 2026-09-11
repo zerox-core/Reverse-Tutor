@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.ImportExport
 import androidx.compose.material.icons.rounded.Key
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.Storage
 import androidx.compose.material.icons.rounded.Sync
@@ -66,6 +67,7 @@ data class FormalSettingsUiState(
     val llmConfigurationLabel: String = "未配置",
     val layoutSizeLabel: String = "标准",
     val hapticFeedbackEnabled: Boolean = true,
+    val webSearchEnabled: Boolean = false,
     val backgroundGenerationNotificationEnabled: Boolean = false,
     val notificationPermissionGranted: Boolean = true,
     val syncStatusLabel: String = "已同步",
@@ -76,12 +78,14 @@ data class FormalSettingsUiState(
             llmProfileState: LlmProfileSettingsUiState,
             challengeReminderEnabled: Boolean = true,
             hapticFeedbackEnabled: Boolean = true,
+            webSearchEnabled: Boolean = false,
             backgroundGenerationNotificationEnabled: Boolean = false,
             notificationPermissionGranted: Boolean = true
         ): FormalSettingsUiState =
             FormalSettingsUiState(
                 challengeReminderEnabled = challengeReminderEnabled,
                 hapticFeedbackEnabled = hapticFeedbackEnabled,
+                webSearchEnabled = webSearchEnabled,
                 backgroundGenerationNotificationEnabled = backgroundGenerationNotificationEnabled,
                 notificationPermissionGranted = notificationPermissionGranted,
                 llmConfigurationLabel = if (llmProfileState.profileItems.isEmpty()) {
@@ -103,8 +107,10 @@ fun FormalSettingsScreen(
     onOpenAbout: () -> Unit,
     challengeReminderEnabled: Boolean = true,
     hapticFeedbackEnabled: Boolean = true,
+    webSearchEnabled: Boolean = false,
     onChallengeReminderChanged: (Boolean) -> Unit = {},
     onHapticFeedbackChanged: (Boolean) -> Unit = {},
+    onWebSearchChanged: (Boolean) -> Unit = {},
     backgroundGenerationNotificationEnabled: Boolean = false,
     notificationPermissionGranted: Boolean = true,
     onBackgroundGenerationNotificationChanged: (Boolean) -> Unit = {},
@@ -116,6 +122,7 @@ fun FormalSettingsScreen(
             llmProfileState = llmProfileState,
             challengeReminderEnabled = challengeReminderEnabled,
             hapticFeedbackEnabled = hapticFeedbackEnabled,
+            webSearchEnabled = webSearchEnabled,
             backgroundGenerationNotificationEnabled = backgroundGenerationNotificationEnabled,
             notificationPermissionGranted = notificationPermissionGranted
         ),
@@ -126,6 +133,7 @@ fun FormalSettingsScreen(
         onOpenAbout = onOpenAbout,
         onChallengeReminderChanged = onChallengeReminderChanged,
         onHapticFeedbackChanged = onHapticFeedbackChanged,
+        onWebSearchChanged = onWebSearchChanged,
         onBackgroundGenerationNotificationChanged = onBackgroundGenerationNotificationChanged,
         onOpenNotificationSettings = onOpenNotificationSettings,
         modifier = modifier
@@ -142,6 +150,7 @@ fun FormalSettingsScreen(
     onOpenAbout: () -> Unit,
     onChallengeReminderChanged: (Boolean) -> Unit = {},
     onHapticFeedbackChanged: (Boolean) -> Unit = {},
+    onWebSearchChanged: (Boolean) -> Unit = {},
     onBackgroundGenerationNotificationChanged: (Boolean) -> Unit = {},
     onOpenNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -155,6 +164,9 @@ fun FormalSettingsScreen(
         FormalSettingsAction.OpenLlmConfiguration to onOpenLlmConfiguration,
         FormalSettingsAction.ToggleHapticFeedback to {
             onHapticFeedbackChanged(!state.hapticFeedbackEnabled)
+        },
+        FormalSettingsAction.ToggleWebSearch to {
+            onWebSearchChanged(!state.webSearchEnabled)
         },
         FormalSettingsAction.ToggleBackgroundGenerationNotification to {
             onBackgroundGenerationNotificationChanged(!state.backgroundGenerationNotificationEnabled)
@@ -528,6 +540,12 @@ internal fun formalSettingsSections(
                 value = state.llmConfigurationLabel,
                 hasChevron = true,
                 action = FormalSettingsAction.OpenLlmConfiguration
+            ),
+            FormalSettingsRowSpec(
+                label = "联网搜索",
+                icon = FormalSettingsIcon.WebSearch,
+                toggleEnabled = state.webSearchEnabled,
+                action = FormalSettingsAction.ToggleWebSearch
             )
         )
     ),
@@ -615,6 +633,7 @@ internal enum class FormalSettingsAction {
     ToggleChallengeReminder,
     OpenLlmConfiguration,
     ToggleHapticFeedback,
+    ToggleWebSearch,
     ToggleBackgroundGenerationNotification,
     OpenNotificationSettings,
     OpenStorage,
@@ -632,6 +651,7 @@ internal enum class FormalSettingsIcon(
     Layout(Icons.AutoMirrored.Rounded.FormatAlignLeft, Color(0xFF2E66C7)),
     Haptics(Icons.Rounded.Vibration, Color(0xFF21857A)),
     Notifications(Icons.Rounded.Notifications, Color(0xFF6170B8)),
+    WebSearch(Icons.Rounded.Public, Color(0xFF2E66C7)),
     Sync(Icons.Rounded.Sync, Color(0xFF178775)),
     Storage(Icons.Rounded.Storage, Color(0xFF386BC2)),
     ImportExport(Icons.Rounded.ImportExport, Color(0xFF6170B8)),

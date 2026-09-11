@@ -1789,6 +1789,13 @@ private fun DestinationContent(
                             .setHapticFeedbackEnabled(enabled)
                     }
                 },
+                webSearchEnabled = appPreferences.webSearchEnabled,
+                onWebSearchChanged = { enabled ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setWebSearchEnabled(enabled)
+                    }
+                },
                 backgroundGenerationNotificationEnabled = appPreferences.backgroundGenerationNotificationEnabled,
                 notificationPermissionGranted = notificationsEnabled,
                 onBackgroundGenerationNotificationChanged = { enabled ->

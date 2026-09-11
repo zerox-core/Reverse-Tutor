@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class AppPreferencesRepository(
@@ -24,7 +25,9 @@ class AppPreferencesRepository(
             scratchMemo = stored[AppPreferenceKeys.scratchMemo] ?: AppPreferences.defaults.scratchMemo,
             backgroundGenerationNotificationEnabled =
                 stored[AppPreferenceKeys.backgroundGenerationNotificationEnabled]
-                    ?: AppPreferences.defaults.backgroundGenerationNotificationEnabled
+                    ?: AppPreferences.defaults.backgroundGenerationNotificationEnabled,
+            webSearchEnabled = stored[AppPreferenceKeys.webSearchEnabled]
+                ?: AppPreferences.defaults.webSearchEnabled
         )
     }
 
@@ -43,6 +46,16 @@ class AppPreferencesRepository(
     suspend fun setChallengeReminderEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[AppPreferenceKeys.challengeReminderEnabled] = enabled
+        }
+    }
+
+    /** NEWMP-V1-018: one-shot read used by ChatGenerationRepository per reply. */
+    suspend fun currentWebSearchEnabled(): Boolean =
+        preferences.map { it.webSearchEnabled }.first()
+
+    suspend fun setWebSearchEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.webSearchEnabled] = enabled
         }
     }
 

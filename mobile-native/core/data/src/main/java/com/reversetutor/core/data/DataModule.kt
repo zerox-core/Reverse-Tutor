@@ -91,13 +91,15 @@ object DataModule {
 
     fun chatGenerationRepository(
         context: Context,
-        runtime: LlmGenerationRuntime? = null
+        runtime: LlmGenerationRuntime? = null,
+        webSearchPreference: (suspend () -> Boolean)? = null
     ): ChatGenerationRepository =
         ChatGenerationRepository(
             messageRepository = messageRepository(context),
             llmProfileRepository = llmProfileRepository(context),
             runtime = runtime ?: productionGenerationRuntime(context),
-            modelConnectionRepository = modelConnectionRepository(context)
+            modelConnectionRepository = modelConnectionRepository(context),
+            webSearchPreference = webSearchPreference ?: { false }
         )
 
     fun backgroundGenerationRepository(

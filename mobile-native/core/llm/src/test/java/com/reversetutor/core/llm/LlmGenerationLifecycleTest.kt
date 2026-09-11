@@ -270,6 +270,39 @@ class LlmGenerationLifecycleTest {
         assertTrue(block.contains("最多问老师一个问题"))
     }
 
+    // NEWMP-V1-018: channel web-search switch — the Bailian-style param must ride
+    // the OpenAI-compatible payload only when the user turns the toggle on.
+    @Test
+    fun openAiPayloadCarriesEnableSearchOnlyWhenWebSearchEnabled() {
+        val runtime = OpenAiCompatibleGenerationRuntime()
+
+        val enabledPayload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible).copy(webSearchEnabled = true)
+        )
+        val disabledPayload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible)
+        )
+
+        assertEquals(true, enabledPayload.body["enable_search"])
+        assertEquals(false, disabledPayload.body.containsKey("enable_search"))
+        assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun plannerPropagatesWebSearchFlagIntoPlannedRequest() {
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Help",
+            profile = profile(LlmProviderKind.OpenAiCompatible, secretRef = null),
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-web-search"),
+            webSearchEnabled = true
+        )
+
+        assertEquals(true, (plan as LlmGenerationPlan.Ready).request.webSearchEnabled)
+    }
+
     private fun request(provider: LlmProviderKind): LlmGenerationRequest =
         LlmGenerationRequest(
             sessionId = "session-1",
