@@ -128,8 +128,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 internal object ChatComposerLayout {
-    val Height = 48.dp
-    val SendSize = 40.dp
+    val Height = 52.dp
+    val SendSize = 46.dp
     val Gap = 8.dp
 }
 
@@ -2017,22 +2017,22 @@ private fun WebSearchToggle(
         contentColor = if (enabled) Color(0xFF2E66C7) else ChatMuted,
         shape = RoundedCornerShape(999.dp),
         border = BorderStroke(1.dp, if (enabled) Color(0xFF4283D9) else Color(0xFFC7D8EA)),
-        modifier = Modifier.padding(start = 14.dp, top = 2.dp)
+        modifier = Modifier.padding(start = 14.dp, top = 4.dp, bottom = 2.dp)
     ) {
         Row(
-            modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Icon(
                 Icons.Rounded.Public,
                 contentDescription = null,
-                modifier = Modifier.size(13.dp)
+                modifier = Modifier.size(16.dp)
             )
             Text(
                 text = if (enabled) "联网搜索·已开启" else "联网搜索",
-                fontSize = 11.sp,
-                lineHeight = 14.sp
+                fontSize = 13.sp,
+                lineHeight = 17.sp
             )
         }
     }
@@ -2064,7 +2064,7 @@ private fun ReverseTeachingComposer(
             shape = CircleShape
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.Add, contentDescription = "添加图片或资料", modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Add, contentDescription = "添加图片或资料", modifier = Modifier.size(24.dp))
             }
         }
         Surface(
@@ -2116,7 +2116,7 @@ private fun ReverseTeachingComposer(
                 Icon(
                     imageVector = Icons.Filled.ArrowUpward,
                     contentDescription = if (isSending) "正在发送" else "发送",
-                    modifier = Modifier.size(19.dp)
+                    modifier = Modifier.size(23.dp)
                 )
             }
         }
