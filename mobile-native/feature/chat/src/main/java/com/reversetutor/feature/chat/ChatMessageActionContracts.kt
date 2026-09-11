@@ -379,6 +379,7 @@ fun buildChatTimelineEntries(
 
 sealed interface ChatRichInline {
     data class Text(val source: String) : ChatRichInline
+    data class Bold(val source: String) : ChatRichInline
     data class Code(val source: String) : ChatRichInline
     data class Formula(val source: String) : ChatRichInline
     data class Link(val label: String, val url: String) : ChatRichInline
@@ -489,8 +490,8 @@ object ChatRichContentParser {
 
     private fun tableCells(line: String): List<String> = line.trim().trim('|').split('|').map(String::trim)
 
-    private fun parseInlines(source: String): List<ChatRichInline> {
-        val pattern = Regex("`([^`]+)`|\\[([^]]+)]\\((https?://[^)]+)\\)|\\$([^$\\n]+)\\$")
+    internal fun parseInlines(source: String): List<ChatRichInline> {
+        val pattern = Regex("`([^`]+)`|\\[([^]]+)]\\((https?://[^)]+)\\)|\\$([^$\\n]+)\\$|\\*\\*([^*\\n]+)\\*\\*")
         val result = mutableListOf<ChatRichInline>()
         var cursor = 0
         pattern.findAll(source).forEach { match ->
@@ -498,7 +499,8 @@ object ChatRichContentParser {
             result += when {
                 match.groupValues[1].isNotEmpty() -> ChatRichInline.Code(match.groupValues[1])
                 match.groupValues[2].isNotEmpty() -> ChatRichInline.Link(match.groupValues[2], match.groupValues[3])
-                else -> ChatRichInline.Formula(match.groupValues[4])
+                match.groupValues[4].isNotEmpty() -> ChatRichInline.Formula(match.groupValues[4])
+                else -> ChatRichInline.Bold(match.groupValues[5])
             }
             cursor = match.range.last + 1
         }

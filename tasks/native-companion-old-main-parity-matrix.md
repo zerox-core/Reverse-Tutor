@@ -157,3 +157,20 @@ old engine's clue/challenge discipline rules baked into the directives.
 Task doc: `tasks/NEWMP-V1-014-OUTPUT-EXPRESSION.md`. Tests: full-project
 gradle test green; `LlmStudentExpressionPolicyTest` 3/3.
 
+## 9. NEWMP-V1-015 rich-text bold rendering (2026-09-11)
+
+Both teacher (user-typed) and learner (AI) bubbles already render through the
+same `RichMessageContent -> ChatRichContentParser.parse` pipeline (headings,
+quotes, lists, tables, code fences, inline code, links). The only gap was
+inline bold: `**...**` rendered as literal asterisks, breaking the V1-014
+student persona's bold-keywords rule. Closed end-to-end in feature/chat
+(unfrozen): `ChatRichInline.Bold` + regex group 5 in `parseInlines`,
+`FontWeight.Bold` span in `buildRichInlineAnnotatedString`, and
+`ListItem`/`Quote` bodies upgraded to `RichInlineRow` (quote keeps its
+grey-blue color via new `textColor` param). Single-asterisk italic is
+deliberately NOT supported (math false positives like 3*4*5); voice-to-text
+is deferred by user decision and will inherit this pipeline automatically.
+Tests: ChatMessageActionsTask3BTest 21/21 (4 new bold tests); full-project
+gradle test green. Task doc: `tasks/NEWMP-V1-015-RICH-BOLD.md`.
+
+

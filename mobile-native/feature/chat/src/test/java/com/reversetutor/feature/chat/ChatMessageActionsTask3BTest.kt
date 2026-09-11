@@ -1,5 +1,6 @@
 package com.reversetutor.feature.chat
 
+import androidx.compose.ui.text.font.FontWeight
 import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -341,6 +342,47 @@ ${'$'}${'$'}x^2 + y^2${'$'}${'$'}
             ChatRichInlineTapTarget.Message,
             resolveChatRichInlineTapTarget(annotated, annotated.length)
         )
+    }
+
+    @Test
+    fun richParserRecognizesBoldInlineInParagraphs() {
+        val paragraph = ChatRichContentParser.parse("老师，**浮力** 就是向上的力，而重力是向下的。")
+            .single() as ChatRichBlock.Paragraph
+
+        val bold = paragraph.inlines.filterIsInstance<ChatRichInline.Bold>().single()
+        assertEquals("浮力", bold.source)
+        assertTrue(paragraph.inlines.any { it is ChatRichInline.Text })
+    }
+
+    @Test
+    fun richParserKeepsSingleAsterisksVerbatimForMathText() {
+        val paragraph = ChatRichContentParser.parse("我算 3*4*5 好像等于 60，是我哪里错了吗？")
+            .single() as ChatRichBlock.Paragraph
+
+        assertTrue(paragraph.inlines.none { it is ChatRichInline.Bold })
+        assertTrue(paragraph.inlines.filterIsInstance<ChatRichInline.Text>().any { "3*4*5" in it.source })
+    }
+
+    @Test
+    fun richInlineBoldBuildsBoldSpanWithoutAsterisks() {
+        val paragraph = ChatRichContentParser.parse("先用 **勾股定理** 再看 `a^2+b^2`。")
+            .single() as ChatRichBlock.Paragraph
+        val annotated = buildRichInlineAnnotatedString(paragraph.inlines)
+
+        assertEquals("先用 勾股定理 再看 a^2+b^2。", annotated.text)
+        val boldSpan = annotated.spanStyles.single { it.item.fontWeight == FontWeight.Bold }
+        val boldStart = annotated.text.indexOf("勾股定理")
+        assertEquals(boldStart, boldSpan.start)
+        assertEquals(boldStart + "勾股定理".length, boldSpan.end)
+    }
+
+    @Test
+    fun listItemAndQuoteBodiesParseBoldInlinesForRendering() {
+        val blocks = ChatRichContentParser.parse("- **第一步**：先算两条直角边\n> **重点**在斜边")
+        val listItem = blocks.filterIsInstance<ChatRichBlock.ListItem>().single()
+        assertTrue(ChatRichContentParser.parseInlines(listItem.text).any { it is ChatRichInline.Bold })
+        val quote = blocks.filterIsInstance<ChatRichBlock.Quote>().single()
+        assertTrue(ChatRichContentParser.parseInlines(quote.text).any { it is ChatRichInline.Bold })
     }
 
     @Test

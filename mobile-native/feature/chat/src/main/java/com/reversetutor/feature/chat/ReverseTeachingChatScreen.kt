@@ -1116,15 +1116,26 @@ private fun RichMessageContent(
                 )
                 is ChatRichBlock.ListItem -> Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text(if (block.ordered) "${block.index ?: 1}." else "•", color = ChatMuted, fontSize = 16.sp)
-                    Text(block.text, modifier = Modifier.weight(1f), color = ChatInk, fontSize = 16.sp, lineHeight = 24.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        RichInlineRow(
+                            inlines = ChatRichContentParser.parseInlines(block.text),
+                            onOpenExternalLink = onOpenExternalLink,
+                            onMessageTap = onMessageTap,
+                            onMessageLongPress = onMessageLongPress
+                        )
+                    }
                 }
-                is ChatRichBlock.Quote -> Text(
-                    block.text,
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFFE9EDF4), RoundedCornerShape(4.dp)).padding(8.dp),
-                    color = Color(0xFF4C586B),
-                    fontSize = 16.sp,
-                    lineHeight = 24.sp
-                )
+                is ChatRichBlock.Quote -> Box(
+                    modifier = Modifier.fillMaxWidth().background(Color(0xFFE9EDF4), RoundedCornerShape(4.dp)).padding(8.dp)
+                ) {
+                    RichInlineRow(
+                        inlines = ChatRichContentParser.parseInlines(block.text),
+                        onOpenExternalLink = onOpenExternalLink,
+                        onMessageTap = onMessageTap,
+                        onMessageLongPress = onMessageLongPress,
+                        textColor = Color(0xFF4C586B)
+                    )
+                }
                 is ChatRichBlock.Code -> RichSourceBlock(
                     label = block.language?.let { "代码 · $it" } ?: "代码",
                     source = block.source,
@@ -1143,7 +1154,8 @@ private fun RichInlineRow(
     inlines: List<ChatRichInline>,
     onOpenExternalLink: (String) -> Unit,
     onMessageTap: () -> Unit,
-    onMessageLongPress: () -> Unit
+    onMessageLongPress: () -> Unit,
+    textColor: Color = ChatInk
 ) {
     val text = remember(inlines) { buildRichInlineAnnotatedString(inlines) }
     var layoutResult by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
@@ -1164,7 +1176,7 @@ private fun RichInlineRow(
                 onLongPress = { onMessageLongPress() }
             )
         },
-        color = ChatInk,
+        color = textColor,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         onTextLayout = { layoutResult = it }
@@ -1195,6 +1207,7 @@ internal fun buildRichInlineAnnotatedString(inlines: List<ChatRichInline>): Anno
     inlines.forEach { inline ->
         when (inline) {
             is ChatRichInline.Text -> append(inline.source)
+            is ChatRichInline.Bold -> withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(inline.source) }
             is ChatRichInline.Code -> withStyle(
                 SpanStyle(
                     color = Color(0xFF33415B),
