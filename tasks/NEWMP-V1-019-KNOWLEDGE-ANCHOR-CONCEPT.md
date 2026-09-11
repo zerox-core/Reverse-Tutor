@@ -1,68 +1,75 @@
-# NEWMP-V1-019: Knowledge anchor (知识锚点) — concept definition (discussion draft)
+# NEWMP-V1-019: Knowledge anchor (知识锚点) — concept & design draft
 
 Date: 2026-09-12
 Branch: newmp
-Phase: **Concept only** (per user instruction: no entry point / UI / code yet)
+Phase: **Concept + design proposal (v2)** — no entry point / UI / code until
+the user approves the plan.
 Feishu discussion doc: https://larkcommunity.feishu.cn/docx/BGNLdcB59oBT4CxSMWocJscAngb
 
-## Goal
+## User's framing (2026-09-12, comment 7684334513253584101)
 
-Define what a "knowledge anchor" (知识锚点) IS, before building anything.
-User decision (2026-09-12 comment): start the knowledge-anchor feature, but do
-NOT build the entry point first — first make "what this thing is" clear for
-everyone.
+Two underlying algorithm systems, two user-visible surfaces:
 
-## Concept (v1 draft)
+- RAG (background knowledge base + retrieval) -> user-visible as the ANCHOR
+  page: user uploads materials (initial upload + mid-chat upload), the app
+  automatically indexes / chunks / composes / injects.
+- Graph (vector graph carrying time-linear change) -> user-visible as the
+  KNOWLEDGE GRAPH page. Out of scope this phase.
 
-A knowledge anchor is a piece of knowledge or agreement "pinned" out of the
-chat: it has a name, a source, and a state. Once pinned, the AI student must
-honor it in every later turn — it cannot drift.
+Top bar decisions: search stays (sessions + materials); "学习大脑" slot becomes
+the anchor page entry; branch management is dropped for now — that slot is
+reserved for the knowledge-graph entry later; branch gets its own layout in a
+later phase.
 
-Fields of an anchor:
+## v2 concept
 
-- name: what this knowledge is called (e.g. "增函数的判定")
-- content: the distilled one-line definition/agreement/conclusion (not the raw chat text)
-- source: which message or material it came from (jumpable)
-- kind: knowledge point / agreement (teacher's rule) / material / note
-- status: active / mastered / voided (corrected or overturned by the teacher)
-- weight: importance — controls its ranking when injected into the prompt
+A knowledge anchor = a material "conscripted" into the AI's background
+knowledge base. User uploads; the app automatically: 1) parses, 2) chunks,
+3) indexes, 4) retrieves + composes the top fragments into the prompt each
+turn (marked "trust the materials first").
 
-Producers: AI auto-pins (old engine did this via per-turn `anchor_updates`,
-e.g. new requirements spoken mid-chat become "requirement" anchors) and the
-user manually pins.
+## Design proposal (awaiting user approval)
 
-Consumers: prompt injection each turn (marked non-driftable, sorted by weight),
-review/due reminders, knowledge-graph nodes, mastery linkage (anchor = what
-the knowledge IS; mastery ledger = how well it is learned).
+1. Parsing v1: TXT/MD, PDF (text layer), images (vision). DOCX/PPTX/EPUB v2.
+2. Chunking: natural paragraphs first; ~500-char cap per chunk; ~50-char
+   overlap; each chunk records anchor id / index / source position.
+3. Retrieval: v1 local keyword search (tokenize + tf scoring + fuzzy match,
+   old-engine parity; fully local, explainable); v2 vector search via channel
+   embedding API — behind a replaceable indexer interface.
+4. Injection: per turn, retrieve top 3-5 chunks for the current user question,
+   inject as "materials hit by current question (trust first)".
+5. Storage: Room tables `anchor` (name/kind/imported-at/chunk-count/status)
+   and `chunk` (anchor id/index/text/keywords).
+6. Anchor page (replaces 学习大脑 top-bar entry): list per session window
+   (name/type/chunks/imported-at), actions import / view / delete, empty state.
+7. Top bar: search unchanged; 学习大脑 -> anchor page; branch management slot
+   reserved for the knowledge-graph entry (phase 2).
 
-Explicit non-goals: an anchor is not the chat log, not a mastery record, not a
-bookmark/favorite (strength differs: an anchor must be obeyed by the AI).
+## Old-engine parity facts (empirical, 2026-09-12)
 
-## Old-engine parity findings (empirical, 2026-09-12)
+Web engine static/app/index.html anchor system:
 
-Web engine static/app/index.html already has an anchor system. Facts:
+- Storage: IndexedDB store `anchors`, per chat window (sid); record shape
+  `{ sid, kind, content, weight, created_at, ...extra }`.
+- Kinds & weights: requirement 1.5 (also AI-extracted from
+  `new_requirements` at 1.2), note 1.4, source 1.2, persona_change 2.6.
+- Source anchors: imported PDF/DOCX/TXT/MD/HTML/PPTX/EPUB/images with stored
+  text; per-turn snippet retrieval injects "当前问题命中的上传资料片段
+  （优先相信）".
+- Prompt injection heading: "主线锚（不可漂移）**永远不能违背**", sorted by
+  weight desc via `format_anchors()`.
+- Graph: `buildGraphData(masteries, ai, anchors)` — anchors, mastery, AI
+  notes form the window graph.
+- Deletion of a message cascades to its linked note/requirement anchors;
+  source anchors survive.
 
-- Storage: browser IndexedDB store `anchors`, keyed per chat window (sid).
-- Record shape: `{ sid, kind, content, weight, created_at, ...extra }`.
-- Kinds & weights: requirement 1.5 (goals/constraints/mainline, manual save or
-  AI-extracted `new_requirements` at 1.2), note 1.4 (随笔 tied to a message),
-  source 1.2 (imported PDF/DOCX/TXT/MD/HTML/PPTX/EPUB/images, with per-turn
-  snippet retrieval), persona_change 2.6.
-- Injection: `format_anchors()` renders them into the system prompt under the
-  heading "主线锚（不可漂移）**永远不能违背**", sorted by weight desc; empty
-  state says "无主线锚，按通用策略走".
-- AI automation: every turn's JSON contract includes `anchor_updates: []`;
-  the model proposes new requirement anchors from the teacher's speech.
-- Graph: `buildGraphData(masteries, ai, anchors)` — anchors, mastery and AI
-  notes together form the window graph; source anchors and notes become nodes.
-- Deletion: deleting a message also deletes note/requirement anchors linked to
-  it (`note_message_id` / `source_message_id` / `source_turn_id`); source-kind
-  anchors survive.
+This phase only ports the SOURCE anchor pipeline (RAG). The
+requirement/note/persona_change kinds (mainline constraints, graph side)
+are deferred with the knowledge graph phase.
 
-## Open decisions (awaiting user, do not implement until answered)
+## Open decisions (awaiting user)
 
-1. Scope: only "knowledge point" anchors, or full old-engine set
-   (agreement/material/note/persona_change)?
-2. First producer: AI auto-pin or user manual pin?
-3. Mastery linkage: anchor name strictly equal to the mastery-ledger
-   knowledge-point name, or loosely linked?
+1. v1 keyword retrieval OK (vector search in v2)?
+2. v1 formats TXT/MD + PDF + images OK (DOCX/PPTX/EPUB later)?
+3. Anchor page scoped to the current window first?
+4. Injection cap 3-5 chunks per turn?
