@@ -20,6 +20,19 @@ class AndroidImagePayloadResolver(
                 ?.let { LlmResolvedImage(mimeType, it) }
         }
         val uri = runCatching { Uri.parse(uriText) }.getOrNull() ?: return null
+        // NEWMP-V1-021: app-private temp files (docx embedded images prepared
+        // for vision transcription) arrive as file:// URIs.
+        if (uri.scheme == "file") {
+            val fileBytes = runCatching {
+                java.io.File(uri.path ?: return null).inputStream().use { input ->
+                    input.readBytes().takeIf { it.size in 1..MaxImageBytes }
+                }
+            }.getOrNull() ?: return null
+            return LlmResolvedImage(
+                mimeType = mimeType,
+                base64Data = Base64.encodeToString(fileBytes, Base64.NO_WRAP)
+            )
+        }
         if (uri.scheme != "content") return null
         val bytes = runCatching {
             context.contentResolver.openInputStream(uri)?.use { input ->

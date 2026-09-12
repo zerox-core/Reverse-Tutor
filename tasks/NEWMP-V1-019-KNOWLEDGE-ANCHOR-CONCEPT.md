@@ -214,3 +214,42 @@ Boundaries kept: vision only ever runs as an OCR fallback; existing
 FutureAssisted sources need a re-import to benefit; cost is one
 multimodal call per image only when OCR finds nothing.
 
+## Implementation record (Word document parsing, 2026-09-12, NEWMP-V1-021, phase 3)
+
+User closed the PRD/Word gap: imported .docx files now parse with
+embedded-image recognition, speed and accuracy first. Shipped on branch
+`newmp`:
+
+- `DocxSourceText.kt` (new, pure JVM): unzip + DOM walk of
+  `word/document.xml`; paragraphs and tables emitted in document order
+  (table rows flatten to "a | b | c"); embedded images resolved via
+  `document.xml.rels` to `word/media/*` (png/jpg/jpeg/gif/bmp/webp only).
+  XXE-hardened parser. Caps: 30 embedded images per document; images under
+  3072 bytes skipped (decorative icons). Zero Android imports, so it is
+  JVM unit-testable. No new dependencies (manual zip+XML, not Apache POI).
+- `DocxSourceImport.kt` (new, app layer): Android wrapper - decodes each
+  embedded image, skips anything under 48px, downscales to 1600px JPEG-85
+  before upload; ML Kit Chinese OCR first (free, exact); cloud vision only
+  as a fallback when OCR finds nothing AND the toggle is on AND a session
+  exists. Reuses the phase-2 vision pipeline; temp file in
+  cacheDir/vision-tmp + file:// URI, deleted after use.
+- `AndroidImagePayloadResolver.kt`: file:// scheme support, so app-private
+  temp files feed the vision call without FileProvider/manifest changes.
+- `AppShell.kt`: docx branch in the import readText chain (between pdf
+  and image), wiring transcribeDocxEmbeddedImage with prefs and session.
+- `SourceRepository.kt`: SourceType.Docx dispatches to new parseDocx -
+  blank text stays FutureAssisted ("No readable text was extracted from
+  this Word document"), success parses PartiallyLocal with a verification
+  warning, mirroring parsePdf.
+- Tests: DocxSourceTextTest +8 (document order incl. transcription
+  position, table flattening, tiny-image skip, 30-image cap, no-
+  transcription drop, blank returns null, invalid zip returns null,
+  detection by name/mime); SourceRepositoryTest +2 (docx text parses
+  locally with chunks, blank stays FutureAssisted). Full `gradle test`
+  green, exit 0.
+
+Boundaries kept: speed measures (skip tiny images, downscale before
+upload, 30-image cap, OCR-first with cloud fallback only when enabled);
+pickers already accept docx via */* so no picker change was needed.
+
+

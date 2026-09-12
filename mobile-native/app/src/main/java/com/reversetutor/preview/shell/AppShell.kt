@@ -1020,6 +1020,20 @@ private fun DestinationContent(
                         readText = {
                             if (isPdfSource(fileName, mimeType)) {
                                 extractPdfSourceText(context, uri)
+                            } else if (isDocxSource(fileName, mimeType)) {
+                                // NEWMP-V1-021: Word 正文按文档顺序还原；
+                                // 嵌入图片在原位置转写（本地 OCR 优先，
+                                // 开了「云端看图转写」则多模态兜底）。
+                                extractDocxSourceText(context, uri) { embedded ->
+                                    transcribeDocxEmbeddedImage(
+                                        context = context,
+                                        repository = chatGenerationRepository,
+                                        sessionId = activeSessionId,
+                                        visionAssistEnabled = appPreferences.visionAssistEnabled,
+                                        visionModelName = appPreferences.visionModelName,
+                                        image = embedded
+                                    )
+                                }
                             } else if (isImageSource(fileName, mimeType)) {
                                 // NEWMP-V1-020: OCR first (free, offline); when it
                                 // finds no readable text and the cloud vision

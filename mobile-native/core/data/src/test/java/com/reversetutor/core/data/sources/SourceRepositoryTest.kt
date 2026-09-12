@@ -159,6 +159,47 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun docxWithExtractedTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "prd.docx",
+                mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                text = "Alpha requirement.\n\nBeta scope.",
+                sourceId = "source-docx-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Docx, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Alpha requirement.", "Beta scope."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun docxWithoutReadableTextStaysFutureAssisted() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "scanned.docx",
+                mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                text = null,
+                sourceId = "source-docx-blank"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Docx, result.source.type)
+        assertEquals(SourceParserStatus.FutureAssisted, result.source.parserStatus)
+        assertTrue(result.chunks.isEmpty())
+    }
+
+    @Test
     fun unsupportedAndFutureParserFilesRemainVisible() = runBlocking {
         val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
 

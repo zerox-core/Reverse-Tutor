@@ -127,7 +127,7 @@ object LocalSourceParser {
             )
             SourceType.Pdf -> parsePdf(type, text)
             SourceType.Image -> parseImage(type, text)
-            SourceType.Docx,
+            SourceType.Docx -> parseDocx(type, text)
             SourceType.Pptx,
             SourceType.Epub -> SourceParseOutcome(
                 type = type,
@@ -229,6 +229,38 @@ object LocalSourceParser {
             extractedText = normalized,
             chunks = chunkText(normalized),
             warnings = listOf("Image text was extracted with on-device OCR or cloud vision transcription; verify against the original image.")
+        )
+    }
+
+    private fun parseDocx(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this Word document; it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this Word document; it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Word text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex layouts against the original document.")
         )
     }
 
