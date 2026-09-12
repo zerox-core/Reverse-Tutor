@@ -1020,6 +1020,8 @@ private fun DestinationContent(
                         readText = {
                             if (isPdfSource(fileName, mimeType)) {
                                 extractPdfSourceText(context, uri)
+                            } else if (isImageSource(fileName, mimeType)) {
+                                extractImageSourceText(context, uri)
                             } else {
                                 context.contentResolver.openInputStream(uri)
                                     ?.bufferedReader(Charsets.UTF_8)

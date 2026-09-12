@@ -118,6 +118,47 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun imageWithRecognizedOcrTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "question.png",
+                mimeType = "image/png",
+                text = "Alpha question.\n\nBeta note.",
+                sourceId = "source-image-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Image, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Alpha question.", "Beta note."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun imageWithoutReadableTextStaysFutureAssisted() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "diagram.png",
+                mimeType = "image/png",
+                text = null,
+                sourceId = "source-image-blank"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Image, result.source.type)
+        assertEquals(SourceParserStatus.FutureAssisted, result.source.parserStatus)
+        assertTrue(result.chunks.isEmpty())
+    }
+
+    @Test
     fun unsupportedAndFutureParserFilesRemainVisible() = runBlocking {
         val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
 

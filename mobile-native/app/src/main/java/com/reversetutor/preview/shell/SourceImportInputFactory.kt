@@ -5,16 +5,20 @@ import java.io.Reader
 
 internal const val MaxSourceTextChars = 500_000
 
-internal fun buildSourceImportInput(
+internal suspend fun buildSourceImportInput(
     requestId: Long,
     fileName: String?,
     mimeType: String?,
     uri: String,
-    readText: () -> String?
+    readText: suspend () -> String?
 ): SourceImportInput {
     val safeFileName = fileName?.takeIf { it.isNotBlank() } ?: "selected-source"
     val text = if (canUseLocalTextParser(safeFileName, mimeType)) {
-        runCatching { readText() }.getOrNull()
+        try {
+            readText()
+        } catch (t: Throwable) {
+            null
+        }
     } else {
         null
     }
@@ -33,14 +37,28 @@ private fun canUseLocalTextParser(
 ): Boolean {
     val ext = fileName.lowercase().substringAfterLast('.', missingDelimiterValue = "")
     val normalizedMime = mimeType.orEmpty().lowercase()
-    return ext in setOf("txt", "md", "markdown", "html", "htm", "pdf") ||
+    return ext in setOf(
+        "txt",
+        "md",
+        "markdown",
+        "html",
+        "htm",
+        "pdf",
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "gif",
+        "bmp"
+    ) ||
         normalizedMime in setOf(
             "text/plain",
             "text/markdown",
             "text/x-markdown",
             "text/html",
             "application/pdf"
-        )
+        ) ||
+        normalizedMime.startsWith("image/")
 }
 
 internal fun readSourceTextWithinLimit(

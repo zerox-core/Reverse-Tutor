@@ -1,6 +1,7 @@
 package com.reversetutor.preview.shell
 
 import java.io.StringReader
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -8,7 +9,7 @@ import org.junit.Test
 
 class SourceImportInputFactoryTest {
     @Test
-    fun unsupportedBinarySelectionDoesNotReadTextBody() {
+    fun unsupportedBinarySelectionDoesNotReadTextBody() = runBlocking {
         var attemptedRead = false
 
         val input = buildSourceImportInput(
@@ -30,7 +31,7 @@ class SourceImportInputFactoryTest {
     }
 
     @Test
-    fun markdownSelectionReadsTextBodyForLocalParser() {
+    fun markdownSelectionReadsTextBodyForLocalParser() = runBlocking {
         val input = buildSourceImportInput(
             requestId = 11L,
             fileName = "notes.md",
@@ -43,7 +44,7 @@ class SourceImportInputFactoryTest {
     }
 
     @Test
-    fun pdfSelectionReadsExtractedTextForLocalParser() {
+    fun pdfSelectionReadsExtractedTextForLocalParser() = runBlocking {
         val input = buildSourceImportInput(
             requestId = 14L,
             fileName = "chapter.pdf",
@@ -58,28 +59,36 @@ class SourceImportInputFactoryTest {
     }
 
     @Test
-    fun imageSelectionDoesNotReadTextBody() {
-        var attemptedRead = false
-
+    fun imageSelectionReadsOcrTextForLocalParser() = runBlocking {
         val input = buildSourceImportInput(
             requestId = 13L,
             fileName = "question.png",
             mimeType = "image/png",
             uri = "content://sources/question.png",
-            readText = {
-                attemptedRead = true
-                error("Image body should not be read as text")
-            }
+            readText = { "扫描出来的题目文字" }
         )
 
         assertEquals("question.png", input.fileName)
         assertEquals("image/png", input.mimeType)
-        assertNull(input.text)
-        assertTrue(!attemptedRead)
+        assertEquals("扫描出来的题目文字", input.text)
     }
 
     @Test
-    fun unreadableTextSelectionStillCreatesImportInput() {
+    fun imageWithoutOcrTextStillCreatesImportInput() = runBlocking {
+        val input = buildSourceImportInput(
+            requestId = 15L,
+            fileName = "diagram.png",
+            mimeType = "image/png",
+            uri = "content://sources/diagram.png",
+            readText = { null }
+        )
+
+        assertEquals("diagram.png", input.fileName)
+        assertNull(input.text)
+    }
+
+    @Test
+    fun unreadableTextSelectionStillCreatesImportInput() = runBlocking {
         val input = buildSourceImportInput(
             requestId = 12L,
             fileName = "notes.txt",

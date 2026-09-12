@@ -82,6 +82,7 @@ android {
 
 dependencies {
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     implementation(project(":core:protocol"))
     implementation(project(":core:model"))
     implementation(project(":core:design"))

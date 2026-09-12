@@ -97,8 +97,10 @@ are deferred with the knowledge graph phase.
 ## Decisions (all confirmed by user 2026-09-12)
 
 1. v1 keyword retrieval (vector search in v2).
-2. v1 formats TXT/MD + PDF text layer. Images deferred to a later phase
-   (needs vision extraction at import; larger scope).
+2. v1 formats TXT/MD + PDF text layer. Images: originally deferred, then
+   shipped 2026-09-12 (same day) via on-device ML Kit Chinese OCR — local,
+   offline, no AI channel needed. Pure diagrams / handwriting without readable
+   text stay FutureAssisted.
 3. Anchor page scoped to the current window (SessionSettingsSources page).
 4. Chunk-level retrieval: top 5 chunks per turn across sources.
 5. Semantic small model: phase-2 (rule chunking ships first).
@@ -130,3 +132,27 @@ Shipped on branch `newmp`:
   SessionSettingsSources 资料管理). `Phase2CoreLoopDeviceTest` updated.
 - Tests: full `gradle test` green (178 unit tests in core:data run,
   build successful).
+
+## Implementation record (image support, 2026-09-12, follow-up round)
+
+Shipped on branch `newmp` (completes decision #2):
+
+- `app/build.gradle.kts`: adds `com.google.mlkit:text-recognition-chinese:16.0.1`
+  (bundled on-device Chinese OCR — offline, no Google Play services needed,
+  APK grows accordingly).
+- `ImageSourceText.kt` (new): `isImageSource` + suspend
+  `extractImageSourceText` — ML Kit Chinese recognizer over the picked URI,
+  returns null on failure / no readable text.
+- `SourceRepository.kt`: `SourceType.Image` split out of the FutureAssisted
+  group into `parseImage` — recognized text becomes PartiallyLocal with
+  chunks + OCR-accuracy warning; blank result stays FutureAssisted with an
+  honest "no readable text" warning.
+- `SourceImportInputFactory.kt`: image extensions (png/jpg/jpeg/webp/gif/bmp)
+  and `image/*` mimes route through the local parser; `readText` is now a
+  `suspend` lambda (try/catch instead of runCatching) so the app layer can
+  call the async OCR.
+- `AppShell.kt`: readText branch — PDF first, then image OCR, else plain
+  text reader.
+- Tests: `SourceRepositoryTest` +2 (OCR text parses, blank stays
+  FutureAssisted); `SourceImportInputFactoryTest` image cases updated to the
+  OCR path. Full `gradle test` green, exit 0.

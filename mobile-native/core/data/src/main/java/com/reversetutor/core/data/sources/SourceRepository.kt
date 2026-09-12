@@ -126,10 +126,10 @@ object LocalSourceParser {
                 warnings = listOf("JSON exports belong to Import/export. The file stays visible here as a reference.")
             )
             SourceType.Pdf -> parsePdf(type, text)
+            SourceType.Image -> parseImage(type, text)
             SourceType.Docx,
             SourceType.Pptx,
-            SourceType.Epub,
-            SourceType.Image -> SourceParseOutcome(
+            SourceType.Epub -> SourceParseOutcome(
                 type = type,
                 status = SourceParserStatus.FutureAssisted,
                 extractedText = null,
@@ -197,6 +197,38 @@ object LocalSourceParser {
             extractedText = normalized,
             chunks = chunkText(normalized),
             warnings = listOf("PDF text layer was extracted locally; scanned pages without a text layer are not supported yet.")
+        )
+    }
+
+    private fun parseImage(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was recognized in this image; pure diagrams or handwriting wait for vision-assisted parsing.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was recognized in this image; pure diagrams or handwriting wait for vision-assisted parsing.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Image text was extracted locally with on-device OCR; complex layouts or handwriting may be inaccurate.")
         )
     }
 
