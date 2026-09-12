@@ -1023,27 +1023,24 @@ private fun DestinationContent(
                             } else if (isDocxSource(fileName, mimeType)) {
                                 // NEWMP-V1-021: Word 正文按文档顺序还原；
                                 // 嵌入图片在原位置转写（本地 OCR 优先，
-                                // 开了「云端看图转写」则多模态兜底）。
+                                // 多模态兜底——V1-022 起永久开启）。
                                 extractDocxSourceText(context, uri) { embedded ->
                                     transcribeDocxEmbeddedImage(
                                         context = context,
                                         repository = chatGenerationRepository,
                                         sessionId = activeSessionId,
-                                        visionAssistEnabled = appPreferences.visionAssistEnabled,
+                                        visionAssistEnabled = true,
                                         visionModelName = appPreferences.visionModelName,
                                         image = embedded
                                     )
                                 }
                             } else if (isImageSource(fileName, mimeType)) {
                                 // NEWMP-V1-020: OCR first (free, offline); when it
-                                // finds no readable text and the cloud vision
-                                // toggle is on, transcribe via the multimodal
-                                // model so pure diagrams become usable.
+                                // finds no readable text, transcribe via the
+                                // multimodal model so pure diagrams become
+                                // usable. NEWMP-V1-022: always on, no toggle.
                                 val ocrText = extractImageSourceText(context, uri)
-                                if (ocrText == null &&
-                                    appPreferences.visionAssistEnabled &&
-                                    activeSessionId != null
-                                ) {
+                                if (ocrText == null && activeSessionId != null) {
                                     describeSourceImageWithVision(
                                         repository = chatGenerationRepository,
                                         sessionId = activeSessionId,
@@ -1763,21 +1760,6 @@ private fun DestinationContent(
                 sourceRepository = sourceRepository,
                 pendingImport = pendingSourceImport,
                 highlightedSourceId = pendingSourceEvidenceTarget,
-                // NEWMP-V1-020: cloud vision transcription toggle for image sources.
-                visionAssistEnabled = appPreferences.visionAssistEnabled,
-                visionModelName = appPreferences.visionModelName,
-                onToggleVisionAssist = {
-                    scope.launch {
-                        hybridAppGraph.appPreferencesRepository
-                            .setVisionAssistEnabled(!appPreferences.visionAssistEnabled)
-                    }
-                },
-                onUpdateVisionModel = { modelName ->
-                    scope.launch {
-                        hybridAppGraph.appPreferencesRepository
-                            .setVisionModelName(modelName)
-                    }
-                },
                 onPickSource = {
                     sourceFileLauncher.launch(
                         arrayOf(

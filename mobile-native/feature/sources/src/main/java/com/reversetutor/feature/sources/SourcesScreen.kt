@@ -14,10 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,11 +45,6 @@ fun SourcesRoute(
     sourceRepository: SourceRepository,
     pendingImport: SourceImportInput?,
     highlightedSourceId: String? = null,
-    /** NEWMP-V1-020: cloud vision transcription toggle + model override. */
-    visionAssistEnabled: Boolean = false,
-    visionModelName: String = "",
-    onToggleVisionAssist: () -> Unit = {},
-    onUpdateVisionModel: (String) -> Unit = {},
     onPickSource: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -80,10 +73,6 @@ fun SourcesRoute(
     SourcesScreen(
         state = SourcesUiState.from(sources = sources, lastImport = lastImport),
         highlightedSourceId = highlightedSourceId,
-        visionAssistEnabled = visionAssistEnabled,
-        visionModelName = visionModelName,
-        onToggleVisionAssist = onToggleVisionAssist,
-        onUpdateVisionModel = onUpdateVisionModel,
         onPickSource = onPickSource,
         onReprocess = { sourceId ->
             scope.launch {
@@ -105,10 +94,6 @@ fun SourcesScreen(
     highlightedSourceId: String? = null,
     onPickSource: () -> Unit,
     onReprocess: (String) -> Unit,
-    visionAssistEnabled: Boolean = false,
-    visionModelName: String = "",
-    onToggleVisionAssist: () -> Unit = {},
-    onUpdateVisionModel: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -157,12 +142,6 @@ fun SourcesScreen(
         Spacer(modifier = Modifier.height(16.dp))
         ParserStatusLegend()
         Spacer(modifier = Modifier.height(12.dp))
-        VisionAssistPanel(
-            enabled = visionAssistEnabled,
-            modelName = visionModelName,
-            onToggle = onToggleVisionAssist,
-            onUpdateModelName = onUpdateVisionModel
-        )
         val importStatus = state.importStatusLabel
         if (importStatus != null) {
             Spacer(modifier = Modifier.height(14.dp))
@@ -182,92 +161,6 @@ fun SourcesScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun VisionAssistPanel(
-    enabled: Boolean,
-    modelName: String,
-    onToggle: () -> Unit,
-    onUpdateModelName: (String) -> Unit
-) {
-    var modelDialogOpen by remember { mutableStateOf(false) }
-    var modelDraft by remember { mutableStateOf(modelName) }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Text(text = "云端看图转写", style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "本地文字识别读不到文字的图片（几何图、函数图像、结构式等）交给所配置渠道的多模态模型转写，每张图按次计费；关闭时维持「等待能力」标记。",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(
-                    onClick = onToggle,
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag("vision-assist-toggle")
-                ) {
-                    Text(if (enabled) "已开启（点击关闭）" else "已关闭（点击开启）")
-                }
-                TextButton(
-                    onClick = {
-                        modelDraft = modelName
-                        modelDialogOpen = true
-                    },
-                    modifier = Modifier
-                        .heightIn(min = 48.dp)
-                        .testTag("vision-assist-model")
-                ) {
-                    Text(if (modelName.isBlank()) "视觉模型：跟随当前模型（点击修改）" else "视觉模型：$modelName（点击修改）")
-                }
-            }
-        }
-    }
-    if (modelDialogOpen) {
-        AlertDialog(
-            onDismissRequest = { modelDialogOpen = false },
-            title = { Text("多模态模型名") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "留空则直接使用当前会话绑定的模型（需其本身支持看图）。若该模型是纯文本模型，请填渠道的多模态模型名，例如 qwen-vl-plus。",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    OutlinedTextField(
-                        value = modelDraft,
-                        onValueChange = { modelDraft = it },
-                        singleLine = true,
-                        placeholder = { Text("qwen-vl-plus") }
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    onUpdateModelName(modelDraft.trim())
-                    modelDialogOpen = false
-                }) {
-                    Text("保存")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { modelDialogOpen = false }) {
-                    Text("取消")
-                }
-            }
-        )
     }
 }
 

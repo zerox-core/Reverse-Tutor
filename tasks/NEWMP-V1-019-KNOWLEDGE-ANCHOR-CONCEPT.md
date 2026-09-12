@@ -252,4 +252,27 @@ Boundaries kept: speed measures (skip tiny images, downscale before
 upload, 30-image cap, OCR-first with cloud fallback only when enabled);
 pickers already accept docx via */* so no picker change was needed.
 
+## Implementation record (vision always-on, 2026-09-13, NEWMP-V1-022)
+
+User directive: the cloud vision transcription toggle is permanently on and
+must not be a user-adjustable option — minimize user-facing choices.
+Shipped on branch `newmp`:
+
+- `SourcesScreen.kt`: VisionAssistPanel (toggle button + multimodal model
+  name dialog) removed entirely; SourcesRoute/SourcesScreen no longer take
+  the four vision params.
+- `AppShell.kt`: SourcesRoute wiring for the toggle/model updater removed;
+  the image branch condition is now `ocrText == null && activeSessionId !=
+  null` (no stored pref consulted); the docx branch passes
+  `visionAssistEnabled = true`. Vision model name still reads the stored
+  pref (blank = active model), so an override set before this change keeps
+  working, but there is no UI to change it anymore.
+- `AppPreferences.kt`: `visionAssistEnabled` default flipped to `true`
+  (V1-022). Storage layer (`AppPreferenceKeys` / repository getters/setters)
+  intentionally kept, mirroring the NEWMP-V1-018 toggle removal pattern.
+- OCR-first pipeline unchanged: offline OCR still runs before any cloud
+  call, so the always-on fallback only bills when OCR finds nothing.
+- Full `gradle test` green, exit 0 (BUILD SUCCESSFUL in 1m 19s).
+
+
 
