@@ -178,7 +178,7 @@ object LocalSourceParser {
                 status = SourceParserStatus.FutureAssisted,
                 extractedText = null,
                 chunks = emptyList(),
-                warnings = listOf("${type.name} parsing is queued for a later assisted or specialized parser path.")
+                warnings = listOf("No readable text was extracted from this PDF (no text layer and on-device OCR found nothing); it stays as a reference.")
             )
         }
         val normalized = normalizeText(text)
@@ -188,7 +188,7 @@ object LocalSourceParser {
                 status = SourceParserStatus.FutureAssisted,
                 extractedText = null,
                 chunks = emptyList(),
-                warnings = listOf("${type.name} parsing is queued for a later assisted or specialized parser path.")
+                warnings = listOf("No readable text was extracted from this PDF (no text layer and on-device OCR found nothing); it stays as a reference.")
             )
         }
         return SourceParseOutcome(
@@ -196,7 +196,7 @@ object LocalSourceParser {
             status = SourceParserStatus.PartiallyLocal,
             extractedText = normalized,
             chunks = chunkText(normalized),
-            warnings = listOf("PDF text layer was extracted locally; scanned pages without a text layer are not supported yet.")
+            warnings = listOf("PDF text was extracted locally (text layer, or on-device OCR for scanned pages); handwriting and complex layouts may be inaccurate.")
         )
     }
 

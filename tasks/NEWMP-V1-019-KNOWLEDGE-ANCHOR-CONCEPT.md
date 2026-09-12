@@ -156,3 +156,21 @@ Shipped on branch `newmp` (completes decision #2):
 - Tests: `SourceRepositoryTest` +2 (OCR text parses, blank stays
   FutureAssisted); `SourceImportInputFactoryTest` image cases updated to the
   OCR path. Full `gradle test` green, exit 0.
+
+## Implementation record (scanned-PDF OCR fallback, 2026-09-12, follow-up)
+
+User approved wiring scanned PDFs (pages are images, no text layer) through
+the same on-device OCR. Shipped on branch `newmp`:
+
+- `PdfSourceText.kt`: `extractPdfSourceText` is now suspend and two-stage —
+  text layer first; if blank, `extractScannedPdfText` renders every page
+  (PDFRenderer, 150 DPI) and runs the Chinese recognizer per page, joining
+  page texts. Cap: first 60 pages; encrypted/unreadable → null.
+- `ImageSourceText.kt`: recognizer creation (`newChineseTextRecognizer`) and
+  per-image recognition (`recognizeText`) extracted as shared internals used
+  by both the image path and the scanned-PDF path.
+- `SourceRepository.parsePdf` warnings updated: blank → "no text layer and
+  on-device OCR found nothing"; success → mentions OCR fallback + accuracy
+  caveat. Statuses unchanged (PartiallyLocal / FutureAssisted).
+- Full `gradle test` green, exit 0. Import-time cost: ~1-2s per scanned page,
+  page rendering on Dispatchers.IO.
