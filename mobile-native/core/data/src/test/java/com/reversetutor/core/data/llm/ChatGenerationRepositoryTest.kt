@@ -559,6 +559,83 @@ class ChatGenerationRepositoryTest {
         assertTrue(runtime.requests.isEmpty())
     }
 
+    @Test
+    fun visionDescriptionGeneratesWithoutPersistingAnAssistantMessage() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+        val image = imageAttachment()
+
+        val outcome = repository.describeImageForSource(
+            sessionId = "session-1",
+            image = image,
+            visionModelName = "qwen-vl-plus"
+        )
+
+        assertEquals(SourceVisionOutcome.Generated("Bound model reply"), outcome)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+        val request = runtime.requests.single()
+        assertEquals("qwen-vl-plus", request.model)
+        assertEquals(image, request.imageAttachments.single())
+        assertTrue(request.capabilities.supportsVision)
+        assertFalse(request.streaming)
+        assertFalse(request.userText.isNullOrBlank())
+        assertNull(request.sessionPolicy)
+        assertTrue(request.contextEvidence.isEmpty())
+    }
+
+    @Test
+    fun visionWithoutModelOverrideUsesActiveProfileModel() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        val outcome = repository.describeImageForSource(
+            sessionId = "session-1",
+            image = imageAttachment(),
+            visionModelName = "   "
+        )
+
+        assertEquals(SourceVisionOutcome.Generated("Bound model reply"), outcome)
+        assertEquals("gpt-4o-mini", runtime.requests.single().model)
+    }
+
+    @Test
+    fun visionWithoutActiveProfileIsNoModelConfigured() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        assertEquals(
+            SourceVisionOutcome.NoModelConfigured,
+            repository.describeImageForSource(
+                sessionId = "session-1",
+                image = imageAttachment(),
+                visionModelName = "qwen-vl-plus"
+            )
+        )
+        assertTrue(runtime.requests.isEmpty())
+    }
+
     private fun input(token: String): ChatGenerationInput =
         ChatGenerationInput(
             sessionId = "session-1",

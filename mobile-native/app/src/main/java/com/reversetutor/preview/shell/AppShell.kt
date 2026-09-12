@@ -1021,7 +1021,26 @@ private fun DestinationContent(
                             if (isPdfSource(fileName, mimeType)) {
                                 extractPdfSourceText(context, uri)
                             } else if (isImageSource(fileName, mimeType)) {
-                                extractImageSourceText(context, uri)
+                                // NEWMP-V1-020: OCR first (free, offline); when it
+                                // finds no readable text and the cloud vision
+                                // toggle is on, transcribe via the multimodal
+                                // model so pure diagrams become usable.
+                                val ocrText = extractImageSourceText(context, uri)
+                                if (ocrText == null &&
+                                    appPreferences.visionAssistEnabled &&
+                                    activeSessionId != null
+                                ) {
+                                    describeSourceImageWithVision(
+                                        repository = chatGenerationRepository,
+                                        sessionId = activeSessionId,
+                                        fileName = fileName,
+                                        mimeType = mimeType,
+                                        uri = uri.toString(),
+                                        visionModelName = appPreferences.visionModelName
+                                    )
+                                } else {
+                                    ocrText
+                                }
                             } else {
                                 context.contentResolver.openInputStream(uri)
                                     ?.bufferedReader(Charsets.UTF_8)
@@ -1730,6 +1749,21 @@ private fun DestinationContent(
                 sourceRepository = sourceRepository,
                 pendingImport = pendingSourceImport,
                 highlightedSourceId = pendingSourceEvidenceTarget,
+                // NEWMP-V1-020: cloud vision transcription toggle for image sources.
+                visionAssistEnabled = appPreferences.visionAssistEnabled,
+                visionModelName = appPreferences.visionModelName,
+                onToggleVisionAssist = {
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setVisionAssistEnabled(!appPreferences.visionAssistEnabled)
+                    }
+                },
+                onUpdateVisionModel = { modelName ->
+                    scope.launch {
+                        hybridAppGraph.appPreferencesRepository
+                            .setVisionModelName(modelName)
+                    }
+                },
                 onPickSource = {
                     sourceFileLauncher.launch(
                         arrayOf(

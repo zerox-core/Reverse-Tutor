@@ -27,7 +27,11 @@ class AppPreferencesRepository(
                 stored[AppPreferenceKeys.backgroundGenerationNotificationEnabled]
                     ?: AppPreferences.defaults.backgroundGenerationNotificationEnabled,
             webSearchEnabled = stored[AppPreferenceKeys.webSearchEnabled]
-                ?: AppPreferences.defaults.webSearchEnabled
+                ?: AppPreferences.defaults.webSearchEnabled,
+            visionAssistEnabled = stored[AppPreferenceKeys.visionAssistEnabled]
+                ?: AppPreferences.defaults.visionAssistEnabled,
+            visionModelName = stored[AppPreferenceKeys.visionModelName]
+                ?: AppPreferences.defaults.visionModelName
         )
     }
 
@@ -56,6 +60,25 @@ class AppPreferencesRepository(
     suspend fun setWebSearchEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[AppPreferenceKeys.webSearchEnabled] = enabled
+        }
+    }
+
+    /** NEWMP-V1-020: one-shot reads used by source import before each vision transcription. */
+    suspend fun currentVisionAssistEnabled(): Boolean =
+        preferences.map { it.visionAssistEnabled }.first()
+
+    suspend fun currentVisionModelName(): String =
+        preferences.map { it.visionModelName }.first()
+
+    suspend fun setVisionAssistEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.visionAssistEnabled] = enabled
+        }
+    }
+
+    suspend fun setVisionModelName(name: String) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.visionModelName] = name
         }
     }
 

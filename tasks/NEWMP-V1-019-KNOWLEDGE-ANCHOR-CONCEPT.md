@@ -174,3 +174,43 @@ the same on-device OCR. Shipped on branch `newmp`:
   caveat. Statuses unchanged (PartiallyLocal / FutureAssisted).
 - Full `gradle test` green, exit 0. Import-time cost: ~1-2s per scanned page,
   page rendering on Dispatchers.IO.
+
+## Implementation record (cloud multimodal vision, 2026-09-12, phase 2)
+
+User picked "云端多模态看图" from the four-way decision: images where
+on-device OCR finds no readable text (pure geometry figures, function
+graphs, chemistry structures) get transcribed by the configured channel's
+multimodal model at import time. Shipped on branch `newmp`:
+
+- `AppPreferences` / `AppPreferenceKeys` / `AppPreferencesRepository`:
+  new persisted prefs `vision_assist_enabled` (default off — billed per
+  image) and `vision_model_name` (blank = use the active profile's model;
+  non-blank overrides the model for the vision call only).
+- `ChatGenerationRepository.describeImageForSource(sessionId, image,
+  visionModelName)`: auxiliary one-off call mirroring
+  `generateSessionSummary` — resolves the session profile (model override
+  applied when provided), forces `LlmCapabilities(supportsVision = true)`
+  (the user explicitly opted in; a text-only model then fails honestly at
+  the provider), attaches the image, `streaming = false`, nothing
+  persisted. New `SourceVisionOutcome` mirrors the summary outcome
+  semantics; failures collapse to the same safe provider codes.
+- `SourceVisionAssistant.kt` (new, app layer): builds the transient
+  `MessageAttachment` from the picked URI and maps the outcome to text-or-
+  null; any throw → null (import continues as FutureAssisted).
+- `AppShell.kt` image branch: OCR first (free, offline); only when OCR
+  returns null AND the toggle is on AND a session exists → vision
+  transcription feeds the same readText pipeline (chunking/retrieval
+  unchanged).
+- `SourcesScreen.kt`: "云端看图转写" panel on the sources page — toggle +
+  model-name dialog (qwen-vl-plus style override), wired to the prefs
+  repository via AppShell.
+- `SourceRepository.parseImage` warning now covers both OCR and cloud
+  vision transcription ("verify against the original image").
+- Tests: `ChatGenerationRepositoryTest` +3 (generated outcome with model
+  override + no persistence, blank override keeps active model, no profile →
+  NoModelConfigured). Full `gradle test` green, exit 0 (465 tasks).
+
+Boundaries kept: vision only ever runs as an OCR fallback; existing
+FutureAssisted sources need a re-import to benefit; cost is one
+multimodal call per image only when OCR finds nothing.
+

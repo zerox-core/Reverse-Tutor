@@ -156,6 +156,58 @@ class ChatGenerationRepository(
         }
     }
 
+    /**
+     * NEWMP-V1-020: auxiliary vision transcription entry point for image
+     * sources whose on-device OCR returned no usable text (pure diagrams,
+     * geometry figures, function graphs, chemistry structures). Runs the same
+     * planner / runtime pipeline but never persists an assistant message —
+     * the caller owns the returned text. Vision capabilities are forced here
+     * because the user explicitly opted in per import; when the configured
+     * model cannot actually see images the provider call fails and the caller
+     * falls back to the existing FutureAssisted state.
+     */
+    suspend fun describeImageForSource(
+        sessionId: String,
+        image: MessageAttachment,
+        visionModelName: String
+    ): SourceVisionOutcome {
+        val resolvedProfile = resolveProfileForSession(sessionId, requestedBindingId = null)
+            ?: return SourceVisionOutcome.NoModelConfigured
+        val profile = if (visionModelName.isNotBlank()) {
+            resolvedProfile.copy(model = visionModelName.trim())
+        } else {
+            resolvedProfile
+        }
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = sessionId,
+            userMessageId = null,
+            userText = SOURCE_VISION_TRANSCRIPTION_PROMPT,
+            profile = profile,
+            capabilities = LlmCapabilities(supportsVision = true),
+            token = LlmGenerationToken("vision-" + profile.id + "-" + System.nanoTime()),
+            imageAttachments = listOf(image)
+        )
+        val request = when (plan) {
+            is LlmGenerationPlan.Blocked -> return plan.reason.toVisionOutcome()
+            is LlmGenerationPlan.Ready -> plan.request.copy(streaming = false)
+        }
+        return when (val result = runtime.generate(request)) {
+            is LlmGenerationResult.Success,
+            is LlmGenerationResult.Streamed -> {
+                val descriptionText = result.visibleText
+                if (descriptionText.isBlank()) {
+                    SourceVisionOutcome.ProviderFailed("llm_provider_invalid_response")
+                } else {
+                    SourceVisionOutcome.Generated(descriptionText)
+                }
+            }
+            is LlmGenerationResult.Failure ->
+                SourceVisionOutcome.ProviderFailed(result.message.toSafeProviderFailureCode())
+            LlmGenerationResult.Timeout ->
+                SourceVisionOutcome.ProviderFailed("llm_provider_timeout")
+        }
+    }
+
     private suspend fun resolveExecutionProfile(input: ChatGenerationInput): LlmProfile? =
         resolveProfileForSession(
             sessionId = input.sessionId,
@@ -285,6 +337,32 @@ private fun LlmGenerationBlockReason.toSummaryOutcome(): SessionSummaryOutcome =
         LlmGenerationBlockReason.UnsupportedVision -> SessionSummaryOutcome.UnsupportedVision
         LlmGenerationBlockReason.BlankPrompt -> SessionSummaryOutcome.BlankPrompt
     }
+
+/**
+ * NEWMP-V1-020: outcome of the auxiliary source-image vision transcription
+ * call. Mirrors [SessionSummaryOutcome] semantics — nothing is persisted and
+ * the Generated branch carries the transcription text itself.
+ */
+sealed interface SourceVisionOutcome {
+    data class Generated(val descriptionText: String) : SourceVisionOutcome
+    data class ProviderFailed(val message: String) : SourceVisionOutcome
+    object NoModelConfigured : SourceVisionOutcome
+    object UnsupportedVision : SourceVisionOutcome
+    object BlankPrompt : SourceVisionOutcome
+}
+
+private fun LlmGenerationBlockReason.toVisionOutcome(): SourceVisionOutcome =
+    when (this) {
+        LlmGenerationBlockReason.NoModelConfigured -> SourceVisionOutcome.NoModelConfigured
+        LlmGenerationBlockReason.UnsupportedVision -> SourceVisionOutcome.UnsupportedVision
+        LlmGenerationBlockReason.BlankPrompt -> SourceVisionOutcome.BlankPrompt
+    }
+
+/** NEWMP-V1-020: transcription prompt for image sources with no OCR text. */
+internal const val SOURCE_VISION_TRANSCRIPTION_PROMPT =
+    "请把这张学习资料图片完整转写成文字：包括题目、选项、图内标注和所有可见文字；" +
+        "对纯图形（几何图、函数图像、结构式等）用简洁中文描述其关键信息。" +
+        "只输出转写内容本身，不要解释、不要加标题。"
 
 private fun LlmGenerationBlockReason.toOutcome(): ChatGenerationOutcome =
     when (this) {

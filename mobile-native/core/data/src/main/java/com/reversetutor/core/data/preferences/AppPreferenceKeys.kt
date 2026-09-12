@@ -14,6 +14,8 @@ object AppPreferenceKeys {
     val backgroundGenerationNotificationEnabled =
         booleanPreferencesKey("background_generation_notification_enabled")
     val webSearchEnabled = booleanPreferencesKey("web_search_enabled")
+    val visionAssistEnabled = booleanPreferencesKey("vision_assist_enabled")
+    val visionModelName = stringPreferencesKey("vision_model_name")
 
     val persistedNames = listOf(
         theme.name,
@@ -24,6 +26,8 @@ object AppPreferenceKeys {
         secondaryMemo.name,
         scratchMemo.name,
         backgroundGenerationNotificationEnabled.name,
-        webSearchEnabled.name
+        webSearchEnabled.name,
+        visionAssistEnabled.name,
+        visionModelName.name
     )
 }

@@ -228,7 +228,7 @@ object LocalSourceParser {
             status = SourceParserStatus.PartiallyLocal,
             extractedText = normalized,
             chunks = chunkText(normalized),
-            warnings = listOf("Image text was extracted locally with on-device OCR; complex layouts or handwriting may be inaccurate.")
+            warnings = listOf("Image text was extracted with on-device OCR or cloud vision transcription; verify against the original image.")
         )
     }
 
