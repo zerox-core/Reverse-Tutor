@@ -1034,6 +1034,32 @@ private fun DestinationContent(
                                         image = embedded
                                     )
                                 }
+                            } else if (isPptxSource(fileName, mimeType)) {
+                                // NEWMP-V1-023: PPT 按页还原文字，
+                                // 嵌入图片转写链与 Word 共用。
+                                extractPptxSourceText(context, uri) { embedded ->
+                                    transcribeDocxEmbeddedImage(
+                                        context = context,
+                                        repository = chatGenerationRepository,
+                                        sessionId = activeSessionId,
+                                        visionAssistEnabled = true,
+                                        visionModelName = appPreferences.visionModelName,
+                                        image = embedded
+                                    )
+                                }
+                            } else if (isEpubSource(fileName, mimeType)) {
+                                // NEWMP-V1-023: 电子书按章节顺序还原，
+                                // 插图转写链与 Word 共用。
+                                extractEpubSourceText(context, uri) { embedded ->
+                                    transcribeDocxEmbeddedImage(
+                                        context = context,
+                                        repository = chatGenerationRepository,
+                                        sessionId = activeSessionId,
+                                        visionAssistEnabled = true,
+                                        visionModelName = appPreferences.visionModelName,
+                                        image = embedded
+                                    )
+                                }
                             } else if (isImageSource(fileName, mimeType)) {
                                 // NEWMP-V1-020: OCR first (free, offline); when it
                                 // finds no readable text, transcribe via the

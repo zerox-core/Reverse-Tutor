@@ -274,5 +274,41 @@ Shipped on branch `newmp`:
   call, so the always-on fallback only bills when OCR finds nothing.
 - Full `gradle test` green, exit 0 (BUILD SUCCESSFUL in 1m 19s).
 
+## Implementation record (no tiny-image skips + PPTX/EPUB parsers, 2026-09-13, NEWMP-V1-023)
+
+User directive: never skip small/decorative embedded images (functionality
+over performance; quality/perf sacrifices are acceptable), and complete
+PPTX + EPUB parsing. Shipped on branch `newmp`:
+
+- `DocxSourceText.kt`: `MinEmbeddedImageBytes` (3KB) filter removed —
+  every embedded image now goes to transcription; `MaxEmbeddedImages`
+  raised 30 -> 100 (hard ceiling against runaway imports, disclosed to
+  the user); XML/rels helpers opened up as `internal` for the new parsers.
+- `DocxSourceImport.kt`: `MinImageDimension` (48px) skip removed. Speed is
+  still protected by the 1600px / JPEG-85 downscale before cloud upload
+  (user explicitly sanctioned trading image quality, not coverage).
+- `PptxSourceText.kt` (new, pure JVM): slides sorted numerically; per
+  slide, shape-order text (a:t per paragraph) + a:blip images via
+  slide rels resolved to ppt/media; "【第 N 页】" headers; images
+  transcribed in place. `PptxSourceImport.kt`: Android wrapper.
+- `EpubSourceText.kt` (new, pure JVM): container.xml -> OPF -> spine
+  order; per chapter, block-aware XHTML text extraction (script/style/
+  head skipped) + <img>/SVG <image> images resolved relative to the
+  content file, transcribed in place. XHTML parse tolerates DOCTYPE
+  (epub2) while keeping external entities disabled. `EpubSourceImport.kt`:
+  Android wrapper.
+- `AppShell.kt`: readText dispatch gained isPptxSource / isEpubSource
+  branches reusing transcribeDocxEmbeddedImage (OCR first, cloud vision
+  always-on).
+- `SourceRepository.kt`: Pptx/Epub split out of the FutureAssisted bucket
+  into parsePptx/parseEpub (PartiallyLocal with verification warnings;
+  blank extractions stay FutureAssisted).
+- `SourcesScreen.kt`: parser status legend updated (all seven formats
+  now extract locally; failures stay visible).
+- Tests: DocxSourceTextTest tiny-image test inverted (now asserts
+  transcription happens), cap test raised to 105 images vs cap 100; new
+  PptxSourceTextTest (7 tests) and EpubSourceTextTest (7 tests);
+  SourceRepositoryTest gained pptx/epub PartiallyLocal cases.
+
 
 

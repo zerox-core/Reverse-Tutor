@@ -10,7 +10,8 @@ import org.w3c.dom.Element
 import org.w3c.dom.Node
 
 /**
- * Word（.docx）资料文本提取（NEWMP-V1-021，知识锚点第三期）。
+ * Word（.docx）资料文本提取（NEWMP-V1-021，知识锚点第三期；
+ * V1-023 起不再按大小/尺寸跳过任何嵌入图）。
  *
  * docx 本质是 zip：word/document.xml 是正文，word/media/ 是嵌入图片。
  * 这里不用任何重型依赖，直接解 zip + DOM 按文档顺序还原正文：
@@ -31,11 +32,12 @@ internal fun isDocxSource(fileName: String?, mimeType: String?): Boolean {
     return fileName != null && fileName.substringAfterLast('.', "").equals("docx", ignoreCase = true)
 }
 
-/** 单文档最多处理的嵌入图片数（防超大文档把导入拖死 / 云端转写费用失控）。 */
-internal const val MaxEmbeddedImages = 30
-
-/** 小于该字节数的嵌入图直接跳过——基本是项目符号、logo、装饰线，转写只会添噪。 */
-internal const val MinEmbeddedImageBytes = 3072
+/**
+ * 单文档最多处理的嵌入图片数（防超大文档把导入拖死 / 云端转写费用失控）。
+ * NEWMP-V1-023：用户要求不跳过任何图片（功能优先），上限由 30 放宽到 100；
+ * 大图仍会压缩到 1600px 以内再转写（允许牺牲画质，见 DocxSourceImport.kt）。
+ */
+internal const val MaxEmbeddedImages = 100
 
 internal class DocxEmbeddedImage(
     val partName: String,
@@ -64,7 +66,6 @@ internal suspend fun extractDocxSourceText(
         when (block) {
             is DocxBlock.Text -> if (block.content.isNotBlank()) parts.add(block.content.trim())
             is DocxBlock.Image -> {
-                if (block.image.bytes.size < MinEmbeddedImageBytes) continue
                 if (transcribed >= MaxEmbeddedImages) continue
                 transcribed += 1
                 val text = runCatching { transcribeImage(block.image) }.getOrNull()
@@ -177,7 +178,7 @@ private fun collectImages(
     return out
 }
 
-private fun parseImageRels(relsXml: String?): Map<String, String> {
+internal fun parseImageRels(relsXml: String?): Map<String, String> {
     if (relsXml == null) return emptyMap()
     val root = runCatching { parseXmlRoot(relsXml) }.getOrNull() ?: return emptyMap()
     val out = mutableMapOf<String, String>()
@@ -200,7 +201,7 @@ private fun normalizePartName(target: String): String? {
     return "word/" + trimmed
 }
 
-private fun mediaMimeFor(partName: String): String? =
+internal fun mediaMimeFor(partName: String): String? =
     when (partName.lowercase().substringAfterLast('.', "")) {
         "png" -> "image/png"
         "jpg", "jpeg" -> "image/jpeg"
@@ -210,7 +211,7 @@ private fun mediaMimeFor(partName: String): String? =
         else -> null
     }
 
-private fun attributeByLocalName(element: Element, localName: String): String? {
+internal fun attributeByLocalName(element: Element, localName: String): String? {
     val attrs = element.attributes
     for (i in 0 until attrs.length) {
         val attr = attrs.item(i)
@@ -221,7 +222,7 @@ private fun attributeByLocalName(element: Element, localName: String): String? {
     return null
 }
 
-private fun childElements(element: Element, localName: String? = null): List<Element> {
+internal fun childElements(element: Element, localName: String? = null): List<Element> {
     val out = mutableListOf<Element>()
     val children = element.childNodes
     for (i in 0 until children.length) {
@@ -231,7 +232,7 @@ private fun childElements(element: Element, localName: String? = null): List<Ele
     return out
 }
 
-private fun parseXmlRoot(xml: String): Element {
+internal fun parseXmlRoot(xml: String): Element {
     val factory = DocumentBuilderFactory.newInstance().apply {
         isNamespaceAware = true
         // 防 XXE：docx 来自用户文件，禁 DOCTYPE 与外部实体

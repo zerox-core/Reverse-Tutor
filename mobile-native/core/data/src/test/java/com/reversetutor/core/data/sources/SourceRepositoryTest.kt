@@ -200,6 +200,48 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun pptxWithExtractedTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "deck.pptx",
+                mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                text = "Slide one title.\n\nSlide two agenda.",
+                sourceId = "source-pptx-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Pptx, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Slide one title.", "Slide two agenda."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun epubWithExtractedTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "book.epub",
+                mimeType = "application/epub+zip",
+                text = "Chapter one.\n\nChapter two.",
+                sourceId = "source-epub-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Epub, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Chapter one.", "Chapter two."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
     fun unsupportedAndFutureParserFilesRemainVisible() = runBlocking {
         val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
 

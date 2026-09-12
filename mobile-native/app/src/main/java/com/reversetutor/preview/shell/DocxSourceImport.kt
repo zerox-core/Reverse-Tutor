@@ -10,7 +10,8 @@ import java.io.ByteArrayInputStream
 import java.io.File
 
 /**
- * Word 资料导入的 Android 侧包装（NEWMP-V1-021）。
+ * Word / PPT / 电子书资料导入的 Android 侧包装（NEWMP-V1-021；V1-023 起
+ * PPTX / EPUB 解析复用本文件的嵌入图转写链）。
  *
  * 解析逻辑在 DocxSourceText.kt（纯 JVM、可单测）；这里负责：
  * 1. 从 content:// 打开文件喂给解析器；
@@ -18,9 +19,6 @@ import java.io.File
  *    OCR 读不出且用户开了「云端看图转写」时，把图压缩后写临时文件，
  *    走与图片资料相同的云端多模态转写，用完即删。
  */
-
-/** 小于该边长的嵌入图视为装饰图（图标/分隔线），跳过省一次识别。 */
-private const val MinImageDimension = 48
 
 /** 发给云端前把大图压到该边长以内：上传更小、转写更快，且远低于 20MB 上限。 */
 private const val VisionMaxDimension = 1600
@@ -41,7 +39,9 @@ internal suspend fun extractDocxSourceText(
 }
 
 /**
- * 单张嵌入图的转写链：解码 → 装饰图过滤 → 本地 OCR →（开关开启时）云端多模态。
+ * 单张嵌入图的转写链：解码 → 本地 OCR → 云端多模态（V1-022 起永久开启）。
+ * NEWMP-V1-023：不再按尺寸跳过任何图片——小图照样走 OCR/云端转写；
+ * 只压缩画质（大图压到 1600px 以内），不牺牲功能。
  * 任何一步失败都返回 null，不影响正文其他部分。
  */
 internal suspend fun transcribeDocxEmbeddedImage(
@@ -55,10 +55,6 @@ internal suspend fun transcribeDocxEmbeddedImage(
     val bitmap = runCatching {
         BitmapFactory.decodeStream(ByteArrayInputStream(image.bytes))
     }.getOrNull() ?: return null
-    if (bitmap.width < MinImageDimension || bitmap.height < MinImageDimension) {
-        bitmap.recycle()
-        return null
-    }
     val recognizer = newChineseTextRecognizer()
     val ocrText = try {
         recognizeText(recognizer, InputImage.fromBitmap(bitmap, 0))

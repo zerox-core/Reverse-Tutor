@@ -53,7 +53,8 @@ class DocxSourceTextTest {
     }
 
     @Test
-    fun tinyDecorativeImagesAreSkipped() = runBlocking {
+    fun tinyImagesAreAlsoTranscribed() = runBlocking {
+        // NEWMP-V1-023：用户要求不再按大小跳过装饰小图，功能优先。
         val docx = buildDocx(
             bodyXml = """
                 <w:p><w:r><w:t>正文</w:t></w:r><w:r><w:drawing><a:blip r:embed="rId1"/></w:drawing></w:r></w:p>
@@ -65,18 +66,18 @@ class DocxSourceTextTest {
 
         val text = extractDocxSourceText(ByteArrayInputStream(docx)) {
             calls += 1
-            "不应出现"
+            "【小图转写】"
         }
 
-        assertEquals(0, calls)
-        assertEquals("正文", text)
+        assertEquals(1, calls)
+        assertEquals(listOf("正文", "【小图转写】"), text!!.split("\n\n"))
     }
 
     @Test
     fun embeddedImageCountIsCapped() = runBlocking {
-        val rels = (1..40).associate { "rId$it" to "media/image$it.png" }
-        val media = (1..40).associate { "word/media/image$it.png" to ByteArray(8192) { it.toByte() } }
-        val body = (1..40).joinToString("") {
+        val rels = (1..105).associate { "rId$it" to "media/image$it.png" }
+        val media = (1..105).associate { "word/media/image$it.png" to ByteArray(1024) { it.toByte() } }
+        val body = (1..105).joinToString("") {
             "<w:p><w:r><w:drawing><a:blip r:embed=\"rId$it\"/></w:drawing></w:r></w:p>"
         }
         var calls = 0

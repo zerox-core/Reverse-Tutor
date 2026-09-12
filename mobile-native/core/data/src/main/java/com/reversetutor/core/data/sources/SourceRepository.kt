@@ -128,14 +128,8 @@ object LocalSourceParser {
             SourceType.Pdf -> parsePdf(type, text)
             SourceType.Image -> parseImage(type, text)
             SourceType.Docx -> parseDocx(type, text)
-            SourceType.Pptx,
-            SourceType.Epub -> SourceParseOutcome(
-                type = type,
-                status = SourceParserStatus.FutureAssisted,
-                extractedText = null,
-                chunks = emptyList(),
-                warnings = listOf("${type.name} parsing is queued for a later assisted or specialized parser path.")
-            )
+            SourceType.Pptx -> parsePptx(type, text)
+            SourceType.Epub -> parseEpub(type, text)
             SourceType.Other -> SourceParseOutcome(
                 type = type,
                 status = SourceParserStatus.Unsupported,
@@ -261,6 +255,70 @@ object LocalSourceParser {
             extractedText = normalized,
             chunks = chunkText(normalized),
             warnings = listOf("Word text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex layouts against the original document.")
+        )
+    }
+
+    private fun parsePptx(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this presentation; it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this presentation; it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Slide text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex slide layouts against the original presentation.")
+        )
+    }
+
+    private fun parseEpub(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this ebook; it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this ebook; it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Ebook text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex formatting against the original ebook.")
         )
     }
 

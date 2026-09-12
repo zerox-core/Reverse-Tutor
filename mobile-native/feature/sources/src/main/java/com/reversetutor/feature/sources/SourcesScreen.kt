@@ -179,7 +179,7 @@ private fun ParserStatusLegend() {
         ) {
             Text(text = "解析状态", style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "TXT 和 Markdown 可本地解析，HTML 会做安全清洗后部分提取。PDF、DOCX、PPTX、EPUB 和图片会保留为等待能力的资料，不会被隐藏。",
+                text = "TXT 和 Markdown 可本地解析，HTML 会做安全清洗后部分提取。PDF、Word、PPT、电子书和图片会就地抽取正文与插图文字，抽取不到的会保留为等待能力的资料，不会被隐藏。",
                 style = MaterialTheme.typography.bodyMedium
             )
             FlowRow(
