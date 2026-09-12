@@ -69,6 +69,7 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.MenuBook
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Search
@@ -238,7 +239,7 @@ internal fun ReverseTeachingChatScreen(
         ReverseTeachingChatHeader(
             state = state,
             onBack = onBack,
-            onOpenSettings = onOpenContextHub,
+            onOpenSettings = onOpenSessionSources,
             onOpenWindowBranches = onOpenWindowBranches,
             onOpenSearch = onOpenSearch,
             onOpenSessionSettings = onOpenSessionSettings,
@@ -641,8 +642,8 @@ private fun ReverseTeachingChatHeader(
             )
             Spacer(Modifier.width(6.dp))
             FormalHeaderIconButton(
-                imageVector = Icons.Rounded.AccountTree,
-                contentDescription = "当前会话图谱",
+                imageVector = Icons.Rounded.MenuBook,
+                contentDescription = "知识锚点",
                 onClick = onOpenSettings,
                 filled = true
             )

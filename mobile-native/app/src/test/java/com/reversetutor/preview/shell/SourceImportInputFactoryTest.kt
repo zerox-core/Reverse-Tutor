@@ -43,6 +43,21 @@ class SourceImportInputFactoryTest {
     }
 
     @Test
+    fun pdfSelectionReadsExtractedTextForLocalParser() {
+        val input = buildSourceImportInput(
+            requestId = 14L,
+            fileName = "chapter.pdf",
+            mimeType = "application/pdf",
+            uri = "content://sources/chapter.pdf",
+            readText = { "Alpha content." }
+        )
+
+        assertEquals("chapter.pdf", input.fileName)
+        assertEquals("application/pdf", input.mimeType)
+        assertEquals("Alpha content.", input.text)
+    }
+
+    @Test
     fun imageSelectionDoesNotReadTextBody() {
         var attemptedRead = false
 

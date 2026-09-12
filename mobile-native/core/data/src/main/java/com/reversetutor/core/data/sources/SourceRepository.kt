@@ -125,7 +125,7 @@ object LocalSourceParser {
                 chunks = emptyList(),
                 warnings = listOf("JSON exports belong to Import/export. The file stays visible here as a reference.")
             )
-            SourceType.Pdf,
+            SourceType.Pdf -> parsePdf(type, text)
             SourceType.Docx,
             SourceType.Pptx,
             SourceType.Epub,
@@ -165,6 +165,38 @@ object LocalSourceParser {
             status = SourceParserStatus.FullyLocal,
             extractedText = normalized,
             chunks = chunkText(normalized)
+        )
+    }
+
+    private fun parsePdf(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("${type.name} parsing is queued for a later assisted or specialized parser path.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("${type.name} parsing is queued for a later assisted or specialized parser path.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("PDF text layer was extracted locally; scanned pages without a text layer are not supported yet.")
         )
     }
 
@@ -254,16 +286,7 @@ private fun normalizeText(text: String): String =
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
 
-private fun chunkText(text: String): List<String> {
-    val paragraphs = text.split(Regex("\n{2,}")).filter { it.isNotBlank() }
-    return paragraphs.flatMap { paragraph ->
-        if (paragraph.length <= 900) {
-            listOf(paragraph)
-        } else {
-            paragraph.chunked(900).map { it.trim() }.filter { it.isNotBlank() }
-        }
-    }.ifEmpty { listOf(text) }
-}
+private fun chunkText(text: String): List<String> = SourceChunker.chunk(text)
 
 private fun estimateTokens(text: String): Int =
     (text.length / 4).coerceAtLeast(1)

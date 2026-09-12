@@ -200,11 +200,11 @@ class Phase2CoreLoopDeviceTest {
         openHomeAndCreateSession(presetTitleA)
         waitForContentDescription("返回会话首页")
 
-        // Chat -> ContextHub（学习大脑）
-        composeRule.onNodeWithContentDescription("当前会话图谱").performClick()
+        // Chat -> 资料管理（知识锚点）
+        composeRule.onNodeWithContentDescription("知识锚点").performClick()
         // Wait for navigation to commit before dispatching system back; otherwise the
         // root back handler still observes the previous Chat destination.
-        waitForTag("context-return-chat")
+        waitForText("资料管理")
         // ContextHub 返回 Chat（系统返回由 AppNavigation.handleSystemBack 处理）
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         waitForContentDescription("返回会话首页")

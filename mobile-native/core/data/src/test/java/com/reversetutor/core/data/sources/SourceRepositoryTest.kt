@@ -97,6 +97,27 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun pdfWithExtractedTextLayerParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "chapter.pdf",
+                mimeType = "application/pdf",
+                text = "Alpha content.\n\nBeta content.",
+                sourceId = "source-pdf-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Pdf, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Alpha content.", "Beta content."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
     fun unsupportedAndFutureParserFilesRemainVisible() = runBlocking {
         val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
 

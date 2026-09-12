@@ -1011,15 +1011,20 @@ private fun DestinationContent(
                 runCatching {
                     val mimeType = context.contentResolver.getType(uri)
                     val requestId = System.currentTimeMillis()
+                    val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "selected-source"
                     val input = buildSourceImportInput(
                         requestId = requestId,
-                        fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "selected-source",
+                        fileName = fileName,
                         mimeType = mimeType,
                         uri = uri.toString(),
                         readText = {
-                            context.contentResolver.openInputStream(uri)
-                                ?.bufferedReader(Charsets.UTF_8)
-                                ?.use { readSourceTextWithinLimit(it) }
+                            if (isPdfSource(fileName, mimeType)) {
+                                extractPdfSourceText(context, uri)
+                            } else {
+                                context.contentResolver.openInputStream(uri)
+                                    ?.bufferedReader(Charsets.UTF_8)
+                                    ?.use { readSourceTextWithinLimit(it) }
+                            }
                         }
                     )
                     if (sessionSettingsPickerActive) {

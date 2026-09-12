@@ -33,8 +33,14 @@ private fun canUseLocalTextParser(
 ): Boolean {
     val ext = fileName.lowercase().substringAfterLast('.', missingDelimiterValue = "")
     val normalizedMime = mimeType.orEmpty().lowercase()
-    return ext in setOf("txt", "md", "markdown", "html", "htm") ||
-        normalizedMime in setOf("text/plain", "text/markdown", "text/x-markdown", "text/html")
+    return ext in setOf("txt", "md", "markdown", "html", "htm", "pdf") ||
+        normalizedMime in setOf(
+            "text/plain",
+            "text/markdown",
+            "text/x-markdown",
+            "text/html",
+            "application/pdf"
+        )
 }
 
 internal fun readSourceTextWithinLimit(

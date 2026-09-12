@@ -221,6 +221,9 @@ private fun LlmGenerationRequest.productionUserText(): String {
                     contextEvidence.forEachIndexed { index, evidence ->
                         append("\n[${index + 1}] ${evidence.kind} - ${evidence.title}: ${evidence.body}")
                     }
+                    if (contextEvidence.any { it.kind == "Source" }) {
+                        append("\n资料片段优先相信：与你的既有知识冲突时，以资料为准。")
+                    }
                 }
             )
         }

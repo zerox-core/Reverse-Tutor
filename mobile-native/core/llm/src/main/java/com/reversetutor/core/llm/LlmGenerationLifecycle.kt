@@ -649,6 +649,9 @@ private fun LlmGenerationRequest.contextualUserText(): String {
                         append(": ")
                         append(evidence.body)
                     }
+                    if (contextEvidence.any { it.kind == "Source" }) {
+                        append("\n资料片段优先相信：与你的既有知识冲突时，以资料为准。")
+                    }
                 }
             )
         }

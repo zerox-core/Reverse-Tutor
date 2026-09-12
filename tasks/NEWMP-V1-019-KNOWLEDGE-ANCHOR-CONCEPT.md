@@ -94,14 +94,39 @@ This phase only ports the SOURCE anchor pipeline (RAG). The
 requirement/note/persona_change kinds (mainline constraints, graph side)
 are deferred with the knowledge graph phase.
 
-## Open decisions (awaiting user)
+## Decisions (all confirmed by user 2026-09-12)
 
-1. v1 keyword retrieval OK (vector search in v2)?
-2. v1 formats TXT/MD + PDF + images OK (DOCX/PPTX/EPUB later)?
-3. Anchor page scoped to the current window first?
-4. Injection cap 3-5 chunks per turn?
-5. Semantic small model: v1 or phase-2 plugin? My recommendation: phase-2
-   (rule chunking first; the embedding model can later be shared by semantic
-   chunking and vector retrieval). If forced into v1, it works — cost is
-   tens of MB APK growth, slower/hotter imports, and limited quality gain
-   over punctuation rules.
+1. v1 keyword retrieval (vector search in v2).
+2. v1 formats TXT/MD + PDF text layer. Images deferred to a later phase
+   (needs vision extraction at import; larger scope).
+3. Anchor page scoped to the current window (SessionSettingsSources page).
+4. Chunk-level retrieval: top 5 chunks per turn across sources.
+5. Semantic small model: phase-2 (rule chunking ships first).
+
+## Implementation record (v1, 2026-09-12)
+
+Shipped on branch `newmp`:
+
+- `SourceChunker.kt` (new): rule-based punctuation-aware chunker —
+  ~500-char target, 50-char overlap between chunks of the same paragraph,
+  <80-char tail merged back, hard char-split for oversized sentences,
+  no character loss. Covered by `SourceChunkerTest.kt` (10 cases).
+- `SourceRepository.kt`: `chunkText` now delegates to `SourceChunker`;
+  PDF split out of the FutureAssisted group into `parsePdf` — text-layer
+  PDFs become PartiallyLocal with chunks + warning; blank/missing text
+  stays FutureAssisted (scanned PDFs unsupported in v1).
+- `ChatContextEvidence.kt`: source evidence is now chunk-level retrieval —
+  all chunks of all usable+selected sources are scored per turn, top 5
+  chunks are taken, then grouped back into per-source evidence items.
+- `LlmGenerationLifecycle.kt` + `ProductionLlmGenerationRuntime.kt`: when
+  any Source evidence is injected, the prompt appends
+  "资料片段优先相信：与你的既有知识冲突时，以资料为准。"
+- PDF import: `app/build.gradle.kts` adds `com.tom-roush:pdfbox-android:2.0.27.0`;
+  new `PdfSourceText.kt` (text-layer extraction via PDFBox, null on
+  encrypted/failure); `SourceImportInputFactory.kt` routes .pdf/application/pdf
+  through the local parser; `AppShell.kt` picks the PDF branch on readText.
+- Entry point: top bar of `ReverseTeachingChatScreen` swaps the context-hub
+  button for the anchor page (book icon, description "知识锚点", opens
+  SessionSettingsSources 资料管理). `Phase2CoreLoopDeviceTest` updated.
+- Tests: full `gradle test` green (178 unit tests in core:data run,
+  build successful).
