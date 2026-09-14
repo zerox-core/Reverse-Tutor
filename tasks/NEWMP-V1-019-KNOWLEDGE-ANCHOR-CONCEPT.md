@@ -341,3 +341,23 @@ Upgrade of the retrieval path from newest-first, first-chunk,
 - Tests: new OpenAiCompatibleEmbeddingRuntimeTest (9), SourceEmbeddingCodecTest (4);
   adapter/wiring tests extended for vector + keyword paths; SchemaPolicyTest
   updated to v13 chain. Full suite green (BUILD SUCCESSFUL; 0 failures/errors).
+
+## Follow-up: embedding model auto-detection (V1-024.1, 2026-09-14)
+
+Users had no way to know which embedding model name their channel
+expects, and the hardcoded `text-embedding-v3` only worked on
+Bailian-style channels. `EmbeddingModelDiscovery` now asks the channel
+itself: GET the OpenAI-compatible `/models` endpoint with the
+channel's own key, prefer known embedding ids (text-embedding-v3/v4,
+text-embedding-3-large/small, embedding-3/2), then accept any id
+containing "embed"/"bge". Resolved names are cached per endpoint for
+the process lifetime; definitive negatives (reachable, no embedding
+model) are cached once, transient failures are not so a recovering
+channel retries. Discovery failure falls back to the old hardcoded
+name, so behavior is never worse than before.
+
+`ProviderHttpRequest` gained an optional `method` parameter (GET
+honored end-to-end: doOutput off, empty body skipped). Wired via
+`DataModule.productionEmbeddingModelDiscovery` and HybridAppGraph.
+Tests: EmbeddingModelDiscoveryTest (9). Full suite green
+(BUILD SUCCESSFUL; 0 failures/errors). Commit 70048d4.
