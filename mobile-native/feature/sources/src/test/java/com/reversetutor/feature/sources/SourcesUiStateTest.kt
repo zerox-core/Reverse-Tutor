@@ -214,6 +214,89 @@ class SourcesUiStateTest {
     }
 
     @Test
+    fun `filter combines session scope type status and title search`() {
+        val state = SourcesUiState.from(
+            sources = listOf(
+                source("s-md", "Guide.md", SourceType.Markdown, SourceParserStatus.FullyLocal),
+                source("s-pdf", "chapter.pdf", SourceType.Pdf, SourceParserStatus.FutureAssisted),
+                source("s-pdf2", "appendix.pdf", SourceType.Pdf, SourceParserStatus.Failed),
+                source("s-html", "page.html", SourceType.Html, SourceParserStatus.PartiallyLocal)
+            ),
+            lastImport = null
+        )
+
+        // 无任何条件：全部可见
+        assertEquals(
+            4,
+            filterSourceItems(state.items, false, emptySet(), null, null, "").size
+        )
+        // 类型筛选
+        assertEquals(
+            listOf("chapter.pdf", "appendix.pdf"),
+            filterSourceItems(state.items, false, emptySet(), "PDF", null, "")
+                .map { it.title }
+        )
+        // 状态筛选
+        assertEquals(
+            listOf("chapter.pdf"),
+            filterSourceItems(state.items, false, emptySet(), null, "等待能力", "")
+                .map { it.title }
+        )
+        // 标题搜索忽略大小写并容忍首尾空格
+        assertEquals(
+            listOf("Guide.md"),
+            filterSourceItems(state.items, false, emptySet(), null, null, "  guide ")
+                .map { it.title }
+        )
+        // 组合：PDF + 失败
+        assertEquals(
+            listOf("appendix.pdf"),
+            filterSourceItems(state.items, false, emptySet(), "PDF", "失败", "")
+                .map { it.title }
+        )
+    }
+
+    @Test
+    fun `filter session scope keeps referenced sources only`() {
+        val state = SourcesUiState.from(
+            sources = listOf(
+                source("s-md", "Guide.md", SourceType.Markdown, SourceParserStatus.FullyLocal),
+                source("s-pdf", "chapter.pdf", SourceType.Pdf, SourceParserStatus.FutureAssisted)
+            ),
+            lastImport = null
+        )
+
+        assertEquals(
+            listOf("Guide.md"),
+            filterSourceItems(
+                items = state.items,
+                sessionScope = true,
+                sessionReferencedIds = setOf("s-md"),
+                typeLabel = null,
+                statusLabel = null,
+                searchQuery = ""
+            ).map { it.title }
+        )
+    }
+
+    @Test
+    fun `filter returns empty when nothing matches`() {
+        val state = SourcesUiState.from(
+            sources = listOf(
+                source("s-md", "Guide.md", SourceType.Markdown, SourceParserStatus.FullyLocal)
+            ),
+            lastImport = null
+        )
+
+        assertTrue(
+            filterSourceItems(state.items, false, emptySet(), "PDF", null, "").isEmpty()
+        )
+        assertTrue(
+            filterSourceItems(state.items, false, emptySet(), null, null, "不存在的关键词").isEmpty()
+        )
+    }
+
+    @Test
     fun `image source and chat attachment capability are represented separately`() {
         val item = SourcesUiState.from(
             sources = listOf(

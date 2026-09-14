@@ -45,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -936,9 +937,13 @@ private fun DestinationContent(
     var sessionSettingsImportError by remember { mutableStateOf<String?>(null) }
     var sessionSettingsRefreshKey by remember { mutableStateOf(0) }
     var sourcesCenterSessionFilter by remember { mutableStateOf(false) }
+    // NEWMP-V1-026: 资料中心四入口（搜索 / 资料 / 图谱 / 设置）的容器状态。
+    var sourcesCenterTab by rememberSaveable { mutableStateOf(SourcesCenterTab.Materials) }
+    var sourcesCenterQuery by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(destination) {
         if (destination != AppDestination.Sources) {
             sourcesCenterSessionFilter = false
+            sourcesCenterTab = SourcesCenterTab.Materials
         }
     }
     val chatDraftStore = remember(context) { SharedPreferencesChatDraftStore(context) }
@@ -1810,27 +1815,124 @@ private fun DestinationContent(
             return@ReverseTutorScreenSurface
         }
         if (destination == AppDestination.Sources) {
-            SourcesRoute(
-                sourceRepository = sourceRepository,
-                pendingImport = pendingSourceImport,
-                onSourceIndexed = { indexSourceAsync(it) },
-                highlightedSourceId = pendingSourceEvidenceTarget,
-                sessionTitle = activeSessionTitle,
-                sessionReferencedIds = activeSessionSnapshot?.sourceSelections?.toSet() ?: emptySet(),
-                openInSessionFilter = sourcesCenterSessionFilter,
-                onPickSource = {
-                    sourceFileLauncher.launch(
-                        arrayOf(
-                            "text/plain",
-                            "text/markdown",
-                            "text/html",
-                            "application/pdf",
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                            "application/epub+zip",
-                            "image/*",
-                            "*/*"
-                        )
+            SourcesCenterHost(
+                selectedTab = sourcesCenterTab,
+                onTabSelected = { sourcesCenterTab = it },
+                searchContent = {
+                    GlobalSearchCenterContent(
+                        searchRepository = hybridAppGraph.globalSearchRepository,
+                        sourceRepository = sourceRepository,
+                        query = sourcesCenterQuery,
+                        onQueryChange = { sourcesCenterQuery = it },
+                        onTargetSelected = onOpenSearchTarget,
+                        onBack = onOpenSessions
+                    )
+                },
+                materialsContent = {
+                    SourcesRoute(
+                        sourceRepository = sourceRepository,
+                        pendingImport = pendingSourceImport,
+                        onSourceIndexed = { indexSourceAsync(it) },
+                        highlightedSourceId = pendingSourceEvidenceTarget,
+                        sessionTitle = activeSessionTitle,
+                        sessionReferencedIds = activeSessionSnapshot?.sourceSelections?.toSet() ?: emptySet(),
+                        openInSessionFilter = sourcesCenterSessionFilter,
+                        searchQuery = sourcesCenterQuery,
+                        onSearchQueryChange = { sourcesCenterQuery = it },
+                        onPickSource = {
+                            sourceFileLauncher.launch(
+                                arrayOf(
+                                    "text/plain",
+                                    "text/markdown",
+                                    "text/html",
+                                    "application/pdf",
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                    "application/epub+zip",
+                                    "image/*",
+                                    "*/*"
+                                )
+                            )
+                        }
+                    )
+                },
+                graphContent = { GraphCenterPlaceholder() },
+                settingsContent = {
+                    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.RequestPermission()
+                    ) { granted ->
+                        scope.launch {
+                            hybridAppGraph.appPreferencesRepository
+                                .setBackgroundGenerationNotificationEnabled(granted)
+                        }
+                    }
+                    val postNotificationsGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS
+                        ) == PackageManager.PERMISSION_GRANTED
+                    val notificationsEnabled = postNotificationsGranted && NotificationManagerCompat
+                        .from(context).areNotificationsEnabled()
+                    FormalSettingsScreen(
+                        llmProfileState = llmProfileState,
+                        onBack = onOpenSessions,
+                        onOpenLlmConfiguration = {
+                            onNavigateDestination(AppDestination.LlmConfiguration)
+                        },
+                        onOpenStorage = onOpenAbout,
+                        onOpenImportExport = onOpenImportExport,
+                        onOpenAbout = onOpenAbout,
+                        challengeReminderEnabled = appPreferences.challengeReminderEnabled,
+                        hapticFeedbackEnabled = appPreferences.hapticFeedbackEnabled,
+                        onChallengeReminderChanged = { enabled ->
+                            scope.launch {
+                                hybridAppGraph.appPreferencesRepository
+                                    .setChallengeReminderEnabled(enabled)
+                            }
+                        },
+                        onHapticFeedbackChanged = { enabled ->
+                            scope.launch {
+                                hybridAppGraph.appPreferencesRepository
+                                    .setHapticFeedbackEnabled(enabled)
+                            }
+                        },
+                        backgroundGenerationNotificationEnabled = appPreferences.backgroundGenerationNotificationEnabled,
+                        notificationPermissionGranted = notificationsEnabled,
+                        onBackgroundGenerationNotificationChanged = { enabled ->
+                            if (enabled) {
+                                when {
+                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU -> {
+                                        scope.launch {
+                                            hybridAppGraph.appPreferencesRepository
+                                                .setBackgroundGenerationNotificationEnabled(true)
+                                        }
+                                    }
+                                    postNotificationsGranted -> {
+                                        scope.launch {
+                                            hybridAppGraph.appPreferencesRepository
+                                                .setBackgroundGenerationNotificationEnabled(true)
+                                        }
+                                    }
+                                    (context as? Activity)?.shouldShowRequestPermissionRationale(
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    ) == true -> Unit
+                                    else -> notificationPermissionLauncher.launch(
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    )
+                                }
+                            } else {
+                                scope.launch {
+                                    hybridAppGraph.appPreferencesRepository
+                                        .setBackgroundGenerationNotificationEnabled(false)
+                                }
+                            }
+                        },
+                        onOpenNotificationSettings = {
+                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            }
+                            context.startActivity(intent)
+                        }
                     )
                 }
             )

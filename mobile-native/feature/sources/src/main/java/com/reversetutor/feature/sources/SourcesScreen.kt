@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,6 +51,8 @@ fun SourcesRoute(
     sessionTitle: String? = null,
     sessionReferencedIds: Set<String> = emptySet(),
     openInSessionFilter: Boolean = false,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onPickSource: () -> Unit,
     onSourceIndexed: (SourceImportResult) -> Unit = {},
     modifier: Modifier = Modifier
@@ -85,6 +88,8 @@ fun SourcesRoute(
         sessionTitle = sessionTitle,
         sessionReferencedIds = sessionReferencedIds,
         openInSessionFilter = openInSessionFilter,
+        searchQuery = searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
         onPickSource = onPickSource,
         onReprocess = { sourceId ->
             scope.launch {
@@ -110,21 +115,32 @@ fun SourcesScreen(
     sessionTitle: String? = null,
     sessionReferencedIds: Set<String> = emptySet(),
     openInSessionFilter: Boolean = false,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onPickSource: () -> Unit,
     onReprocess: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var helpExpanded by remember { mutableStateOf(false) }
     var sessionFilter by remember { mutableStateOf(openInSessionFilter) }
+    var selectedType by remember { mutableStateOf<String?>(null) }
+    var selectedStatus by remember { mutableStateOf<String?>(null) }
     var expandedIds by remember(highlightedSourceId) {
         mutableStateOf(setOfNotNull(highlightedSourceId))
     }
     val hasSessionScope = sessionReferencedIds.isNotEmpty()
-    val visibleItems = if (sessionFilter && hasSessionScope) {
-        state.items.filter { sessionReferencedIds.contains(it.id) }
-    } else {
-        state.items
-    }
+    val visibleItems = filterSourceItems(
+        items = state.items,
+        sessionScope = sessionFilter && hasSessionScope,
+        sessionReferencedIds = sessionReferencedIds,
+        typeLabel = selectedType,
+        statusLabel = selectedStatus,
+        searchQuery = searchQuery
+    )
+    val typeOptions = state.items.map { it.typeLabel }.distinct().sorted()
+    val statusOptions = listOf("已解析", "部分解析", "等待能力", "暂不支持", "失败")
+        .filter { label -> state.items.any { it.statusLabel == label } }
+    val filtersActive = visibleItems.size != state.items.size
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -146,7 +162,7 @@ fun SourcesScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (sessionFilter && hasSessionScope) {
+                    text = if (filtersActive) {
                         "${visibleItems.size} / ${state.items.size} 份资料"
                     } else {
                         state.summary
@@ -196,7 +212,67 @@ fun SourcesScreen(
                 )
             }
         }
-        Spacer(modifier = Modifier.height(12.dp))
+        if (state.items.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = onSearchQueryChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("sources-search"),
+                placeholder = { Text("搜索资料标题") },
+                singleLine = true
+            )
+            if (typeOptions.size > 1) {
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedType == null,
+                        onClick = { selectedType = null },
+                        label = { Text("全部类型") },
+                        modifier = Modifier.testTag("sources-type-filter-all")
+                    )
+                    typeOptions.forEach { label ->
+                        FilterChip(
+                            selected = selectedType == label,
+                            onClick = {
+                                selectedType = if (selectedType == label) null else label
+                            },
+                            label = { Text(label) },
+                            modifier = Modifier.testTag("sources-type-filter-$label")
+                        )
+                    }
+                }
+            }
+            if (statusOptions.size > 1) {
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedStatus == null,
+                        onClick = { selectedStatus = null },
+                        label = { Text("全部状态") },
+                        modifier = Modifier.testTag("sources-status-filter-all")
+                    )
+                    statusOptions.forEach { label ->
+                        FilterChip(
+                            selected = selectedStatus == label,
+                            onClick = {
+                                selectedStatus = if (selectedStatus == label) null else label
+                            },
+                            label = { Text(label) },
+                            modifier = Modifier.testTag("sources-status-filter-$label")
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(14.dp))
         SourcesHelpRow(
             expanded = helpExpanded,
             onToggle = { helpExpanded = !helpExpanded }
@@ -210,7 +286,11 @@ fun SourcesScreen(
         if (state.isEmpty) {
             EmptySources(onPickSource = onPickSource, title = state.emptyTitle)
         } else if (visibleItems.isEmpty()) {
-            EmptySessionScope()
+            if (sessionFilter && hasSessionScope) {
+                EmptySessionScope()
+            } else {
+                EmptyFilterResult()
+            }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 visibleItems.forEach { item ->
@@ -350,6 +430,23 @@ private fun EmptySessionScope() {
         )
     }
 }
+
+@Composable
+private fun EmptyFilterResult() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = "没有符合当前搜索或筛选条件的资料。",
+            modifier = Modifier.padding(18.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)

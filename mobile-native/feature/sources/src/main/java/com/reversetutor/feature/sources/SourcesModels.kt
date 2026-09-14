@@ -74,6 +74,28 @@ data class SourceCardUiItem(
     }
 }
 
+/**
+ * NEWMP-V1-026: 资料入口的搜索与筛选（纯函数，供 UI 与单测共用）。
+ *
+ * 条件全部为可选：null / 空串表示不启用该条件；搜索按标题忽略大小写匹配。
+ */
+fun filterSourceItems(
+    items: List<SourceCardUiItem>,
+    sessionScope: Boolean,
+    sessionReferencedIds: Set<String>,
+    typeLabel: String?,
+    statusLabel: String?,
+    searchQuery: String
+): List<SourceCardUiItem> {
+    val query = searchQuery.trim()
+    return items.filter { item ->
+        (!sessionScope || sessionReferencedIds.contains(item.id)) &&
+            (typeLabel == null || item.typeLabel == typeLabel) &&
+            (statusLabel == null || item.statusLabel == statusLabel) &&
+            (query.isEmpty() || item.title.contains(query, ignoreCase = true))
+    }
+}
+
 enum class SourceStatusTone {
     Success,
     Warning,
