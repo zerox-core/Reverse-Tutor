@@ -5,7 +5,8 @@ data class ProviderHttpRequest(
     val headers: Map<String, String>,
     val jsonBody: String,
     val timeoutMillis: Int,
-    val streaming: Boolean
+    val streaming: Boolean,
+    val method: String = "POST"
 )
 
 sealed interface ProviderHttpResult {

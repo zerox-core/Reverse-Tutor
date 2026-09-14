@@ -219,7 +219,9 @@ class HybridAppGraph private constructor(
                         context = appContext,
                         webSearchPreference = webSearchPreference,
                         // NEWMP-V1-024: semantic retrieval embedding runtime.
-                        embeddingRuntime = DataModule.productionEmbeddingRuntime(appContext)
+                        embeddingRuntime = DataModule.productionEmbeddingRuntime(appContext),
+                        // NEWMP-V1-024 follow-up: ask the channel for its embedding model.
+                        embeddingModelDiscovery = DataModule.productionEmbeddingModelDiscovery(appContext)
                     )
             }
             val backgroundGenerationRepository = when (llmRuntimeMode) {

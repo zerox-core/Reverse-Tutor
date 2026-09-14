@@ -12,15 +12,17 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
         withContext(Dispatchers.IO) {
             try {
                 val connection = (URL(request.url).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
+                    requestMethod = request.method
                     connectTimeout = request.timeoutMillis
                     readTimeout = request.timeoutMillis
                     instanceFollowRedirects = false
                     useCaches = false
-                    doOutput = true
+                    doOutput = request.method.uppercase() != "GET"
                     request.headers.forEach { (name, value) -> setRequestProperty(name, value) }
-                    outputStream.bufferedWriter(Charsets.UTF_8).use {
-                        it.write(request.jsonBody)
+                    if (request.jsonBody.isNotEmpty()) {
+                        outputStream.bufferedWriter(Charsets.UTF_8).use {
+                            it.write(request.jsonBody)
+                        }
                     }
                 }
                 try {
@@ -53,12 +55,12 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
     ): ProviderHttpResult = withContext(Dispatchers.IO) {
         try {
             val connection = (URL(request.url).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
+                requestMethod = request.method
                 connectTimeout = request.timeoutMillis
                 readTimeout = request.timeoutMillis
                 instanceFollowRedirects = false
                 useCaches = false
-                doOutput = true
+                doOutput = request.method.uppercase() != "GET"
                 request.headers.forEach { (name, value) -> setRequestProperty(name, value) }
                 outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(request.jsonBody) }
             }

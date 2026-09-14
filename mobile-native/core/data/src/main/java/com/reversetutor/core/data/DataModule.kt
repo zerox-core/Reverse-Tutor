@@ -33,6 +33,7 @@ import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.data.wipe.RoomLocalDataWipeStore
 import com.reversetutor.core.data.worldtree.RoomWorldTreeRepository
 import com.reversetutor.core.llm.CompositeLlmGenerationRuntime
+import com.reversetutor.core.llm.EmbeddingModelDiscovery
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.OpenAiCompatibleEmbeddingRuntime
 import com.reversetutor.core.llm.LlmSecretResolver
@@ -94,7 +95,8 @@ object DataModule {
         context: Context,
         runtime: LlmGenerationRuntime? = null,
         webSearchPreference: (suspend () -> Boolean)? = null,
-        embeddingRuntime: OpenAiCompatibleEmbeddingRuntime? = null
+        embeddingRuntime: OpenAiCompatibleEmbeddingRuntime? = null,
+        embeddingModelDiscovery: EmbeddingModelDiscovery? = null
     ): ChatGenerationRepository =
         ChatGenerationRepository(
             messageRepository = messageRepository(context),
@@ -102,7 +104,8 @@ object DataModule {
             runtime = runtime ?: productionGenerationRuntime(context),
             modelConnectionRepository = modelConnectionRepository(context),
             webSearchPreference = webSearchPreference ?: { false },
-            embeddingRuntime = embeddingRuntime
+            embeddingRuntime = embeddingRuntime,
+            embeddingModelDiscovery = embeddingModelDiscovery
         )
 
     fun backgroundGenerationRepository(
@@ -135,6 +138,15 @@ object DataModule {
     fun productionEmbeddingRuntime(context: Context): OpenAiCompatibleEmbeddingRuntime {
         val secretStore = secretStore(context.applicationContext)
         return OpenAiCompatibleEmbeddingRuntime(
+            transport = UrlConnectionProviderHttpTransport(),
+            secretResolver = LlmSecretResolver(secretStore::get)
+        )
+    }
+
+    /** NEWMP-V1-024 follow-up: auto-detects the channel's embedding model name. */
+    fun productionEmbeddingModelDiscovery(context: Context): EmbeddingModelDiscovery {
+        val secretStore = secretStore(context.applicationContext)
+        return EmbeddingModelDiscovery(
             transport = UrlConnectionProviderHttpTransport(),
             secretResolver = LlmSecretResolver(secretStore::get)
         )

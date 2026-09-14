@@ -5,6 +5,7 @@ import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.domain.TurnPlan
 import com.reversetutor.core.llm.EmbeddingCallResult
+import com.reversetutor.core.llm.EmbeddingModelDiscovery
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmGuidedTurnPlan
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
@@ -38,6 +39,8 @@ class ChatGenerationRepository(
     private val webSearchPreference: suspend () -> Boolean = { false },
     /** NEWMP-V1-024: optional embeddings runtime for semantic source retrieval. */
     private val embeddingRuntime: OpenAiCompatibleEmbeddingRuntime? = null,
+    /** NEWMP-V1-024 follow-up: asks the channel which embedding model it serves. */
+    private val embeddingModelDiscovery: EmbeddingModelDiscovery? = null,
     private val embeddingModelName: String = "text-embedding-v3"
 ) {
     suspend fun generateReply(
@@ -232,7 +235,8 @@ class ChatGenerationRepository(
             val result = runtime.embed(
                 secretRef = profile.secretRef,
                 baseUrl = profile.baseUrl,
-                model = embeddingModelName,
+                model = embeddingModelDiscovery?.discover(profile.secretRef, profile.baseUrl)
+                    ?: embeddingModelName,
                 texts = texts
             )
         ) {
