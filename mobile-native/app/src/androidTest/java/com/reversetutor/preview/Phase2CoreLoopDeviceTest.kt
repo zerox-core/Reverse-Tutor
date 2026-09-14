@@ -204,7 +204,7 @@ class Phase2CoreLoopDeviceTest {
         composeRule.onNodeWithContentDescription("知识锚点").performClick()
         // Wait for navigation to commit before dispatching system back; otherwise the
         // root back handler still observes the previous Chat destination.
-        waitForText("资料管理")
+        waitForText("资料中心")
         // ContextHub 返回 Chat（系统返回由 AppNavigation.handleSystemBack 处理）
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         waitForContentDescription("返回会话首页")

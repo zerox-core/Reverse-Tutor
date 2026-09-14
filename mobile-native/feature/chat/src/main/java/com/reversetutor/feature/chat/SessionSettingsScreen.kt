@@ -86,6 +86,7 @@ fun SessionSettingsScreen(
     onDismissDeleteSession: () -> Unit = {},
     canUndoSessionDelete: Boolean = false,
     onUndoSessionDelete: () -> Unit = {},
+    onOpenSourceCenter: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var section by remember(initialSection) { mutableStateOf(initialSection) }
@@ -166,7 +167,16 @@ fun SessionSettingsScreen(
             }
         }
         when (section) {
-            null -> SettingsIndex(coordinator.state.applied, onOpen = { section = it })
+            null -> SettingsIndex(
+                coordinator.state.applied,
+                onOpen = { opened ->
+                    if (opened == SessionSettingsSection.SourceManagement && onOpenSourceCenter != null) {
+                        onOpenSourceCenter()
+                    } else {
+                        section = opened
+                    }
+                }
+            )
             SessionSettingsSection.Basic -> BasicProfilePage(
                 coordinator,
                 commitBoundary,

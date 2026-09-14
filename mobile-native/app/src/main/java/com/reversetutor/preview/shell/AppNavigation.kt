@@ -12,7 +12,7 @@ enum class AppDestination(
     ContextHub("brain", "学习大脑", "全局图谱和薄弱节点"),
     WeeklyDashboard("weekly-dashboard", "本周", "跨会话学习概览"),
     GlobalGraph("global-graph", "全局图谱", "跨会话只读图谱"),
-    Sources("sources", "资料", "本地资料库"),
+    Sources("sources", "资料", "资料中心"),
     Community("community", "社区", "挑战、模板和公开学习树"),
     SessionSettings("session-settings", "会话设置", "当前会话设置"),
     SessionSettingsLibrary("session-settings-library", "会话设置", "资料库"),
@@ -122,6 +122,11 @@ data class AppNavigationState(
                 AppDestination.Settings,
                 destination
             )
+            AppDestination.Sources -> if (current == AppDestination.Chat) {
+                listOf(AppDestination.Sessions, AppDestination.Chat, AppDestination.Sources)
+            } else {
+                listOf(AppDestination.Sessions, AppDestination.Sources)
+            }
             else -> listOf(AppDestination.Sessions, destination)
         }
         return copy(backStack = nextStack, modal = null, drawerOpen = false)

@@ -1,5 +1,6 @@
 package com.reversetutor.feature.sources
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,6 +47,9 @@ fun SourcesRoute(
     sourceRepository: SourceRepository,
     pendingImport: SourceImportInput?,
     highlightedSourceId: String? = null,
+    sessionTitle: String? = null,
+    sessionReferencedIds: Set<String> = emptySet(),
+    openInSessionFilter: Boolean = false,
     onPickSource: () -> Unit,
     onSourceIndexed: (SourceImportResult) -> Unit = {},
     modifier: Modifier = Modifier
@@ -77,6 +82,9 @@ fun SourcesRoute(
     SourcesScreen(
         state = SourcesUiState.from(sources = sources, lastImport = lastImport),
         highlightedSourceId = highlightedSourceId,
+        sessionTitle = sessionTitle,
+        sessionReferencedIds = sessionReferencedIds,
+        openInSessionFilter = openInSessionFilter,
         onPickSource = onPickSource,
         onReprocess = { sourceId ->
             scope.launch {
@@ -99,10 +107,24 @@ fun SourcesRoute(
 fun SourcesScreen(
     state: SourcesUiState,
     highlightedSourceId: String? = null,
+    sessionTitle: String? = null,
+    sessionReferencedIds: Set<String> = emptySet(),
+    openInSessionFilter: Boolean = false,
     onPickSource: () -> Unit,
     onReprocess: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var helpExpanded by remember { mutableStateOf(false) }
+    var sessionFilter by remember { mutableStateOf(openInSessionFilter) }
+    var expandedIds by remember(highlightedSourceId) {
+        mutableStateOf(setOfNotNull(highlightedSourceId))
+    }
+    val hasSessionScope = sessionReferencedIds.isNotEmpty()
+    val visibleItems = if (sessionFilter && hasSessionScope) {
+        state.items.filter { sessionReferencedIds.contains(it.id) }
+    } else {
+        state.items
+    }
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -118,16 +140,27 @@ fun SourcesScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "资料库",
+                    text = "资料中心",
                     color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = state.summary,
+                    text = if (sessionFilter && hasSessionScope) {
+                        "${visibleItems.size} / ${state.items.size} 份资料"
+                    } else {
+                        state.summary
+                    },
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
+                if (!sessionTitle.isNullOrBlank() && hasSessionScope) {
+                    Text(
+                        text = "当前会话：$sessionTitle",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
                 if (!highlightedSourceId.isNullOrBlank()) {
                     Text(
                         text = "证据定位：$highlightedSourceId",
@@ -146,23 +179,52 @@ fun SourcesScreen(
                 Text("添加资料")
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        ParserStatusLegend()
+        if (hasSessionScope) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = !sessionFilter,
+                    onClick = { sessionFilter = false },
+                    label = { Text("全部") },
+                    modifier = Modifier.testTag("sources-filter-all")
+                )
+                FilterChip(
+                    selected = sessionFilter,
+                    onClick = { sessionFilter = true },
+                    label = { Text("本会话") },
+                    modifier = Modifier.testTag("sources-filter-session")
+                )
+            }
+        }
         Spacer(modifier = Modifier.height(12.dp))
+        SourcesHelpRow(
+            expanded = helpExpanded,
+            onToggle = { helpExpanded = !helpExpanded }
+        )
         val importStatus = state.importStatusLabel
         if (importStatus != null) {
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             ImportStatusPanel(status = importStatus, lines = state.importDetailLines)
         }
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         if (state.isEmpty) {
             EmptySources(onPickSource = onPickSource, title = state.emptyTitle)
+        } else if (visibleItems.isEmpty()) {
+            EmptySessionScope()
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                state.items.forEach { item ->
+                visibleItems.forEach { item ->
                     SourceCard(
                         item = item,
                         highlighted = item.id == highlightedSourceId,
+                        expanded = expandedIds.contains(item.id),
+                        onToggleExpanded = {
+                            expandedIds = if (expandedIds.contains(item.id)) {
+                                expandedIds - item.id
+                            } else {
+                                expandedIds + item.id
+                            }
+                        },
                         onReprocess = { onReprocess(item.id) }
                     )
                 }
@@ -173,20 +235,34 @@ fun SourcesScreen(
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
-private fun ParserStatusLegend() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+private fun SourcesHelpRow(
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "解析状态", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "解析状态",
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.titleMedium
+            )
+            TextButton(
+                onClick = onToggle,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("sources-help-toggle")
+            ) {
+                Text(if (expanded) "收起" else "?")
+            }
+        }
+        if (expanded) {
             Text(
                 text = "TXT 和 Markdown 可本地解析，HTML 会做安全清洗后部分提取。PDF、Word、PPT、电子书和图片会就地抽取正文与插图文字，抽取不到的会保留为等待能力的资料，不会被隐藏。",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodyMedium
             )
             FlowRow(
@@ -260,10 +336,28 @@ private fun EmptySources(
 }
 
 @Composable
+private fun EmptySessionScope() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = "当前会话还没有引用资料。切换到「全部」可查看所有资料。",
+            modifier = Modifier.padding(18.dp),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun SourceCard(
     item: SourceCardUiItem,
     highlighted: Boolean,
+    expanded: Boolean,
+    onToggleExpanded: () -> Unit,
     onReprocess: () -> Unit
 ) {
     val statusContainerColor = when (item.statusTone) {
@@ -294,7 +388,9 @@ private fun SourceCard(
         shape = RoundedCornerShape(8.dp)
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .clickable(onClick = onToggleExpanded)
+                .padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
@@ -328,28 +424,36 @@ private fun SourceCard(
             }
             Text(text = item.impactMessage, style = MaterialTheme.typography.bodyMedium)
             Text(text = item.chunkCountLabel, style = MaterialTheme.typography.bodyMedium)
-            if (item.snippets.isNotEmpty()) {
+            if (expanded) {
                 Text(
                     text = "片段",
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                item.snippets.forEach { snippet ->
-                    Text(text = snippet, style = MaterialTheme.typography.bodyMedium)
+                if (item.snippets.isNotEmpty()) {
+                    item.snippets.forEach { snippet ->
+                        Text(text = snippet, style = MaterialTheme.typography.bodyMedium)
+                    }
+                } else {
+                    Text(
+                        text = "尚无可引用片段。",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
-            } else {
                 Text(
-                    text = "尚无可引用片段。",
+                    text = item.evidenceSummary,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodyMedium
                 )
+            } else {
+                Text(
+                    text = "展开片段",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
-            Text(
-                text = item.evidenceSummary,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
-            )
             if (item.recoveryEnabled && item.recoveryLabel != null) {
                 TextButton(
                     onClick = onReprocess,

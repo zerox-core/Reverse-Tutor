@@ -146,9 +146,9 @@ private val SourceParserStatus.canReprocess: Boolean
 
 private val SourceParserStatus.recoveryLabel: String?
     get() = when (this) {
-        SourceParserStatus.Failed -> "重试"
+        SourceParserStatus.Failed -> "重新处理"
         SourceParserStatus.FullyLocal,
-        SourceParserStatus.PartiallyLocal -> "重新解析"
+        SourceParserStatus.PartiallyLocal -> "重新处理"
         SourceParserStatus.FutureAssisted,
         SourceParserStatus.Unsupported -> null
     }

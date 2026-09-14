@@ -115,7 +115,7 @@ class Phase5SourcesDeviceTest {
             }
         }
 
-        composeRule.onNodeWithText("资料库").assertIsDisplayed()
+        composeRule.onNodeWithText("资料中心").assertIsDisplayed()
         composeRule.onNodeWithText("解析状态").assertIsDisplayed()
         composeRule.onNodeWithText("notes.md").assertExists()
         assertTrue(composeRule.onAllNodesWithText("已解析").fetchSemanticsNodes().isNotEmpty())

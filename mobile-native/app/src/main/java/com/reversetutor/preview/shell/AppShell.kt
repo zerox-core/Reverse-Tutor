@@ -935,6 +935,12 @@ private fun DestinationContent(
     }
     var sessionSettingsImportError by remember { mutableStateOf<String?>(null) }
     var sessionSettingsRefreshKey by remember { mutableStateOf(0) }
+    var sourcesCenterSessionFilter by remember { mutableStateOf(false) }
+    LaunchedEffect(destination) {
+        if (destination != AppDestination.Sources) {
+            sourcesCenterSessionFilter = false
+        }
+    }
     val chatDraftStore = remember(context) { SharedPreferencesChatDraftStore(context) }
     val chatAttachmentOrderStore = remember(context) { SharedPreferencesChatAttachmentOrderStore(context) }
     val chatPendingDeletionStore = remember(context) { SharedPreferencesChatPendingDeletionStore(context) }
@@ -1487,7 +1493,10 @@ private fun DestinationContent(
                     onNavigateDestination(AppDestination.WindowBranches)
                 },
                 onOpenSearch = { onNavigateDestination(AppDestination.ChatReferences) },
-                onOpenSessionSources = { onNavigateDestination(AppDestination.SessionSettingsSources) },
+                onOpenSessionSources = {
+                    sourcesCenterSessionFilter = true
+                    onNavigateDestination(AppDestination.Sources)
+                },
                 onOpenSessionSource = { sourceId ->
                     if (sourceId == null) {
                         onNavigateDestination(AppDestination.ChatReferences)
@@ -1740,6 +1749,10 @@ private fun DestinationContent(
                 onSessionLearnerRoleChanged = onActiveSessionLearnerRoleChanged,
                 onSessionDeleted = onActiveSessionDeleted,
                 onSelectDestination = onNavigateDestination,
+                onOpenSourceCenter = {
+                    sourcesCenterSessionFilter = true
+                    onNavigateDestination(AppDestination.Sources)
+                },
                 onOpenBrain = { onNavigateDestination(AppDestination.GlobalGraph) },
                 onBack = onOpenChat,
                 onPickSource = {
@@ -1802,6 +1815,9 @@ private fun DestinationContent(
                 pendingImport = pendingSourceImport,
                 onSourceIndexed = { indexSourceAsync(it) },
                 highlightedSourceId = pendingSourceEvidenceTarget,
+                sessionTitle = activeSessionTitle,
+                sessionReferencedIds = activeSessionSnapshot?.sourceSelections?.toSet() ?: emptySet(),
+                openInSessionFilter = sourcesCenterSessionFilter,
                 onPickSource = {
                     sourceFileLauncher.launch(
                         arrayOf(

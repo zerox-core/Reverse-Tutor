@@ -73,7 +73,7 @@ class SourcesUiStateTest {
         )
 
         assertEquals("失败", state.items.single().statusLabel)
-        assertEquals("重试", state.items.single().recoveryLabel)
+        assertEquals("重新处理", state.items.single().recoveryLabel)
         assertTrue(state.items.single().recoveryEnabled)
     }
 
@@ -149,7 +149,7 @@ class SourcesUiStateTest {
         assertEquals(SourceStatusTone.Success, item.statusTone)
         assertTrue(item.impactMessage.contains("片段"))
         assertTrue(item.recoveryEnabled)
-        assertEquals("重新解析", item.recoveryLabel)
+        assertEquals("重新处理", item.recoveryLabel)
         assertTrue(item.evidenceSummary.contains("资料库"))
     }
 
@@ -165,7 +165,7 @@ class SourcesUiStateTest {
         assertEquals(SourceStatusTone.Warning, item.statusTone)
         assertTrue(item.impactMessage.contains("部分"))
         assertTrue(item.recoveryEnabled)
-        assertEquals("重新解析", item.recoveryLabel)
+        assertEquals("重新处理", item.recoveryLabel)
     }
 
     @Test
@@ -210,7 +210,7 @@ class SourcesUiStateTest {
 
         assertEquals(SourceStatusTone.Error, item.statusTone)
         assertTrue(item.recoveryEnabled)
-        assertEquals("重试", item.recoveryLabel)
+        assertEquals("重新处理", item.recoveryLabel)
     }
 
     @Test

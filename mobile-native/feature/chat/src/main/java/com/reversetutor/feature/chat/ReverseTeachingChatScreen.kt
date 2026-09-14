@@ -512,7 +512,8 @@ internal fun ReverseTeachingChatScreen(
             onSelect = {
                 showSourcePicker = false
                 onSelectSource(it)
-            }
+            },
+            onOpenSources = onOpenSources
         )
     }
     actionMessage?.let { item ->
@@ -2014,7 +2015,8 @@ private fun AttachmentPanelAction(
 private fun ChatSourcePickerSheet(
     sources: List<ChatDraftAttachment>,
     onDismiss: () -> Unit,
-    onSelect: (ChatDraftAttachment) -> Unit
+    onSelect: (ChatDraftAttachment) -> Unit,
+    onOpenSources: () -> Unit = {}
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Text(
@@ -2042,6 +2044,17 @@ private fun ChatSourcePickerSheet(
                     }
                 }
             }
+        }
+        TextButton(
+            onClick = {
+                onDismiss()
+                onOpenSources()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+        ) {
+            Text("打开资料中心", color = ChatMuted)
         }
         Spacer(Modifier.height(24.dp))
     }

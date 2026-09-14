@@ -144,6 +144,7 @@ fun SessionSettingsRoute(
     externalImportError: String? = null,
     onRetryImport: () -> Unit = {},
     onBack: () -> Unit = {},
+    onOpenSourceCenter: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -215,6 +216,7 @@ fun SessionSettingsRoute(
                 null
             },
             highlightedSourceId = highlightedSourceId,
+            onOpenSourceCenter = onOpenSourceCenter,
             onBack = onBack,
             onProfileBoundary = { profile ->
                 onSessionLearnerRoleChanged(profile.learnerRole)
