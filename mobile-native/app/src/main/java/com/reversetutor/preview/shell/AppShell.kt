@@ -825,6 +825,7 @@ private fun AppDestination.usesDrawerNavigation(): Boolean =
 
 private fun AppDestination.ownsInContentTopBar(): Boolean =
     workspacePage != null ||
+        this == AppDestination.Sources ||
         this == AppDestination.Chat ||
         this == AppDestination.ChatReferences ||
         this == AppDestination.NewSession ||
@@ -1818,6 +1819,7 @@ private fun DestinationContent(
                 sourceRepository = sourceRepository,
                 pendingImport = pendingSourceImport,
                 onSourceIndexed = { indexSourceAsync(it) },
+                onBack = onOpenSessions,
                 highlightedSourceId = pendingSourceEvidenceTarget,
                 sessionTitle = activeSessionTitle,
                 sessionReferencedIds = activeSessionSnapshot?.sourceSelections?.toSet() ?: emptySet(),
