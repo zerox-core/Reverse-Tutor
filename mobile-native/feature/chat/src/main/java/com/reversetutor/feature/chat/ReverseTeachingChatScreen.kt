@@ -138,7 +138,7 @@ enum class ChatOverflowAction(val label: String) {
     GlobalSettings("全局设置"),
     KnowledgeAnchors("知识锚点"),
     WindowBranches("管理分支"),
-    SessionSettings("会话设置"),
+    SessionSettings("窗口设置"),
     Export("导出会话")
 }
 

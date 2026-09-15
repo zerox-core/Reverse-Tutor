@@ -60,7 +60,7 @@ class FormalPersonalizationAvatarTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription("会话设置").performClick()
+        composeRule.onNodeWithContentDescription("窗口设置").performClick()
         composeRule.waitUntil(2_000L) { port.loadCount > 0 }
         composeRule.waitForIdle()
 

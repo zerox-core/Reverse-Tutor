@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,14 +25,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Park
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -42,6 +50,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,13 +63,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.reversetutor.core.design.FormalColors
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import java.text.SimpleDateFormat
@@ -144,9 +159,9 @@ fun SessionSettingsScreen(
         refresh()
     }
 
-    Column(modifier.fillMaxSize().background(Color(0xFFF4F7FC)).testTag("session-settings-screen")) {
+    Column(modifier.fillMaxSize().background(FormalColors.Background).testTag("session-settings-screen")) {
         SessionSettingsHeader(
-            title = section?.label ?: "会话设置",
+            title = section?.label ?: "窗口设置",
             subtitle = coordinator.state.applied.profile.title,
             onBack = handleBack
         )
@@ -262,20 +277,26 @@ fun SessionSettingsScreen(
 
 @Composable
 private fun SessionSettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
-    Surface(color = Color(0xFFFAFCFE), shadowElevation = 1.dp) {
-        Row(
-            Modifier.fillMaxWidth().height(72.dp).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+    Column(Modifier.fillMaxWidth().background(FormalColors.Surface)) {
+        Box(Modifier.fillMaxWidth().height(64.dp)) {
+            Box(
+                Modifier.align(Alignment.CenterStart).padding(start = 6.dp).size(44.dp)
+                    .clickable(onClickLabel = "返回", role = Role.Button, onClick = onBack),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.ArrowBackIosNew,
+                    contentDescription = "返回",
+                    tint = FormalColors.Ink,
+                    modifier = Modifier.size(20.dp)
+                )
             }
-            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+            Column(Modifier.align(Alignment.CenterStart).padding(start = 56.dp, end = 16.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = FormalColors.Ink)
+                Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = FormalColors.Muted)
             }
-            Spacer(Modifier.width(48.dp))
         }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(FormalColors.Divider))
     }
 }
 
@@ -295,19 +316,81 @@ private fun SettingsIndex(document: SessionSettingsDocument, onOpen: (SessionSet
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(SessionSettingsSection.entries) { section ->
+            val isDanger = section == SessionSettingsSection.Danger
+            val (icon, iconColor) = sessionSectionIcon(section)
             SettingsGroup {
                 Row(
                     Modifier.fillMaxWidth().clickable { onOpen(section) }.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    SessionGlossyIcon(icon, null, iconColor, size = 36.dp, glyphSize = 19.dp, radius = 10.dp)
+                    Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(section.label, fontWeight = FontWeight.SemiBold)
-                        Text(summaries.getValue(section), style = MaterialTheme.typography.bodySmall, color = Color(0xFF687386))
+                        Text(
+                            section.label,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDanger) FormalColors.Danger else FormalColors.Ink
+                        )
+                        Text(
+                            summaries.getValue(section),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isDanger) FormalColors.Danger.copy(alpha = 0.72f) else FormalColors.Muted
+                        )
                     }
-                    Icon(Icons.Filled.ChevronRight, null)
+                    Icon(
+                        Icons.Filled.ChevronRight,
+                        contentDescription = null,
+                        tint = FormalColors.Tertiary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
         }
+    }
+}
+
+private fun sessionSectionIcon(section: SessionSettingsSection): Pair<ImageVector, Color> = when (section) {
+    SessionSettingsSection.Basic -> Icons.Rounded.Person to Color(0xFF2E66C7)
+    SessionSettingsSection.GoalPlan -> Icons.Rounded.Flag to Color(0xFFC96E26)
+    SessionSettingsSection.ConversationStrategy -> Icons.Rounded.Tune to Color(0xFF5C6B8A)
+    SessionSettingsSection.SourceManagement -> Icons.Rounded.Folder to Color(0xFF6170B8)
+    SessionSettingsSection.WorldTree -> Icons.Rounded.Park to Color(0xFF178775)
+    SessionSettingsSection.Danger -> Icons.Rounded.DeleteForever to FormalColors.Danger
+}
+
+@Composable
+private fun SessionGlossyIcon(
+    imageVector: ImageVector,
+    contentDescription: String?,
+    color: Color,
+    size: Dp = 30.dp,
+    glyphSize: Dp = 17.dp,
+    radius: Dp = 8.dp
+) {
+    val shape = RoundedCornerShape(radius)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .shadow(
+                elevation = 4.dp,
+                shape = shape,
+                ambientColor = Color(0x261F3861),
+                spotColor = Color(0x261F3861)
+            )
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(color.copy(red = (color.red + 0.18f).coerceAtMost(1f)), color)
+                ),
+                shape = shape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(glyphSize)
+        )
     }
 }
 
@@ -326,10 +409,20 @@ private fun BasicProfilePage(
     SettingsTextField("互动习惯", profile.interactionHabits, { coordinator.editProfile { p -> p.copy(interactionHabits = it) }; refresh() }, commitBoundary)
     SettingsGroup {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Person, null)
+            Icon(Icons.Filled.Person, null, tint = FormalColors.Muted)
             Spacer(Modifier.width(12.dp))
-            Text("显示当前会话头像", Modifier.weight(1f))
-            Switch(profile.avatarVisible, onCheckedChange = { coordinator.setAvatarVisible(it); refresh() })
+            Text("显示当前会话头像", Modifier.weight(1f), color = FormalColors.Ink)
+            Switch(
+                profile.avatarVisible,
+                onCheckedChange = { coordinator.setAvatarVisible(it); refresh() },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = FormalColors.Success,
+                    checkedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFFE4E4E9),
+                    uncheckedThumbColor = Color.White,
+                    uncheckedBorderColor = Color(0xFFE4E4E9)
+                )
+            )
         }
     }
     SettingsGroup {
@@ -658,9 +751,13 @@ private fun DangerPage(
 ) = SettingsPage {
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("删除当前会话", color = Color(0xFFB3261E), fontWeight = FontWeight.Bold)
-            Text("复用首页会话删除确认、durable 清理、5 秒撤销及幂等竞态处理。")
-            Button(onClick = onRequestDeleteSession, Modifier.fillMaxWidth()) { Text("删除当前会话") }
+            Text("删除当前会话", color = FormalColors.Danger, fontWeight = FontWeight.Bold)
+            Text("复用首页会话删除确认、durable 清理、5 秒撤销及幂等竞态处理。", color = FormalColors.Muted)
+            Button(
+                onClick = onRequestDeleteSession,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = FormalColors.Danger)
+            ) { Text("删除当前会话") }
             if (canUndo) OutlinedButton(onClick = onUndo, Modifier.fillMaxWidth()) { Text("撤销删除（5 秒）") }
         }
     }
@@ -697,8 +794,8 @@ private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        color = Color(0xFFFAFCFE),
-        tonalElevation = 1.dp
+        color = FormalColors.Surface,
+        border = BorderStroke(1.dp, FormalColors.Divider)
     ) { Column(content = content) }
 }
 

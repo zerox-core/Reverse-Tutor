@@ -27,7 +27,7 @@ class ChatPresentationContractsTest {
             ChatOverflowAction.entries
         )
         assertEquals(
-            listOf("全局设置", "知识锚点", "管理分支", "会话设置", "导出会话"),
+            listOf("全局设置", "知识锚点", "管理分支", "窗口设置", "导出会话"),
             ChatOverflowAction.entries.map(ChatOverflowAction::label)
         )
     }
