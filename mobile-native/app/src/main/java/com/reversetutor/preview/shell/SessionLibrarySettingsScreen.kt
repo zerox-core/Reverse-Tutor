@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -25,6 +24,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -66,43 +67,48 @@ internal fun SessionLibrarySettingsScreen(
             onBack = onBack
         )
         LibrarySettingsTabs(onSelectDestination)
+        LibraryIntroPanel(state.sources.size)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 22.dp, bottom = 30.dp)
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 30.dp)
         ) {
             item {
-                Text(
-                    text = "当前会话已连接 ${state.sources.size} 份资料",
-                    color = LibraryInk,
-                    fontSize = 17.sp,
-                    lineHeight = 23.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(5.dp))
-                Text(
-                    text = "PDF、课堂笔记、错题图片和代码文件",
-                    color = LibraryMuted,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp
-                )
-                Spacer(Modifier.height(16.dp))
                 AddSourceRow(onClick = onPickSource)
                 Spacer(Modifier.height(10.dp))
             }
-            itemsIndexed(state.sources, key = { _, source -> source.id }) { index, source ->
-                SessionLibrarySourceRow(
-                    source = source,
-                    onEnabledChange = { enabled ->
-                        state = state.toggle(source.id, enabled)
-                    },
-                    onRetry = {
-                        state = state.retry(source.id)
-                    },
-                    onRename = { renameSource = source },
-                    onRemove = { removeSource = source }
-                )
-                if (index != state.sources.lastIndex) {
-                    LibraryDivider()
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.Transparent,
+                    border = BorderStroke(1.dp, LibraryDividerColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color(0xFFF3F7FD), Color(0xFFEFF4FC))
+                                )
+                            )
+                    ) {
+                        state.sources.forEachIndexed { index, source ->
+                            SessionLibrarySourceRow(
+                                source = source,
+                                onEnabledChange = { enabled ->
+                                    state = state.toggle(source.id, enabled)
+                                },
+                                onRetry = {
+                                    state = state.retry(source.id)
+                                },
+                                onRename = { renameSource = source },
+                                onRemove = { removeSource = source }
+                            )
+                            if (index != state.sources.lastIndex) {
+                                LibraryDivider()
+                            }
+                        }
+                    }
                 }
             }
             item {
@@ -155,10 +161,10 @@ private fun LibrarySettingsHeader(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xF8FAFBFE),
+        color = Color(0xFFF7FAFE),
         contentColor = LibraryInk,
         shadowElevation = 1.dp,
-        border = BorderStroke(1.dp, Color(0xFFE2E6EE))
+        border = BorderStroke(1.dp, Color(0xFFE4EAF3))
     ) {
         Row(
             modifier = Modifier
@@ -195,8 +201,8 @@ private fun LibrarySettingsHeader(
                 Text(
                     text = sessionTitle,
                     color = LibraryMuted,
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -224,7 +230,7 @@ private fun LibrarySettingsTabs(onSelectDestination: (AppDestination) -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .background(Color(0xF8FAFBFE))
+            .background(Color(0xFFF6F9FE))
             .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.Bottom
@@ -236,29 +242,52 @@ private fun LibrarySettingsTabs(onSelectDestination: (AppDestination) -> Unit) {
                     .weight(1f)
                     .height(58.dp),
                 color = Color.Transparent,
-                contentColor = if (index == 0) Color(0xFF194EA3) else Color(0xFF454E60)
+                contentColor = if (index == 0) Color(0xFF0F59C7) else Color(0xFF404759)
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(Modifier.height(18.dp))
                     Text(
                         text = label,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
                         fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1
                     )
                     Spacer(Modifier.weight(1f))
-                    Box(
-                        modifier = Modifier
-                            .width(if (index == 0) 38.dp else 0.dp)
-                            .height(3.dp)
-                            .background(Color(0xFF1F58B7), RoundedCornerShape(2.dp))
-                    )
                 }
             }
         }
     }
-    LibraryDivider()
+    LibraryDivider(Color(0xFFE8EDF4))
+}
+
+@Composable
+private fun LibraryIntroPanel(sourceCount: Int) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFF6F9FE)
+    ) {
+        Column(
+            modifier = Modifier.padding(
+                start = 18.dp, end = 18.dp, top = 14.dp, bottom = 16.dp
+            )
+        ) {
+            Text(
+                text = "当前会话已连接 $sourceCount 份资料",
+                color = LibraryInk,
+                fontSize = 17.sp,
+                lineHeight = 23.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = "PDF、课堂笔记、错题图片和代码文件",
+                color = LibraryMuted,
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+        }
+    }
 }
 
 @Composable
@@ -268,10 +297,10 @@ private fun AddSourceRow(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp),
-        color = Color(0xF2FAFBFD),
-        contentColor = Color(0xFF1854AD),
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, Color(0xFFD3D9E4))
+        color = Color(0xFFFAFCFE),
+        contentColor = Color(0xFF084CB0),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, Color(0xFFDCE4ED))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp),
@@ -281,14 +310,14 @@ private fun AddSourceRow(onClick: () -> Unit) {
                 modifier = Modifier
                     .size(42.dp)
                     .shadow(8.dp, RoundedCornerShape(11.dp), ambientColor = Color(0x35306FD3), spotColor = Color(0x35306FD3)),
-                color = Color(0xFF2D70DD),
+                color = Color(0xFF62A9FF),
                 contentColor = Color.White,
                 shape = RoundedCornerShape(11.dp),
-                border = BorderStroke(1.dp, Color(0xFF1F5FC7))
+                border = BorderStroke(1.dp, Color(0xFF3E8AF2))
             ) {
                 Box(
                     modifier = Modifier.background(
-                        Brush.verticalGradient(listOf(Color(0xFF66A2FA), Color(0xFF1260CC)))
+                        Brush.verticalGradient(listOf(Color(0xFF7DB9FF), Color(0xFF3E8AF2)))
                     ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -336,7 +365,14 @@ private fun SessionLibrarySourceRow(
         Switch(
             checked = source.enabled,
             onCheckedChange = onEnabledChange,
-            enabled = source.status !is SessionSourceStatus.ReadFailed
+            enabled = source.status !is SessionSourceStatus.ReadFailed,
+            modifier = Modifier.scale(0.78f),
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Color(0xFF55A1FF),
+                checkedThumbColor = Color.White,
+                uncheckedTrackColor = Color(0xFFD9DEE7),
+                uncheckedThumbColor = Color.White
+            )
         )
         Box {
             Surface(
@@ -376,11 +412,11 @@ private fun SessionLibrarySourceRow(
 @Composable
 private fun SourceTypeIcon(type: SessionLibrarySourceType) {
     val (background, foreground) = when (type) {
-        SessionLibrarySourceType.Pdf -> Color(0xFFEF343B) to Color.White
-        SessionLibrarySourceType.Note -> Color(0xFF24C78A) to Color.White
-        SessionLibrarySourceType.Image -> Color(0xFF526EF2) to Color.White
-        SessionLibrarySourceType.Python -> Color(0xFFF7F8FB) to Color(0xFF2E6DA4)
-        SessionLibrarySourceType.Markdown -> Color(0xFFD6DBE2) to Color(0xFF36404D)
+        SessionLibrarySourceType.Pdf -> Color(0xFFFF6D70) to Color.White
+        SessionLibrarySourceType.Note -> Color(0xFF67E6BC) to Color.White
+        SessionLibrarySourceType.Image -> Color(0xFF8EA5FF) to Color.White
+        SessionLibrarySourceType.Python -> Color(0xFFFFFFFF) to Color(0xFF4E9DD8)
+        SessionLibrarySourceType.Markdown -> Color(0xFFF2F5F8) to Color(0xFF374151)
     }
     Surface(
         modifier = Modifier
@@ -401,7 +437,16 @@ private fun SourceTypeIcon(type: SessionLibrarySourceType) {
                 SessionLibrarySourceType.Pdf -> Text("PDF", fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 SessionLibrarySourceType.Note -> RtIcon(RtIconKey.Edit, tint = foreground, size = 22.dp)
                 SessionLibrarySourceType.Image -> RtIcon(RtIconKey.Image, tint = foreground, size = 22.dp)
-                SessionLibrarySourceType.Python -> Text("Py", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                SessionLibrarySourceType.Python -> Box {
+                    Text("Py", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(4.dp)
+                            .size(5.dp)
+                            .background(Color(0xFFFFE069), CircleShape)
+                    )
+                }
                 SessionLibrarySourceType.Markdown -> Text("M↓", fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
         }
@@ -415,7 +460,7 @@ private fun SourceStatusLine(source: SessionLibrarySource, onRetry: () -> Unit) 
         Spacer(Modifier.width(9.dp))
         when (val status = source.status) {
             SessionSourceStatus.Active -> {
-                Box(Modifier.size(7.dp).background(Color(0xFF2DBF68), CircleShape))
+                Box(Modifier.size(7.dp).background(Color(0xFF1FBD5C), CircleShape))
                 Spacer(Modifier.width(6.dp))
                 Text("参与当前会话", color = LibraryMuted, fontSize = 11.sp)
             }
@@ -423,18 +468,18 @@ private fun SourceStatusLine(source: SessionLibrarySource, onRetry: () -> Unit) 
                 CircularProgressIndicator(
                     progress = { status.progress.coerceIn(0, 100) / 100f },
                     modifier = Modifier.size(14.dp),
-                    color = Color(0xFF2C70DE),
+                    color = Color(0xFF55A1FF),
                     strokeWidth = 2.dp
                 )
                 Spacer(Modifier.width(6.dp))
                 Text("正在导入 ${status.progress}%", color = LibraryMuted, fontSize = 11.sp)
             }
             SessionSourceStatus.ReadFailed -> {
-                Text("▲", color = Color(0xFFF0A019), fontSize = 11.sp)
+                Text("▲", color = Color(0xFFF59A18), fontSize = 11.sp)
                 Spacer(Modifier.width(5.dp))
-                Text("读取失败 · ", color = LibraryMuted, fontSize = 11.sp)
+                Text("读取失败 · ", color = Color(0xFF8F6633), fontSize = 11.sp)
                 TextButton(onClick = onRetry, contentPadding = PaddingValues(0.dp)) {
-                    Text("重试", color = Color(0xFF1E63C7), fontSize = 11.sp)
+                    Text("重试", color = Color(0xFF0F63D1), fontSize = 11.sp)
                 }
             }
         }
@@ -445,18 +490,18 @@ private fun SourceStatusLine(source: SessionLibrarySource, onRetry: () -> Unit) 
 private fun EnabledSourcesSummary(summary: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFE9EEF7),
+        color = Color(0xFFF1F6FC),
         contentColor = LibraryInk,
-        shape = RoundedCornerShape(8.dp),
-        border = BorderStroke(1.dp, Color(0xFFD6DDE9))
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, Color(0xFFDCE4ED))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(Modifier.size(8.dp).background(Color(0xFF2DBF68), CircleShape))
+            Box(Modifier.size(8.dp).background(Color(0xFF1FBD5C), CircleShape))
             Spacer(Modifier.width(9.dp))
-            Text(summary, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Bold)
+            Text(summary, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             Text("已自动保存", color = LibraryMuted, fontSize = 10.sp)
         }
@@ -495,15 +540,16 @@ private fun RenameSourceDialog(
 }
 
 @Composable
-private fun LibraryDivider() {
+private fun LibraryDivider(color: Color = LibraryDividerColor) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(Color(0xFFDDE2EA))
+            .background(color)
     )
 }
 
-private val LibraryPageBackground = Color(0xFFF4F6FA)
-private val LibraryInk = Color(0xFF151A24)
-private val LibraryMuted = Color(0xFF747D8F)
+private val LibraryPageBackground = Color(0xFFEDF2F9)
+private val LibraryInk = Color(0xFF0D121C)
+private val LibraryMuted = Color(0xFF6E7585)
+private val LibraryDividerColor = Color(0xFFDCE4ED)
