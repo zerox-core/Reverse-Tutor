@@ -2,6 +2,7 @@ package com.reversetutor.feature.sources
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -56,6 +59,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -223,9 +228,7 @@ fun SourcesScreen(
     var sessionFilter by remember { mutableStateOf(openInSessionFilter) }
     var selectedType by remember { mutableStateOf<String?>(null) }
     var selectedStatus by remember { mutableStateOf<String?>(null) }
-    var expandedIds by remember(highlightedSourceId) {
-        mutableStateOf(setOfNotNull(highlightedSourceId))
-    }
+    var expandedId by remember(highlightedSourceId) { mutableStateOf(highlightedSourceId) }
     val hasSessionScope = sessionReferencedIds.isNotEmpty()
     val visibleItems = filterSourceItems(
         items = state.items,
@@ -378,23 +381,375 @@ fun SourcesScreen(
                     )
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    visibleItems.forEach { item ->
-                        SourceCard(
-                            item = item,
-                            highlighted = item.id == highlightedSourceId,
-                            expanded = expandedIds.contains(item.id),
-                            onToggleExpanded = {
-                                expandedIds = if (expandedIds.contains(item.id)) {
-                                    expandedIds - item.id
-                                } else {
-                                    expandedIds + item.id
-                                }
-                            },
-                            onReprocess = { onReprocess(item.id) },
-                            colors = colors
-                        )
+                SourcesBookshelf(
+                    items = visibleItems,
+                    highlightedSourceId = highlightedSourceId,
+                    expandedId = expandedId,
+                    onToggleExpanded = { id ->
+                        expandedId = if (expandedId == id) null else id
+                    },
+                    onReprocess = onReprocess,
+                    onPickSource = onPickSource,
+                    colors = colors
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourcesBookshelf(
+    items: List<SourceCardUiItem>,
+    highlightedSourceId: String?,
+    expandedId: String?,
+    onToggleExpanded: (String) -> Unit,
+    onReprocess: (String) -> Unit,
+    onPickSource: () -> Unit,
+    colors: SourcesColors
+) {
+    val rows = items.chunked(3)
+    Column {
+        rows.forEachIndexed { index, rowItems ->
+            val isLastRow = index == rows.lastIndex
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowItems.forEach { item ->
+                    BookCover(
+                        item = item,
+                        highlighted = item.id == highlightedSourceId,
+                        onToggle = { onToggleExpanded(item.id) },
+                        colors = colors,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                val emptySlots = 3 - rowItems.size
+                if (isLastRow && emptySlots > 0) {
+                    AddBookCover(
+                        onPickSource = onPickSource,
+                        colors = colors,
+                        modifier = Modifier.weight(1f)
+                    )
+                    repeat(emptySlots - 1) {
+                        Spacer(Modifier.weight(1f))
                     }
+                } else {
+                    repeat(emptySlots) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(Modifier.height(5.dp))
+            ShelfPlank(colors)
+            val expandedItem = rowItems.firstOrNull { it.id == expandedId }
+            if (expandedItem != null) {
+                Spacer(Modifier.height(10.dp))
+                SourceDetailPanel(
+                    item = expandedItem,
+                    onReprocess = { onReprocess(expandedItem.id) },
+                    colors = colors
+                )
+            }
+            Spacer(Modifier.height(18.dp))
+        }
+        if (rows.isNotEmpty() && rows.last().size == 3) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AddBookCover(
+                    onPickSource = onPickSource,
+                    colors = colors,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(5.dp))
+            ShelfPlank(colors)
+        }
+    }
+}
+
+@Composable
+private fun ShelfPlank(colors: SourcesColors) {
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(7.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(colors.surfaceSubtle, colors.border)
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(colors.divider)
+        )
+    }
+}
+
+private fun coverColor(typeLabel: String): Color = when (typeLabel) {
+    "PDF" -> Color(0xFF9E5B4F)
+    "DOCX" -> Color(0xFF5A6B57)
+    "TXT" -> Color(0xFF4A4A4E)
+    "Markdown" -> Color(0xFF8A6D4F)
+    "HTML" -> Color(0xFF6E7B76)
+    "PPTX" -> Color(0xFFB07A4A)
+    "EPUB" -> Color(0xFF6E5849)
+    "图片" -> Color(0xFF5B6068)
+    "JSON 导出" -> Color(0xFF4E5A52)
+    else -> Color(0xFF55555A)
+}
+
+@Composable
+private fun statusForeground(tone: SourceStatusTone, colors: SourcesColors): Color = when (tone) {
+    SourceStatusTone.Success -> colors.success
+    SourceStatusTone.Warning -> colors.warning
+    SourceStatusTone.Info -> colors.muted
+    SourceStatusTone.Disabled -> colors.faint
+    SourceStatusTone.Error -> colors.danger
+}
+
+@Composable
+private fun BookCover(
+    item: SourceCardUiItem,
+    highlighted: Boolean,
+    onToggle: () -> Unit,
+    colors: SourcesColors,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    val statusColor = statusForeground(item.statusTone, colors)
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.72f)
+                .testTag("source-card-${item.id}")
+                .semantics { selected = highlighted }
+                .clip(RoundedCornerShape(6.dp))
+                .background(coverColor(item.typeLabel))
+                .clickable(onClick = onToggle)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(7.dp)
+                    .background(Color.Black.copy(alpha = 0.18f))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(7.dp)
+                    .size(8.dp)
+                    .background(statusColor, CircleShape)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 15.dp, end = 9.dp, top = 12.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Icon(
+                    imageVector = typeIcon(item.typeLabel),
+                    contentDescription = item.typeLabel,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = item.title,
+                        color = Color.White,
+                        style = type.style(10f, 14f, FontWeight.SemiBold),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = item.typeLabel,
+                        color = Color.White.copy(alpha = 0.72f),
+                        style = type.style(7f, 11f)
+                    )
+                }
+            }
+            if (highlighted) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(2.dp, colors.borderStrong, RoundedCornerShape(6.dp))
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = item.statusLabel,
+            color = statusColor,
+            style = type.style(8f, 12f, FontWeight.Medium),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("source-status-${item.id}")
+        )
+    }
+}
+
+@Composable
+private fun AddBookCover(
+    onPickSource: () -> Unit,
+    colors: SourcesColors,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.72f)
+                .clip(RoundedCornerShape(6.dp))
+                .background(colors.surface)
+                .border(BorderStroke(1.dp, colors.borderStrong), RoundedCornerShape(6.dp))
+                .clickable(role = Role.Button, onClickLabel = "添加资料", onClick = onPickSource)
+                .testTag("sources-add-book"),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = null,
+                    tint = colors.muted,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "添加资料",
+                    color = colors.muted,
+                    style = type.style(8f, 12f, FontWeight.Medium)
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = " ",
+            color = colors.faint,
+            style = type.style(8f, 12f)
+        )
+    }
+}
+
+@Composable
+private fun SourceDetailPanel(
+    item: SourceCardUiItem,
+    onReprocess: () -> Unit,
+    colors: SourcesColors
+) {
+    val type = LocalFormalTypeScale.current
+    val statusColor = statusForeground(item.statusTone, colors)
+    SourcesOutlinedCard(colors = colors, modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.title,
+                    color = colors.ink,
+                    style = type.style(11f, 16f, FontWeight.SemiBold),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = item.statusLabel,
+                    color = statusColor,
+                    style = type.style(8f, 12f, FontWeight.Medium)
+                )
+            }
+            Text(
+                text = item.impactMessage,
+                color = colors.muted,
+                style = type.style(9f, 14f)
+            )
+            Text(
+                text = item.chunkCountLabel,
+                color = colors.faint,
+                style = type.style(8f, 12f)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(colors.divider)
+            )
+            Text(
+                text = "片段",
+                color = colors.ink,
+                style = type.style(9f, 14f, FontWeight.SemiBold)
+            )
+            if (item.snippets.isNotEmpty()) {
+                item.snippets.forEach { snippet ->
+                    Text(
+                        text = snippet,
+                        color = colors.muted,
+                        style = type.style(9f, 14f)
+                    )
+                }
+            } else {
+                Text(
+                    text = "尚无可引用片段。",
+                    color = colors.faint,
+                    style = type.style(9f, 14f)
+                )
+            }
+            Text(
+                text = item.evidenceSummary,
+                color = colors.faint,
+                style = type.style(8f, 13f)
+            )
+            if (item.recoveryEnabled && item.recoveryLabel != null) {
+                Row {
+                    Surface(
+                        modifier = Modifier
+                            .heightIn(min = 36.dp)
+                            .testTag("source-action-${item.id}")
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = item.recoveryLabel,
+                                onClick = onReprocess
+                            ),
+                        color = colors.surface,
+                        shape = RoundedCornerShape(FormalShapes.PillRadius),
+                        border = BorderStroke(1.dp, colors.borderStrong)
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = item.recoveryLabel,
+                                color = colors.ink,
+                                style = type.style(9f, 13f, FontWeight.Medium)
+                            )
+                        }
+                    }
+                }
+            } else {
+                item.recoveryReason?.let { reason ->
+                    Text(
+                        text = reason,
+                        color = colors.faint,
+                        style = type.style(8f, 13f)
+                    )
                 }
             }
         }
@@ -831,195 +1186,4 @@ private fun typeIcon(typeLabel: String): ImageVector = when (typeLabel) {
     "图片" -> Icons.Rounded.Image
     "JSON 导出" -> Icons.Rounded.DataObject
     else -> Icons.Rounded.InsertDriveFile
-}
-
-@Composable
-private fun SourceCard(
-    item: SourceCardUiItem,
-    highlighted: Boolean,
-    expanded: Boolean,
-    onToggleExpanded: () -> Unit,
-    onReprocess: () -> Unit,
-    colors: SourcesColors
-) {
-    val type = LocalFormalTypeScale.current
-    val statusBackground = when (item.statusTone) {
-        SourceStatusTone.Success -> colors.successSoft
-        SourceStatusTone.Warning -> colors.warningSoft
-        SourceStatusTone.Info -> colors.surfaceSubtle
-        SourceStatusTone.Disabled -> colors.divider
-        SourceStatusTone.Error -> colors.dangerSoft
-    }
-    val statusForeground = when (item.statusTone) {
-        SourceStatusTone.Success -> colors.success
-        SourceStatusTone.Warning -> colors.warning
-        SourceStatusTone.Info -> colors.muted
-        SourceStatusTone.Disabled -> colors.faint
-        SourceStatusTone.Error -> colors.danger
-    }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("source-card-${item.id}")
-            .semantics { selected = highlighted },
-        color = if (highlighted) colors.surfaceSubtle else colors.surface,
-        shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, if (highlighted) colors.borderStrong else colors.border)
-    ) {
-        Column(
-            modifier = Modifier
-                .clickable(onClick = onToggleExpanded)
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(
-                            colors.divider.copy(alpha = 0.55f),
-                            RoundedCornerShape(FormalShapes.CompactRadius)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = typeIcon(item.typeLabel),
-                        contentDescription = item.typeLabel,
-                        tint = colors.muted,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-                Spacer(Modifier.width(12.dp))
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = item.title,
-                        color = colors.ink,
-                        style = type.style(11f, 16f, FontWeight.SemiBold),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = item.typeLabel,
-                        color = colors.faint,
-                        style = type.style(8f, 12f)
-                    )
-                }
-                Spacer(Modifier.width(8.dp))
-                Surface(
-                    color = statusBackground,
-                    shape = RoundedCornerShape(FormalShapes.PillRadius)
-                ) {
-                    Text(
-                        text = item.statusLabel,
-                        modifier = Modifier
-                            .testTag("source-status-${item.id}")
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                        color = statusForeground,
-                        style = type.style(8f, 12f, FontWeight.Medium)
-                    )
-                }
-            }
-            Text(
-                text = item.impactMessage,
-                color = colors.muted,
-                style = type.style(9f, 14f)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = item.chunkCountLabel,
-                    color = colors.faint,
-                    style = type.style(8f, 12f),
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    imageVector = if (expanded) {
-                        Icons.Rounded.KeyboardArrowUp
-                    } else {
-                        Icons.Rounded.KeyboardArrowDown
-                    },
-                    contentDescription = if (expanded) "收起片段" else "展开片段",
-                    tint = colors.faint,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-            if (expanded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(colors.divider)
-                )
-                Text(
-                    text = "片段",
-                    color = colors.ink,
-                    style = type.style(9f, 14f, FontWeight.SemiBold)
-                )
-                if (item.snippets.isNotEmpty()) {
-                    item.snippets.forEach { snippet ->
-                        Text(
-                            text = snippet,
-                            color = colors.muted,
-                            style = type.style(9f, 14f)
-                        )
-                    }
-                } else {
-                    Text(
-                        text = "尚无可引用片段。",
-                        color = colors.faint,
-                        style = type.style(9f, 14f)
-                    )
-                }
-                Text(
-                    text = item.evidenceSummary,
-                    color = colors.faint,
-                    style = type.style(8f, 13f)
-                )
-            }
-            if (item.recoveryEnabled && item.recoveryLabel != null) {
-                Row {
-                    Surface(
-                        modifier = Modifier
-                            .heightIn(min = 36.dp)
-                            .testTag("source-action-${item.id}")
-                            .clickable(
-                                role = Role.Button,
-                                onClickLabel = item.recoveryLabel,
-                                onClick = onReprocess
-                            ),
-                        color = colors.surface,
-                        shape = RoundedCornerShape(FormalShapes.PillRadius),
-                        border = BorderStroke(1.dp, colors.borderStrong)
-                    ) {
-                        Box(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = item.recoveryLabel,
-                                color = colors.ink,
-                                style = type.style(9f, 13f, FontWeight.Medium)
-                            )
-                        }
-                    }
-                }
-            } else {
-                item.recoveryReason?.let { reason ->
-                    Text(
-                        text = reason,
-                        color = colors.faint,
-                        style = type.style(8f, 13f)
-                    )
-                }
-            }
-        }
-    }
 }
