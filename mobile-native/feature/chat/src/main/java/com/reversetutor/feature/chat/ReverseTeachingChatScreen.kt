@@ -135,8 +135,10 @@ internal object ChatComposerLayout {
 }
 
 enum class ChatOverflowAction(val label: String) {
+    GlobalSettings("全局设置"),
+    KnowledgeAnchors("知识锚点"),
+    WindowBranches("管理分支"),
     SessionSettings("会话设置"),
-    Sources("资料库"),
     Export("导出会话")
 }
 
@@ -172,6 +174,7 @@ internal fun ReverseTeachingChatScreen(
     onWebSearchChange: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit,
     onOpenWindowBranches: () -> Unit = {},
+    onOpenGlobalGraph: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
@@ -239,14 +242,16 @@ internal fun ReverseTeachingChatScreen(
         ReverseTeachingChatHeader(
             state = state,
             onBack = onBack,
-            onOpenSettings = onOpenSessionSources,
-            onOpenWindowBranches = onOpenWindowBranches,
             onOpenSearch = onOpenSearch,
+            onOpenSources = onOpenSources,
+            onOpenGlobalGraph = onOpenGlobalGraph,
             onOpenSessionSettings = onOpenSessionSettings,
             onOverflowAction = { action ->
                 when (action) {
+                    ChatOverflowAction.GlobalSettings -> onOpenModelSettings()
+                    ChatOverflowAction.KnowledgeAnchors -> onOpenSessionSources()
+                    ChatOverflowAction.WindowBranches -> onOpenWindowBranches()
                     ChatOverflowAction.SessionSettings -> onOpenSessionSettings()
-                    ChatOverflowAction.Sources -> onOpenSources()
                     ChatOverflowAction.Export -> onExport()
                 }
             }
@@ -573,9 +578,9 @@ internal fun ReverseTeachingChatScreen(
 private fun ReverseTeachingChatHeader(
     state: ChatUiState,
     onBack: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onOpenWindowBranches: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenSources: () -> Unit,
+    onOpenGlobalGraph: () -> Unit,
     onOpenSessionSettings: () -> Unit,
     onOverflowAction: (ChatOverflowAction) -> Unit
 ) {
@@ -637,24 +642,24 @@ private fun ReverseTeachingChatHeader(
             }
             FormalHeaderIconButton(
                 imageVector = Icons.Rounded.Search,
-                contentDescription = "资料与引用",
+                contentDescription = "全局搜索",
                 onClick = onOpenSearch,
                 filled = true
             )
             Spacer(Modifier.width(6.dp))
             FormalHeaderIconButton(
                 imageVector = Icons.Rounded.MenuBook,
-                contentDescription = "知识锚点",
-                onClick = onOpenSettings,
+                contentDescription = "资料",
+                onClick = onOpenSources,
                 filled = true
             )
             Spacer(Modifier.width(6.dp))
             FormalHeaderIconButton(
                 imageVector = Icons.Rounded.AccountTree,
-                contentDescription = "管理分支",
-                onClick = onOpenWindowBranches,
+                contentDescription = "图谱",
+                onClick = onOpenGlobalGraph,
                 filled = false,
-                modifier = Modifier.testTag("chat-window-branches")
+                modifier = Modifier.testTag("chat-global-graph")
             )
             Spacer(Modifier.width(6.dp))
             Box {

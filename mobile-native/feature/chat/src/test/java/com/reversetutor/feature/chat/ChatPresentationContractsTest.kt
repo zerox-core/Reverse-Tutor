@@ -18,14 +18,16 @@ class ChatPresentationContractsTest {
     fun overflowProvidesNonDestructiveSessionActions() {
         assertEquals(
             listOf(
+                ChatOverflowAction.GlobalSettings,
+                ChatOverflowAction.KnowledgeAnchors,
+                ChatOverflowAction.WindowBranches,
                 ChatOverflowAction.SessionSettings,
-                ChatOverflowAction.Sources,
                 ChatOverflowAction.Export
             ),
             ChatOverflowAction.entries
         )
         assertEquals(
-            listOf("会话设置", "资料库", "导出会话"),
+            listOf("全局设置", "知识锚点", "管理分支", "会话设置", "导出会话"),
             ChatOverflowAction.entries.map(ChatOverflowAction::label)
         )
     }
