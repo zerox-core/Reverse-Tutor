@@ -9,17 +9,17 @@ import org.junit.Test
 class GraphSourceFidelityPresentationTest {
     @Test
     fun sourcePaletteMapsNativeKindsToReferenceColors() {
-        assertEquals(0xFF3B82F6L, graphKindFillArgb(GraphNodeKind.Concept))
-        assertEquals(0xFFFF6B61L, graphKindFillArgb(GraphNodeKind.Requirement))
-        assertEquals(0xFF84B547L, graphKindFillArgb(GraphNodeKind.Source))
-        assertEquals(0xFF8B5CF6L, graphKindFillArgb(GraphNodeKind.Session))
-        assertEquals(0xFFF59E0BL, graphKindFillArgb(GraphNodeKind.Person))
-        assertEquals(0xFF22B8CFL, graphKindFillArgb(GraphNodeKind.Other))
+        assertEquals(0xFFC6E4F6L, graphKindFillArgb(GraphNodeKind.Concept))
+        assertEquals(0xFFF3CBD8L, graphKindFillArgb(GraphNodeKind.Requirement))
+        assertEquals(0xFFC3E6BEL, graphKindFillArgb(GraphNodeKind.Source))
+        assertEquals(0xFFCCC0EAL, graphKindFillArgb(GraphNodeKind.Session))
+        assertEquals(0xFFE8BC6CL, graphKindFillArgb(GraphNodeKind.Person))
+        assertEquals(0xFF48BAAEL, graphKindFillArgb(GraphNodeKind.Other))
     }
 
     @Test
     fun sourceCanvasTokensMatchReferenceConfig() {
-        assertEquals(0xFFF7F8FAL, GraphCanvasPresentation.BackgroundArgb)
+        assertEquals(0xFFEDF2F9L, GraphCanvasPresentation.BackgroundArgb)
         assertEquals(0xFF64748BL, GraphCanvasPresentation.EdgeArgb)
         assertEquals(0.16f, GraphCanvasPresentation.EdgeAlpha)
         assertEquals(0.70f, GraphCanvasPresentation.EdgeHighlightAlpha)

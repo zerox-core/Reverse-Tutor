@@ -564,7 +564,7 @@ private fun FormalGraphTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .height(72.dp)
-            .background(Color(0xF2FBFCFF))
+            .background(Color(0xF2EDF2F9))
             .then(
                 onBackgroundClick?.let { onClick ->
                     Modifier.clickable(onClick = onClick)
@@ -1353,4 +1353,4 @@ private fun FormalGraphStateOverlay(
     }
 }
 
-private val FormalGraphBackground = Color.White
+private val FormalGraphBackground = Color(0xFFEDF2F9)

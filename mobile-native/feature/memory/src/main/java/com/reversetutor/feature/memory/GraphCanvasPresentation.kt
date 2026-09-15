@@ -15,7 +15,7 @@ data class GraphNodeVisualStyle(
 
 object GraphCanvasPresentation {
     const val ControlTouchTargetDp = 48f
-    const val BackgroundArgb = 0xFFF7F8FAL
+    const val BackgroundArgb = 0xFFEDF2F9L
     const val EdgeArgb = 0xFF64748BL
     const val EdgeAlpha = 0.16f
     const val EdgeHighlightAlpha = 0.70f
@@ -60,12 +60,12 @@ fun graphNodeFillAlpha(
 }
 
 fun graphKindFillArgb(kind: GraphNodeKind): Long = when (kind) {
-    GraphNodeKind.Concept -> 0xFF3B82F6L
-    GraphNodeKind.Requirement -> 0xFFFF6B61L
-    GraphNodeKind.Source -> 0xFF84B547L
-    GraphNodeKind.Session -> 0xFF8B5CF6L
-    GraphNodeKind.Person -> 0xFFF59E0BL
-    GraphNodeKind.Other -> 0xFF22B8CFL
+    GraphNodeKind.Concept -> 0xFFC6E4F6L
+    GraphNodeKind.Requirement -> 0xFFF3CBD8L
+    GraphNodeKind.Source -> 0xFFC3E6BEL
+    GraphNodeKind.Session -> 0xFFCCC0EAL
+    GraphNodeKind.Person -> 0xFFE8BC6CL
+    GraphNodeKind.Other -> 0xFF48BAAEL
 }
 
 fun graphDisplayImportance(node: GraphLayoutNode, relatedEdgeCount: Int): Int =
