@@ -3,8 +3,8 @@ package com.reversetutor.feature.settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,8 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -179,7 +178,7 @@ fun FormalSettingsScreen(
                 .padding(start = 20.dp, top = 16.dp, end = 20.dp, bottom = 22.dp)
         ) {
             AccountAndSyncCard(state = state, colors = colors)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(22.dp))
             sections.forEachIndexed { index, section ->
                 SettingsSection(
                     section = section,
@@ -218,7 +217,7 @@ private fun FormalSettingsTopBar(
                 imageVector = Icons.Rounded.ArrowBackIosNew,
                 contentDescription = "返回会话首页",
                 tint = colors.backIcon,
-                modifier = Modifier.size(19.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
         Text(
@@ -227,7 +226,7 @@ private fun FormalSettingsTopBar(
             style = typeScale.style(
                 sizeSp = 18f,
                 lineHeightSp = 28f,
-                weight = FontWeight.Medium
+                weight = FontWeight.SemiBold
             ),
             modifier = Modifier.align(Alignment.Center)
         )
@@ -250,26 +249,31 @@ private fun AccountAndSyncCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .height(86.dp),
+            .height(88.dp),
         color = colors.surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, colors.border),
-        shadowElevation = 2.dp
+        border = BorderStroke(1.dp, colors.border)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 13.dp),
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            SettingsGlossyIcon(
-                imageVector = Icons.Rounded.Person,
-                contentDescription = null,
-                color = FormalColors.Primary,
-                size = 52.dp,
-                glyphSize = 24.dp,
-                radius = 16.dp
-            )
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(colors.avatar),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Person,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
             Spacer(Modifier.width(16.dp))
             Column(
                 modifier = Modifier.weight(1f),
@@ -332,19 +336,19 @@ private fun SettingsSection(
         text = section.title,
         color = colors.sectionLabel,
         style = typeScale.style(
-            sizeSp = 11f,
-            lineHeightSp = 16f,
+            sizeSp = 12f,
+            lineHeightSp = 17f,
             weight = FontWeight.Medium,
             color = colors.sectionLabel
-        )
+        ),
+        modifier = Modifier.padding(start = 2.dp)
     )
-    Spacer(Modifier.height(7.dp))
+    Spacer(Modifier.height(8.dp))
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = colors.surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, colors.border),
-        shadowElevation = 2.dp
+        border = BorderStroke(1.dp, colors.border)
     ) {
         Column {
             section.rows.forEachIndexed { index, row ->
@@ -359,7 +363,7 @@ private fun SettingsSection(
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
                                 .fillMaxWidth()
-                                .padding(start = 55.dp)
+                                .padding(start = 58.dp)
                                 .height(1.dp)
                                 .background(colors.divider)
                         )
@@ -394,23 +398,23 @@ private fun FormalSettingsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
+            .height(52.dp)
             .then(interaction)
-            .padding(horizontal = 13.dp),
+            .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsGlossyIcon(
+        SettingsFlatIcon(
             imageVector = row.icon.imageVector,
             contentDescription = null,
-            color = row.icon.color
+            colors = colors
         )
         Spacer(Modifier.width(14.dp))
         Text(
             text = row.label,
             color = colors.rowLabel,
             style = typeScale.style(
-                sizeSp = 12f,
-                lineHeightSp = 18f,
+                sizeSp = 14f,
+                lineHeightSp = 21f,
                 color = colors.rowLabel
             ),
             modifier = Modifier.weight(1f)
@@ -419,7 +423,7 @@ private fun FormalSettingsRow(
             Text(
                 text = value,
                 color = colors.value,
-                style = typeScale.style(sizeSp = 11f, lineHeightSp = 17f)
+                style = typeScale.style(sizeSp = 12f, lineHeightSp = 18f)
             )
             Spacer(Modifier.width(8.dp))
         }
@@ -444,56 +448,43 @@ private fun SettingsToggle(
 ) {
     Box(
         modifier = Modifier
-            .width(42.dp)
-            .height(24.dp)
+            .width(44.dp)
+            .height(26.dp)
             .clearAndSetSemantics { }
             .background(
-                color = if (enabled) colors.primary else colors.toggleOff,
+                color = if (enabled) colors.toggleOn else colors.toggleOff,
                 shape = RoundedCornerShape(FormalShapes.PillRadius)
             )
-            .padding(2.dp)
+            .padding(3.dp)
     ) {
         Box(
             modifier = Modifier
                 .align(if (enabled) Alignment.CenterEnd else Alignment.CenterStart)
                 .size(20.dp)
-                .shadow(2.dp, CircleShape)
                 .background(colors.toggleThumb, CircleShape)
         )
     }
 }
 
 @Composable
-private fun SettingsGlossyIcon(
+private fun SettingsFlatIcon(
     imageVector: ImageVector,
     contentDescription: String?,
-    color: Color,
-    size: Dp = 28.dp,
-    glyphSize: Dp = 16.dp,
-    radius: Dp = 7.dp
+    colors: FormalSettingsColors,
+    size: Dp = 30.dp,
+    glyphSize: Dp = 17.dp
 ) {
-    val shape = RoundedCornerShape(radius)
     Box(
         modifier = Modifier
             .size(size)
-            .shadow(
-                elevation = 5.dp,
-                shape = shape,
-                ambientColor = Color(0x261F3861),
-                spotColor = Color(0x261F3861)
-            )
-            .background(
-                brush = Brush.linearGradient(
-                    colors = listOf(color.copy(red = (color.red + 0.18f).coerceAtMost(1f)), color)
-                ),
-                shape = shape
-            ),
+            .clip(RoundedCornerShape(8.dp))
+            .background(colors.iconChip),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = imageVector,
             contentDescription = contentDescription,
-            tint = Color.White,
+            tint = colors.iconGlyph,
             modifier = Modifier.size(glyphSize)
         )
     }
@@ -623,20 +614,19 @@ internal enum class FormalSettingsAction {
 }
 
 internal enum class FormalSettingsIcon(
-    val imageVector: ImageVector,
-    val color: Color
+    val imageVector: ImageVector
 ) {
-    Challenge(Icons.Rounded.EmojiEvents, Color(0xFFC96E26)),
-    Download(Icons.Rounded.Download, Color(0xFF2E66C7)),
-    ApiKey(Icons.Rounded.Key, Color(0xFF296EC2)),
-    Layout(Icons.AutoMirrored.Rounded.FormatAlignLeft, Color(0xFF2E66C7)),
-    Haptics(Icons.Rounded.Vibration, Color(0xFF21857A)),
-    Notifications(Icons.Rounded.Notifications, Color(0xFF6170B8)),
-    Sync(Icons.Rounded.Sync, Color(0xFF178775)),
-    Storage(Icons.Rounded.Storage, Color(0xFF386BC2)),
-    ImportExport(Icons.Rounded.ImportExport, Color(0xFF6170B8)),
-    Privacy(Icons.Rounded.Shield, Color(0xFFBD4F6B)),
-    About(Icons.AutoMirrored.Rounded.HelpOutline, Color(0xFF5C6B8A))
+    Challenge(Icons.Rounded.EmojiEvents),
+    Download(Icons.Rounded.Download),
+    ApiKey(Icons.Rounded.Key),
+    Layout(Icons.AutoMirrored.Rounded.FormatAlignLeft),
+    Haptics(Icons.Rounded.Vibration),
+    Notifications(Icons.Rounded.Notifications),
+    Sync(Icons.Rounded.Sync),
+    Storage(Icons.Rounded.Storage),
+    ImportExport(Icons.Rounded.ImportExport),
+    Privacy(Icons.Rounded.Shield),
+    About(Icons.AutoMirrored.Rounded.HelpOutline)
 }
 
 @Immutable
@@ -651,10 +641,13 @@ private data class FormalSettingsColors(
     val value: Color,
     val border: Color,
     val divider: Color,
-    val primary: Color,
     val success: Color,
     val chevron: Color,
     val backIcon: Color,
+    val avatar: Color,
+    val iconChip: Color,
+    val iconGlyph: Color,
+    val toggleOn: Color,
     val toggleOff: Color,
     val toggleThumb: Color
 )
@@ -674,11 +667,14 @@ private fun formalSettingsColors(): FormalSettingsColors {
             value = scheme.onSurfaceVariant,
             border = scheme.outlineVariant,
             divider = scheme.outlineVariant,
-            primary = scheme.primary,
             success = FormalColors.Success,
             chevron = scheme.onSurfaceVariant,
-            backIcon = scheme.onSurfaceVariant,
-            toggleOff = scheme.surfaceVariant,
+            backIcon = scheme.onSurface,
+            avatar = scheme.onSurface,
+            iconChip = scheme.surface,
+            iconGlyph = scheme.onSurface,
+            toggleOn = FormalColors.Success,
+            toggleOff = scheme.outlineVariant,
             toggleThumb = scheme.onPrimary
         )
     } else {
@@ -687,17 +683,20 @@ private fun formalSettingsColors(): FormalSettingsColors {
             topBar = FormalColors.Surface,
             surface = FormalColors.Surface,
             ink = FormalColors.Ink,
-            rowLabel = Color(0xFF2E384A),
-            sectionLabel = Color(0xFF454F61),
+            rowLabel = FormalColors.Ink,
+            sectionLabel = FormalColors.Muted,
             muted = FormalColors.Muted,
-            value = Color(0xFF667082),
-            border = Color(0xFFB9BAC0),
+            value = FormalColors.Tertiary,
+            border = FormalColors.Border,
             divider = FormalColors.Divider,
-            primary = FormalColors.Primary,
             success = FormalColors.Success,
-            chevron = Color(0xFF7A879C),
-            backIcon = Color(0xFF3D5370),
-            toggleOff = Color(0xFFB5BECC),
+            chevron = FormalColors.Tertiary,
+            backIcon = FormalColors.Ink,
+            avatar = FormalColors.Ink,
+            iconChip = FormalColors.SurfaceSubtle,
+            iconGlyph = Color(0xFF3A3A3C),
+            toggleOn = FormalColors.Success,
+            toggleOff = FormalColors.Border,
             toggleThumb = Color.White
         )
     }
