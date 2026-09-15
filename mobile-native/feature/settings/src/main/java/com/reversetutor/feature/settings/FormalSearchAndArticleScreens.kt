@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.CheckCircleOutline
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Share
@@ -57,6 +58,26 @@ import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalShapes
 import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
+
+private val SearchPageBackground = Color(0xFFF4F7FC)
+private val SearchAccent = Color(0xFF2B74D2)
+
+@Composable
+private fun SearchIndexBanner(status: String) {
+    val colors = formalBatch6Colors()
+    val type = LocalFormalTypeScale.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.primarySoft, RoundedCornerShape(FormalShapes.CardRadius))
+            .padding(horizontal = 13.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(7.dp).background(colors.success, CircleShape))
+        Spacer(Modifier.width(10.dp))
+        Text(status, color = colors.muted, style = type.style(9f, 14f, FontWeight.Medium))
+    }
+}
 
 @Immutable
 data class FormalSearchUiState(
@@ -118,12 +139,12 @@ fun FormalGlobalSearchScreen(
 ) {
     val colors = formalBatch6Colors()
     val type = LocalFormalTypeScale.current
-    Column(modifier = modifier.fillMaxSize().background(colors.background)) {
+    Column(modifier = modifier.fillMaxSize().background(SearchPageBackground)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
-                .background(colors.surface)
+                .background(SearchPageBackground)
                 .padding(start = 7.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -143,8 +164,7 @@ fun FormalGlobalSearchScreen(
             Surface(
                 modifier = Modifier.weight(1f).height(44.dp),
                 color = colors.surfaceQuiet,
-                shape = RoundedCornerShape(8.dp),
-                border = BorderStroke(1.dp, colors.border)
+                shape = RoundedCornerShape(22.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
@@ -190,7 +210,6 @@ fun FormalGlobalSearchScreen(
                 }
             }
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.divider))
         if (state.showingResults) {
             SearchResultsContent(state, onResultClick)
         } else {
@@ -223,7 +242,7 @@ private fun SearchRecentContent(
                 if (state.recentSearches.isNotEmpty()) {
                     Text(
                         "清除",
-                        color = Color(0xFF4C86C5),
+                        color = SearchAccent,
                         style = type.style(9f, 15f),
                         modifier = Modifier.clickable(onClickLabel = "清除最近搜索", onClick = onClearRecentSearches)
                     )
@@ -264,11 +283,7 @@ private fun SearchRecentContent(
         }
         item {
             Spacer(Modifier.height(26.dp))
-            FormalInfoBanner(
-                title = state.indexStatus,
-                body = "",
-                success = true
-            )
+            SearchIndexBanner(state.indexStatus)
         }
     }
 }
@@ -322,7 +337,7 @@ private fun SearchResultsContent(state: FormalSearchUiState, onResultClick: (Str
                     Row(modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(state.selectedTypeLabel, color = colors.muted, style = type.style(9f, 14f))
                         Spacer(Modifier.width(12.dp))
-                        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = colors.muted, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Rounded.KeyboardArrowDown, null, tint = colors.muted, modifier = Modifier.size(14.dp))
                     }
                 }
             }
@@ -353,7 +368,7 @@ private fun SearchResultRow(result: FormalSearchResult, query: String, onClick: 
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (result.kind == FormalSearchKind.Message) {
-            Box(Modifier.width(3.dp).height(40.dp).background(Color(0xFF4C91EC), RoundedCornerShape(2.dp)))
+            Box(Modifier.width(3.dp).height(40.dp).background(SearchAccent, RoundedCornerShape(2.dp)))
             Spacer(Modifier.width(11.dp))
         } else {
             FormalGlossySquare(result.kind.icon, null, result.kind.color, size = 30.dp, glyphSize = 14.dp)
@@ -361,7 +376,7 @@ private fun SearchResultRow(result: FormalSearchResult, query: String, onClick: 
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                text = highlighted(result.title, result.emphasizedTerm ?: query, colors.primary, colors.ink),
+                text = highlighted(result.title, result.emphasizedTerm ?: query, SearchAccent, colors.ink),
                 style = type.style(10f, 16f, if (result.kind == FormalSearchKind.Message) FontWeight.Normal else FontWeight.Medium)
             )
             Text(result.subtitle, color = colors.faint, style = type.style(8f, 13f))
