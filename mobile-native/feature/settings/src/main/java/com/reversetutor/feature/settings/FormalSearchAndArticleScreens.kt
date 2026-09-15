@@ -75,7 +75,7 @@ private fun SearchIndexBanner(status: String) {
     ) {
         Box(Modifier.size(7.dp).background(colors.success, CircleShape))
         Spacer(Modifier.width(10.dp))
-        Text(status, color = colors.muted, style = type.style(9f, 14f, FontWeight.Medium))
+        Text(status, color = colors.muted, style = type.style(11f, 17f, FontWeight.Medium))
     }
 }
 
@@ -176,7 +176,7 @@ fun FormalGlobalSearchScreen(
                         value = state.query,
                         onValueChange = onQueryChange,
                         singleLine = true,
-                        textStyle = type.style(11f, 17f, FontWeight.Medium, colors.ink),
+                        textStyle = type.style(14f, 21f, FontWeight.Medium, colors.ink),
                         cursorBrush = SolidColor(colors.primary),
                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { onSubmitSearch() }),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -188,7 +188,7 @@ fun FormalGlobalSearchScreen(
                                     Text(
                                         "搜索会话、消息、资料和节点",
                                         color = colors.faint,
-                                        style = type.style(10f, 17f)
+                                        style = type.style(13f, 21f)
                                     )
                                 }
                                 inner()
@@ -236,14 +236,14 @@ private fun SearchRecentContent(
                 Text(
                     "最近搜索",
                     color = colors.ink,
-                    style = type.style(13f, 20f, FontWeight.SemiBold),
+                    style = type.style(16f, 24f, FontWeight.SemiBold),
                     modifier = Modifier.weight(1f)
                 )
                 if (state.recentSearches.isNotEmpty()) {
                     Text(
                         "清除",
                         color = SearchAccent,
-                        style = type.style(9f, 15f),
+                        style = type.style(11f, 18f),
                         modifier = Modifier.clickable(onClickLabel = "清除最近搜索", onClick = onClearRecentSearches)
                     )
                 }
@@ -264,7 +264,7 @@ private fun SearchRecentContent(
                             ) {
                                 Icon(Icons.Rounded.History, null, tint = colors.muted, modifier = Modifier.size(17.dp))
                                 Spacer(Modifier.width(13.dp))
-                                Text(value, color = colors.ink, style = type.style(10f, 16f), modifier = Modifier.weight(1f))
+                                Text(value, color = colors.ink, style = type.style(13f, 20f), modifier = Modifier.weight(1f))
                                 Icon(Icons.AutoMirrored.Rounded.Reply, null, tint = colors.muted, modifier = Modifier.size(15.dp))
                             }
                             if (index != state.recentSearches.lastIndex) {
@@ -275,7 +275,7 @@ private fun SearchRecentContent(
                 }
             }
             Spacer(Modifier.height(26.dp))
-            FormalSectionLabel("最近访问")
+            FormalSectionLabel("最近访问", textSize = 16f, textLineHeight = 24f)
             Spacer(Modifier.height(10.dp))
         }
         items(state.recentVisits, key = { it.id }) { visit ->
@@ -302,11 +302,11 @@ private fun SearchVisitRow(visit: FormalSearchVisit, onClick: (String) -> Unit) 
         FormalGlossySquare(visit.kind.icon, null, visit.kind.color, size = 38.dp, glyphSize = 17.dp)
         Spacer(Modifier.width(13.dp))
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(visit.title, color = colors.ink, style = type.style(11f, 17f, FontWeight.Medium))
-            Text(visit.subtitle, color = colors.faint, style = type.style(8f, 13f))
+            Text(visit.title, color = colors.ink, style = type.style(14f, 21f, FontWeight.Medium))
+            Text(visit.subtitle, color = colors.faint, style = type.style(10f, 16f))
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(visit.timeLabel, color = colors.faint, style = type.style(8f, 12f))
+            Text(visit.timeLabel, color = colors.faint, style = type.style(10f, 15f))
             Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = colors.muted, modifier = Modifier.size(17.dp))
         }
     }
@@ -326,7 +326,7 @@ private fun SearchResultsContent(state: FormalSearchUiState, onResultClick: (Str
                 Text(
                     "${state.resultCount} 条结果",
                     color = colors.ink,
-                    style = type.style(12f, 18f, FontWeight.SemiBold),
+                    style = type.style(15f, 22f, FontWeight.SemiBold),
                     modifier = Modifier.weight(1f)
                 )
                 Surface(
@@ -335,7 +335,7 @@ private fun SearchResultsContent(state: FormalSearchUiState, onResultClick: (Str
                     border = BorderStroke(1.dp, colors.border)
                 ) {
                     Row(modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(state.selectedTypeLabel, color = colors.muted, style = type.style(9f, 14f))
+                        Text(state.selectedTypeLabel, color = colors.muted, style = type.style(11f, 17f))
                         Spacer(Modifier.width(12.dp))
                         Icon(Icons.Rounded.KeyboardArrowDown, null, tint = colors.muted, modifier = Modifier.size(14.dp))
                     }
@@ -345,7 +345,7 @@ private fun SearchResultsContent(state: FormalSearchUiState, onResultClick: (Str
         }
         state.resultGroups.forEach { group ->
             item {
-                FormalSectionLabel(group.title, trailing = group.count.toString())
+                FormalSectionLabel(group.title, trailing = group.count.toString(), textSize = 16f, textLineHeight = 24f)
                 Spacer(Modifier.height(5.dp))
             }
             items(group.results, key = { it.id }) { result ->
@@ -377,9 +377,9 @@ private fun SearchResultRow(result: FormalSearchResult, query: String, onClick: 
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = highlighted(result.title, result.emphasizedTerm ?: query, SearchAccent, colors.ink),
-                style = type.style(10f, 16f, if (result.kind == FormalSearchKind.Message) FontWeight.Normal else FontWeight.Medium)
+                style = type.style(13f, 20f, if (result.kind == FormalSearchKind.Message) FontWeight.Normal else FontWeight.Medium)
             )
-            Text(result.subtitle, color = colors.faint, style = type.style(8f, 13f))
+            Text(result.subtitle, color = colors.faint, style = type.style(10f, 16f))
         }
     }
     Box(Modifier.fillMaxWidth().padding(start = 40.dp).height(1.dp).background(colors.divider))

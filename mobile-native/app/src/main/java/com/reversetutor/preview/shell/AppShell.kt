@@ -1845,7 +1845,7 @@ private fun DestinationContent(
         if (destination == AppDestination.GlobalSearch) {
             FormalGlobalSearchRoute(
                 searchRepository = hybridAppGraph.globalSearchRepository,
-                onBack = onOpenSessions,
+                onBack = onOpenChat,
                 onTargetSelected = onOpenSearchTarget
             )
             return@ReverseTutorScreenSurface

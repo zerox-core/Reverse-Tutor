@@ -268,7 +268,9 @@ internal fun FormalGlossySquare(
 internal fun FormalSectionLabel(
     text: String,
     modifier: Modifier = Modifier,
-    trailing: String? = null
+    trailing: String? = null,
+    textSize: Float = 13f,
+    textLineHeight: Float = 20f
 ) {
     val colors = formalBatch6Colors()
     val type = LocalFormalTypeScale.current
@@ -276,7 +278,7 @@ internal fun FormalSectionLabel(
         Text(
             text = text,
             color = colors.ink,
-            style = type.style(13f, 20f, FontWeight.SemiBold),
+            style = type.style(textSize, textLineHeight, FontWeight.SemiBold),
             modifier = Modifier.weight(1f)
         )
         trailing?.let {
