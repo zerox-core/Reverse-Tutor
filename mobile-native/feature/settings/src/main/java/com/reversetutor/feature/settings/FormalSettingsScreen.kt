@@ -44,6 +44,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -260,20 +262,14 @@ private fun AccountAndSyncCard(
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(colors.avatar),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Person,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
+            SettingsGlossyIcon(
+                imageVector = Icons.Rounded.Person,
+                contentDescription = null,
+                color = FormalColors.Primary,
+                size = 52.dp,
+                glyphSize = 24.dp,
+                radius = 16.dp
+            )
             Spacer(Modifier.width(16.dp))
             Column(
                 modifier = Modifier.weight(1f),
@@ -403,10 +399,10 @@ private fun FormalSettingsRow(
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        SettingsFlatIcon(
+        SettingsGlossyIcon(
             imageVector = row.icon.imageVector,
             contentDescription = null,
-            colors = colors
+            color = row.icon.color
         )
         Spacer(Modifier.width(14.dp))
         Text(
@@ -467,24 +463,36 @@ private fun SettingsToggle(
 }
 
 @Composable
-private fun SettingsFlatIcon(
+private fun SettingsGlossyIcon(
     imageVector: ImageVector,
     contentDescription: String?,
-    colors: FormalSettingsColors,
+    color: Color,
     size: Dp = 30.dp,
-    glyphSize: Dp = 17.dp
+    glyphSize: Dp = 17.dp,
+    radius: Dp = 8.dp
 ) {
+    val shape = RoundedCornerShape(radius)
     Box(
         modifier = Modifier
             .size(size)
-            .clip(RoundedCornerShape(8.dp))
-            .background(colors.iconChip),
+            .shadow(
+                elevation = 4.dp,
+                shape = shape,
+                ambientColor = Color(0x261F3861),
+                spotColor = Color(0x261F3861)
+            )
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(color.copy(red = (color.red + 0.18f).coerceAtMost(1f)), color)
+                ),
+                shape = shape
+            ),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = imageVector,
             contentDescription = contentDescription,
-            tint = colors.iconGlyph,
+            tint = Color.White,
             modifier = Modifier.size(glyphSize)
         )
     }
@@ -614,19 +622,20 @@ internal enum class FormalSettingsAction {
 }
 
 internal enum class FormalSettingsIcon(
-    val imageVector: ImageVector
+    val imageVector: ImageVector,
+    val color: Color
 ) {
-    Challenge(Icons.Rounded.EmojiEvents),
-    Download(Icons.Rounded.Download),
-    ApiKey(Icons.Rounded.Key),
-    Layout(Icons.AutoMirrored.Rounded.FormatAlignLeft),
-    Haptics(Icons.Rounded.Vibration),
-    Notifications(Icons.Rounded.Notifications),
-    Sync(Icons.Rounded.Sync),
-    Storage(Icons.Rounded.Storage),
-    ImportExport(Icons.Rounded.ImportExport),
-    Privacy(Icons.Rounded.Shield),
-    About(Icons.AutoMirrored.Rounded.HelpOutline)
+    Challenge(Icons.Rounded.EmojiEvents, Color(0xFFC96E26)),
+    Download(Icons.Rounded.Download, Color(0xFF2E66C7)),
+    ApiKey(Icons.Rounded.Key, Color(0xFF296EC2)),
+    Layout(Icons.AutoMirrored.Rounded.FormatAlignLeft, Color(0xFF2E66C7)),
+    Haptics(Icons.Rounded.Vibration, Color(0xFF21857A)),
+    Notifications(Icons.Rounded.Notifications, Color(0xFF6170B8)),
+    Sync(Icons.Rounded.Sync, Color(0xFF178775)),
+    Storage(Icons.Rounded.Storage, Color(0xFF386BC2)),
+    ImportExport(Icons.Rounded.ImportExport, Color(0xFF6170B8)),
+    Privacy(Icons.Rounded.Shield, Color(0xFFBD4F6B)),
+    About(Icons.AutoMirrored.Rounded.HelpOutline, Color(0xFF5C6B8A))
 }
 
 @Immutable
