@@ -229,8 +229,8 @@ fun GlobalGraphRoute(
         state = selectedState,
         onSelectedNodeChange = { selectedNodeId = it },
         modifier = modifier,
-        title = "全局图谱",
-        subtitle = "跨会话知识结构",
+        title = "知识图谱",
+        subtitle = "全局",
         onBack = {
             if (canvasModeActive) onCanvasModeChange(false) else onBack()
         },
