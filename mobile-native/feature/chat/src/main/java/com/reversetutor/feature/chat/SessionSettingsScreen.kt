@@ -72,6 +72,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -313,38 +314,63 @@ private fun SettingsIndex(document: SessionSettingsDocument, onOpen: (SessionSet
     LazyColumn(
         modifier = Modifier.fillMaxSize().testTag("session-settings-index"),
         contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(SessionSettingsSection.entries) { section ->
-            val isDanger = section == SessionSettingsSection.Danger
-            val (icon, iconColor) = sessionSectionIcon(section)
-            SettingsGroup {
-                Row(
-                    Modifier.fillMaxWidth().clickable { onOpen(section) }.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    SessionGlossyIcon(icon, null, iconColor, size = 36.dp, glyphSize = 19.dp, radius = 10.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            section.label,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (isDanger) FormalColors.Danger else FormalColors.Ink
-                        )
-                        Text(
-                            summaries.getValue(section),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isDanger) FormalColors.Danger.copy(alpha = 0.72f) else FormalColors.Muted
-                        )
-                    }
-                    Icon(
-                        Icons.Filled.ChevronRight,
-                        contentDescription = null,
-                        tint = FormalColors.Tertiary,
-                        modifier = Modifier.size(20.dp)
+        items(SessionSettingsSection.entries.chunked(3)) { rowSections ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowSections.forEach { section ->
+                    SettingsGridCell(
+                        section = section,
+                        summary = summaries.getValue(section),
+                        modifier = Modifier.weight(1f),
+                        onClick = { onOpen(section) }
                     )
                 }
+                repeat(3 - rowSections.size) { Spacer(Modifier.weight(1f)) }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsGridCell(
+    section: SessionSettingsSection,
+    summary: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val isDanger = section == SessionSettingsSection.Danger
+    val (icon, iconColor) = sessionSectionIcon(section)
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = FormalColors.Surface,
+        border = BorderStroke(1.dp, FormalColors.Divider)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SessionGlossyIcon(icon, null, iconColor, size = 44.dp, glyphSize = 23.dp, radius = 12.dp)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                section.label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (isDanger) FormalColors.Danger else FormalColors.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                summary,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isDanger) FormalColors.Danger.copy(alpha = 0.72f) else FormalColors.Muted,
+                maxLines = 2,
+                minLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
