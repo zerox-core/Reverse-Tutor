@@ -1,4 +1,4 @@
-package com.reversetutor.feature.chat
+﻿package com.reversetutor.feature.chat
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -68,7 +68,8 @@ fun CustomColumnEditorScreen(
     tagLibraryEditor: TagLibraryEditor,
     onTagLibraryStateChange: (TagLibraryEditorState) -> Unit,
     onColumnsChange: (List<CustomColumn>) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    internalScroll: Boolean = true
 ) {
     var editing by remember { mutableStateOf<CustomColumn?>(null) }
     var adding by remember { mutableStateOf(false) }
@@ -85,7 +86,7 @@ fun CustomColumnEditorScreen(
     }
 
     Column(
-        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        modifier = (if (internalScroll) modifier.fillMaxSize().verticalScroll(rememberScrollState()) else modifier.fillMaxWidth()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -1,10 +1,11 @@
-package com.reversetutor.feature.chat
+﻿package com.reversetutor.feature.chat
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,7 +22,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -60,6 +66,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,7 +79,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -83,7 +89,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SessionSettingsScreen(
     coordinator: SessionSettingsCoordinator,
@@ -105,8 +113,15 @@ fun SessionSettingsScreen(
     onOpenSourceCenter: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var section by remember(initialSection) { mutableStateOf(initialSection) }
+    val sections = SessionSettingsSection.entries
     var revision by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(
+        initialPage = initialSection?.let { sections.indexOf(it).coerceAtLeast(0) } ?: 0
+    ) { sections.size }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(initialSection) {
+        initialSection?.let { pagerState.scrollToPage(sections.indexOf(it).coerceAtLeast(0)) }
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
     val tagEditor = remember(tagLibraryPersistence) { TagLibraryEditor(tagLibraryPersistence) }
     var tagState by remember(tagEditor) {
@@ -136,7 +151,7 @@ fun SessionSettingsScreen(
     }
     val handleBack = {
         commitBoundary()
-        if (section == null) onBack() else section = null
+        onBack()
     }
     BackHandler(onBack = handleBack)
 
@@ -162,7 +177,7 @@ fun SessionSettingsScreen(
 
     Column(modifier.fillMaxSize().background(FormalColors.Background).testTag("session-settings-screen")) {
         SessionSettingsHeader(
-            title = section?.label ?: "窗口设置",
+            title = "窗口设置",
             subtitle = coordinator.state.applied.profile.title,
             onBack = handleBack
         )
@@ -182,53 +197,54 @@ fun SessionSettingsScreen(
                 if (externalImportError != null) TextButton(onClick = onRetryImport) { Text("重试") }
             }
         }
-        when (section) {
-            null -> SettingsIndex(
-                coordinator.state.applied,
-                onOpen = { opened ->
-                    if (opened == SessionSettingsSection.SourceManagement && onOpenSourceCenter != null) {
-                        onOpenSourceCenter()
-                    } else {
-                        section = opened
-                    }
-                }
-            )
-            SessionSettingsSection.Basic -> BasicProfilePage(
-                coordinator,
-                commitBoundary,
-                onPickLearnerImage = { learnerImageLauncher.launch(arrayOf("image/*")) },
-                refresh = refresh
-            )
-            SessionSettingsSection.GoalPlan -> GoalPlanPage(
-                coordinator,
-                tagEditor,
-                tagState,
-                onTagStateChange = { tagState = it },
-                commitBoundary,
-                refresh
-            )
-            SessionSettingsSection.ConversationStrategy -> StrategyPage(coordinator, refresh)
-            SessionSettingsSection.SourceManagement -> SourceManagementPage(
-                coordinator,
-                onPickSource,
-                refresh,
-                highlightedSourceId
-            )
-            SessionSettingsSection.WorldTree -> WorldTreePage(
-                coordinator,
-                tagEditor,
-                tagState,
-                onTagStateChange = { tagState = it },
-                commitBoundary,
-                onPickLearnerImage = { learnerImageLauncher.launch(arrayOf("image/*")) },
-                onPickStoryImage = { storyImageLauncher.launch(arrayOf("image/*")) },
-                refresh = refresh
-            )
-            SessionSettingsSection.Danger -> DangerPage(
-                onRequestDeleteSession,
-                canUndoSessionDelete,
-                onUndoSessionDelete
-            )
+        SectionTabStrip(
+            document = coordinator.state.applied,
+            sections = sections,
+            selectedPage = pagerState.currentPage,
+            onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } }
+        )
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            when (sections[page]) {
+                SessionSettingsSection.Basic -> BasicProfilePage(
+                    coordinator,
+                    commitBoundary,
+                    onPickLearnerImage = { learnerImageLauncher.launch(arrayOf("image/*")) },
+                    refresh = refresh
+                )
+                SessionSettingsSection.GoalPlan -> GoalPlanPage(
+                    coordinator,
+                    tagEditor,
+                    tagState,
+                    onTagStateChange = { tagState = it },
+                    commitBoundary,
+                    refresh
+                )
+                SessionSettingsSection.ConversationStrategy -> StrategyPage(coordinator, refresh)
+                SessionSettingsSection.SourceManagement -> SourceManagementPage(
+                    coordinator,
+                    onPickSource,
+                    refresh,
+                    highlightedSourceId
+                )
+                SessionSettingsSection.WorldTree -> WorldTreePage(
+                    coordinator,
+                    tagEditor,
+                    tagState,
+                    onTagStateChange = { tagState = it },
+                    commitBoundary,
+                    onPickLearnerImage = { learnerImageLauncher.launch(arrayOf("image/*")) },
+                    onPickStoryImage = { storyImageLauncher.launch(arrayOf("image/*")) },
+                    refresh = refresh
+                )
+                SessionSettingsSection.Danger -> DangerPage(
+                    onRequestDeleteSession,
+                    canUndoSessionDelete,
+                    onUndoSessionDelete
+                )
+            }
         }
     }
 
@@ -302,7 +318,12 @@ private fun SessionSettingsHeader(title: String, subtitle: String, onBack: () ->
 }
 
 @Composable
-private fun SettingsIndex(document: SessionSettingsDocument, onOpen: (SessionSettingsSection) -> Unit) {
+private fun SectionTabStrip(
+    document: SessionSettingsDocument,
+    sections: List<SessionSettingsSection>,
+    selectedPage: Int,
+    onSelect: (Int) -> Unit
+) {
     val summaries = mapOf(
         SessionSettingsSection.Basic to "${document.profile.learnerDisplayName} · ${document.profile.learnerRole}",
         SessionSettingsSection.GoalPlan to document.goalPlan.primaryGoal.ifBlank { "尚未设置主要目标" },
@@ -311,65 +332,65 @@ private fun SettingsIndex(document: SessionSettingsDocument, onOpen: (SessionSet
         SessionSettingsSection.WorldTree to "独立快照 · ${document.snapshot.effectiveCustomColumns().size} 个自定义栏目",
         SessionSettingsSection.Danger to "删除当前会话"
     )
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().testTag("session-settings-index"),
-        contentPadding = PaddingValues(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedPage) {
+        if (selectedPage > 0) listState.animateScrollToItem(selectedPage - 1)
+    }
+    LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth().testTag("session-settings-index"),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(SessionSettingsSection.entries.chunked(3)) { rowSections ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowSections.forEach { section ->
-                    SettingsGridCell(
-                        section = section,
-                        summary = summaries.getValue(section),
-                        modifier = Modifier.weight(1f),
-                        onClick = { onOpen(section) }
-                    )
-                }
-                repeat(3 - rowSections.size) { Spacer(Modifier.weight(1f)) }
-            }
+        itemsIndexed(sections) { index, section ->
+            SettingsTabCard(
+                section = section,
+                summary = summaries.getValue(section),
+                selected = index == selectedPage,
+                onClick = { onSelect(index) }
+            )
         }
     }
 }
 
 @Composable
-private fun SettingsGridCell(
+private fun SettingsTabCard(
     section: SessionSettingsSection,
     summary: String,
-    modifier: Modifier = Modifier,
+    selected: Boolean,
     onClick: () -> Unit
 ) {
     val isDanger = section == SessionSettingsSection.Danger
     val (icon, iconColor) = sessionSectionIcon(section)
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = Modifier.width(116.dp).clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = FormalColors.Surface,
-        border = BorderStroke(1.dp, FormalColors.Divider)
+        color = if (selected) FormalColors.Success.copy(alpha = 0.08f) else FormalColors.Surface,
+        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) FormalColors.Success else FormalColors.Divider)
     ) {
         Column(
-            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SessionGlossyIcon(icon, null, iconColor, size = 44.dp, glyphSize = 23.dp, radius = 12.dp)
-            Spacer(Modifier.height(10.dp))
+            SessionGlossyIcon(icon, null, iconColor, size = 40.dp, glyphSize = 21.dp, radius = 11.dp)
+            Spacer(Modifier.height(8.dp))
             Text(
                 section.label,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isDanger) FormalColors.Danger else FormalColors.Ink,
+                color = if (isDanger) FormalColors.Danger
+                else if (selected) FormalColors.Success
+                else FormalColors.Ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(Modifier.height(3.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 summary,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isDanger) FormalColors.Danger.copy(alpha = 0.72f) else FormalColors.Muted,
-                maxLines = 2,
-                minLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -765,7 +786,8 @@ private fun WorldTreePage(
         tagLibraryState = tagState,
         tagLibraryEditor = tagEditor,
         onTagLibraryStateChange = onTagStateChange,
-        onColumnsChange = { columns -> coordinator.updateWorldTree { it.withCustomColumns(columns) }; refresh() }
+        onColumnsChange = { columns -> coordinator.updateWorldTree { it.withCustomColumns(columns) }; refresh() },
+        internalScroll = false
     )
 }
 

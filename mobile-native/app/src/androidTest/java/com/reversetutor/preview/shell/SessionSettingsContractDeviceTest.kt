@@ -80,9 +80,8 @@ class SessionSettingsContractDeviceTest {
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.runOnIdle {
             assertEquals("临时世界树", coordinator.state.applied.snapshot.story)
-            assertEquals(0, leftSettings)
+            assertEquals(1, leftSettings)
         }
-        composeRule.onNodeWithText("窗口设置").assertIsDisplayed()
 
         composeRule.onNodeWithText("资料管理").performClick()
         composeRule.onNodeWithText("概率论讲义").performClick()
@@ -122,13 +121,10 @@ class SessionSettingsContractDeviceTest {
         composeRule.onNodeWithText("世界树配置").performClick()
         composeRule.onNodeWithTag("session-settings-story").performTextReplacement("系统返回提交")
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
-        composeRule.onNodeWithText("窗口设置").assertIsDisplayed()
         composeRule.runOnIdle {
             assertEquals("系统返回提交", persistence.sessions.getValue("session-a").story)
-            assertEquals(0, leftSettings)
-            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+            assertEquals(1, leftSettings)
         }
-        composeRule.runOnIdle { assertEquals(1, leftSettings) }
     }
 
     @Test
