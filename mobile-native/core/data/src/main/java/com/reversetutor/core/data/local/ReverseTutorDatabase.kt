@@ -25,6 +25,7 @@ import com.reversetutor.core.data.local.dao.LearningLedgerDao
 import com.reversetutor.core.data.local.dao.CompanionMemoryDao
 import com.reversetutor.core.data.local.dao.WindowHeartbeatDao
 import com.reversetutor.core.data.local.dao.WindowMemoryDao
+import com.reversetutor.core.data.local.dao.WindowMemoryTokenMeterDao
 import com.reversetutor.core.data.local.dao.WorldTreeDao
 import com.reversetutor.core.data.local.dao.SessionAgentDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
@@ -40,6 +41,7 @@ import com.reversetutor.core.data.local.entity.LlmProfileEntity
 import com.reversetutor.core.data.local.entity.MemoryItemEntity
 import com.reversetutor.core.data.local.entity.MessageAttachmentEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryTokenMeterEntity
 import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.local.entity.ModelBindingEntity
 import com.reversetutor.core.data.local.entity.NoteEntity
@@ -137,7 +139,8 @@ import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
         WindowMemoryObservationEntity::class,
         WindowMemoryActiveValueEntity::class,
         WindowIntakeWatermarkEntity::class,
-        WindowRollingSummaryEntity::class
+        WindowRollingSummaryEntity::class,
+        WindowMemoryTokenMeterEntity::class
     ],
     version = DatabaseSchema.version,
     exportSchema = DatabaseSchema.exportSchema
@@ -168,4 +171,5 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun windowHeartbeatDao(): WindowHeartbeatDao
     abstract fun sessionAgentDao(): SessionAgentDao
     abstract fun windowMemoryDao(): WindowMemoryDao
+    abstract fun windowMemoryTokenMeterDao(): WindowMemoryTokenMeterDao
 }

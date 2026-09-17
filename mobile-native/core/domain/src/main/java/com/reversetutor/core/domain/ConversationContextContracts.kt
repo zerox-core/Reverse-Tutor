@@ -89,7 +89,14 @@ data class ConversationContextContract(
      * pre-existing construction site stays source-compatible; blank means
      * no summary has been generated yet.
      */
-    val earlyHistoryDigest: String = ""
+    val earlyHistoryDigest: String = "",
+    /**
+     * V2-006: bounded window-memory injection block (active values, patterns,
+     * rolling summary), relevance-ranked and token-budgeted by
+     * [WindowMemoryContextSelector]. Defaulted so every pre-existing
+     * construction site stays source-compatible; blank means nothing stored.
+     */
+    val windowMemoryDigest: String = ""
 ) {
     companion object {
         fun empty(spaceId: String, sessionId: String): ConversationContextContract =
@@ -196,5 +203,19 @@ interface SessionDigestContextPort {
     suspend fun loadEarlyHistoryDigest(
         spaceId: String,
         sessionId: String
+    ): String
+}
+
+/**
+ * V2-006: returns the bounded window-memory injection block for a session.
+ * [queryText] lets implementations rank active values by relevance to the
+ * current question (lorebook-style selective injection, never everything).
+ * Blank means nothing is stored yet.
+ */
+fun interface WindowMemoryContextPort {
+    suspend fun loadWindowMemoryContext(
+        spaceId: String,
+        sessionId: String,
+        queryText: String
     ): String
 }

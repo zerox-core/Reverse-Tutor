@@ -70,6 +70,8 @@ data class WindowIntakeReport(
     val conflictCount: Int,
     val ignoredCount: Int,
     val summaryFolded: Boolean,
+    /** V2-006: estimated tokens of the kept window, for budget tuning. */
+    val windowKeptTokens: Int = 0,
 )
 
 /**
@@ -129,6 +131,7 @@ class WindowMemoryIntakeCoordinator(
                 conflictCount = 0,
                 ignoredCount = 0,
                 summaryFolded = false,
+                windowKeptTokens = eviction.kept.sumOf { it.estimatedTokens },
             )
         }
 
@@ -236,6 +239,7 @@ class WindowMemoryIntakeCoordinator(
             conflictCount = conflict,
             ignoredCount = ignored,
             summaryFolded = summaryFolded,
+            windowKeptTokens = eviction.kept.sumOf { it.estimatedTokens },
         )
     }
 }

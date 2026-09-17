@@ -35,6 +35,7 @@ import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
 import com.reversetutor.core.data.local.entity.WindowIntakeWatermarkEntity
 import com.reversetutor.core.data.local.entity.WindowMemoryActiveValueEntity
 import com.reversetutor.core.data.local.entity.WindowMemoryObservationEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryTokenMeterEntity
 import com.reversetutor.core.data.local.entity.WindowRollingSummaryEntity
 import com.reversetutor.core.data.local.entity.AssistantReplyArtifactEntity
 import com.reversetutor.core.data.local.entity.SessionDocumentEntity
@@ -545,4 +546,13 @@ interface WindowMemoryDao {
 
     @Query("SELECT * FROM window_memory_rolling_summaries WHERE sessionId = :sessionId")
     suspend fun getRollingSummary(sessionId: String): WindowRollingSummaryEntity?
+}
+
+@Dao
+interface WindowMemoryTokenMeterDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMeter(meter: WindowMemoryTokenMeterEntity)
+
+    @Query("SELECT * FROM window_memory_token_meters WHERE sessionId = :sessionId ORDER BY createdAtEpochMillis ASC")
+    suspend fun listMeters(sessionId: String): List<WindowMemoryTokenMeterEntity>
 }

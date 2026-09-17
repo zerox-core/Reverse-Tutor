@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 14
+    const val version = 15
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -122,6 +122,14 @@ object DatabaseSchema {
         }
     }
 
+    /** V2-006: window-memory token metering for budget tuning. */
+    val migration14To15: Migration = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            windowMemoryTokenMeterTableSql.forEach(db::execSQL)
+            windowMemoryTokenMeterIndexSql.forEach(db::execSQL)
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -135,7 +143,8 @@ object DatabaseSchema {
         migration10To11,
         migration11To12,
         migration12To13,
-        migration13To14
+        migration13To14,
+        migration14To15
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -792,6 +801,24 @@ object DatabaseSchema {
 
     private val windowMemoryIndexSql = listOf(
         "CREATE INDEX IF NOT EXISTS index_window_memory_observations_sessionId ON window_memory_observations(sessionId)"
+    )
+
+    private val windowMemoryTokenMeterTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_token_meters (
+            id TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            estimatedTokens INTEGER NOT NULL,
+            detail TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val windowMemoryTokenMeterIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_window_memory_token_meters_sessionId ON window_memory_token_meters(sessionId)"
     )
 }
 

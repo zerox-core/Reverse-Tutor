@@ -847,3 +847,23 @@ data class WindowRollingSummaryEntity(
         )
     }
 }
+
+// Window-memory token metering (V2-006, schema 14 -> 15). Budget-tuning
+// telemetry for the memory subsystem itself (kept-window size, injected
+// context size); distinct from token_usage_records, which meters individual
+// LLM calls per turn attempt.
+@Entity(tableName = "window_memory_token_meters", indices = [Index("sessionId")])
+data class WindowMemoryTokenMeterEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val kind: String,
+    val estimatedTokens: Int,
+    val detail: String,
+    val createdAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "sessionId", "kind", "estimatedTokens", "detail", "createdAtEpochMillis"
+        )
+    }
+}

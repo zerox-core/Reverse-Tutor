@@ -2,6 +2,8 @@ package com.reversetutor.preview.wiring.session
 
 import com.reversetutor.core.data.llm.SessionSummaryOutcome
 import com.reversetutor.core.data.windowmemory.WindowMemoryRepository
+import com.reversetutor.core.data.windowmemory.WindowTokenMeterRepository
+import com.reversetutor.core.domain.CategorizedObservation
 import com.reversetutor.core.domain.ExtractionRole
 import com.reversetutor.core.domain.WindowActiveValue
 import com.reversetutor.core.domain.WindowIntakeMessage
@@ -9,6 +11,9 @@ import com.reversetutor.core.domain.WindowIntakeMessagePort
 import com.reversetutor.core.domain.WindowIntakeStore
 import com.reversetutor.core.domain.WindowIntakeWatermark
 import com.reversetutor.core.domain.WindowLocalObservation
+import com.reversetutor.core.domain.WindowMemoryContextPort
+import com.reversetutor.core.domain.WindowMemoryContextSelector
+import com.reversetutor.core.domain.WindowMemoryPolicy
 import com.reversetutor.core.domain.WindowObservationCategory
 import com.reversetutor.core.model.Message
 import com.reversetutor.core.model.MessageRole
@@ -139,3 +144,52 @@ fun windowIntakeFoldSummary(
             else -> null
         }
     }
+
+/**
+ * V2-006: turns stored window memory into the bounded injection block.
+ * Lorebook rule (locked): never inject everything - the domain selector
+ * ranks (always-on > query relevance > weight > recency) and truncates by
+ * the injection token budget. Every non-empty injection is metered so the
+ * default budget can be tuned against real usage.
+ */
+class WindowMemoryContextPortAdapter(
+    private val repository: WindowMemoryRepository,
+    private val meterRepository: WindowTokenMeterRepository,
+    private val hourOfDayAt: (Long) -> Int,
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+) : WindowMemoryContextPort {
+    override suspend fun loadWindowMemoryContext(
+        spaceId: String,
+        sessionId: String,
+        queryText: String,
+    ): String {
+        val activeValues = repository.listActiveValues(sessionId)
+        val patterns = WindowMemoryPolicy.aggregatePatterns(
+            repository.listObservations(sessionId).map {
+                CategorizedObservation(
+                    category = it.category,
+                    occurredAtEpochMillis = it.occurredAtEpochMillis,
+                    hourOfDay = hourOfDayAt(it.occurredAtEpochMillis),
+                )
+            },
+        )
+        val rollingSummary = repository.loadRollingSummary(sessionId)?.summary
+        val block = WindowMemoryContextSelector.select(
+            activeValues = activeValues,
+            patterns = patterns,
+            rollingSummary = rollingSummary,
+            queryText = queryText,
+        )
+        if (block.text.isEmpty()) return ""
+        meterRepository.recordTokenMeter(
+            sessionId = sessionId,
+            kind = "injection",
+            estimatedTokens = block.estimatedTokens,
+            detail = "values=" + block.includedValueCount +
+                ",patterns=" + block.includedPatternCount +
+                ",summary=" + block.summaryIncluded,
+            createdAtEpochMillis = nowEpochMillis(),
+        )
+        return block.text
+    }
+}
