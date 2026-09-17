@@ -10,9 +10,9 @@ enum class SessionSettingsSection(val label: String) {
     Basic("基本资料"),
     GoalPlan("学习目标与计划"),
     ConversationStrategy("对话策略"),
+    /** 资料管理：不出现在窗口设置标签页，仅供资料证据深链（initialSection）直达。 */
     SourceManagement("资料管理"),
-    WorldTree("世界树配置"),
-    Danger("危险操作")
+    Danger("系统操作")
 }
 
 enum class ConversationStrategyControl(val label: String) {
@@ -31,6 +31,8 @@ enum class SourceDetailAction(val label: String) {
 }
 
 enum class DangerousSessionAction(val label: String) {
+    ExportSessionMemory("导出当前会话记忆库"),
+    ExportSessionConfig("导出当前配置"),
     DeleteCurrentSession("删除当前会话")
 }
 

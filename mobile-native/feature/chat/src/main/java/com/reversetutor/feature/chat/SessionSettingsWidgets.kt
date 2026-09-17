@@ -111,8 +111,19 @@ internal fun CardRadioRow(
         modifier = modifier.fillMaxWidth().testTag(testTag),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        options.forEach { option ->
+        options.forEachIndexed { index, option ->
             val selected = option.id == selectedId
+            val entrance = remember { Animatable(0f) }
+            LaunchedEffect(Unit) {
+                delay(index * 90L)
+                entrance.animateTo(
+                    1f,
+                    spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                )
+            }
             val scale by animateFloatAsState(
                 targetValue = if (selected) 1.05f else 1f,
                 animationSpec = spring(
@@ -145,7 +156,14 @@ internal fun CardRadioRow(
                         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(option.emoji, fontSize = 26.sp)
+                        Text(
+                            option.emoji,
+                            fontSize = 26.sp,
+                            modifier = Modifier.graphicsLayer {
+                                scaleX = entrance.value
+                                scaleY = entrance.value
+                            }
+                        )
                         Spacer(Modifier.height(6.dp))
                         Text(
                             option.title,

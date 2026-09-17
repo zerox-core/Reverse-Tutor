@@ -816,6 +816,7 @@ fun SessionConfigurationTextField(
     label: String,
     value: String,
     testTag: String? = null,
+    singleLine: Boolean = false,
     onBoundary: () -> Unit = {},
     onValueChange: (String) -> Unit
 ) {
@@ -831,8 +832,9 @@ fun SessionConfigurationTextField(
                 if (focused && !it.isFocused) onBoundary()
                 focused = it.isFocused
             },
-        minLines = 3,
-        maxLines = 8,
+        singleLine = singleLine,
+        minLines = if (singleLine) 1 else 3,
+        maxLines = if (singleLine) 1 else 8,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onBoundary() })
     )

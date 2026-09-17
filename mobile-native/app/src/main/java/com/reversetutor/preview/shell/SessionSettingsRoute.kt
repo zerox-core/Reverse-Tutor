@@ -58,8 +58,14 @@ import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.SessionSettingsCoordinator
 import com.reversetutor.feature.chat.SessionSettingsDocument
 import com.reversetutor.feature.chat.SessionSettingsScreen
+import android.content.Context
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.FileProvider
+import com.reversetutor.feature.chat.SessionExportPayload
 import com.reversetutor.feature.chat.SessionSettingsSection
 import com.reversetutor.feature.chat.SessionSettingsStore
+import java.io.File
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.SourceFileDeleteCapability
 import com.reversetutor.feature.chat.TagLibraryPersistence
@@ -147,6 +153,7 @@ fun SessionSettingsRoute(
     onOpenSourceCenter: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val sessionHomeViewModel = remember(sessionHomePort) {
         SessionHomeViewModel(sessionHomePort, scope)
@@ -217,6 +224,7 @@ fun SessionSettingsRoute(
             },
             highlightedSourceId = highlightedSourceId,
             onOpenSourceCenter = onOpenSourceCenter,
+            onExportShare = { payload -> shareSessionExport(context, payload) },
             onBack = onBack,
             onProfileBoundary = { profile ->
                 onSessionLearnerRoleChanged(profile.learnerRole)
@@ -960,4 +968,19 @@ private fun RtDivider() {
             .height(1.dp)
             .background(ReverseTutorDesign.surfaces.inputBorder)
     )
+}
+
+private fun shareSessionExport(context: Context, payload: SessionExportPayload) {
+    runCatching {
+        val dir = File(context.cacheDir, "exports").apply { mkdirs() }
+        val file = File(dir, payload.fileName)
+        file.writeText(payload.json)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.chat-files", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "导出会话数据"))
+    }
 }

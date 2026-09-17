@@ -14,6 +14,7 @@ import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.SessionSettingsCoordinator
 import com.reversetutor.feature.chat.SessionSettingsDocument
 import com.reversetutor.feature.chat.SessionSettingsScreen
+import com.reversetutor.feature.chat.SessionSettingsSection
 import com.reversetutor.feature.chat.ChatScreen
 import com.reversetutor.feature.chat.ChatUiState
 import com.reversetutor.feature.chat.ChatComposerState
@@ -70,20 +71,28 @@ class SessionSettingsContractDeviceTest {
             }
         }
 
-        listOf("基本资料", "学习目标与计划", "对话策略", "资料管理", "世界树配置", "危险操作").forEach {
+        listOf("基本资料", "学习目标与计划", "对话策略", "系统操作").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
 
-        composeRule.onNodeWithText("世界树配置").performClick()
-        composeRule.onNodeWithTag("session-settings-story").performTextReplacement("临时世界树")
-        composeRule.runOnIdle { assertEquals("", coordinator.state.applied.snapshot.story) }
+        composeRule.onNodeWithTag("session-settings-title").performTextReplacement("临时标题")
+        composeRule.runOnIdle { assertEquals("概率论", coordinator.state.applied.profile.title) }
         composeRule.onNodeWithContentDescription("返回").performClick()
         composeRule.runOnIdle {
-            assertEquals("临时世界树", coordinator.state.applied.snapshot.story)
+            assertEquals("临时标题", coordinator.state.applied.profile.title)
             assertEquals(1, leftSettings)
         }
 
-        composeRule.onNodeWithText("资料管理").performClick()
+        composeRule.setContent {
+            ReverseTutorTheme {
+                SessionSettingsScreen(
+                    coordinator = coordinator,
+                    tagLibraryPersistence = EmptyTagLibraryPersistence,
+                    initialSection = SessionSettingsSection.SourceManagement,
+                    onBack = {}
+                )
+            }
+        }
         composeRule.onNodeWithText("概率论讲义").performClick()
         composeRule.onNodeWithText("删除资料文件").performClick()
         composeRule.onNodeWithText("当前版本暂不支持删除资料文件；引用、文件内容与读取状态都会保留。")
@@ -118,11 +127,10 @@ class SessionSettingsContractDeviceTest {
 
         composeRule.onNodeWithText("重试").performClick()
         composeRule.runOnIdle { assertEquals(1, importRetries) }
-        composeRule.onNodeWithText("世界树配置").performClick()
-        composeRule.onNodeWithTag("session-settings-story").performTextReplacement("系统返回提交")
+        composeRule.onNodeWithTag("session-settings-title").performTextReplacement("系统返回提交")
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         composeRule.runOnIdle {
-            assertEquals("系统返回提交", persistence.sessions.getValue("session-a").story)
+            assertEquals("系统返回提交", persistence.sessions.getValue("session-a").title)
             assertEquals(1, leftSettings)
         }
     }

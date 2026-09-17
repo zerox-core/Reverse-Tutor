@@ -12,7 +12,7 @@ class SessionSettingsCoordinatorTest {
     @Test
     fun groupedIndexAndStrategyControlsMatchTheConfirmedContract() {
         assertEquals(
-            listOf("基本资料", "学习目标与计划", "对话策略", "资料管理", "世界树配置", "危险操作"),
+            listOf("基本资料", "学习目标与计划", "对话策略", "资料管理", "系统操作"),
             SessionSettingsSection.entries.map(SessionSettingsSection::label)
         )
         assertEquals(
@@ -23,7 +23,10 @@ class SessionSettingsCoordinatorTest {
             listOf("重新选择文件", "取消本会话引用", "删除资料文件"),
             SourceDetailAction.entries.map(SourceDetailAction::label)
         )
-        assertEquals(listOf("删除当前会话"), DangerousSessionAction.entries.map(DangerousSessionAction::label))
+        assertEquals(
+            listOf("导出当前会话记忆库", "导出当前配置", "删除当前会话"),
+            DangerousSessionAction.entries.map(DangerousSessionAction::label)
+        )
         assertEquals(5_000L, SessionSettingsUndoWindowMillis)
     }
 

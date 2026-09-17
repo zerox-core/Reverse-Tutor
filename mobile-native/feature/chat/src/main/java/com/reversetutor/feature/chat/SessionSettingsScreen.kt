@@ -41,7 +41,10 @@ import androidx.compose.material.icons.rounded.DeleteForever
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Park
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -109,9 +112,15 @@ fun SessionSettingsScreen(
     canUndoSessionDelete: Boolean = false,
     onUndoSessionDelete: () -> Unit = {},
     onOpenSourceCenter: (() -> Unit)? = null,
+    onExportShare: (SessionExportPayload) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val sections = SessionSettingsSection.entries
+    val sourceOnly = initialSection == SessionSettingsSection.SourceManagement
+    val sections = if (sourceOnly) {
+        listOf(SessionSettingsSection.SourceManagement)
+    } else {
+        SessionSettingsSection.entries.filter { it != SessionSettingsSection.SourceManagement }
+    }
     var revision by remember { mutableIntStateOf(0) }
     val pagerState = rememberPagerState(
         initialPage = initialSection?.let { sections.indexOf(it).coerceAtLeast(0) } ?: 0
@@ -137,13 +146,6 @@ fun SessionSettingsScreen(
         if (uri != null) {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             coordinator.setLearnerImageRef(uri.toString())
-            refresh()
-        }
-    }
-    val storyImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            coordinator.setStoryImageRef(uri.toString())
             refresh()
         }
     }
@@ -195,12 +197,14 @@ fun SessionSettingsScreen(
                 if (externalImportError != null) TextButton(onClick = onRetryImport) { Text("重试") }
             }
         }
-        SectionTabStrip(
-            document = coordinator.state.applied,
-            sections = sections,
-            selectedPage = pagerState.currentPage,
-            onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } }
-        )
+        if (!sourceOnly) {
+            SectionTabStrip(
+                document = coordinator.state.applied,
+                sections = sections,
+                selectedPage = pagerState.currentPage,
+                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } }
+            )
+        }
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize()
@@ -227,20 +231,12 @@ fun SessionSettingsScreen(
                     refresh,
                     highlightedSourceId
                 )
-                SessionSettingsSection.WorldTree -> WorldTreePage(
-                    coordinator,
-                    tagEditor,
-                    tagState,
-                    onTagStateChange = { tagState = it },
-                    commitBoundary,
-                    onPickLearnerImage = { learnerImageLauncher.launch(arrayOf("image/*")) },
-                    onPickStoryImage = { storyImageLauncher.launch(arrayOf("image/*")) },
-                    refresh = refresh
-                )
-                SessionSettingsSection.Danger -> DangerPage(
-                    onRequestDeleteSession,
-                    canUndoSessionDelete,
-                    onUndoSessionDelete
+                SessionSettingsSection.Danger -> SystemOpsPage(
+                    coordinator = coordinator,
+                    onExportShare = onExportShare,
+                    onRequestDeleteSession = onRequestDeleteSession,
+                    canUndo = canUndoSessionDelete,
+                    onUndo = onUndoSessionDelete
                 )
             }
         }
@@ -327,25 +323,19 @@ private fun SectionTabStrip(
         SessionSettingsSection.GoalPlan to document.goalPlan.primaryGoal.ifBlank { "尚未设置主要目标" },
         SessionSettingsSection.ConversationStrategy to "反馈 ${document.strategy.feedbackIntensity}/5 · ${document.strategy.speakingTone}",
         SessionSettingsSection.SourceManagement to "已引用 ${document.snapshot.sourceSelections.size} 份资料",
-        SessionSettingsSection.WorldTree to "独立快照 · ${document.snapshot.effectiveCustomColumns().size} 个自定义栏目",
-        SessionSettingsSection.Danger to "删除当前会话"
+        SessionSettingsSection.Danger to "导出记忆库/配置 · 删除会话"
     )
-    val listState = rememberLazyListState()
-    LaunchedEffect(selectedPage) {
-        if (selectedPage > 0) listState.animateScrollToItem(selectedPage - 1)
-    }
-    LazyRow(
-        state = listState,
-        modifier = Modifier.fillMaxWidth().testTag("session-settings-index"),
-        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp).testTag("session-settings-index"),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        itemsIndexed(sections) { index, section ->
+        sections.forEachIndexed { index, section ->
             SettingsTabCard(
                 section = section,
                 summary = summaries.getValue(section),
                 selected = index == selectedPage,
-                onClick = { onSelect(index) }
+                onClick = { onSelect(index) },
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -356,12 +346,12 @@ private fun SettingsTabCard(
     section: SessionSettingsSection,
     summary: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val isDanger = section == SessionSettingsSection.Danger
     val (icon, iconColor) = sessionSectionIcon(section)
     Surface(
-        modifier = Modifier.width(116.dp).clickable(onClick = onClick),
+        modifier = modifier.clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         color = if (selected) FormalColors.Success.copy(alpha = 0.08f) else FormalColors.Surface,
         border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) FormalColors.Success else FormalColors.Divider)
@@ -376,9 +366,7 @@ private fun SettingsTabCard(
                 section.label,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isDanger) FormalColors.Danger
-                else if (selected) FormalColors.Success
-                else FormalColors.Ink,
+                color = if (selected) FormalColors.Success else FormalColors.Ink,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -386,7 +374,7 @@ private fun SettingsTabCard(
             Text(
                 summary,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (isDanger) FormalColors.Danger.copy(alpha = 0.72f) else FormalColors.Muted,
+                color = FormalColors.Muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -399,8 +387,7 @@ private fun sessionSectionIcon(section: SessionSettingsSection): Pair<ImageVecto
     SessionSettingsSection.GoalPlan -> Icons.Rounded.Flag to Color(0xFFC96E26)
     SessionSettingsSection.ConversationStrategy -> Icons.Rounded.Tune to Color(0xFF5C6B8A)
     SessionSettingsSection.SourceManagement -> Icons.Rounded.Folder to Color(0xFF6170B8)
-    SessionSettingsSection.WorldTree -> Icons.Rounded.Park to Color(0xFF178775)
-    SessionSettingsSection.Danger -> Icons.Rounded.DeleteForever to FormalColors.Danger
+    SessionSettingsSection.Danger -> Icons.Rounded.Settings to Color(0xFF45506B)
 }
 
 @Composable
@@ -447,27 +434,54 @@ private fun BasicProfilePage(
     refresh: () -> Unit
 ) = SettingsPage {
     val profile = coordinator.state.form.profile
-    SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary)
-    SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary)
-    SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary)
+    val presetMatch = PersonalityPresets.firstOrNull { it.title == profile.personality.trim() }
+    var customPersonaExpanded by remember {
+        mutableStateOf(profile.personality.isNotBlank() && presetMatch == null)
+    }
+    SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary, singleLine = true, testTag = "session-settings-title")
+    SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary, singleLine = true)
+    SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary, singleLine = true)
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("人格预设", fontWeight = FontWeight.SemiBold)
             CardRadioRow(
                 options = PersonalityPresets,
-                selectedId = PersonalityPresets.firstOrNull { it.title == profile.personality.trim() }?.id,
+                selectedId = presetMatch?.id,
                 onSelect = { presetId ->
                     PersonalityPresets.firstOrNull { it.id == presetId }?.let { preset ->
                         coordinator.editProfile { p -> p.copy(personality = preset.title) }
+                        customPersonaExpanded = false
                         refresh()
                     }
                 }
             )
-            Text("点选预设会替换人格文本；也可以直接在下方自己写。", color = FormalColors.Muted)
         }
     }
-    SettingsTextField("人格", profile.personality, { coordinator.editProfile { p -> p.copy(personality = it) }; refresh() }, commitBoundary)
-    SettingsTextField("互动习惯", profile.interactionHabits, { coordinator.editProfile { p -> p.copy(interactionHabits = it) }; refresh() }, commitBoundary)
+    SettingsGroup {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().clickable(
+                    onClickLabel = if (customPersonaExpanded) "收起自定义人设" else "展开自定义人设",
+                    role = Role.Button,
+                    onClick = { customPersonaExpanded = !customPersonaExpanded }
+                ).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("自己写人设与互动习惯（可选）", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                Icon(
+                    if (customPersonaExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = FormalColors.Muted
+                )
+            }
+            if (customPersonaExpanded) {
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsTextField("人格", profile.personality, { coordinator.editProfile { p -> p.copy(personality = it) }; refresh() }, commitBoundary)
+                    SettingsTextField("互动习惯", profile.interactionHabits, { coordinator.editProfile { p -> p.copy(interactionHabits = it) }; refresh() }, commitBoundary)
+                }
+            }
+        }
+    }
     SettingsGroup {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.Person, null, tint = FormalColors.Muted)
@@ -752,72 +766,30 @@ private fun SourceManagementPage(
 }
 
 @Composable
-private fun WorldTreePage(
+private fun SystemOpsPage(
     coordinator: SessionSettingsCoordinator,
-    tagEditor: TagLibraryEditor,
-    tagState: TagLibraryEditorState,
-    onTagStateChange: (TagLibraryEditorState) -> Unit,
-    commitBoundary: () -> Unit,
-    onPickLearnerImage: () -> Unit,
-    onPickStoryImage: () -> Unit,
-    refresh: () -> Unit
-) = SettingsPage {
-    val document = coordinator.state.form
-    val snapshot = document.snapshot
-    Text("只编辑当前会话的独立快照", fontWeight = FontWeight.SemiBold)
-    Text("不会回写内置预设、草稿、收藏或模板；此页不含草稿箱、收藏和随机组合。", style = MaterialTheme.typography.bodySmall)
-    SettingsTextField("会话标题", document.profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary)
-    SettingsTextField("学习者角色", document.profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary)
-    SettingsTextField("学习者画像", document.profile.personality, { coordinator.editProfile { p -> p.copy(personality = it) }; refresh() }, commitBoundary)
-    SettingsTextField("主要目标", document.goalPlan.primaryGoal, { coordinator.editGoalPlan { p -> p.copy(primaryGoal = it) }; refresh() }, commitBoundary)
-    SettingsTextField("学习计划", document.goalPlan.weeklyPlan, { coordinator.editGoalPlan { p -> p.copy(weeklyPlan = it) }; refresh() }, commitBoundary)
-    SettingsTextField("对话策略", document.profile.interactionHabits, { coordinator.editProfile { p -> p.copy(interactionHabits = it) }; refresh() }, commitBoundary)
-    SettingsTextField("世界树故事", snapshot.story, {
-        coordinator.editWorldTree { current -> current.copy(story = it) }
-        refresh()
-    }, commitBoundary, testTag = "session-settings-story")
-    Text("资料 Source ID：${snapshot.sourceSelections.ifEmpty { listOf("未选择") }.joinToString()}")
-    SettingsGroup {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("学习者图片：${snapshot.learnerImageRef ?: "未设置"}")
-            OutlinedButton(onClick = onPickLearnerImage, Modifier.fillMaxWidth()) { Text("选择或修改学习者图片") }
-            Text("故事图片：${snapshot.storyImageRef ?: "未设置"}")
-            OutlinedButton(onClick = onPickStoryImage, Modifier.fillMaxWidth()) { Text("选择或修改故事图片") }
-        }
-    }
-    SettingsTextField("来源预设标识", snapshot.builtInPresetId.orEmpty(), {
-        coordinator.editWorldTree { current -> current.copy(builtInPresetId = it.trim().ifEmpty { null }) }
-        refresh()
-    }, commitBoundary)
-    Text("分类快捷标签", fontWeight = FontWeight.SemiBold)
-    TagLibraryPicker(
-        state = tagState,
-        selection = document.quickTags["world-tree"] ?: TagFieldSelection(),
-        editor = tagEditor,
-        onStateChange = onTagStateChange,
-        onToggle = { coordinator.toggleQuickTag("world-tree", TagSelectionValue(it.id, it.name)); refresh() },
-        onExpansionChange = { groupId, expanded ->
-            tagEditor.setGroupExpanded(groupId, expanded)
-            onTagStateChange(tagEditor.state)
-        }
-    )
-    Text("自定义栏目", fontWeight = FontWeight.SemiBold)
-    CustomColumnEditorScreen(
-        columns = snapshot.effectiveCustomColumns(),
-        tagLibraryState = tagState,
-        tagLibraryEditor = tagEditor,
-        onTagLibraryStateChange = onTagStateChange,
-        onColumnsChange = { columns -> coordinator.updateWorldTree { it.withCustomColumns(columns) }; refresh() },
-        internalScroll = false
-    )
-}
-
-@Composable
-private fun DangerPage(
+    onExportShare: (SessionExportPayload) -> Unit,
     onRequestDeleteSession: () -> Unit,
     canUndo: Boolean,
     onUndo: () -> Unit
 ) = SettingsPage {
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("导出", fontWeight = FontWeight.Bold, color = FormalColors.Ink)
+            Text(
+                "记忆库是当前会话的结构化记录（基本资料、目标计划、对话策略、快照与快捷标签）；分层记忆接入后会自动并入下载包。",
+                color = FormalColors.Muted
+            )
+            OutlinedButton(
+                onClick = { onExportShare(SessionSettingsExport.buildMemoryPayload(coordinator.state.applied)) },
+                modifier = Modifier.fillMaxWidth().testTag("export-session-memory")
+            ) { Text("导出当前会话记忆库") }
+            OutlinedButton(
+                onClick = { onExportShare(SessionSettingsExport.buildConfigPayload(coordinator.state.applied)) },
+                modifier = Modifier.fillMaxWidth().testTag("export-session-config")
+            ) { Text("导出当前配置（基本资料/目标计划/对话策略）") }
+        }
+    }
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("删除当前会话", color = FormalColors.Danger, fontWeight = FontWeight.Bold)
@@ -839,12 +811,14 @@ private fun SettingsTextField(
     value: String,
     onValueChange: (String) -> Unit,
     onBoundary: () -> Unit,
-    testTag: String? = null
+    testTag: String? = null,
+    singleLine: Boolean = false
 ) {
     SessionConfigurationTextField(
         label = label,
         value = value,
         testTag = testTag,
+        singleLine = singleLine,
         onBoundary = onBoundary,
         onValueChange = onValueChange
     )
