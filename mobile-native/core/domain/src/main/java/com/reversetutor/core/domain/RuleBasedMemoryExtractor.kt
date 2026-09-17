@@ -11,12 +11,12 @@ package com.reversetutor.core.domain
  * stays reachable through the provenance handle back to the turn.
  */
 
-enum class MessageRole { USER, ASSISTANT }
+enum class ExtractionRole { USER, ASSISTANT }
 
 /** Minimal message view the extractor reasons about. */
 data class ExtractableMessage(
     val messageId: String,
-    val role: MessageRole,
+    val role: ExtractionRole,
     val text: String,
     val occurredAtEpochMillis: Long,
     val hourOfDay: Int,
@@ -43,7 +43,7 @@ object RuleBasedMemoryExtractor {
         val candidates = mutableListOf<WindowLocalObservation>()
         var reminderSeen = false
         for (message in batch) {
-            if (message.role == MessageRole.ASSISTANT) {
+            if (message.role == ExtractionRole.ASSISTANT) {
                 if (REMINDER_KEYWORDS.any { message.text.contains(it) }) reminderSeen = true
                 continue
             }

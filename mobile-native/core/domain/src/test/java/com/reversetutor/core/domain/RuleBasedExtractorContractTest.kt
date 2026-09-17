@@ -12,10 +12,10 @@ import org.junit.Test
 class RuleBasedExtractorContractTest {
 
     private fun user(text: String, hour: Int = 15, id: String = "u1", at: Long = 100L) =
-        ExtractableMessage(messageId = id, role = MessageRole.USER, text = text, occurredAtEpochMillis = at, hourOfDay = hour)
+        ExtractableMessage(messageId = id, role = ExtractionRole.USER, text = text, occurredAtEpochMillis = at, hourOfDay = hour)
 
     private fun assistant(text: String, hour: Int = 15, id: String = "a1", at: Long = 99L) =
-        ExtractableMessage(messageId = id, role = MessageRole.ASSISTANT, text = text, occurredAtEpochMillis = at, hourOfDay = hour)
+        ExtractableMessage(messageId = id, role = ExtractionRole.ASSISTANT, text = text, occurredAtEpochMillis = at, hourOfDay = hour)
 
     @Test
     fun `goal statement produces goal candidate with high confidence`() {

@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 13
+    const val version = 14
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -114,6 +114,14 @@ object DatabaseSchema {
         }
     }
 
+    /** V2-004: window-local memory layers (observations / active values / watermark / rolling summary). */
+    val migration13To14: Migration = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            windowMemoryTableSql.forEach(db::execSQL)
+            windowMemoryIndexSql.forEach(db::execSQL)
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -126,7 +134,8 @@ object DatabaseSchema {
         migration9To10,
         migration10To11,
         migration11To12,
-        migration12To13
+        migration12To13,
+        migration13To14
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -730,6 +739,59 @@ object DatabaseSchema {
         "CREATE INDEX IF NOT EXISTS index_session_table_rows_tableId ON session_table_rows(tableId)",
         "CREATE INDEX IF NOT EXISTS index_tool_call_receipts_sessionId ON tool_call_receipts(sessionId)",
         "CREATE INDEX IF NOT EXISTS index_tool_call_receipts_toolName ON tool_call_receipts(toolName)"
+    )
+
+    private val windowMemoryTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_observations (
+            id TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            category TEXT NOT NULL,
+            slotKey TEXT NOT NULL,
+            value TEXT NOT NULL,
+            sourceClass TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            salience TEXT NOT NULL,
+            occurredAtEpochMillis INTEGER NOT NULL,
+            provenanceHandle TEXT NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_active_values (
+            sessionId TEXT NOT NULL,
+            category TEXT NOT NULL,
+            slotKey TEXT NOT NULL,
+            value TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            weight REAL NOT NULL,
+            sourceClass TEXT NOT NULL,
+            provenanceHandle TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId, category, slotKey)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_intake_watermarks (
+            sessionId TEXT NOT NULL,
+            lastProcessedMessageId TEXT NOT NULL,
+            lastProcessedEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_rolling_summaries (
+            sessionId TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            coversUntilMessageId TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId)
+        )
+        """.trimIndent()
+    )
+
+    private val windowMemoryIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_window_memory_observations_sessionId ON window_memory_observations(sessionId)"
     )
 }
 

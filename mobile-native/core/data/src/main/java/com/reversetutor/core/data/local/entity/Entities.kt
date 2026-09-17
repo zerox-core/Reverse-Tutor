@@ -770,3 +770,80 @@ data class WindowHeartbeatEntity(
         )
     }
 }
+
+// ---------------------------------------------------------------------------
+// Window-local memory (V2-004, schema 13 -> 14). Session-scoped structured
+// memory only: observations, evolved active values, intake watermark, and
+// the rolling summary of evicted raw turns. No raw transcript rows.
+// ---------------------------------------------------------------------------
+
+@Entity(tableName = "window_memory_observations", indices = [Index("sessionId")])
+data class WindowMemoryObservationEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val category: String,
+    val slotKey: String,
+    val value: String,
+    val sourceClass: String,
+    val confidence: Double,
+    val salience: String,
+    val occurredAtEpochMillis: Long,
+    val provenanceHandle: String
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "sessionId", "category", "slotKey", "value", "sourceClass",
+            "confidence", "salience", "occurredAtEpochMillis", "provenanceHandle"
+        )
+    }
+}
+
+@Entity(
+    tableName = "window_memory_active_values",
+    primaryKeys = ["sessionId", "category", "slotKey"]
+)
+data class WindowMemoryActiveValueEntity(
+    val sessionId: String,
+    val category: String,
+    val slotKey: String,
+    val value: String,
+    val revision: Long,
+    val weight: Double,
+    val sourceClass: String,
+    val provenanceHandle: String,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "category", "slotKey", "value", "revision", "weight",
+            "sourceClass", "provenanceHandle", "updatedAtEpochMillis"
+        )
+    }
+}
+
+@Entity(tableName = "window_memory_intake_watermarks")
+data class WindowIntakeWatermarkEntity(
+    @PrimaryKey val sessionId: String,
+    val lastProcessedMessageId: String,
+    val lastProcessedEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "lastProcessedMessageId", "lastProcessedEpochMillis"
+        )
+    }
+}
+
+@Entity(tableName = "window_memory_rolling_summaries")
+data class WindowRollingSummaryEntity(
+    @PrimaryKey val sessionId: String,
+    val summary: String,
+    val coversUntilMessageId: String,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "summary", "coversUntilMessageId", "updatedAtEpochMillis"
+        )
+    }
+}

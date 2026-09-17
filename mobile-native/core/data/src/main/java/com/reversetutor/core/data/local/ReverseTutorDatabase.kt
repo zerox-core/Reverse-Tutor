@@ -24,6 +24,7 @@ import com.reversetutor.core.data.local.dao.WindowTopologyDao
 import com.reversetutor.core.data.local.dao.LearningLedgerDao
 import com.reversetutor.core.data.local.dao.CompanionMemoryDao
 import com.reversetutor.core.data.local.dao.WindowHeartbeatDao
+import com.reversetutor.core.data.local.dao.WindowMemoryDao
 import com.reversetutor.core.data.local.dao.WorldTreeDao
 import com.reversetutor.core.data.local.dao.SessionAgentDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
@@ -69,6 +70,10 @@ import com.reversetutor.core.data.local.entity.ScopeSignalEntity
 import com.reversetutor.core.data.local.entity.CompanionMemoryVersionEntity
 import com.reversetutor.core.data.local.entity.MemoryObservationEntity
 import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
+import com.reversetutor.core.data.local.entity.WindowIntakeWatermarkEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryActiveValueEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryObservationEntity
+import com.reversetutor.core.data.local.entity.WindowRollingSummaryEntity
 import com.reversetutor.core.data.local.entity.AssistantReplyArtifactEntity
 import com.reversetutor.core.data.local.entity.SessionDocumentEntity
 import com.reversetutor.core.data.local.entity.SessionDocumentBlockEntity
@@ -128,7 +133,11 @@ import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
         SessionTableEntity::class,
         SessionTableColumnEntity::class,
         SessionTableRowEntity::class,
-        ToolCallReceiptEntity::class
+        ToolCallReceiptEntity::class,
+        WindowMemoryObservationEntity::class,
+        WindowMemoryActiveValueEntity::class,
+        WindowIntakeWatermarkEntity::class,
+        WindowRollingSummaryEntity::class
     ],
     version = DatabaseSchema.version,
     exportSchema = DatabaseSchema.exportSchema
@@ -158,4 +167,5 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun companionMemoryDao(): CompanionMemoryDao
     abstract fun windowHeartbeatDao(): WindowHeartbeatDao
     abstract fun sessionAgentDao(): SessionAgentDao
+    abstract fun windowMemoryDao(): WindowMemoryDao
 }

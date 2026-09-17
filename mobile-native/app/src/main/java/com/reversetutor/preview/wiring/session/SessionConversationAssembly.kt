@@ -55,6 +55,7 @@ class SessionConversationAssembly(
     private val learningLedgerRepository: LearningLedgerRepository? = null,
     private val messageContextPort: MessageContextPort = MessageContextPortAdapter(messageRepository),
     private val sessionSummaryStore: SessionSummaryStore? = null,
+    private val windowIntakeDispatcher: WindowIntakeDispatcher? = null,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
 
@@ -180,6 +181,9 @@ class SessionConversationAssembly(
             token = token,
             policyInput = policyInput
         )
+        // V2-004 / decision #9: window-memory intake runs after the turn,
+        // asynchronously, and can never block or fail the chat loop.
+        windowIntakeDispatcher?.dispatch(sessionId)
         val messages = messageRepository.listMessages(sessionId).map {
             ConversationMessageContract(it.id, it.role.name.lowercase(), it.text, it.createdAtEpochMillis)
         }
