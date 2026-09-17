@@ -14,6 +14,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -69,6 +73,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reversetutor.core.design.FormalColors
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 窗口设置页标准组件库（组件库 mock 定案 01/02/03/07/10 的 Compose 落地）。
@@ -462,6 +467,10 @@ internal fun TokenField(
 
 // region 10 按住确认 HoldToConfirm
 
+/**
+ * 组件库 D 类「按住确认」完整交互链：
+ * 按下弹性形变 → 进度扫过 + 震动节拍 + 文案变化 → 充满变绿、对勾弹入 → 中途松手进度回弹复位。
+ */
 @Composable
 internal fun HoldToConfirmButton(
     text: String,
@@ -479,19 +488,50 @@ internal fun HoldToConfirmButton(
         if (pressed) {
             completed = false
             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            val ticks = launch {
+                while (true) {
+                    delay(160)
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            }
             progress.animateTo(1f, tween(durationMillis.toInt(), easing = LinearEasing))
+            ticks.cancel()
             if (pressed) {
                 completed = true
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onConfirm()
             }
-        } else {
+        } else if (!completed) {
+            progress.animateTo(
+                0f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            )
+        }
+    }
+    // 成功态短暂停留后复位（确认弹窗被取消时按钮也能回到初始态）
+    LaunchedEffect(completed) {
+        if (completed) {
+            delay(1600)
+            completed = false
             progress.snapTo(0f)
         }
     }
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && !completed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    )
+    val checkScale by animateFloatAsState(
+        targetValue = if (completed) 1f else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
+    )
     Surface(
         modifier = modifier
             .testTag(testTag)
             .semantics { role = Role.Button }
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
@@ -505,30 +545,166 @@ internal fun HoldToConfirmButton(
                 )
             },
         shape = RoundedCornerShape(12.dp),
-        color = FormalColors.Danger
+        color = if (completed) FormalColors.Success else FormalColors.Danger
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            CircularProgressIndicator(
-                progress = progress.value,
-                modifier = Modifier.size(22.dp),
-                color = Color.White,
-                strokeWidth = 2.5.dp,
-                trackColor = Color.White.copy(alpha = 0.30f)
+        Box(Modifier.fillMaxWidth()) {
+            // 进度扫过层：按住时从左向右铺满
+            if (!completed) {
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxHeight()
+                        .fillMaxWidth(fraction = progress.value)
+                        .background(Color.White.copy(alpha = 0.22f))
+                )
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                    if (completed) {
+                        Icon(
+                            Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    scaleX = checkScale
+                                    scaleY = checkScale
+                                }
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            progress = progress.value,
+                            modifier = Modifier.size(22.dp),
+                            color = Color.White,
+                            strokeWidth = 2.5.dp,
+                            trackColor = Color.White.copy(alpha = 0.30f)
+                        )
+                    }
+                }
+                Text(
+                    when {
+                        completed -> "已确认"
+                        pressed || progress.value > 0f -> holdingText
+                        else -> text
+                    },
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+        }
+    }
+}
+
+// endregion
+
+// region 11 导出动作卡 ExportActionCard
+
+/**
+ * 系统操作页导出入口：组件库白卡 + 细边框 + 弹性按压缩放。
+ * [vertical] = true 为半宽竖版大卡（emoji 在上、文案在下）；false 为整宽横版卡。
+ */
+@Composable
+internal fun ExportActionCard(
+    title: String,
+    tagline: String,
+    emoji: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    vertical: Boolean = false,
+    testTag: String
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+    )
+    Surface(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClickLabel = title,
+                onClick = onClick
             )
-            Text(
-                when {
-                    completed -> "已确认"
-                    pressed || progress.value > 0f -> holdingText
-                    else -> text
-                },
-                color = Color.White,
-                fontWeight = FontWeight.SemiBold,
-                style = MaterialTheme.typography.titleSmall
-            )
+            .testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
+        color = FormalColors.Surface,
+        border = BorderStroke(1.dp, FormalColors.Divider)
+    ) {
+        if (vertical) {
+            Column(Modifier.fillMaxWidth().padding(14.dp)) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .background(FormalColors.SurfaceSubtle, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) { Text(emoji, fontSize = 22.sp) }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FormalColors.Ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    tagline,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FormalColors.Muted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    Modifier
+                        .size(40.dp)
+                        .background(FormalColors.SurfaceSubtle, RoundedCornerShape(10.dp)),
+                    contentAlignment = Alignment.Center
+                ) { Text(emoji, fontSize = 22.sp) }
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FormalColors.Ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        tagline,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = FormalColors.Muted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Icon(
+                    Icons.Rounded.ChevronRight,
+                    contentDescription = null,
+                    tint = FormalColors.Tertiary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

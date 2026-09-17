@@ -765,6 +765,9 @@ private fun SourceManagementPage(
     }
 }
 
+// 导出面版式：1 = 整宽横版卡竖排；2 = 半宽竖版卡横排（拍板后收敛为一版）
+private const val ExportPanelVariant = 2
+
 @Composable
 private fun SystemOpsPage(
     coordinator: SessionSettingsCoordinator,
@@ -780,14 +783,50 @@ private fun SystemOpsPage(
                 "记忆库是当前会话的结构化记录（基本资料、目标计划、对话策略、快照与快捷标签）；分层记忆接入后会自动并入下载包。",
                 color = FormalColors.Muted
             )
-            OutlinedButton(
-                onClick = { onExportShare(SessionSettingsExport.buildMemoryPayload(coordinator.state.applied)) },
-                modifier = Modifier.fillMaxWidth().testTag("export-session-memory")
-            ) { Text("导出当前会话记忆库") }
-            OutlinedButton(
-                onClick = { onExportShare(SessionSettingsExport.buildConfigPayload(coordinator.state.applied)) },
-                modifier = Modifier.fillMaxWidth().testTag("export-session-config")
-            ) { Text("导出当前配置（基本资料/目标计划/对话策略）") }
+            if (ExportPanelVariant == 1) {
+                ExportActionCard(
+                    title = "导出当前会话记忆库",
+                    tagline = "全部设定 + 快照 + 快捷标签",
+                    emoji = "\uD83D\uDCE6",
+                    onClick = { onExportShare(SessionSettingsExport.buildMemoryPayload(coordinator.state.applied)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "export-session-memory"
+                )
+                ExportActionCard(
+                    title = "导出当前配置",
+                    tagline = "基本资料 / 目标计划 / 对话策略三块",
+                    emoji = "\uD83E\uDDFE",
+                    onClick = { onExportShare(SessionSettingsExport.buildConfigPayload(coordinator.state.applied)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "export-session-config"
+                )
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ExportActionCard(
+                        title = "会话记忆库",
+                        tagline = "全部设定打包",
+                        emoji = "\uD83D\uDCE6",
+                        onClick = { onExportShare(SessionSettingsExport.buildMemoryPayload(coordinator.state.applied)) },
+                        modifier = Modifier.weight(1f),
+                        vertical = true,
+                        testTag = "export-session-memory"
+                    )
+                    ExportActionCard(
+                        title = "当前配置",
+                        tagline = "资料/目标/策略",
+                        emoji = "\uD83E\uDDFE",
+                        onClick = { onExportShare(SessionSettingsExport.buildConfigPayload(coordinator.state.applied)) },
+                        modifier = Modifier.weight(1f),
+                        vertical = true,
+                        testTag = "export-session-config"
+                    )
+                }
+            }
+            Text(
+                "通过系统分享面板发出，可存到文件或发给好友。",
+                color = FormalColors.Muted,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
     SettingsGroup {
@@ -804,6 +843,7 @@ private fun SystemOpsPage(
         }
     }
 }
+
 
 @Composable
 private fun SettingsTextField(
