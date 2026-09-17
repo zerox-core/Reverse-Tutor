@@ -70,7 +70,7 @@ import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.ArrowBackIosNew
 import androidx.compose.material.icons.rounded.MenuBook
-import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
@@ -78,8 +78,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -103,12 +101,34 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.hypot
+import kotlin.math.roundToInt
+import kotlin.math.sin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.AnnotatedString
@@ -233,10 +253,14 @@ internal fun ReverseTeachingChatScreen(
         if (selectedMessageId == selected) selectedMessageId = null
     }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(ChatPageBackground)
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
             .imePadding()
     ) {
         ReverseTeachingChatHeader(
@@ -509,6 +533,17 @@ internal fun ReverseTeachingChatScreen(
         }
     }
 
+    ChatCornerRadialMenu(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .padding(top = 1.dp, end = 0.dp),
+        onOpenSearch = onOpenSearch,
+        onOpenSources = onOpenSources,
+        onOpenGlobalGraph = onOpenGlobalGraph,
+        onOpenSessionSettings = onOpenSessionSettings
+    )
+    }
+
 
     if (showSourcePicker) {
         ChatSourcePickerSheet(
@@ -584,7 +619,6 @@ private fun ReverseTeachingChatHeader(
     onOpenSessionSettings: () -> Unit,
     onOverflowAction: (ChatOverflowAction) -> Unit
 ) {
-    var overflowExpanded by remember { mutableStateOf(false) }
     Surface(
         color = Color(0xFFFAFCFE),
         contentColor = ChatInk,
@@ -629,59 +663,191 @@ private fun ReverseTeachingChatHeader(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = "${state.learnerName} · ${state.learnerStatus}",
-                            color = ChatMuted,
-                            fontSize = 9.sp,
-                            lineHeight = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+
                     }
                 }
             }
-            FormalHeaderIconButton(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = "全局搜索",
-                onClick = onOpenSearch,
-                filled = true
-            )
-            Spacer(Modifier.width(6.dp))
-            FormalHeaderIconButton(
-                imageVector = Icons.Rounded.MenuBook,
-                contentDescription = "资料",
-                onClick = onOpenSources,
-                filled = true
-            )
-            Spacer(Modifier.width(6.dp))
-            FormalHeaderIconButton(
-                imageVector = Icons.Rounded.AccountTree,
-                contentDescription = "图谱",
-                onClick = onOpenGlobalGraph,
-                filled = false,
-                modifier = Modifier.testTag("chat-global-graph")
-            )
-            Spacer(Modifier.width(6.dp))
-            Box {
-                FormalHeaderIconButton(
-                    imageVector = Icons.Rounded.MoreVert,
-                    contentDescription = "更多会话操作",
-                    onClick = { overflowExpanded = true },
-                    filled = false
-                )
-                DropdownMenu(
-                    expanded = overflowExpanded,
-                    onDismissRequest = { overflowExpanded = false }
-                ) {
-                    ChatOverflowAction.entries.forEach { action ->
-                        DropdownMenuItem(
-                            text = { Text(action.label) },
-                            onClick = {
-                                overflowExpanded = false
-                                onOverflowAction(action)
+        }
+    }
+}
+
+private data class ChatRadialEntry(
+    val angleDeg: Float,
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val testTag: String?,
+    val onClick: () -> Unit
+)
+
+/** 顶栏圆盘快捷菜单：按住中心，向左下四个方向拖动选中，松手触发 */
+@Composable
+private fun ChatCornerRadialMenu(
+    onOpenSearch: () -> Unit,
+    onOpenSources: () -> Unit,
+    onOpenGlobalGraph: () -> Unit,
+    onOpenSessionSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var pressed by remember { mutableStateOf(false) }
+    var cancelled by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf(-1) }
+    val entries = remember(onOpenSearch, onOpenSources, onOpenGlobalGraph, onOpenSessionSettings) {
+        listOf(
+            ChatRadialEntry(180f, "搜索", Icons.Rounded.Search, "radial-search", onOpenSearch),
+            ChatRadialEntry(210f, "资料", Icons.Rounded.MenuBook, "radial-sources", onOpenSources),
+            ChatRadialEntry(240f, "图谱", GraphNetworkIcon, "chat-global-graph", onOpenGlobalGraph),
+            ChatRadialEntry(270f, "设置", Icons.Rounded.Settings, "chat-session-settings", onOpenSessionSettings)
+        )
+    }
+    val progress by animateFloatAsState(
+        targetValue = if (pressed && !cancelled) 1f else 0f,
+        animationSpec = if (pressed) {
+            spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow)
+        } else {
+            spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+        },
+        label = "radial-progress"
+    )
+    val discScale by animateFloatAsState(
+        targetValue = if (pressed) 0.86f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "radial-disc-scale"
+    )
+
+    val screenHalfY = with(LocalDensity.current) {
+        (LocalConfiguration.current.screenHeightDp / 2).dp.toPx()
+    }
+    var haloTopInWindow by remember { mutableStateOf(0f) }
+
+    // 外层 70dp 是不可见的触控热区：起手不必精确按在圆盘上，圆盘四周都能起手；
+    // 起手后 Compose 会把同一根手指的后续事件持续路由到本节点，拖出导航栏、
+    // 拖到屏幕任意位置都不会丢手势。
+    Box(
+        modifier = modifier
+            .size(70.dp)
+            .onGloballyPositioned { haloTopInWindow = it.boundsInWindow().top }
+            .pointerInput(entries) {
+                val activatePx = 26.dp.toPx()
+                val cancelPx = 18.dp.toPx()
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    pressed = true
+                    cancelled = false
+                    selected = -1
+                    var currentIndex = -1
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: break
+                        if (!change.pressed) break
+                        val dx = change.position.x - down.position.x
+                        val dy = change.position.y - down.position.y
+                        // 误触判定一：拖到屏幕下半部分，整个手势作废并锁定到松手，
+                        // 菜单收起作为反馈（progress 跟随 pressed && !cancelled）
+                        if (haloTopInWindow + change.position.y > screenHalfY) {
+                            cancelled = true
+                        }
+                        if (cancelled) {
+                            currentIndex = -1
+                        } else {
+                            val dist = hypot(dx, dy)
+                            currentIndex = when {
+                                // 误触判定二：滑回圆盘附近 = 主动取消，松手不触发
+                                dist < cancelPx -> -1
+                                dist > activatePx -> {
+                                    // atan2 返回 -180..180，左下/正下方向是负角度，
+                                    // 必须先归一到 0..360 再按环形差值比较，
+                                    // 否则 180° 以外的三个方向永远匹配不上
+                                    val angle = (Math.toDegrees(atan2(-dy.toDouble(), dx.toDouble())) + 360.0) % 360.0
+                                    var best = -1
+                                    var bestDiff = 28.0
+                                    entries.forEachIndexed { i, e ->
+                                        val rawDiff = abs(angle - e.angleDeg.toDouble())
+                                        val diff = minOf(rawDiff, 360.0 - rawDiff)
+                                        if (diff < bestDiff) {
+                                            bestDiff = diff
+                                            best = i
+                                        }
+                                    }
+                                    best
+                                }
+                                // 滞回带：18..26dp 之间保持上一个状态，防止边界抖动
+                                else -> currentIndex
                             }
-                        )
+                        }
+                        selected = currentIndex
+                        change.consume()
                     }
+                    val fired = currentIndex
+                    pressed = false
+                    cancelled = false
+                    selected = -1
+                    if (fired >= 0) entries[fired].onClick()
+                }
+            }
+    ) {
+        // 可视层：46dp 圆盘（与返回键同尺寸，居中于 72dp 顶栏）+ 四个 44dp 菜单项，
+        // 都以热区右上角为锚点；展开半径 120dp，下方项会探入聊天区但不压顶栏小字
+        Box(modifier = Modifier.align(Alignment.Center).size(46.dp)) {
+            entries.forEachIndexed { index, entry ->
+                val isSelected = selected == index
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset {
+                            val rad = Math.toRadians(entry.angleDeg.toDouble())
+                            val dist = 120.dp.toPx() * progress
+                            val base = 1.dp.roundToPx()
+                            IntOffset(
+                                (dist * cos(rad)).roundToInt() - base,
+                                (-dist * sin(rad)).roundToInt() - base
+                            )
+                        }
+                        .graphicsLayer {
+                            alpha = progress
+                            val scale = 0.5f + 0.5f * progress
+                            val bump = if (isSelected) 1.22f else 1f
+                            scaleX = scale * bump
+                            scaleY = scale * bump
+                        }
+                        .testTag(entry.testTag ?: "radial-item")
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (isSelected) ChatInk else Color.White)
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) ChatInk else Color(0xFFE5E5EA),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = entry.icon,
+                        contentDescription = entry.label,
+                        tint = if (isSelected) Color.White else ChatInk,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Surface(
+                shape = CircleShape,
+                color = if (pressed) Color(0xFFEDEFF5) else Color.White,
+                border = BorderStroke(1.dp, if (pressed) Color(0xFFC9CEDA) else Color(0xFFE5E5EA)),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .graphicsLayer {
+                        scaleX = discScale
+                        scaleY = discScale
+                    }
+                    .size(46.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (selected >= 0) entries[selected].icon else Icons.Rounded.Apps,
+                        contentDescription = "快捷入口",
+                        tint = ChatInk,
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
         }
@@ -698,30 +864,17 @@ private fun FormalHeaderIconButton(
 ) {
     Surface(
         onClick = onClick,
-        modifier = modifier
-            .size(44.dp)
-            .then(
-                if (filled) {
-                    Modifier.shadow(
-                        3.dp,
-                        CircleShape,
-                        ambientColor = Color(0x12000000),
-                        spotColor = Color(0x12000000)
-                    )
-                } else {
-                    Modifier
-                }
-            ),
-        color = if (filled) Color(0xFFEEF5FC) else Color.Transparent,
-        contentColor = Color(0xFF395575),
+        modifier = modifier.size(44.dp),
+        color = if (filled) Color(0xFFFFFFFF) else Color.Transparent,
+        contentColor = Color(0xFF171C27),
         shape = CircleShape,
-        border = if (filled) BorderStroke(1.dp, Color(0xFFCAD9EA)) else null
+        border = if (filled) BorderStroke(1.dp, Color(0xFFE5E5EA)) else null
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector,
                 contentDescription = contentDescription,
-                modifier = Modifier.size(if (filled) 18.dp else 24.dp)
+                modifier = Modifier.size(if (filled) 20.dp else 24.dp)
             )
         }
     }
@@ -2186,3 +2339,24 @@ private fun ReverseTeachingComposer(
 private val ChatPageBackground = Color(0xFFF4F7FC)
 private val ChatInk = Color(0xFF171C27)
 private val ChatMuted = Color(0xFF6D778C)
+
+/** 自定义「图谱」图标：中心实心节点 + 三个描边卫星节点 + 连线，笔画粗细对齐 Material Rounded（2f/24dp） */
+private val GraphNetworkIcon: ImageVector = ImageVector.Builder(
+    name = "GraphNetwork",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).addPath(
+    pathData = addPathNodes("M12,12 m-2.1,0 a2.1,2.1 0 1,0 4.2,0 a2.1,2.1 0 1,0 -4.2,0"),
+    fill = SolidColor(Color.Black)
+).addPath(
+    pathData = addPathNodes("M10.1,10.45 L7.45,8.28 M13.9,10.45 L16.55,8.28 M12,14.45 L12,16.15"),
+    stroke = SolidColor(Color.Black),
+    strokeLineWidth = 2f,
+    strokeLineCap = StrokeCap.Round
+).addPath(
+    pathData = addPathNodes("M5.4,6.6 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0 M18.6,6.6 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0 M12,18.8 m-2.3,0 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0"),
+    stroke = SolidColor(Color.Black),
+    strokeLineWidth = 2f
+).build()

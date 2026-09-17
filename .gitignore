@@ -18,3 +18,7 @@ Thumbs.db
 *.apk
 *.jks
 *.keystore
+dump_*.py
+local.properties.bak
+.tmp/
+rm_s1.png

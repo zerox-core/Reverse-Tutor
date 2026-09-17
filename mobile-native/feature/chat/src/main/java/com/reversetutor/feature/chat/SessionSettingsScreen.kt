@@ -45,7 +45,6 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -53,7 +52,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -452,6 +450,22 @@ private fun BasicProfilePage(
     SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary)
     SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary)
     SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary)
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("人格预设", fontWeight = FontWeight.SemiBold)
+            CardRadioRow(
+                options = PersonalityPresets,
+                selectedId = PersonalityPresets.firstOrNull { it.title == profile.personality.trim() }?.id,
+                onSelect = { presetId ->
+                    PersonalityPresets.firstOrNull { it.id == presetId }?.let { preset ->
+                        coordinator.editProfile { p -> p.copy(personality = preset.title) }
+                        refresh()
+                    }
+                }
+            )
+            Text("点选预设会替换人格文本；也可以直接在下方自己写。", color = FormalColors.Muted)
+        }
+    }
     SettingsTextField("人格", profile.personality, { coordinator.editProfile { p -> p.copy(personality = it) }; refresh() }, commitBoundary)
     SettingsTextField("互动习惯", profile.interactionHabits, { coordinator.editProfile { p -> p.copy(interactionHabits = it) }; refresh() }, commitBoundary)
     SettingsGroup {
@@ -500,7 +514,6 @@ private fun GoalPlanPage(
     listOf(
         "主要目标" to value.primaryGoal,
         "截止时间" to value.deadline,
-        "学习范围" to value.learningScope,
         "模块" to value.modules,
         "阶段里程碑" to value.stageMilestones,
         "每周计划" to value.weeklyPlan,
@@ -511,7 +524,6 @@ private fun GoalPlanPage(
                 when (label) {
                     "主要目标" -> current.copy(primaryGoal = next)
                     "截止时间" -> current.copy(deadline = next)
-                    "学习范围" -> current.copy(learningScope = next)
                     "模块" -> current.copy(modules = next)
                     "阶段里程碑" -> current.copy(stageMilestones = next)
                     "每周计划" -> current.copy(weeklyPlan = next)
@@ -520,6 +532,16 @@ private fun GoalPlanPage(
             }
             refresh()
         }, commitBoundary)
+    }
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("学习范围", fontWeight = FontWeight.SemiBold)
+            TokenField(
+                value = value.learningScope,
+                onValueChange = { next -> coordinator.editGoalPlan { current -> current.copy(learningScope = next) }; refresh() }
+            )
+            Text("输入知识点后回车或点「添加」变成标签，例如：立体几何、导数、概率统计。", color = FormalColors.Muted)
+        }
     }
     Text("分类快捷标签", fontWeight = FontWeight.SemiBold)
     TagLibraryPicker(
@@ -538,44 +560,43 @@ private fun GoalPlanPage(
 @Composable
 private fun StrategyPage(coordinator: SessionSettingsCoordinator, refresh: () -> Unit) = SettingsPage {
     val strategy = coordinator.state.applied.strategy
-    StrategySlider("反馈强度", strategy.feedbackIntensity) { value ->
+    MoodSettingGroup("反馈强度", strategy.feedbackIntensity, FeedbackMoodLevels) { value ->
         coordinator.setStrategy { current -> current.copy(feedbackIntensity = value) }
         refresh()
     }
-    StrategySlider("追问强度", strategy.probingIntensity) { value -> coordinator.setStrategy { it.copy(probingIntensity = value) }; refresh() }
-    StrategySlider("脚手架强度", strategy.scaffoldingIntensity) { value -> coordinator.setStrategy { it.copy(scaffoldingIntensity = value) }; refresh() }
-    StrategySegments("纠错坚持度", strategy.correctionPersistence, listOf("宽松", "适中", "严格")) {
+    MoodSettingGroup("追问强度", strategy.probingIntensity, ProbingMoodLevels) { value ->
+        coordinator.setStrategy { it.copy(probingIntensity = value) }; refresh()
+    }
+    MoodSettingGroup("脚手架强度", strategy.scaffoldingIntensity, ScaffoldingMoodLevels) { value ->
+        coordinator.setStrategy { it.copy(scaffoldingIntensity = value) }; refresh()
+    }
+    SegmentedSettingGroup("纠错坚持度", strategy.correctionPersistence, listOf("宽松", "适中", "严格")) {
         coordinator.setStrategy { current -> current.copy(correctionPersistence = it) }; refresh()
     }
-    StrategySegments("复习频率", strategy.reviewFrequency, listOf("低", "每周", "高")) {
+    SegmentedSettingGroup("复习频率", strategy.reviewFrequency, listOf("低", "每周", "高")) {
         coordinator.setStrategy { current -> current.copy(reviewFrequency = it) }; refresh()
     }
-    StrategySegments("说话语气", strategy.speakingTone, listOf("温和", "自然", "直接")) {
+    SegmentedSettingGroup("说话语气", strategy.speakingTone, listOf("温和", "自然", "直接")) {
         coordinator.setSpeakingTone(it); refresh()
     }
 }
 
 @Composable
-private fun StrategySlider(label: String, value: Int, onChange: (Int) -> Unit) {
+private fun MoodSettingGroup(label: String, value: Int, levels: List<MoodLevel>, onChange: (Int) -> Unit) {
     SettingsGroup {
-        Column(Modifier.padding(16.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(label)
-                Text("$value / 5")
-            }
-            Slider(value.toFloat(), onValueChange = { onChange(it.toInt().coerceIn(1, 5)) }, valueRange = 1f..5f, steps = 3)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, fontWeight = FontWeight.SemiBold)
+            MoodSliderRow(value = value, levels = levels, onChange = onChange)
         }
     }
 }
 
 @Composable
-private fun StrategySegments(label: String, selected: String, values: List<String>, onSelect: (String) -> Unit) {
+private fun SegmentedSettingGroup(label: String, selected: String, values: List<String>, onSelect: (String) -> Unit) {
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                values.forEach { value -> FilterChip(selected == value, onClick = { onSelect(value) }, label = { Text(value) }) }
-            }
+            Text(label, fontWeight = FontWeight.SemiBold)
+            SegmentedPillsRow(values = values, selected = selected, onSelect = onSelect)
         }
     }
 }
@@ -801,11 +822,12 @@ private fun DangerPage(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("删除当前会话", color = FormalColors.Danger, fontWeight = FontWeight.Bold)
             Text("复用首页会话删除确认、durable 清理、5 秒撤销及幂等竞态处理。", color = FormalColors.Muted)
-            Button(
-                onClick = onRequestDeleteSession,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = FormalColors.Danger)
-            ) { Text("删除当前会话") }
+            HoldToConfirmButton(
+                text = "按住不放，删除当前会话",
+                holdingText = "继续按住…",
+                onConfirm = onRequestDeleteSession,
+                modifier = Modifier.fillMaxWidth()
+            )
             if (canUndo) OutlinedButton(onClick = onUndo, Modifier.fillMaxWidth()) { Text("撤销删除（5 秒）") }
         }
     }
