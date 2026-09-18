@@ -233,6 +233,37 @@ internal fun ReverseTeachingChatScreen(
         if (selectedMessageId == selected) selectedMessageId = null
     }
 
+    // 自动滚动：用户发送消息后强制滚动到最新内容；新内容（回复到达 / 流式文本增长）
+    // 仅在视口本来就贴近底部时跟随，不打断向上翻阅历史。
+    var followNextAppend by remember(state.sessionTitle) { mutableStateOf(false) }
+    val streamingLength = (state.generation as? ChatGenerationUiState.Streaming)?.text?.length ?: 0
+    val timelineItemCount = run {
+        val messageItems = if (state.messages.isEmpty()) 1 else buildChatTimelineEntries(state.messages).size
+        messageItems + (if (state.generationStatusLabel != null) 1 else 0) + (if (sessionContract != null) 1 else 0)
+    }
+    var previousTimelineItemCount by remember(state.sessionTitle) { mutableStateOf(timelineItemCount) }
+    var scrollRestoreGuard by remember(state.sessionTitle) { mutableStateOf(true) }
+    LaunchedEffect(timelineItemCount, streamingLength) {
+        val countChanged = timelineItemCount != previousTimelineItemCount
+        previousTimelineItemCount = timelineItemCount
+        if (scrollRestoreGuard) {
+            // 首次组合跳过，保留 initialScrollPosition 的位置恢复语义
+            scrollRestoreGuard = false
+            return@LaunchedEffect
+        }
+        if (timelineItemCount <= 0) return@LaunchedEffect
+        val layoutInfo = listState.layoutInfo
+        val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        val nearEnd = layoutInfo.totalItemsCount == 0 || lastVisibleIndex >= layoutInfo.totalItemsCount - 2
+        if (!followNextAppend && !nearEnd) return@LaunchedEffect
+        followNextAppend = false
+        if (countChanged) {
+            listState.animateScrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+        } else {
+            listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -401,7 +432,10 @@ internal fun ReverseTeachingChatScreen(
                         showAttachmentActions = true
                     }
                 },
-                onSend = onSendMessage,
+                onSend = {
+                    followNextAppend = true
+                    onSendMessage()
+                },
                 onFocusChanged = { focused ->
                     if (focused) showAttachmentActions = false
                     onComposerFocusChanged(focused)
