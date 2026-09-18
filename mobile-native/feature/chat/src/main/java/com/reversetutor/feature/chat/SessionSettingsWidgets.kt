@@ -22,6 +22,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +36,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -1102,19 +1105,37 @@ private fun RecipePreviewCard(selection: RecipeSelection, testTag: String) {
 
 /** 一轮问答：AI 学生提问 [question]，已填值 [value]，提交回调 [onCommit]；
  * [ackTemplate] 为答完后 AI 回显模板（{answer} 占位本地替换，纯 mock 无 LLM 调用）；
- * [placeholder] 为输入态 hint。 */
+ * [reAskTemplate] 为输入被判定成反问/闲聊（不是答案）时的兜底追问；[placeholder] 为输入态 hint。 */
 data class ChatFieldRound(
     val id: String,
     val question: String,
     val value: String,
     val onCommit: (String) -> Unit,
     val ackTemplate: String? = null,
-    val placeholder: String = "输入你的回答"
+    val placeholder: String = "输入你的回答",
+    val reAskTemplate: String? = null
 )
 
+/** mock 阶段的「非答案输入」本地判定（无 LLM）：以问号结尾、或以常见疑问词开头的输入，
+ * 视为用户在反问/闲聊而不是给答案——不写入资料，AI 用 reAskTemplate 兜底追问。 */
+internal fun isQuestionLikeChatInput(text: String): Boolean {
+    val t = text.trim()
+    if (t.isEmpty()) return false
+    if (t.endsWith("？") || t.endsWith("?")) return true
+    val questionPrefixes = listOf(
+        "为什么", "为啥", "怎么", "怎样", "什么", "啥", "哪", "谁",
+        "是不是", "能不能", "可不可以", "会不会", "难道", "吗", "呢"
+    )
+    return questionPrefixes.any { t.startsWith(it) }
+}
+
+private const val ChatFieldDefaultReAsk = "嗯……这个我不太懂诶，老师直接告诉我答案嘛～"
+
 /**
- * 组件库 B 类「聊天气泡编辑器」：左边 AI 学生气泡提问，右边用户气泡即表单值；
- * 未回答时底部是输入框 + 发送钮，已回答可点「重新回答」再改。
+ * 组件库 B 类「聊天气泡编辑器」：
+ * 上半是限高对话记录区——最多容纳约两轮问答，超出在区域内向下滚动并自动跟到最新；
+ * 下半是固定输入行——始终归属「当前待答轮」（首个未答轮，或点了「重新回答」的轮）；
+ * 判定为反问/闲聊的输入不写入，追加一条 AI 兜底追问气泡，轮次保持待答。
  */
 @Composable
 internal fun ChatFieldQA(
@@ -1122,142 +1143,61 @@ internal fun ChatFieldQA(
     modifier: Modifier = Modifier,
     testTag: String = "chat-field"
 ) {
-    Column(modifier.fillMaxWidth().testTag(testTag), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        rounds.forEachIndexed { index, round ->
-            ChatFieldRoundBlock(
-                round = round,
-                entranceDelay = index * 120L,
-                testTag = "$testTag-${round.id}"
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChatFieldRoundBlock(
-    round: ChatFieldRound,
-    entranceDelay: Long,
-    testTag: String
-) {
-    val entrance = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        delay(entranceDelay)
-        entrance.animateTo(
-            1f,
-            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
-        )
-    }
-    var editing by remember(round.id) { mutableStateOf(round.value.isBlank()) }
-    var draft by remember(round.id) { mutableStateOf(round.value) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .testTag(testTag)
-            .graphicsLayer { alpha = entrance.value },
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(verticalAlignment = Alignment.Top) {
-            Box(
-                Modifier.size(28.dp).background(FormalColors.SuccessSoft, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("🧑‍🎓", fontSize = 14.sp)
-            }
-            Spacer(Modifier.width(8.dp))
-            Surface(
-                shape = RoundedCornerShape(4.dp, 14.dp, 14.dp, 14.dp),
-                color = FormalColors.SurfaceSubtle,
-                border = BorderStroke(1.dp, FormalColors.Divider)
-            ) {
-                Text(
-                    round.question,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = FormalColors.Ink
-                )
+    val scroll = rememberScrollState()
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var draft by remember { mutableStateOf("") }
+    var reAsk by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val activeRound = rounds.firstOrNull { it.id == editingId }
+        ?: rounds.firstOrNull { it.value.isBlank() }
+    Column(modifier.fillMaxWidth().testTag(testTag)) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = 300.dp)
+                .verticalScroll(scroll)
+        ) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                rounds.forEachIndexed { index, round ->
+                    ChatFieldTranscriptRound(
+                        round = round,
+                        entranceDelay = index * 120L,
+                        reAnswering = editingId == round.id,
+                        onReanswer = {
+                            editingId = round.id
+                            draft = round.value
+                            reAsk = null
+                        },
+                        testTag = "$testTag-${round.id}"
+                    )
+                }
+                val pendingReAsk = reAsk
+                if (pendingReAsk != null && pendingReAsk.first == activeRound?.id) {
+                    ChatFieldAiBubble(
+                        text = pendingReAsk.second,
+                        containerColor = FormalColors.SuccessSoft.copy(alpha = 0.45f),
+                        borderColor = FormalColors.Success.copy(alpha = 0.22f),
+                        entrance = true
+                    )
+                }
             }
         }
-        if (round.value.isNotBlank() && !editing) {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 用户答案气泡（右对齐）
-                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp, 4.dp, 14.dp, 14.dp),
-                        color = FormalColors.PrimarySoft,
-                        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.25f))
-                    ) {
-                        Text(
-                            round.value,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = FormalColors.Ink
-                        )
-                    }
-                }
-                // AI 回显气泡（本地 mock 模板替换 {answer}，无 LLM 调用；错峰 180ms 入场）
-                round.ackTemplate?.let { template ->
-                    val ackEntrance = remember { Animatable(0f) }
-                    LaunchedEffect(round.value) {
-                        ackEntrance.snapTo(0f)
-                        delay(180L)
-                        ackEntrance.animateTo(
-                            1f,
-                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
-                        )
-                    }
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier.graphicsLayer {
-                            alpha = ackEntrance.value
-                            translationX = (1f - ackEntrance.value) * -14f
-                        }
-                    ) {
-                        Box(
-                            Modifier.size(28.dp).background(FormalColors.SuccessSoft, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🧑‍🎓", fontSize = 14.sp)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp, 14.dp, 14.dp, 14.dp),
-                            color = FormalColors.SuccessSoft.copy(alpha = 0.45f),
-                            border = BorderStroke(1.dp, FormalColors.Success.copy(alpha = 0.22f))
-                        ) {
-                            Text(
-                                template.replace("{answer}", round.value),
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = FormalColors.Ink
-                            )
-                        }
-                    }
-                }
-                Text(
-                    "点这里重新回答",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = FormalColors.Muted,
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .clickable(
-                            onClickLabel = "重新回答",
-                            role = Role.Button,
-                            onClick = {
-                                draft = round.value
-                                editing = true
-                            }
-                        )
-                        .padding(top = 3.dp)
-                        .testTag("$testTag-reanswer")
-                )
-            }
-        } else {
+        LaunchedEffect(rounds.map { it.value }, reAsk) {
+            scroll.animateScrollTo(scroll.maxValue)
+        }
+        val active = activeRound
+        if (active != null) {
+            Spacer(Modifier.height(12.dp))
             val commit = {
                 val answer = draft.trim()
                 if (answer.isNotEmpty()) {
-                    round.onCommit(answer)
-                    editing = false
+                    if (isQuestionLikeChatInput(answer)) {
+                        reAsk = active.id to (active.reAskTemplate ?: ChatFieldDefaultReAsk)
+                    } else {
+                        active.onCommit(answer)
+                        reAsk = null
+                        editingId = null
+                        draft = ""
+                    }
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -1265,7 +1205,7 @@ private fun ChatFieldRoundBlock(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f).testTag("$testTag-input"),
-                    placeholder = { Text(round.placeholder) },
+                    placeholder = { Text(active.placeholder) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { commit() })
@@ -1295,6 +1235,128 @@ private fun ChatFieldRoundBlock(
                     }
                 }
             }
+        }
+    }
+}
+
+/** 左侧 AI 学生气泡；[entrance] 为 true 时带 180ms 延迟的 spring 弹入（用于回显/追问这类「新消息」）。 */
+@Composable
+private fun ChatFieldAiBubble(
+    text: String,
+    containerColor: Color,
+    borderColor: Color,
+    entrance: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val anim = remember { Animatable(if (entrance) 0f else 1f) }
+    if (entrance) {
+        LaunchedEffect(text) {
+            anim.snapTo(0f)
+            delay(180L)
+            anim.animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            )
+        }
+    }
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = modifier.graphicsLayer {
+            alpha = anim.value
+            translationX = (1f - anim.value) * -14f
+        }
+    ) {
+        Box(
+            Modifier.size(28.dp).background(FormalColors.SuccessSoft, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("🧑‍🎓", fontSize = 14.sp)
+        }
+        Spacer(Modifier.width(8.dp))
+        Surface(
+            shape = RoundedCornerShape(4.dp, 14.dp, 14.dp, 14.dp),
+            color = containerColor,
+            border = BorderStroke(1.dp, borderColor)
+        ) {
+            Text(
+                text,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = FormalColors.Ink
+            )
+        }
+    }
+}
+
+/** 记录区里的一轮：AI 提问气泡 +（已答时）用户答案气泡 + AI 回显气泡 +「点这里重新回答」。 */
+@Composable
+private fun ChatFieldTranscriptRound(
+    round: ChatFieldRound,
+    entranceDelay: Long,
+    reAnswering: Boolean,
+    onReanswer: () -> Unit,
+    testTag: String
+) {
+    val entrance = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(entranceDelay)
+        entrance.animateTo(
+            1f,
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+        )
+    }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+            .graphicsLayer { alpha = entrance.value },
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        ChatFieldAiBubble(
+            text = round.question,
+            containerColor = FormalColors.SurfaceSubtle,
+            borderColor = FormalColors.Divider,
+            entrance = false
+        )
+        if (round.value.isNotBlank()) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp, 4.dp, 14.dp, 14.dp),
+                    color = FormalColors.PrimarySoft,
+                    border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.25f))
+                ) {
+                    Text(
+                        round.value,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FormalColors.Ink
+                    )
+                }
+            }
+            round.ackTemplate?.let { template ->
+                ChatFieldAiBubble(
+                    text = template.replace("{answer}", round.value),
+                    containerColor = FormalColors.SuccessSoft.copy(alpha = 0.45f),
+                    borderColor = FormalColors.Success.copy(alpha = 0.22f),
+                    entrance = true
+                )
+            }
+            Text(
+                if (reAnswering) "正在下方重新回答…" else "点这里重新回答",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (reAnswering) FormalColors.Primary else FormalColors.Muted,
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .clickable(
+                        enabled = !reAnswering,
+                        onClickLabel = "重新回答",
+                        role = Role.Button,
+                        onClick = onReanswer
+                    )
+                    .padding(top = 3.dp)
+                    .testTag("$testTag-reanswer")
+            )
         }
     }
 }
