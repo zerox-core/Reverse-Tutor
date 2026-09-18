@@ -1,6 +1,7 @@
 package com.reversetutor.feature.chat
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +61,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -110,7 +113,9 @@ internal fun CardRadioRow(
     selectedId: String?,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    testTag: String = "card-radio"
+    testTag: String = "card-radio",
+    accentColor: Color = FormalColors.Success,
+    accentContainerColor: Color = FormalColors.SuccessSoft
 ) {
     Row(
         modifier = modifier.fillMaxWidth().testTag(testTag),
@@ -150,10 +155,10 @@ internal fun CardRadioRow(
                     )
                     .testTag("$testTag-${option.id}"),
                 shape = RoundedCornerShape(12.dp),
-                color = if (selected) FormalColors.SuccessSoft else FormalColors.Surface,
+                color = if (selected) accentContainerColor else FormalColors.Surface,
                 border = BorderStroke(
                     width = if (selected) 2.dp else 1.dp,
-                    color = if (selected) FormalColors.Success else FormalColors.Divider
+                    color = if (selected) accentColor else FormalColors.Divider
                 )
             ) {
                 Box {
@@ -174,7 +179,7 @@ internal fun CardRadioRow(
                             option.title,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = if (selected) FormalColors.Success else FormalColors.Ink,
+                            color = if (selected) accentColor else FormalColors.Ink,
                             maxLines = 1
                         )
                         Text(
@@ -191,7 +196,7 @@ internal fun CardRadioRow(
                                 .align(Alignment.TopEnd)
                                 .padding(5.dp)
                                 .size(18.dp)
-                                .background(FormalColors.Success, CircleShape),
+                                .background(accentColor, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -603,39 +608,208 @@ internal fun HoldToConfirmButton(
 
 // endregion
 
-// region 11 导出动作卡 ExportActionCard
+// region 11 填充动作按钮 FilledActionButton
 
 /**
- * 系统操作页导出入口：组件库白卡 + 细边框 + 弹性按压缩放。
- * [vertical] = true 为半宽竖版大卡（emoji 在上、文案在下）；false 为整宽横版卡。
+ * 组件库动作按钮：Primary / Danger 填充 + 12dp 圆角 + 按压 0.97 形变 + ripple。
+ * 导出分享主按钮与删除确认弹窗的确认按钮共用；文字一律白色。
  */
 @Composable
-internal fun ExportActionCard(
-    title: String,
-    tagline: String,
-    emoji: String,
+internal fun FilledActionButton(
+    text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    vertical: Boolean = false,
-    testTag: String
+    danger: Boolean = false,
+    icon: ImageVector? = null,
+    testTag: String = "filled-action",
+    onClickLabel: String = text
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)
     )
+    val container = if (danger) FormalColors.Danger else FormalColors.Primary
     Surface(
         modifier = modifier
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,
                 role = Role.Button,
-                onClickLabel = title,
+                onClickLabel = onClickLabel,
+                onClick = onClick
+            )
+            .testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
+        color = container
+    ) {
+        Row(
+            Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+            }
+            Text(
+                text,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+    }
+}
+
+// endregion
+
+// region 12 导出装箱单 ExportManifestCard
+
+/** 「装箱单」预览：浅底细边框卡，列出将打包的内容，随选择过渡切换。 */
+@Composable
+internal fun ExportManifestCard(
+    memory: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = FormalColors.SurfaceSubtle,
+        border = BorderStroke(1.dp, FormalColors.Divider)
+    ) {
+        Crossfade(targetState = memory, label = "export-manifest") { isMemory ->
+            Column(
+                Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                Text("将打包：", style = MaterialTheme.typography.labelMedium, color = FormalColors.Muted)
+                val items = if (isMemory) listOf(
+                    "基本资料 · 学习目标 · 对话策略",
+                    "当前全部设定快照",
+                    "快捷标签"
+                ) else listOf(
+                    "基本资料",
+                    "学习目标与计划",
+                    "对话策略"
+                )
+                items.forEach { line ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(5.dp).background(FormalColors.Primary, CircleShape))
+                        Text(line, style = MaterialTheme.typography.bodySmall, color = FormalColors.Ink)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// endregion
+
+// region 13 导出·版式C 卡选+装箱单+主按钮 ExportPickSharePanel
+
+/**
+ * 导出面板·版式 C：复用组件库 01 CardRadio（弹性放大 + 高亮描边 + 角标对勾）单选，
+ * 下方实时「装箱单」+ 一颗 Primary 分享主按钮（按压形变）。
+ */
+@Composable
+internal fun ExportPickSharePanel(
+    onShare: (memory: Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selectedId by remember { mutableStateOf("memory") }
+    val memory = selectedId == "memory"
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        CardRadioRow(
+            options = listOf(
+                CardRadioOption(id = "memory", title = "会话记忆库", tagline = "全部设定打包", emoji = "\uD83D\uDCE6"),
+                CardRadioOption(id = "config", title = "当前配置", tagline = "资料·目标·策略", emoji = "\uD83E\uDDFE")
+            ),
+            selectedId = selectedId,
+            onSelect = { selectedId = it },
+            testTag = "export-pick",
+            accentColor = FormalColors.Primary,
+            accentContainerColor = FormalColors.PrimarySoft
+        )
+        ExportManifestCard(memory = memory)
+        FilledActionButton(
+            text = if (memory) "分享会话记忆库" else "分享当前配置",
+            icon = Icons.Rounded.Share,
+            onClick = { onShare(memory) },
+            modifier = Modifier.fillMaxWidth(),
+            testTag = if (memory) "export-session-memory" else "export-session-config"
+        )
+    }
+}
+
+// endregion
+
+// region 14 导出·版式D 胶囊分段+装箱单+主按钮 ExportSegmentsSharePanel
+
+/**
+ * 导出面板·版式 D：复用组件库 02 SegmentedPills（白色滑块滑动迁移）切换，
+ * 下方实时「装箱单」+ 一颗 Primary 分享主按钮（按压形变）。
+ */
+@Composable
+internal fun ExportSegmentsSharePanel(
+    onShare: (memory: Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var selected by remember { mutableStateOf("记忆库") }
+    val memory = selected == "记忆库"
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SegmentedPillsRow(
+            values = listOf("记忆库", "当前配置"),
+            selected = selected,
+            onSelect = { selected = it },
+            testTag = "export-seg"
+        )
+        ExportManifestCard(memory = memory)
+        FilledActionButton(
+            text = if (memory) "分享会话记忆库" else "分享当前配置",
+            icon = Icons.Rounded.Share,
+            onClick = { onShare(memory) },
+            modifier = Modifier.fillMaxWidth(),
+            testTag = if (memory) "export-session-memory" else "export-session-config"
+        )
+    }
+}
+
+// endregion
+
+// region 15 次级动作按钮 SecondaryActionButton
+
+/**
+ * 组件库次级动作按钮：白底细边框 + 按压 0.97 形变 + ripple；
+ * [danger] = true 时文字用 Danger 色（撤销删除类轻量操作）。
+ */
+@Composable
+internal fun SecondaryActionButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    danger: Boolean = false,
+    testTag: String = "secondary-action",
+    onClickLabel: String = text
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)
+    )
+    Surface(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClickLabel = onClickLabel,
                 onClick = onClick
             )
             .testTag(testTag),
@@ -643,68 +817,16 @@ internal fun ExportActionCard(
         color = FormalColors.Surface,
         border = BorderStroke(1.dp, FormalColors.Divider)
     ) {
-        if (vertical) {
-            Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .background(FormalColors.SurfaceSubtle, RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) { Text(emoji, fontSize = 22.sp) }
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = FormalColors.Ink,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    tagline,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = FormalColors.Muted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        } else {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    Modifier
-                        .size(40.dp)
-                        .background(FormalColors.SurfaceSubtle, RoundedCornerShape(10.dp)),
-                    contentAlignment = Alignment.Center
-                ) { Text(emoji, fontSize = 22.sp) }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = FormalColors.Ink,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        tagline,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = FormalColors.Muted,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-                Icon(
-                    Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = FormalColors.Tertiary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+        Box(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text,
+                color = if (danger) FormalColors.Danger else FormalColors.Ink,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge
+            )
         }
     }
 }
