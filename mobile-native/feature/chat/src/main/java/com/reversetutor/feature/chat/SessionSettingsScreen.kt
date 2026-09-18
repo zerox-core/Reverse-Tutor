@@ -443,25 +443,75 @@ private fun BasicProfilePage(
     val profile = coordinator.state.form.profile
     val presetMatch = PersonalityPresets.firstOrNull { it.title == profile.personality.trim() }
     var customPersonaExpanded by remember {
-        mutableStateOf(profile.personality.isNotBlank() && presetMatch == null)
+        mutableStateOf(
+            profile.personality.isNotBlank() && presetMatch == null &&
+                composeRecipeText(parseRecipeSelection(profile.personality)) == null
+        )
     }
     SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary, singleLine = true, testTag = "session-settings-title")
-    SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary, singleLine = true)
-    SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary, singleLine = true)
-    SettingsGroup {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("人格预设", fontWeight = FontWeight.SemiBold)
-            CardRadioRow(
-                options = PersonalityPresets,
-                selectedId = presetMatch?.id,
-                onSelect = { presetId ->
-                    PersonalityPresets.firstOrNull { it.id == presetId }?.let { preset ->
-                        coordinator.editProfile { p -> p.copy(personality = preset.title) }
-                        customPersonaExpanded = false
-                        refresh()
+    if (ProfilePageVariant == 1) {
+        // 版式E · 聊天建档：组件库 06 ChatField，用对话方式填显示名与角色
+        SettingsGroup {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("和学习者打个招呼", fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                Text(
+                    "用对话的方式填资料，回答会直接写进基本资料。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FormalColors.Muted
+                )
+                ChatFieldQA(
+                    rounds = listOf(
+                        ChatFieldRound("name", "老师，我该怎么称呼你？", profile.learnerDisplayName) { answer ->
+                            coordinator.editProfile { p -> p.copy(learnerDisplayName = answer) }
+                            refresh()
+                        },
+                        ChatFieldRound("role", "那我在你身边算什么角色呀？", profile.learnerRole) { answer ->
+                            coordinator.editProfile { p -> p.copy(learnerRole = answer) }
+                            refresh()
+                        }
+                    )
+                )
+            }
+        }
+    } else {
+        SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary, singleLine = true)
+        SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary, singleLine = true)
+    }
+    if (ProfilePageVariant == 2) {
+        // 版式F · 配方工坊：组件库 04 RecipePicker（底子×怪癖×口头禅 + 08 骰子）组合人格
+        var recipeSel by remember(profile.personality) {
+            mutableStateOf(parseRecipeSelection(profile.personality))
+        }
+        SettingsGroup {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                RecipePickerPanel(
+                    selection = recipeSel,
+                    onSelect = { next ->
+                        recipeSel = next
+                        composeRecipeText(next)?.let { text ->
+                            coordinator.editProfile { p -> p.copy(personality = text) }
+                            refresh()
+                        }
                     }
-                }
-            )
+                )
+            }
+        }
+    } else {
+        SettingsGroup {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("人格预设", fontWeight = FontWeight.SemiBold)
+                CardRadioRow(
+                    options = PersonalityPresets,
+                    selectedId = presetMatch?.id,
+                    onSelect = { presetId ->
+                        PersonalityPresets.firstOrNull { it.id == presetId }?.let { preset ->
+                            coordinator.editProfile { p -> p.copy(personality = preset.title) }
+                            customPersonaExpanded = false
+                            refresh()
+                        }
+                    }
+                )
+            }
         }
     }
     SettingsGroup {
@@ -510,12 +560,17 @@ private fun BasicProfilePage(
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("当前头像：${coordinator.state.form.snapshot.learnerImageRef ?: "未设置"}")
-            OutlinedButton(onClick = onPickLearnerImage, Modifier.fillMaxWidth()) { Text("选择或修改头像") }
+            SecondaryActionButton(
+                text = "选择或修改头像",
+                onClick = onPickLearnerImage,
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "pick-learner-image"
+            )
             if (coordinator.state.form.snapshot.learnerImageRef != null) {
                 TextButton(
                     onClick = { coordinator.setLearnerImageRef(null); refresh() },
                     modifier = Modifier.fillMaxWidth()
-                ) { Text("移除当前会话头像") }
+                ) { Text("移除当前会话头像", color = FormalColors.Danger) }
             }
         }
     }
@@ -774,6 +829,9 @@ private fun SourceManagementPage(
 
 // 导出面版式：1 = 版式C 大图标卡单选+装箱单+主按钮；2 = 版式D 胶囊分段+装箱单+主按钮（拍板后收敛为一版）
 private const val ExportPanelVariant = 1
+
+/** 基本资料页版式开关：1 = 版式E 聊天建档（ChatField），2 = 版式F 配方工坊（RecipePicker）。 */
+private const val ProfilePageVariant = 1
 
 @Composable
 private fun SystemOpsPage(

@@ -40,6 +40,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Share
@@ -84,6 +85,8 @@ import kotlinx.coroutines.launch
  * - 01 CardRadio          [CardRadioRow]
  * - 02 SegmentedPills     [SegmentedPillsRow]
  * - 03 MoodSlider         [MoodSliderRow]
+ * - 04 RecipePicker       [RecipePickerPanel]（含 08 骰子随机）
+ * - 06 ChatField          [ChatFieldQA]
  * - 07 TokenField         [TokenField]
  * - 10 HoldToConfirm      [HoldToConfirmButton]
  *
@@ -827,6 +830,416 @@ internal fun SecondaryActionButton(
                 fontWeight = FontWeight.SemiBold,
                 style = MaterialTheme.typography.labelLarge
             )
+        }
+    }
+}
+
+// endregion
+
+
+// region 04 配方组合器 RecipePicker（含 08 骰子随机）
+
+/** 配方选项：三列（底子 / 怪癖 / 口头禅）各选一个，组合出学生人格。 */
+data class RecipeOption(
+    val id: String,
+    val title: String,
+    val emoji: String
+)
+
+/** 当前配方选择；三项齐全才能出炉（[composeRecipeText] 非空）。 */
+data class RecipeSelection(
+    val baseId: String?,
+    val quirkId: String?,
+    val catchphraseId: String?
+)
+
+internal val RecipeBases: List<RecipeOption> =
+    PersonalityPresets.map { RecipeOption(it.id, it.title, it.emoji) }
+
+internal val RecipeQuirks = listOf(
+    RecipeOption(id = "note-taker", title = "爱记笔记", emoji = "📝"),
+    RecipeOption(id = "daydreamer", title = "上课走神", emoji = "💭"),
+    RecipeOption(id = "digger", title = "刨根问底", emoji = "🔍"),
+    RecipeOption(id = "bargainer", title = "爱讲条件", emoji = "🤝"),
+    RecipeOption(id = "crammer", title = "临时抱佛脚", emoji = "⏰")
+)
+
+internal val RecipeCatchphrases = listOf(
+    RecipeOption(id = "aha", title = "原来如此", emoji = "💡"),
+    RecipeOption(id = "why", title = "为啥呀", emoji = "🙋"),
+    RecipeOption(id = "got-it", title = "我懂了", emoji = "🎉"),
+    RecipeOption(id = "again", title = "再来一遍", emoji = "🔁"),
+    RecipeOption(id = "so-what", title = "这有啥用", emoji = "🤷"),
+    RecipeOption(id = "yes-sir", title = "老师说得对", emoji = "🫡")
+)
+
+/** 三项齐全时组合出人格文本（写回 profile.personality 的格式），否则为 null。 */
+internal fun composeRecipeText(selection: RecipeSelection): String? {
+    val base = RecipeBases.firstOrNull { it.id == selection.baseId } ?: return null
+    val quirk = RecipeQuirks.firstOrNull { it.id == selection.quirkId } ?: return null
+    val catchphrase = RecipeCatchphrases.firstOrNull { it.id == selection.catchphraseId } ?: return null
+    return "${base.title} · ${quirk.title} · ${catchphrase.title}"
+}
+
+/** 从人格文本反解配方选择；不是配方格式或某项对不上时该项为 null。 */
+internal fun parseRecipeSelection(personality: String): RecipeSelection {
+    val parts = personality.split(" · ").map { it.trim() }
+    if (parts.size != 3) return RecipeSelection(null, null, null)
+    return RecipeSelection(
+        baseId = RecipeBases.firstOrNull { it.title == parts[0] }?.id,
+        quirkId = RecipeQuirks.firstOrNull { it.title == parts[1] }?.id,
+        catchphraseId = RecipeCatchphrases.firstOrNull { it.title == parts[2] }?.id
+    )
+}
+
+internal fun randomRecipeSelection(): RecipeSelection = RecipeSelection(
+    baseId = RecipeBases.random().id,
+    quirkId = RecipeQuirks.random().id,
+    catchphraseId = RecipeCatchphrases.random().id
+)
+
+/**
+ * 组件库 B 类主角「配方组合器」：三列各选一个 → 实时配方卡（组合数可见），
+ * 右上角 🎲 一键随机一整套（规格 08 的联动入口）。收敛的创造：给配方，不给白板。
+ */
+@Composable
+internal fun RecipePickerPanel(
+    selection: RecipeSelection,
+    onSelect: (RecipeSelection) -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String = "recipe-picker"
+) {
+    val haptics = LocalHapticFeedback.current
+    var diceTarget by remember { mutableStateOf(0f) }
+    val diceAngle by animateFloatAsState(
+        targetValue = diceTarget,
+        animationSpec = tween(600, easing = LinearEasing),
+        label = "recipe-dice"
+    )
+    Column(modifier.fillMaxWidth().testTag(testTag), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("人格配方", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+            Surface(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(
+                        onClickLabel = "随机一套配方",
+                        role = Role.Button,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            diceTarget += 720f
+                            onSelect(randomRecipeSelection())
+                        }
+                    )
+                    .testTag("$testTag-dice"),
+                shape = CircleShape,
+                color = FormalColors.SurfaceSubtle,
+                border = BorderStroke(1.dp, FormalColors.Divider)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        "🎲",
+                        fontSize = 18.sp,
+                        modifier = Modifier.graphicsLayer { rotationZ = diceAngle }
+                    )
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            RecipeColumn(
+                header = "底子",
+                options = RecipeBases,
+                selectedId = selection.baseId,
+                onPick = { onSelect(selection.copy(baseId = it)) },
+                modifier = Modifier.weight(1f),
+                testTag = "$testTag-base"
+            )
+            RecipeColumn(
+                header = "怪癖",
+                options = RecipeQuirks,
+                selectedId = selection.quirkId,
+                onPick = { onSelect(selection.copy(quirkId = it)) },
+                modifier = Modifier.weight(1f),
+                testTag = "$testTag-quirk"
+            )
+            RecipeColumn(
+                header = "口头禅",
+                options = RecipeCatchphrases,
+                selectedId = selection.catchphraseId,
+                onPick = { onSelect(selection.copy(catchphraseId = it)) },
+                modifier = Modifier.weight(1f),
+                testTag = "$testTag-catch"
+            )
+        }
+        RecipePreviewCard(selection = selection, testTag = "$testTag-card")
+    }
+}
+
+@Composable
+private fun RecipeColumn(
+    header: String,
+    options: List<RecipeOption>,
+    selectedId: String?,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String
+) {
+    val haptics = LocalHapticFeedback.current
+    Column(modifier.testTag(testTag), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            header,
+            style = MaterialTheme.typography.labelSmall,
+            color = FormalColors.Muted,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        )
+        options.forEach { option ->
+            val selected = option.id == selectedId
+            val scale by animateFloatAsState(
+                targetValue = if (selected) 1.04f else 1f,
+                animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
+                label = "recipe-option-scale"
+            )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { scaleX = scale; scaleY = scale }
+                    .clickable(
+                        onClickLabel = option.title,
+                        role = Role.RadioButton,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onPick(option.id)
+                        }
+                    )
+                    .testTag("$testTag-${option.id}"),
+                shape = RoundedCornerShape(10.dp),
+                color = if (selected) FormalColors.PrimarySoft else FormalColors.Surface,
+                border = BorderStroke(
+                    width = if (selected) 1.5.dp else 1.dp,
+                    color = if (selected) FormalColors.Primary else FormalColors.Divider
+                )
+            ) {
+                Column(
+                    Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 2.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(option.emoji, fontSize = 18.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        option.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (selected) FormalColors.Primary else FormalColors.Ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecipePreviewCard(selection: RecipeSelection, testTag: String) {
+    val combo = "${RecipeBases.size}×${RecipeQuirks.size}×${RecipeCatchphrases.size}"
+    val total = RecipeBases.size * RecipeQuirks.size * RecipeCatchphrases.size
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
+        color = FormalColors.SurfaceSubtle,
+        border = BorderStroke(1.dp, FormalColors.Divider)
+    ) {
+        Crossfade(targetState = selection, label = "recipe-card") { sel ->
+            val base = RecipeBases.firstOrNull { it.id == sel.baseId }
+            val quirk = RecipeQuirks.firstOrNull { it.id == sel.quirkId }
+            val catchphrase = RecipeCatchphrases.firstOrNull { it.id == sel.catchphraseId }
+            Column(
+                Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (base != null && quirk != null && catchphrase != null) {
+                    Text(
+                        "配方出炉 ${base.emoji}${quirk.emoji}${catchphrase.emoji}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = FormalColors.Success,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "一个${base.title}，${quirk.title}，张口就是「${catchphrase.title}」的学生",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FormalColors.Ink
+                    )
+                    Text(
+                        "$combo = $total 种人格，点 🎲 随机换一套",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = FormalColors.Muted
+                    )
+                } else {
+                    val missing = listOf(base, quirk, catchphrase).count { it == null }
+                    Text(
+                        "还差 $missing 步：三列各点一个，配方就出炉；或点右上角 🎲 随机一套",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = FormalColors.Muted
+                    )
+                }
+            }
+        }
+    }
+}
+
+// endregion
+
+// region 06 聊天气泡编辑器 ChatField
+
+/** 一轮问答：AI 学生提问 [question]，已填值 [value]，提交回调 [onCommit]。 */
+data class ChatFieldRound(
+    val id: String,
+    val question: String,
+    val value: String,
+    val onCommit: (String) -> Unit
+)
+
+/**
+ * 组件库 B 类「聊天气泡编辑器」：左边 AI 学生气泡提问，右边用户气泡即表单值；
+ * 未回答时底部是输入框 + 发送钮，已回答可点「重新回答」再改。
+ */
+@Composable
+internal fun ChatFieldQA(
+    rounds: List<ChatFieldRound>,
+    modifier: Modifier = Modifier,
+    testTag: String = "chat-field"
+) {
+    Column(modifier.fillMaxWidth().testTag(testTag), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        rounds.forEachIndexed { index, round ->
+            ChatFieldRoundBlock(
+                round = round,
+                entranceDelay = index * 120L,
+                testTag = "$testTag-${round.id}"
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatFieldRoundBlock(
+    round: ChatFieldRound,
+    entranceDelay: Long,
+    testTag: String
+) {
+    val entrance = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(entranceDelay)
+        entrance.animateTo(
+            1f,
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+        )
+    }
+    var editing by remember(round.id) { mutableStateOf(round.value.isBlank()) }
+    var draft by remember(round.id) { mutableStateOf(round.value) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+            .graphicsLayer { alpha = entrance.value },
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Box(
+                Modifier.size(28.dp).background(FormalColors.SuccessSoft, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("🧑‍🎓", fontSize = 14.sp)
+            }
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                shape = RoundedCornerShape(4.dp, 14.dp, 14.dp, 14.dp),
+                color = FormalColors.SurfaceSubtle,
+                border = BorderStroke(1.dp, FormalColors.Divider)
+            ) {
+                Text(
+                    round.question,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FormalColors.Ink
+                )
+            }
+        }
+        if (round.value.isNotBlank() && !editing) {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp, 4.dp, 14.dp, 14.dp),
+                    color = FormalColors.PrimarySoft,
+                    border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.25f))
+                ) {
+                    Text(
+                        round.value,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FormalColors.Ink
+                    )
+                }
+                Text(
+                    "点这里重新回答",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FormalColors.Muted,
+                    modifier = Modifier
+                        .clickable(
+                            onClickLabel = "重新回答",
+                            role = Role.Button,
+                            onClick = {
+                                draft = round.value
+                                editing = true
+                            }
+                        )
+                        .padding(top = 3.dp)
+                        .testTag("$testTag-reanswer")
+                )
+            }
+        } else {
+            val commit = {
+                val answer = draft.trim()
+                if (answer.isNotEmpty()) {
+                    round.onCommit(answer)
+                    editing = false
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.weight(1f).testTag("$testTag-input"),
+                    placeholder = { Text("输入你的回答") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { commit() })
+                )
+                Spacer(Modifier.width(8.dp))
+                val canSend = draft.isNotBlank()
+                Surface(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clickable(
+                            enabled = canSend,
+                            onClickLabel = "发送回答",
+                            role = Role.Button,
+                            onClick = { commit() }
+                        )
+                        .testTag("$testTag-send"),
+                    shape = CircleShape,
+                    color = if (canSend) FormalColors.Primary else FormalColors.Divider
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Rounded.Send,
+                            contentDescription = "发送",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
