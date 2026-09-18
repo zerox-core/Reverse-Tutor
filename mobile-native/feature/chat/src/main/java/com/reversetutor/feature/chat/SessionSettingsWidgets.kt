@@ -1,6 +1,7 @@
 package com.reversetutor.feature.chat
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -9,11 +10,14 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -43,6 +47,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -57,9 +62,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,8 +93,9 @@ import kotlinx.coroutines.launch
  * - 02 SegmentedPills     [SegmentedPillsRow]
  * - 03 MoodSlider         [MoodSliderRow]
  * - 04 RecipePicker       [RecipePickerPanel]（含 08 骰子随机）
- * - 06 ChatField          [ChatFieldQA]
+ * - 06 ChatField          [ChatFieldQA]（含 mock 回显模板）
  * - 07 TokenField         [TokenField]
+ * - 09 PresetChipsDrawer  [PresetChipsDrawer]
  * - 10 HoldToConfirm      [HoldToConfirmButton]
  *
  * 视觉令牌全部走 [FormalColors]（苹果灰底、白卡细边框、小面积彩色点缀）。
@@ -1092,12 +1100,16 @@ private fun RecipePreviewCard(selection: RecipeSelection, testTag: String) {
 
 // region 06 聊天气泡编辑器 ChatField
 
-/** 一轮问答：AI 学生提问 [question]，已填值 [value]，提交回调 [onCommit]。 */
+/** 一轮问答：AI 学生提问 [question]，已填值 [value]，提交回调 [onCommit]；
+ * [ackTemplate] 为答完后 AI 回显模板（{answer} 占位本地替换，纯 mock 无 LLM 调用）；
+ * [placeholder] 为输入态 hint。 */
 data class ChatFieldRound(
     val id: String,
     val question: String,
     val value: String,
-    val onCommit: (String) -> Unit
+    val onCommit: (String) -> Unit,
+    val ackTemplate: String? = null,
+    val placeholder: String = "输入你的回答"
 )
 
 /**
@@ -1166,25 +1178,68 @@ private fun ChatFieldRoundBlock(
             }
         }
         if (round.value.isNotBlank() && !editing) {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-                Surface(
-                    shape = RoundedCornerShape(14.dp, 4.dp, 14.dp, 14.dp),
-                    color = FormalColors.PrimarySoft,
-                    border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.25f))
-                ) {
-                    Text(
-                        round.value,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = FormalColors.Ink
-                    )
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // 用户答案气泡（右对齐）
+                Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp, 4.dp, 14.dp, 14.dp),
+                        color = FormalColors.PrimarySoft,
+                        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.25f))
+                    ) {
+                        Text(
+                            round.value,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = FormalColors.Ink
+                        )
+                    }
+                }
+                // AI 回显气泡（本地 mock 模板替换 {answer}，无 LLM 调用；错峰 180ms 入场）
+                round.ackTemplate?.let { template ->
+                    val ackEntrance = remember { Animatable(0f) }
+                    LaunchedEffect(round.value) {
+                        ackEntrance.snapTo(0f)
+                        delay(180L)
+                        ackEntrance.animateTo(
+                            1f,
+                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = ackEntrance.value
+                            translationX = (1f - ackEntrance.value) * -14f
+                        }
+                    ) {
+                        Box(
+                            Modifier.size(28.dp).background(FormalColors.SuccessSoft, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🧑‍🎓", fontSize = 14.sp)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp, 14.dp, 14.dp, 14.dp),
+                            color = FormalColors.SuccessSoft.copy(alpha = 0.45f),
+                            border = BorderStroke(1.dp, FormalColors.Success.copy(alpha = 0.22f))
+                        ) {
+                            Text(
+                                template.replace("{answer}", round.value),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = FormalColors.Ink
+                            )
+                        }
+                    }
                 }
                 Text(
                     "点这里重新回答",
                     style = MaterialTheme.typography.labelSmall,
                     color = FormalColors.Muted,
                     modifier = Modifier
+                        .align(Alignment.End)
                         .clickable(
                             onClickLabel = "重新回答",
                             role = Role.Button,
@@ -1210,7 +1265,7 @@ private fun ChatFieldRoundBlock(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.weight(1f).testTag("$testTag-input"),
-                    placeholder = { Text("输入你的回答") },
+                    placeholder = { Text(round.placeholder) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { commit() })
@@ -1237,6 +1292,189 @@ private fun ChatFieldRoundBlock(
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// endregion
+
+
+// region 09 抽屉式预设选择器 PresetChipsDrawer
+
+/**
+ * 组件库 09 · 抽屉式预设选择器：默认收起只显示「标题 + 当前选中 chip + 折叠箭头」，
+ * 点击字段行向下滑出选项列（非 BottomSheet 大面板），选一个后延迟 220ms 自动收起。
+ * 微动效：字段行按下 scale 0.98；箭头 180° 旋转；抽屉 spring 展开收起；选项错峰 40ms 弹入；选项行按下 scale 0.97。
+ */
+@Composable
+internal fun PresetChipsDrawer(
+    title: String,
+    options: List<CardRadioOption>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String = "preset-chips-drawer"
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "chevron"
+    )
+    val headerInteraction = remember { MutableInteractionSource() }
+    val headerPressed by headerInteraction.collectIsPressedAsState()
+    val headerScale by animateFloatAsState(
+        targetValue = if (headerPressed) 0.98f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "header-press"
+    )
+    Column(modifier.fillMaxWidth().testTag(testTag)) {
+        // 字段行（始终可见）：标题 + 当前选中 chip + 折叠箭头
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .graphicsLayer { scaleX = headerScale; scaleY = headerScale }
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(
+                    interactionSource = headerInteraction,
+                    indication = LocalIndication.current,
+                    onClickLabel = if (expanded) "收起$title" else "展开$title",
+                    role = Role.Button,
+                    onClick = { expanded = !expanded }
+                )
+                .padding(vertical = 8.dp, horizontal = 4.dp)
+                .testTag("$testTag-header"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                title,
+                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.SemiBold,
+                color = FormalColors.Ink
+            )
+            selectedId?.let { id ->
+                options.firstOrNull { it.id == id }?.let { opt ->
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = FormalColors.SuccessSoft,
+                        border = BorderStroke(1.dp, FormalColors.Success.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(opt.emoji, fontSize = 13.sp)
+                            Text(
+                                opt.title,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = FormalColors.Success
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(6.dp))
+                }
+            }
+            Icon(
+                Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                tint = FormalColors.Muted,
+                modifier = Modifier.graphicsLayer { rotationZ = chevronRotation }
+            )
+        }
+        // 抽屉内容：spring 展开收起，选项错峰 40ms 弹入
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                expandFrom = Alignment.Top
+            ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+            exit = shrinkVertically(
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                shrinkTowards = Alignment.Top
+            ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                options.forEachIndexed { index, option ->
+                    val selected = option.id == selectedId
+                    val entrance = remember { Animatable(0f) }
+                    LaunchedEffect(Unit) {
+                        delay(index * 40L)
+                        entrance.animateTo(
+                            1f,
+                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                        )
+                    }
+                    val optionInteraction = remember { MutableInteractionSource() }
+                    val optionPressed by optionInteraction.collectIsPressedAsState()
+                    val optionScale by animateFloatAsState(
+                        targetValue = if (optionPressed) 0.97f else 1f,
+                        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+                        label = "option-press"
+                    )
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                alpha = entrance.value
+                                translationY = (1f - entrance.value) * 14f
+                                scaleX = optionScale
+                                scaleY = optionScale
+                            }
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (selected) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle)
+                            .border(
+                                1.dp,
+                                if (selected) FormalColors.Success else FormalColors.Divider,
+                                RoundedCornerShape(12.dp)
+                            )
+                            .clickable(
+                                interactionSource = optionInteraction,
+                                indication = LocalIndication.current,
+                                onClickLabel = "选择${option.title}",
+                                role = Role.Button,
+                                onClick = {
+                                    onSelect(option.id)
+                                    scope.launch {
+                                        delay(220L)
+                                        expanded = false
+                                    }
+                                }
+                            )
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .testTag("$testTag-option-${option.id}"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(option.emoji, fontSize = 20.sp)
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                option.title,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (selected) FormalColors.Success else FormalColors.Ink
+                            )
+                            Text(
+                                option.tagline,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = FormalColors.Muted
+                            )
+                        }
+                        if (selected) {
+                            Icon(
+                                Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = FormalColors.Success,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

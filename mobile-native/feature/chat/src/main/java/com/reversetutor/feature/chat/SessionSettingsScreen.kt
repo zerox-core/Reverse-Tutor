@@ -448,9 +448,8 @@ private fun BasicProfilePage(
                 composeRecipeText(parseRecipeSelection(profile.personality)) == null
         )
     }
-    SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary, singleLine = true, testTag = "session-settings-title")
     if (ProfilePageVariant == 1) {
-        // 版式E · 聊天建档：组件库 06 ChatField，用对话方式填显示名与角色
+        // 版式E · 聊天建档：组件库 06 ChatField，标题/显示名/角色全走对话式填写；mock 模板本地替换 {answer}（不接 LLM）
         SettingsGroup {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("和学习者打个招呼", fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
@@ -461,19 +460,45 @@ private fun BasicProfilePage(
                 )
                 ChatFieldQA(
                     rounds = listOf(
-                        ChatFieldRound("name", "老师，我该怎么称呼你？", profile.learnerDisplayName) { answer ->
-                            coordinator.editProfile { p -> p.copy(learnerDisplayName = answer) }
-                            refresh()
-                        },
-                        ChatFieldRound("role", "那我在你身边算什么角色呀？", profile.learnerRole) { answer ->
-                            coordinator.editProfile { p -> p.copy(learnerRole = answer) }
-                            refresh()
-                        }
+                        ChatFieldRound(
+                            id = "title",
+                            question = "这节课叫个什么名字呀？",
+                            value = profile.title,
+                            ackTemplate = "收到！这节课就叫「{answer}」啦。",
+                            placeholder = "比如：高三数学、英语启蒙…",
+                            onCommit = { answer ->
+                                coordinator.editProfile { p -> p.copy(title = answer) }
+                                refresh()
+                            }
+                        ),
+                        ChatFieldRound(
+                            id = "name",
+                            question = "老师，我该怎么称呼你？",
+                            value = profile.learnerDisplayName,
+                            ackTemplate = "好，那我以后就叫你「{answer}」啦。",
+                            placeholder = "比如：曦策、小朱…",
+                            onCommit = { answer ->
+                                coordinator.editProfile { p -> p.copy(learnerDisplayName = answer) }
+                                refresh()
+                            }
+                        ),
+                        ChatFieldRound(
+                            id = "role",
+                            question = "那我在你身边算什么角色呀？",
+                            value = profile.learnerRole,
+                            ackTemplate = "明白，我是你的「{answer}」，请多指教！",
+                            placeholder = "比如：学生、弟弟、小跟班…",
+                            onCommit = { answer ->
+                                coordinator.editProfile { p -> p.copy(learnerRole = answer) }
+                                refresh()
+                            }
+                        )
                     )
                 )
             }
         }
     } else {
+        SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary, singleLine = true, testTag = "session-settings-title")
         SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary, singleLine = true)
         SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary, singleLine = true)
     }
@@ -497,10 +522,11 @@ private fun BasicProfilePage(
             }
         }
     } else {
+        // 人格预设抽屉（组件库 09 PresetChipsDrawer）：默认收起只显示选中 chip，点击字段行向下抽出选项列
         SettingsGroup {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("人格预设", fontWeight = FontWeight.SemiBold)
-                CardRadioRow(
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                PresetChipsDrawer(
+                    title = "人格预设",
                     options = PersonalityPresets,
                     selectedId = presetMatch?.id,
                     onSelect = { presetId ->
