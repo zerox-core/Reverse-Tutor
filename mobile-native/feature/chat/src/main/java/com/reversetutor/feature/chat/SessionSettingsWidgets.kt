@@ -4,6 +4,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -16,6 +20,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -77,12 +82,14 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reversetutor.core.design.FormalColors
@@ -98,7 +105,8 @@ import kotlinx.coroutines.launch
  * - 04 RecipePicker       [RecipePickerPanel]（含 08 骰子随机）
  * - 06 ChatField          [ChatFieldQA]（含 mock 回显模板）
  * - 07 TokenField         [TokenField]
- * - 09 PresetChipsDrawer  [PresetChipsDrawer]
+ * - 16 EmojiRecipePicker  [EmojiRecipePicker]（表情库四列）
+ * - 17 HabitSlotComposer  [HabitSlotComposer]（拼句式互动习惯）
  * - 10 HoldToConfirm      [HoldToConfirmButton]
  *
  * 视觉令牌全部走 [FormalColors]（苹果灰底、白卡细边框、小面积彩色点缀）。
@@ -854,7 +862,8 @@ internal fun SecondaryActionButton(
 data class RecipeOption(
     val id: String,
     val title: String,
-    val emoji: String
+    val emoji: String,
+    val imageRes: Int = 0
 )
 
 /** 当前配方选择；三项齐全才能出炉（[composeRecipeText] 非空）。 */
@@ -864,24 +873,36 @@ data class RecipeSelection(
     val catchphraseId: String?
 )
 
-internal val RecipeBases: List<RecipeOption> =
-    PersonalityPresets.map { RecipeOption(it.id, it.title, it.emoji) }
+internal val RecipeBases = listOf(
+    RecipeOption(id = "good-student", title = "乖学生", emoji = "📖", imageRes = R.drawable.emo_smile),
+    RecipeOption(id = "arguer", title = "杠精", emoji = "🗣️", imageRes = R.drawable.emo_smirk),
+    RecipeOption(id = "curious", title = "好奇宝宝", emoji = "🤔", imageRes = R.drawable.emo_think),
+    RecipeOption(id = "slacker", title = "摸鱼达人", emoji = "😴", imageRes = R.drawable.emo_sleepy)
+)
 
 internal val RecipeQuirks = listOf(
-    RecipeOption(id = "note-taker", title = "爱记笔记", emoji = "📝"),
-    RecipeOption(id = "daydreamer", title = "上课走神", emoji = "💭"),
-    RecipeOption(id = "digger", title = "刨根问底", emoji = "🔍"),
-    RecipeOption(id = "bargainer", title = "爱讲条件", emoji = "🤝"),
-    RecipeOption(id = "crammer", title = "临时抱佛脚", emoji = "⏰")
+    RecipeOption(id = "note-taker", title = "爱记笔记", emoji = "📝", imageRes = R.drawable.emo_playful),
+    RecipeOption(id = "daydreamer", title = "上课走神", emoji = "💭", imageRes = R.drawable.emo_dizzy),
+    RecipeOption(id = "digger", title = "刨根问底", emoji = "🔍", imageRes = R.drawable.emo_question),
+    RecipeOption(id = "bargainer", title = "爱讲条件", emoji = "🤝", imageRes = R.drawable.emo_wink),
+    RecipeOption(id = "crammer", title = "临时抱佛脚", emoji = "⏰", imageRes = R.drawable.emo_sweat)
 )
 
 internal val RecipeCatchphrases = listOf(
-    RecipeOption(id = "aha", title = "原来如此", emoji = "💡"),
-    RecipeOption(id = "why", title = "为啥呀", emoji = "🙋"),
-    RecipeOption(id = "got-it", title = "我懂了", emoji = "🎉"),
-    RecipeOption(id = "again", title = "再来一遍", emoji = "🔁"),
-    RecipeOption(id = "so-what", title = "这有啥用", emoji = "🤷"),
-    RecipeOption(id = "yes-sir", title = "老师说得对", emoji = "🫡")
+    RecipeOption(id = "aha", title = "原来如此", emoji = "💡", imageRes = R.drawable.emo_starry),
+    RecipeOption(id = "why", title = "为啥呀", emoji = "🙋", imageRes = R.drawable.emo_raised_hand),
+    RecipeOption(id = "got-it", title = "我懂了", emoji = "🎉", imageRes = R.drawable.emo_laugh),
+    RecipeOption(id = "again", title = "再来一遍", emoji = "🔁", imageRes = R.drawable.emo_confused),
+    RecipeOption(id = "so-what", title = "这有啥用", emoji = "🤷", imageRes = R.drawable.emo_shrug),
+    RecipeOption(id = "yes-sir", title = "老师说得对", emoji = "🫡", imageRes = R.drawable.emo_clasped)
+)
+
+/** 互动习惯快捷选项（第四列）：标题直接写回 profile.interactionHabits。 */
+internal val HabitOptions = listOf(
+    RecipeOption(id = "habit-examples", title = "多举例子", emoji = "🤩", imageRes = R.drawable.emo_starry2),
+    RecipeOption(id = "habit-slow", title = "讲慢一点儿", emoji = "😎", imageRes = R.drawable.emo_cool),
+    RecipeOption(id = "habit-praise", title = "多鼓励我", emoji = "🥰", imageRes = R.drawable.emo_heart),
+    RecipeOption(id = "habit-gentle", title = "错了温柔点", emoji = "🥺", imageRes = R.drawable.emo_wronged)
 )
 
 /** 三项齐全时组合出人格文本（写回 profile.personality 的格式），否则为 null。 */
@@ -1034,7 +1055,15 @@ private fun RecipeColumn(
                     Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(option.emoji, fontSize = 18.sp)
+                    if (option.imageRes != 0) {
+                        Image(
+                            painter = painterResource(option.imageRes),
+                            contentDescription = option.title,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        Text(option.emoji, fontSize = 18.sp)
+                    }
                     Spacer(Modifier.height(2.dp))
                     Text(
                         option.title,
@@ -1363,184 +1392,515 @@ private fun ChatFieldTranscriptRound(
 
 // endregion
 
+// region 16 表情配方选择器 EmojiRecipePicker（表情库四列）
 
-// region 09 抽屉式预设选择器 PresetChipsDrawer
+private class EmojiRecipeColumnSpec(
+    val key: String,
+    val header: String,
+    val options: List<RecipeOption>,
+    val selectedId: String?,
+    val onPick: (String) -> Unit
+)
 
 /**
- * 组件库 09 · 抽屉式预设选择器：默认收起只显示「标题 + 当前选中 chip + 折叠箭头」，
- * 点击字段行向下滑出选项列（非 BottomSheet 大面板），选一个后延迟 220ms 自动收起。
- * 微动效：字段行按下 scale 0.98；箭头 180° 旋转；抽屉 spring 展开收起；选项错峰 40ms 弹入；选项行按下 scale 0.97。
+ * 组件库 16 · 表情配方选择器：四列横向排布（底子 / 怪癖 / 口头禅 / 互动），
+ * 点击某一列只在该列下方弹出表情选项条（spring 展开收起），选一个后延迟 200ms 自动收起；
+ * 再点列头或其他列可切换。所有表情来自表情库 drawable（[RecipeOption.imageRes]），
+ * 常驻 ±5° 轻摇摆（各选项周期错开相位），选中 1.3→1 弹跳，按下 scale 0.9。
  */
 @Composable
-internal fun PresetChipsDrawer(
-    title: String,
-    options: List<CardRadioOption>,
-    selectedId: String?,
-    onSelect: (String) -> Unit,
+internal fun EmojiRecipePicker(
+    selection: RecipeSelection,
+    onSelect: (RecipeSelection) -> Unit,
+    habitId: String?,
+    onHabitSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
-    testTag: String = "preset-chips-drawer"
+    testTag: String = "emoji-recipe"
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = spring(stiffness = Spring.StiffnessMedium),
-        label = "chevron"
+    var openColumn by remember { mutableStateOf<String?>(null) }
+    var diceTarget by remember { mutableStateOf(0f) }
+    val diceAngle by animateFloatAsState(
+        targetValue = diceTarget,
+        animationSpec = tween(600, easing = LinearEasing),
+        label = "emoji-recipe-dice"
     )
-    val headerInteraction = remember { MutableInteractionSource() }
-    val headerPressed by headerInteraction.collectIsPressedAsState()
-    val headerScale by animateFloatAsState(
-        targetValue = if (headerPressed) 0.98f else 1f,
-        animationSpec = spring(stiffness = Spring.StiffnessHigh),
-        label = "header-press"
+    val columns = listOf(
+        EmojiRecipeColumnSpec("base", "底子", RecipeBases, selection.baseId) { onSelect(selection.copy(baseId = it)) },
+        EmojiRecipeColumnSpec("quirk", "怪癖", RecipeQuirks, selection.quirkId) { onSelect(selection.copy(quirkId = it)) },
+        EmojiRecipeColumnSpec("catch", "口头禅", RecipeCatchphrases, selection.catchphraseId) { onSelect(selection.copy(catchphraseId = it)) },
+        EmojiRecipeColumnSpec("habit", "互动", HabitOptions, habitId, onHabitSelect)
     )
-    Column(modifier.fillMaxWidth().testTag(testTag)) {
-        // 字段行（始终可见）：标题 + 当前选中 chip + 折叠箭头
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .graphicsLayer { scaleX = headerScale; scaleY = headerScale }
-                .clip(RoundedCornerShape(12.dp))
-                .clickable(
-                    interactionSource = headerInteraction,
-                    indication = LocalIndication.current,
-                    onClickLabel = if (expanded) "收起$title" else "展开$title",
-                    role = Role.Button,
-                    onClick = { expanded = !expanded }
-                )
-                .padding(vertical = 8.dp, horizontal = 4.dp)
-                .testTag("$testTag-header"),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                title,
-                modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.SemiBold,
-                color = FormalColors.Ink
-            )
-            selectedId?.let { id ->
-                options.firstOrNull { it.id == id }?.let { opt ->
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = FormalColors.SuccessSoft,
-                        border = BorderStroke(1.dp, FormalColors.Success.copy(alpha = 0.3f))
-                    ) {
-                        Row(
-                            Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(opt.emoji, fontSize = 13.sp)
-                            Text(
-                                opt.title,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = FormalColors.Success
-                            )
+    Column(modifier.fillMaxWidth().testTag(testTag), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("人格配方", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+            Surface(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clickable(
+                        onClickLabel = "随机一套配方",
+                        role = Role.Button,
+                        onClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            diceTarget += 720f
+                            onSelect(randomRecipeSelection())
                         }
-                    }
-                    Spacer(Modifier.width(6.dp))
+                    )
+                    .testTag("$testTag-dice"),
+                shape = CircleShape,
+                color = FormalColors.SurfaceSubtle,
+                border = BorderStroke(1.dp, FormalColors.Divider)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("🎲", fontSize = 18.sp, modifier = Modifier.graphicsLayer { rotationZ = diceAngle })
                 }
             }
-            Icon(
-                Icons.Rounded.KeyboardArrowDown,
-                contentDescription = null,
-                tint = FormalColors.Muted,
-                modifier = Modifier.graphicsLayer { rotationZ = chevronRotation }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            columns.forEach { spec ->
+                EmojiRecipeColumnCard(
+                    spec = spec,
+                    open = openColumn == spec.key,
+                    onToggle = { openColumn = if (openColumn == spec.key) null else spec.key },
+                    modifier = Modifier.weight(1f),
+                    testTag = "$testTag-col-${spec.key}"
+                )
+            }
+        }
+        columns.forEach { spec ->
+            AnimatedVisibility(
+                visible = openColumn == spec.key,
+                enter = expandVertically(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    expandFrom = Alignment.Top
+                ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                exit = shrinkVertically(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    shrinkTowards = Alignment.Top
+                ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+            ) {
+                EmojiOptionStrip(
+                    spec = spec,
+                    onPick = { optionId ->
+                        spec.onPick(optionId)
+                        scope.launch {
+                            delay(200L)
+                            if (openColumn == spec.key) openColumn = null
+                        }
+                    },
+                    testTag = "$testTag-strip-${spec.key}"
+                )
+            }
+        }
+        RecipePreviewCard(selection = selection, testTag = "$testTag-card")
+        HabitOptions.firstOrNull { it.id == habitId }?.let { habit ->
+            Text(
+                "互动习惯：${habit.title}",
+                style = MaterialTheme.typography.labelSmall,
+                color = FormalColors.Muted
             )
         }
-        // 抽屉内容：spring 展开收起，选项错峰 40ms 弹入
-        AnimatedVisibility(
-            visible = expanded,
-            enter = expandVertically(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                expandFrom = Alignment.Top
-            ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
-            exit = shrinkVertically(
-                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                shrinkTowards = Alignment.Top
-            ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+    }
+}
+
+@Composable
+private fun EmojiRecipeColumnCard(
+    spec: EmojiRecipeColumnSpec,
+    open: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String
+) {
+    val selected = spec.options.firstOrNull { it.id == spec.selectedId }
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "col-press"
+    )
+    Surface(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClickLabel = if (open) "收起${spec.header}" else "展开${spec.header}选项",
+                role = Role.Button,
+                onClick = onToggle
+            )
+            .testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
+        color = if (open) FormalColors.PrimarySoft else FormalColors.Surface,
+        border = BorderStroke(
+            width = if (open || selected != null) 1.5.dp else 1.dp,
+            color = if (open) FormalColors.Primary else if (selected != null) FormalColors.Success else FormalColors.Divider
+        )
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Column(
-                Modifier.fillMaxWidth().padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+            Text(spec.header, style = MaterialTheme.typography.labelSmall, color = FormalColors.Muted)
+            if (selected != null && selected.imageRes != 0) {
+                WigglingEmoji(
+                    imageRes = selected.imageRes,
+                    contentDescription = selected.title,
+                    onClick = onToggle,
+                    size = 34.dp,
+                    wiggleSeed = spec.key.length,
+                    testTag = "$testTag-selected"
+                )
+            } else {
+                Box(Modifier.size(34.dp), contentAlignment = Alignment.Center) {
+                    Text("＋", fontSize = 20.sp, color = FormalColors.Muted)
+                }
+            }
+            Text(
+                selected?.title ?: "点我选",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected != null) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected != null) FormalColors.Ink else FormalColors.Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun EmojiOptionStrip(
+    spec: EmojiRecipeColumnSpec,
+    onPick: (String) -> Unit,
+    testTag: String
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
+        color = FormalColors.SurfaceSubtle,
+        border = BorderStroke(1.dp, FormalColors.Divider)
+    ) {
+        Column(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("选一个${spec.header}", style = MaterialTheme.typography.labelSmall, color = FormalColors.Muted)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                options.forEachIndexed { index, option ->
-                    val selected = option.id == selectedId
+                spec.options.forEachIndexed { index, option ->
                     val entrance = remember { Animatable(0f) }
                     LaunchedEffect(Unit) {
                         delay(index * 40L)
                         entrance.animateTo(
                             1f,
-                            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                            spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)
                         )
                     }
-                    val optionInteraction = remember { MutableInteractionSource() }
-                    val optionPressed by optionInteraction.collectIsPressedAsState()
-                    val optionScale by animateFloatAsState(
-                        targetValue = if (optionPressed) 0.97f else 1f,
-                        animationSpec = spring(stiffness = Spring.StiffnessHigh),
-                        label = "option-press"
-                    )
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                alpha = entrance.value
-                                translationY = (1f - entrance.value) * 14f
-                                scaleX = optionScale
-                                scaleY = optionScale
-                            }
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (selected) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle)
-                            .border(
-                                1.dp,
-                                if (selected) FormalColors.Success else FormalColors.Divider,
-                                RoundedCornerShape(12.dp)
-                            )
-                            .clickable(
-                                interactionSource = optionInteraction,
-                                indication = LocalIndication.current,
-                                onClickLabel = "选择${option.title}",
-                                role = Role.Button,
-                                onClick = {
-                                    onSelect(option.id)
-                                    scope.launch {
-                                        delay(220L)
-                                        expanded = false
-                                    }
-                                }
-                            )
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                            .testTag("$testTag-option-${option.id}"),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(option.emoji, fontSize = 20.sp)
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                option.title,
-                                fontWeight = FontWeight.SemiBold,
-                                color = if (selected) FormalColors.Success else FormalColors.Ink
-                            )
-                            Text(
-                                option.tagline,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = FormalColors.Muted
-                            )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
+                        modifier = Modifier.graphicsLayer {
+                            alpha = entrance.value
+                            translationY = (1f - entrance.value) * 14f
                         }
-                        if (selected) {
-                            Icon(
-                                Icons.Rounded.Check,
-                                contentDescription = null,
-                                tint = FormalColors.Success,
-                                modifier = Modifier.size(18.dp)
+                    ) {
+                        WigglingEmoji(
+                            imageRes = option.imageRes,
+                            contentDescription = option.title,
+                            selected = option.id == spec.selectedId,
+                            onClick = { onPick(option.id) },
+                            size = 40.dp,
+                            wiggleSeed = index,
+                            testTag = "$testTag-option-${option.id}"
+                        )
+                        Text(
+                            option.title,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (option.id == spec.selectedId) FormalColors.Primary else FormalColors.Muted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 表情库图片 + 简单常驻动效：±5° 轻摇摆（[wiggleSeed] 错开相位），
+ * [selected] 变 true 时 1.3→1 弹跳一下，按下 scale 0.9。
+ */
+@Composable
+internal fun WigglingEmoji(
+    imageRes: Int,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    size: Dp = 44.dp,
+    wiggleSeed: Int = 0,
+    testTag: String = "wiggle-emoji"
+) {
+    val haptics = LocalHapticFeedback.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val infinite = rememberInfiniteTransition(label = "wiggle")
+    val rotation by infinite.animateFloat(
+        initialValue = -5f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 620 + (wiggleSeed and 3) * 110, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "wiggle-rotation"
+    )
+    val popScale = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        if (selected) {
+            popScale.snapTo(1.3f)
+            popScale.animateTo(
+                1f,
+                spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium)
+            )
+        }
+    }
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.9f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "wiggle-press"
+    )
+    Image(
+        painter = painterResource(imageRes),
+        contentDescription = contentDescription,
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                rotationZ = rotation
+                scaleX = popScale.value * pressScale
+                scaleY = popScale.value * pressScale
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClickLabel = contentDescription,
+                role = Role.Button,
+                onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onClick()
+                }
+            )
+            .testTag(testTag)
+    )
+}
+
+// endregion
+
+// region 17 拼句式互动习惯 HabitSlotComposer
+
+/** 互动习惯的三个词槽：讲题方式 / 答错反馈 / 日常语气。 */
+data class HabitSlots(
+    val teach: String?,
+    val wrong: String?,
+    val tone: String?
+)
+
+internal val HabitSlotTeach = listOf("多举例子", "一步一步来", "直接给重点")
+internal val HabitSlotWrong = listOf("温柔提醒我", "直接指出来", "让我再试一次")
+internal val HabitSlotTone = listOf("多鼓励我", "严格一点", "轻松一点")
+
+/** 三槽齐全时拼成完整句子（写回 profile.interactionHabits 的格式），否则为 null。 */
+internal fun composeHabitSlotsText(slots: HabitSlots): String? {
+    val teach = slots.teach ?: return null
+    val wrong = slots.wrong ?: return null
+    val tone = slots.tone ?: return null
+    return "讲题的时候$teach，如果我答错了$wrong，平时说话$tone。"
+}
+
+private val HabitSlotsRegex = Regex("^讲题的时候(.+?)，如果我答错了(.+?)，平时说话(.+?)。$")
+
+/** 从互动习惯文本反解三词槽；不是拼句格式或某槽不在词表内时返回 null。 */
+internal fun parseHabitSlotsText(text: String): HabitSlots? {
+    val match = HabitSlotsRegex.find(text.trim()) ?: return null
+    val teach = match.groupValues[1]
+    val wrong = match.groupValues[2]
+    val tone = match.groupValues[3]
+    if (teach !in HabitSlotTeach || wrong !in HabitSlotWrong || tone !in HabitSlotTone) return null
+    return HabitSlots(teach, wrong, tone)
+}
+
+/**
+ * 组件库 17 · 拼句式互动习惯：把文本输入藏进一句「完形句子」——
+ * 「讲题的时候__，如果我答错了__，平时说话__。」点词槽从词卡里挑一个即填好，
+ * 不像在做完形填空；想完全自己写可点右上角「我自己写一整段」切换。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun HabitSlotComposer(
+    slots: HabitSlots,
+    onSlots: (HabitSlots) -> Unit,
+    freeText: String,
+    onFreeText: (String) -> Unit,
+    freeWrite: Boolean,
+    onFreeWriteChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String = "habit-slots"
+) {
+    var openSlot by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+    Column(modifier.fillMaxWidth().testTag(testTag), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("互动习惯", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+            TextButton(
+                onClick = { onFreeWriteChange(!freeWrite) },
+                modifier = Modifier.testTag("$testTag-toggle")
+            ) {
+                Text(if (freeWrite) "用拼句填" else "我自己写一整段")
+            }
+        }
+        if (freeWrite) {
+            OutlinedTextField(
+                value = freeText,
+                onValueChange = onFreeText,
+                modifier = Modifier.fillMaxWidth().testTag("$testTag-free"),
+                placeholder = { Text("比如：讲题多举例子，答错了温柔一点…") },
+                minLines = 2
+            )
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text("讲题的时候", color = FormalColors.Ink, modifier = Modifier.align(Alignment.CenterVertically))
+                HabitSlotChip(slots.teach, "怎么讲", openSlot == "teach", { openSlot = if (openSlot == "teach") null else "teach" }, "$testTag-slot-teach")
+                Text("，如果我答错了", color = FormalColors.Ink, modifier = Modifier.align(Alignment.CenterVertically))
+                HabitSlotChip(slots.wrong, "怎么反馈", openSlot == "wrong", { openSlot = if (openSlot == "wrong") null else "wrong" }, "$testTag-slot-wrong")
+                Text("，平时说话", color = FormalColors.Ink, modifier = Modifier.align(Alignment.CenterVertically))
+                HabitSlotChip(slots.tone, "什么语气", openSlot == "tone", { openSlot = if (openSlot == "tone") null else "tone" }, "$testTag-slot-tone")
+                Text("。", color = FormalColors.Ink, modifier = Modifier.align(Alignment.CenterVertically))
+            }
+            val slotWords = when (openSlot) {
+                "teach" -> HabitSlotTeach
+                "wrong" -> HabitSlotWrong
+                "tone" -> HabitSlotTone
+                else -> emptyList()
+            }
+            AnimatedVisibility(
+                visible = openSlot != null,
+                enter = expandVertically(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    expandFrom = Alignment.Top
+                ) + fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)),
+                exit = shrinkVertically(
+                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                    shrinkTowards = Alignment.Top
+                ) + fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+            ) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FormalColors.SurfaceSubtle)
+                        .border(1.dp, FormalColors.Divider, RoundedCornerShape(12.dp))
+                        .padding(10.dp)
+                        .testTag("$testTag-words")
+                ) {
+                    slotWords.forEach { word ->
+                        val current = when (openSlot) {
+                            "teach" -> slots.teach
+                            "wrong" -> slots.wrong
+                            else -> slots.tone
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(999.dp),
+                            color = if (word == current) FormalColors.PrimarySoft else FormalColors.Surface,
+                            border = BorderStroke(1.dp, if (word == current) FormalColors.Primary else FormalColors.Divider),
+                            modifier = Modifier
+                                .clickable(
+                                    onClickLabel = "选择$word",
+                                    role = Role.Button,
+                                    onClick = {
+                                        when (openSlot) {
+                                            "teach" -> onSlots(slots.copy(teach = word))
+                                            "wrong" -> onSlots(slots.copy(wrong = word))
+                                            "tone" -> onSlots(slots.copy(tone = word))
+                                        }
+                                        scope.launch {
+                                            delay(180L)
+                                            openSlot = null
+                                        }
+                                    }
+                                )
+                                .testTag("$testTag-word-$word")
+                        ) {
+                            Text(
+                                word,
+                                Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                fontSize = 13.sp,
+                                color = if (word == current) FormalColors.Primary else FormalColors.Ink
                             )
                         }
                     }
                 }
             }
+            composeHabitSlotsText(slots)?.let { text ->
+                Text(
+                    "写进资料：$text",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = FormalColors.Muted
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun HabitSlotChip(
+    value: String?,
+    placeholder: String,
+    open: Boolean,
+    onToggle: () -> Unit,
+    testTag: String
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessHigh),
+        label = "slot-press"
+    )
+    Surface(
+        shape = RoundedCornerShape(999.dp),
+        color = if (open) FormalColors.PrimarySoft else if (value != null) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle,
+        border = BorderStroke(
+            1.dp,
+            if (open) FormalColors.Primary else if (value != null) FormalColors.Success.copy(alpha = 0.4f) else FormalColors.Divider
+        ),
+        modifier = Modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                onClickLabel = if (value != null) "重选$value" else "选择$placeholder",
+                role = Role.Button,
+                onClick = onToggle
+            )
+            .testTag(testTag)
+    ) {
+        Text(
+            value ?: "＋$placeholder",
+            Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            fontSize = 13.sp,
+            fontWeight = if (value != null) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (open) FormalColors.Primary else if (value != null) FormalColors.Success else FormalColors.Muted
+        )
     }
 }
 

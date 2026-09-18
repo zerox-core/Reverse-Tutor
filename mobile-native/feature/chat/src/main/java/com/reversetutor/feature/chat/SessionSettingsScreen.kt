@@ -1,11 +1,14 @@
 ﻿package com.reversetutor.feature.chat
 
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -71,10 +74,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
@@ -326,7 +332,7 @@ private fun SectionTabStrip(
     onSelect: (Int) -> Unit
 ) {
     val summaries = mapOf(
-        SessionSettingsSection.Basic to "${document.profile.learnerDisplayName} · ${document.profile.learnerRole}",
+        SessionSettingsSection.Basic to document.profile.learnerDisplayName,
         SessionSettingsSection.GoalPlan to document.goalPlan.primaryGoal.ifBlank { "尚未设置主要目标" },
         SessionSettingsSection.ConversationStrategy to "反馈 ${document.strategy.feedbackIntensity}/5 · ${document.strategy.speakingTone}",
         SessionSettingsSection.SourceManagement to "已引用 ${document.snapshot.sourceSelections.size} 份资料",
@@ -513,17 +519,27 @@ private fun BasicProfilePage(
             }
         }
     } else {
-        // 人格预设抽屉（组件库 09 PresetChipsDrawer）：默认收起只显示选中 chip，点击字段行向下抽出选项列
+        // 人格配方（组件库 16 EmojiRecipePicker）：四列横向（底子/怪癖/口头禅/互动），
+        // 点某一列只在该列下方弹出表情库选项条，选中自动收起；表情常驻轻摇摆动效
+        var recipeSel by remember(profile.personality) {
+            mutableStateOf(parseRecipeSelection(profile.personality))
+        }
         SettingsGroup {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                PresetChipsDrawer(
-                    title = "人格预设",
-                    options = PersonalityPresets,
-                    selectedId = presetMatch?.id,
-                    onSelect = { presetId ->
-                        PersonalityPresets.firstOrNull { it.id == presetId }?.let { preset ->
-                            coordinator.editProfile { p -> p.copy(personality = preset.title) }
+                EmojiRecipePicker(
+                    selection = recipeSel,
+                    onSelect = { next ->
+                        recipeSel = next
+                        composeRecipeText(next)?.let { text ->
+                            coordinator.editProfile { p -> p.copy(personality = text) }
                             customPersonaExpanded = false
+                            refresh()
+                        }
+                    },
+                    habitId = HabitOptions.firstOrNull { it.title == profile.interactionHabits.trim() }?.id,
+                    onHabitSelect = { optionId ->
+                        HabitOptions.firstOrNull { it.id == optionId }?.let { option ->
+                            coordinator.editProfile { p -> p.copy(interactionHabits = option.title) }
                             refresh()
                         }
                     }
@@ -551,7 +567,29 @@ private fun BasicProfilePage(
             if (customPersonaExpanded) {
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SettingsTextField("人格", profile.personality, { coordinator.editProfile { p -> p.copy(personality = it) }; refresh() }, commitBoundary)
-                    SettingsTextField("互动习惯", profile.interactionHabits, { coordinator.editProfile { p -> p.copy(interactionHabits = it) }; refresh() }, commitBoundary)
+                    // 互动习惯 · 拼句式填写（组件库 17 HabitSlotComposer）：点词槽选词拼句，也可切换成整段手写
+                    var habitsFreeWrite by remember(profile.interactionHabits) {
+                        mutableStateOf(
+                            profile.interactionHabits.isNotBlank() &&
+                                parseHabitSlotsText(profile.interactionHabits) == null
+                        )
+                    }
+                    HabitSlotComposer(
+                        slots = parseHabitSlotsText(profile.interactionHabits) ?: HabitSlots(null, null, null),
+                        onSlots = { next ->
+                            composeHabitSlotsText(next)?.let { text ->
+                                coordinator.editProfile { p -> p.copy(interactionHabits = text) }
+                                refresh()
+                            }
+                        },
+                        freeText = profile.interactionHabits,
+                        onFreeText = {
+                            coordinator.editProfile { p -> p.copy(interactionHabits = it) }
+                            refresh()
+                        },
+                        freeWrite = habitsFreeWrite,
+                        onFreeWriteChange = { habitsFreeWrite = it }
+                    )
                 }
             }
         }
@@ -576,7 +614,30 @@ private fun BasicProfilePage(
     }
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("当前头像：${coordinator.state.form.snapshot.learnerImageRef ?: "未设置"}")
+            val learnerImageRef = coordinator.state.form.snapshot.learnerImageRef
+            val avatarContext = LocalContext.current
+            val avatarBitmap = remember(learnerImageRef) {
+                learnerImageRef?.let { ref ->
+                    runCatching {
+                        avatarContext.contentResolver.openInputStream(Uri.parse(ref))?.use { stream ->
+                            BitmapFactory.decodeStream(stream)
+                        }
+                    }.getOrNull()?.asImageBitmap()
+                }
+            }
+            if (avatarBitmap != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Image(
+                        bitmap = avatarBitmap,
+                        contentDescription = "当前头像",
+                        modifier = Modifier.size(44.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Text("已设置头像（来自图库）", color = FormalColors.Ink)
+                }
+            } else {
+                Text("当前头像：未设置，点下方按钮从图库选择", color = FormalColors.Muted)
+            }
             SecondaryActionButton(
                 text = "选择或修改头像",
                 onClick = onPickLearnerImage,
