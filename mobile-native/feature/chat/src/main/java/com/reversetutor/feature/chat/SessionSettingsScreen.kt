@@ -773,7 +773,7 @@ private fun SourceManagementPage(
 }
 
 // 导出面版式：1 = 版式C 大图标卡单选+装箱单+主按钮；2 = 版式D 胶囊分段+装箱单+主按钮（拍板后收敛为一版）
-private const val ExportPanelVariant = 2
+private const val ExportPanelVariant = 1
 
 @Composable
 private fun SystemOpsPage(
