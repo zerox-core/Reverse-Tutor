@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.nativeCanvas
@@ -220,6 +221,33 @@ private fun buildDiskStreaks(): List<DiskStreak> {
             sweep = 18f + 66f * rng.nextFloat(),
             alpha = 0.10f + 0.30f * rng.nextFloat(),
             width = 0.030f + 0.060f * rng.nextFloat()
+        )
+    }
+}
+
+/** 内流光束（仅浅色主题）：光从盘口线向黑洞中心汇聚——用户 2026-09-20 拍板「光芒往中心射」。 */
+private data class InflowRay(
+    /** 固定方位角（弧度，抖动非均布）。 */
+    val angle: Float,
+    /** 脉冲相位（0~1，各束错峰）。 */
+    val phase: Float,
+    /** 脉冲速度（圈/秒）。 */
+    val speed: Float,
+    /** 束身基础 alpha。 */
+    val alpha: Float,
+    /** 束宽（dp）。 */
+    val widthDp: Float
+)
+
+private fun buildInflowRays(): List<InflowRay> {
+    val rng = Random(20260920L xor 0xBEA4)
+    return List(18) { i ->
+        InflowRay(
+            angle = i * 6.2832f / 18f + (rng.nextFloat() - 0.5f) * 0.22f,
+            phase = rng.nextFloat(),
+            speed = 0.10f + 0.10f * rng.nextFloat(),
+            alpha = 0.20f + 0.16f * rng.nextFloat(),
+            widthDp = 1.2f + 1.8f * rng.nextFloat()
         )
     }
 }
@@ -458,6 +486,7 @@ private fun BlackHoleGraphReadyContent(
     val camera = remember(engine) { BlackHoleCamera() }
     val dust = remember(engine, palette) { buildDust(engine, palette.dustColors) }
     val diskStreaks = remember { buildDiskStreaks() }
+    val inflowRays = remember { buildInflowRays() }
     val starfield = remember(engine) { buildStarfield(engine) }
     val nebulae = remember(engine) { buildNebulae(engine) }
     var frame by remember { mutableLongStateOf(0L) }
@@ -784,6 +813,54 @@ private fun BlackHoleGraphReadyContent(
                     alpha = 0.9f,
                     style = Stroke(width = 1f.dp.toPx())
                 )
+            }
+
+            // 内流光束（仅浅色，用户 2026-09-20 拍板）：光从盘口线向中心汇聚——
+            // 束身外淡内亮（光被黑洞吸入的蓄能感），脉冲包沿束向核心行进、没入光子环
+            if (!palette.isDark) {
+                val rayColor = Color(0xFFFFD98F)
+                val rOut = diskR * 0.985f
+                val rIn = coreR * 1.12f
+                inflowRays.forEach { ray ->
+                    val dirX = kotlin.math.cos(ray.angle)
+                    val dirY = kotlin.math.sin(ray.angle)
+                    val p0 = Offset(holeCenter.x + dirX * rOut, holeCenter.y + dirY * rOut)
+                    val p1 = Offset(holeCenter.x + dirX * rIn, holeCenter.y + dirY * rIn)
+                    drawLine(
+                        brush = Brush.linearGradient(
+                            0f to rayColor.copy(alpha = 0f),
+                            0.55f to rayColor.copy(alpha = ray.alpha * 0.55f),
+                            1f to rayColor.copy(alpha = ray.alpha),
+                            start = p0,
+                            end = p1
+                        ),
+                        start = p0,
+                        end = p1,
+                        strokeWidth = ray.widthDp.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                    // 脉冲包：从盘口向核心行进的一段亮斑，行至核心即没入（循环）
+                    val travel = (seconds * ray.speed + ray.phase) % 1f
+                    val headT = 0.08f + 0.92f * travel
+                    val tailT = (headT - 0.16f).coerceAtLeast(0f)
+                    val glow = kotlin.math.sin(travel * 3.1416f)
+                    val h0 = Offset(
+                        holeCenter.x + dirX * (rOut + (rIn - rOut) * tailT),
+                        holeCenter.y + dirY * (rOut + (rIn - rOut) * tailT)
+                    )
+                    val h1 = Offset(
+                        holeCenter.x + dirX * (rOut + (rIn - rOut) * headT),
+                        holeCenter.y + dirY * (rOut + (rIn - rOut) * headT)
+                    )
+                    drawLine(
+                        color = rayColor,
+                        start = h0,
+                        end = h1,
+                        alpha = (ray.alpha * 1.6f * glow).coerceIn(0f, 0.85f),
+                        strokeWidth = (ray.widthDp * 1.5f).dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
             }
 
             // 选中态：邻接保持高亮，其余压暗（聚焦模式）
