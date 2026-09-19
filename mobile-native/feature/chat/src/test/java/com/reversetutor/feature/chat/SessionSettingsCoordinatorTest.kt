@@ -12,7 +12,7 @@ class SessionSettingsCoordinatorTest {
     @Test
     fun groupedIndexAndStrategyControlsMatchTheConfirmedContract() {
         assertEquals(
-            listOf("基本资料", "学习目标与计划", "对话策略", "资料管理", "系统操作"),
+            listOf("基本资料", "学习目标", "对话策略", "资料管理", "系统操作"),
             SessionSettingsSection.entries.map(SessionSettingsSection::label)
         )
         assertEquals(

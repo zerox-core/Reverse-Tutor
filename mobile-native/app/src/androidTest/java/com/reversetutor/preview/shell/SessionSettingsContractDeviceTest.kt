@@ -71,7 +71,7 @@ class SessionSettingsContractDeviceTest {
             }
         }
 
-        listOf("基本资料", "学习目标与计划", "对话策略", "系统操作").forEach {
+        listOf("基本资料", "学习目标", "对话策略", "系统操作").forEach {
             composeRule.onNodeWithText(it).assertIsDisplayed()
         }
 

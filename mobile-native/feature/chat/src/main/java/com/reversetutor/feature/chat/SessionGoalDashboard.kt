@@ -2,12 +2,7 @@ package com.reversetutor.feature.chat
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -19,8 +14,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,13 +31,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +54,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
@@ -70,7 +68,9 @@ import androidx.compose.ui.unit.sp
 import com.reversetutor.core.design.FormalColors
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 // region 18 · R68 目标看板（方向A 卡片仪表盘）
 //
@@ -96,6 +96,15 @@ import java.util.Locale
 // - 英雄卡再升级：旅程小径上有呼吸的柔光圆与沿路径行进的光点（克制的
 //   微动效），分区用细发线隔开，层级更清；
 // - 区块标题统一加 3dp 色条引导，计数改为胶囊徽章，全页排版对齐收紧。
+//
+// R76 迭代（按用户反馈）：
+// - 页签简称「学习目标」（原「学习目标与计划」显示不下被省略号截断）；
+// - 英雄卡移除「当前状态」区（表情素材与动画将整体重制，方案见
+//   docs/specs/animated-emoji-redesign-plan.md，暂缓执行）；
+// - 截止时间改为日历点选（可「不设置时间」），不再手动输入；
+// - 英雄卡背景动效重做：去掉呼吸光晕与行进光点，改为入场一次性描绘、
+//   之后静止的旅程小径；
+// - 移除「拆到这一周」连接符；设置页禁用左右滑动翻页，杜绝误翻页。
 //
 // 数据结构不变：SessionGoalPlan 七个 String 字段原样保留，清单勾选态用
 // GitHub task-list 风格编码进文本（"[x] 已做 / [ ] 未做"，逐行一项），
@@ -205,20 +214,17 @@ fun goalDeadlineLabel(daysLeft: Int): String = when {
     else -> "还剩 $daysLeft 天"
 }
 
+/** 日历选择的毫秒值（UTC 当日零点）→ 存储格式 yyyy-MM-dd。 */
+fun formatGoalDeadlineMillis(millis: Long): String =
+    SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+        .format(Date(millis))
+
 fun goalDeadlineTone(daysLeft: Int): GoalDeadlineTone = when {
     daysLeft < 0 -> GoalDeadlineTone.Overdue
     daysLeft <= 3 -> GoalDeadlineTone.Soon
     else -> GoalDeadlineTone.Calm
 }
-
-internal data class GoalStatusOption(val label: String, val imageRes: Int)
-
-/** 当前状态三选项，复用表情库素材。 */
-internal val GoalStatusOptions = listOf(
-    GoalStatusOption("进行中", R.drawable.emo_playful),
-    GoalStatusOption("卡住了", R.drawable.emo_sweat),
-    GoalStatusOption("已完成", R.drawable.emo_starry)
-)
 
 internal fun goalDeadlineToneColor(tone: GoalDeadlineTone): Color = when (tone) {
     GoalDeadlineTone.Calm -> FormalColors.Success
@@ -268,23 +274,22 @@ internal fun GoalHairline() {
 
 // —— 主目标英雄卡 ——
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GoalDashboardHero(
     goal: String,
     deadline: String,
-    currentState: String,
     onGoalCommit: (String) -> Unit,
     onDeadlineCommit: (String) -> Unit,
-    onStatusSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     todayMillis: Long = System.currentTimeMillis(),
     testTag: String = "goal-hero"
 ) {
     var editingGoal by remember { mutableStateOf(false) }
     var goalDraft by remember(goal) { mutableStateOf(goal) }
-    var editingDeadline by remember { mutableStateOf(false) }
-    var deadlineDraft by remember(deadline) { mutableStateOf(if (deadline == "未设置") "" else deadline) }
+    var showDeadlinePicker by remember { mutableStateOf(false) }
     val daysLeft = parseGoalDeadlineDaysLeft(deadline, todayMillis)
+    val deadlineText = if (deadline.isBlank() || deadline == "未设置") "不设置时间" else deadline
 
     Box(
         modifier = modifier
@@ -364,141 +369,88 @@ fun GoalDashboardHero(
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("截止时间", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
-                    if (editingDeadline) {
-                        OutlinedTextField(
-                            value = deadlineDraft,
-                            onValueChange = { deadlineDraft = it },
-                            modifier = Modifier.fillMaxWidth().testTag("$testTag-deadline-input"),
-                            placeholder = { Text("如 2026-10-01 或 10月1日") },
-                            singleLine = true,
-                            shape = RoundedCornerShape(10.dp),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = {
-                                onDeadlineCommit(deadlineDraft)
-                                editingDeadline = false
-                            })
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = deadlineText,
+                            fontSize = 15.sp,
+                            color = FormalColors.Ink
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(
-                                onClick = {
-                                    onDeadlineCommit(deadlineDraft)
-                                    editingDeadline = false
-                                },
-                                enabled = deadlineDraft.isNotBlank(),
-                                modifier = Modifier.testTag("$testTag-deadline-done")
-                            ) { Text("保存") }
-                            TextButton(onClick = {
-                                deadlineDraft = if (deadline == "未设置") "" else deadline
-                                editingDeadline = false
-                            }) { Text("取消") }
-                        }
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = deadline.ifBlank { "未设置" },
-                                fontSize = 15.sp,
-                                color = FormalColors.Ink
-                            )
-                            TextButton(
-                                onClick = { editingDeadline = true },
-                                modifier = Modifier.testTag("$testTag-deadline-edit")
-                            ) { Text("改", fontSize = 13.sp) }
-                        }
-                        when {
-                            daysLeft != null -> Text(
-                                text = goalDeadlineLabel(daysLeft),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = goalDeadlineToneColor(goalDeadlineTone(daysLeft))
-                            )
-                            deadline.isNotBlank() && deadline != "未设置" -> Text(
-                                text = "暂时认不出这个日期，试试 2026-10-01 这种写法",
-                                fontSize = 12.sp,
-                                color = FormalColors.Muted
-                            )
-                            else -> Text(
-                                text = "定个日期，左边的圆环会替你倒数",
-                                fontSize = 12.sp,
-                                color = FormalColors.Muted
-                            )
-                        }
+                        TextButton(
+                            onClick = { showDeadlinePicker = true },
+                            modifier = Modifier.testTag("$testTag-deadline-edit")
+                        ) { Text("改", fontSize = 13.sp) }
+                    }
+                    when {
+                        daysLeft != null -> Text(
+                            text = goalDeadlineLabel(daysLeft),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = goalDeadlineToneColor(goalDeadlineTone(daysLeft))
+                        )
+                        deadline.isNotBlank() && deadline != "未设置" -> Text(
+                            text = "暂时认不出这个日期，点「改」从日历里重新选",
+                            fontSize = 12.sp,
+                            color = FormalColors.Muted
+                        )
+                        else -> Text(
+                            text = "点「改」从日历里挑一天，左边的圆环会替你倒数",
+                            fontSize = 12.sp,
+                            color = FormalColors.Muted
+                        )
                     }
                 }
             }
 
-            GoalHairline()
-
-            Text("当前状态", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
-            Text(
-                text = "选好后会随每条消息发给 AI，它会照着调整讲课方式。",
-                fontSize = 12.sp,
-                color = FormalColors.Muted
-            )
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                GoalStatusOptions.forEachIndexed { index, option ->
-                    GoalStatusChip(
-                        option = option,
-                        selected = currentState == option.label,
-                        wiggleSeed = index,
-                        onClick = { onStatusSelect(option.label) },
-                        testTag = "$testTag-status-${option.label}"
-                    )
-                }
-                val custom = currentState.trim()
-                if (custom.isNotEmpty() && custom != "未设置" && GoalStatusOptions.none { it.label == custom }) {
-                    Surface(
-                        shape = RoundedCornerShape(999.dp),
-                        color = FormalColors.PrimarySoft,
-                        border = BorderStroke(1.dp, FormalColors.Primary)
-                    ) {
-                        Text(
-                            text = custom,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = FormalColors.Primary,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
-                        )
+            if (showDeadlinePicker) {
+                val pickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = daysLeft?.let { todayMillis + it * 86_400_000L }
+                )
+                DatePickerDialog(
+                    onDismissRequest = { showDeadlinePicker = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                pickerState.selectedDateMillis?.let { onDeadlineCommit(formatGoalDeadlineMillis(it)) }
+                                showDeadlinePicker = false
+                            },
+                            enabled = pickerState.selectedDateMillis != null,
+                            modifier = Modifier.testTag("$testTag-deadline-confirm")
+                        ) { Text("确定") }
+                    },
+                    dismissButton = {
+                        Row {
+                            TextButton(
+                                onClick = {
+                                    onDeadlineCommit("")
+                                    showDeadlinePicker = false
+                                },
+                                modifier = Modifier.testTag("$testTag-deadline-clear")
+                            ) { Text("不设置时间") }
+                            TextButton(onClick = { showDeadlinePicker = false }) { Text("取消") }
+                        }
                     }
+                ) {
+                    DatePicker(state = pickerState)
                 }
             }
         }
     }
 }
 
-/** 英雄卡背景：哑光浅蓝渐变底上的「学习旅程」小径，柔光圆轻轻呼吸、光点沿路径行进。 */
+/** 英雄卡背景：哑光渐变底上的「学习旅程」小径，入场一次性描绘，之后静止。 */
 @Composable
 internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "goal-hero-bg")
-    val trailT by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
-        label = "goal-hero-trail"
+    var started by remember { mutableStateOf(false) }
+    val drawT by animateFloatAsState(
+        targetValue = if (started) 1f else 0f,
+        animationSpec = tween(900, easing = FastOutSlowInEasing),
+        label = "goal-hero-draw"
     )
-    val breath by transition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(4200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "goal-hero-breath"
-    )
+    LaunchedEffect(Unit) { started = true }
     Canvas(modifier) {
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
-        drawCircle(
-            color = FormalColors.PrimarySoft.copy(alpha = 0.5f * breath),
-            radius = h * 0.62f,
-            center = Offset(w * 0.94f, h * 0.04f)
-        )
-        drawCircle(
-            color = FormalColors.SuccessSoft.copy(alpha = 0.45f * breath),
-            radius = h * 0.34f,
-            center = Offset(w * 0.10f, h * 1.02f)
-        )
         val p0 = Offset(w * 0.05f, h * 0.96f)
         val c1 = Offset(w * 0.32f, h * 0.78f)
         val c2 = Offset(w * 0.55f, h * 1.04f)
@@ -507,72 +459,26 @@ internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
             moveTo(p0.x, p0.y)
             cubicTo(c1.x, c1.y, c2.x, c2.y, p1.x, p1.y)
         }
+        val measure = PathMeasure()
+        measure.setPath(trail, false)
+        val segment = Path()
+        measure.getSegment(0f, measure.length * drawT, segment, true)
         drawPath(
-            path = trail,
+            path = segment,
             color = FormalColors.Primary.copy(alpha = 0.14f),
             style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
         )
-        val stationColor = FormalColors.Primary.copy(alpha = 0.26f)
+        val stationColor = FormalColors.Primary.copy(alpha = 0.26f * drawT)
         drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.17f, h * 0.86f))
         drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.46f, h * 0.90f))
         drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.71f, h * 0.76f))
         // 终点小旗环
         drawCircle(
-            color = FormalColors.Primary.copy(alpha = 0.30f),
+            color = FormalColors.Primary.copy(alpha = 0.30f * drawT),
             radius = 5.dp.toPx(),
             center = p1,
             style = Stroke(width = 1.5.dp.toPx())
         )
-        // 沿路径行进的光点
-        val t = trailT
-        val u = 1f - t
-        val pos = Offset(
-            x = u * u * u * p0.x + 3f * u * u * t * c1.x + 3f * u * t * t * c2.x + t * t * t * p1.x,
-            y = u * u * u * p0.y + 3f * u * u * t * c1.y + 3f * u * t * t * c2.y + t * t * t * p1.y
-        )
-        drawCircle(FormalColors.Primary.copy(alpha = 0.10f), 7.dp.toPx(), pos)
-        drawCircle(FormalColors.Primary.copy(alpha = 0.34f), 3.5.dp.toPx(), pos)
-    }
-}
-
-@Composable
-internal fun GoalStatusChip(
-    option: GoalStatusOption,
-    selected: Boolean,
-    wiggleSeed: Int,
-    onClick: () -> Unit,
-    testTag: String
-) {
-    Surface(
-        modifier = Modifier.testTag(testTag),
-        shape = RoundedCornerShape(999.dp),
-        color = if (selected) FormalColors.PrimarySoft else FormalColors.SurfaceSubtle,
-        border = BorderStroke(1.dp, if (selected) FormalColors.Primary else FormalColors.Divider)
-    ) {
-        Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .clickable(onClick = onClick)
-                .padding(start = 6.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            WigglingEmoji(
-                imageRes = option.imageRes,
-                contentDescription = option.label,
-                onClick = onClick,
-                selected = selected,
-                size = 24.dp,
-                wiggleSeed = wiggleSeed,
-                testTag = "$testTag-emoji"
-            )
-            Text(
-                text = option.label,
-                fontSize = 13.sp,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (selected) FormalColors.Primary else FormalColors.Muted
-            )
-        }
     }
 }
 
@@ -752,20 +658,6 @@ fun GoalBreakdownCard(
                 inputTag = "$testTag-milestone-input",
                 addTag = "$testTag-milestone-add"
             )
-
-            // —— 拆解连接符 ——
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = FormalColors.Tertiary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text("拆到这一周", fontSize = 11.sp, color = FormalColors.Muted)
-            }
 
             // —— 本周聚焦：寄托在里程碑之下 ——
             Row(verticalAlignment = Alignment.CenterVertically) {

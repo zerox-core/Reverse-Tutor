@@ -104,6 +104,18 @@ class SessionGoalDashboardTest {
         assertNull(parseGoalDeadlineDaysLeft("", todayMillis))
     }
 
+    // —— 日历选择毫秒格式化 ——
+
+    @Test
+    fun datePickerMillisFormatsToStorageDate() {
+        val utc = java.util.TimeZone.getTimeZone("UTC")
+        val millis = Calendar.getInstance(utc).apply {
+            set(2026, 9, 1, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        assertEquals("2026-10-01", formatGoalDeadlineMillis(millis))
+    }
+
     // —— 倒计时文案与紧急度 ——
 
     @Test

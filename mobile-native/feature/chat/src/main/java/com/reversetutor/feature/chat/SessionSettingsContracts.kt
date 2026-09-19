@@ -8,7 +8,7 @@ const val SessionSettingsUndoWindowMillis: Long = 5_000L
 
 enum class SessionSettingsSection(val label: String) {
     Basic("基本资料"),
-    GoalPlan("学习目标与计划"),
+    GoalPlan("学习目标"),
     ConversationStrategy("对话策略"),
     /** 资料管理：不出现在窗口设置标签页，仅供资料证据深链（initialSection）直达。 */
     SourceManagement("资料管理"),

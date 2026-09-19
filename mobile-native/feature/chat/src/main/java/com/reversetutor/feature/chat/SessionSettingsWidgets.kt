@@ -720,7 +720,7 @@ internal fun ExportManifestCard(
                     "快捷标签"
                 ) else listOf(
                     "基本资料",
-                    "学习目标与计划",
+                    "学习目标",
                     "对话策略"
                 )
                 items.forEach { line ->

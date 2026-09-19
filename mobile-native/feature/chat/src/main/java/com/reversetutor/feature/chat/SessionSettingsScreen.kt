@@ -213,7 +213,10 @@ fun SessionSettingsScreen(
         }
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            // R76：禁用左右滑动翻页——页内横向手势（里程碑拖动等）曾被误判成翻页；
+            // 切换页签只走顶部 tab 点击（animateScrollToPage 不受影响）。
+            userScrollEnabled = false
         ) { page ->
             when (sections[page]) {
                 SessionSettingsSection.Basic -> BasicProfilePage(
@@ -665,12 +668,13 @@ private fun GoalPlanPage(
     refresh: () -> Unit
 ) = SettingsPage {
     val value = coordinator.state.form.goalPlan
-    // R68 目标看板（方向A）：主目标英雄卡 + 倒计时圆环 + 状态 chip；
+    // R68 目标看板（方向A）：主目标英雄卡 + 倒计时圆环；
     // 里程碑 / 每周计划升级为可勾选清单（勾选态编码进文本，数据结构不变）。
+    // R76：英雄卡移除「当前状态」区（表情动效整体重制，见 docs/specs/
+    // animated-emoji-redesign-plan.md）；currentState 数据与生成链路保持不变。
     GoalDashboardHero(
         goal = value.primaryGoal,
         deadline = value.deadline,
-        currentState = value.currentState,
         onGoalCommit = { next ->
             coordinator.editGoalPlan { it.copy(primaryGoal = next.trim()) }
             commitBoundary()
@@ -680,10 +684,6 @@ private fun GoalPlanPage(
             coordinator.applyGoalPlanImmediate { it.copy(deadline = next.trim().ifBlank { "未设置" }) }
             refresh()
         },
-        onStatusSelect = { status ->
-            coordinator.applyGoalPlanImmediate { it.copy(currentState = status) }
-            refresh()
-        }
     )
     // R69：拆解卡 = 阶段里程碑（横向站点旅程，可左右拖动）→ 本周聚焦（寄托其下）。
     GoalBreakdownCard(
