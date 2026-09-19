@@ -728,17 +728,25 @@ private fun BlackHoleGraphReadyContent(
             val coreR = engine.holeCoreRadius * camera.scale
             val diskR = engine.exclusionRadius * camera.scale
             // 盘底色：径向亮度梯度（内缘最亮 → 外缘渐隐；用户拍板纯白盘）
+            val diskStops = if (palette.isDark) arrayOf(
+                0f to Color.Transparent,
+                (coreR * 1.05f / diskR) to Color.Transparent,
+                (coreR * 1.25f / diskR) to palette.diskHot.copy(alpha = palette.diskHot.alpha * 0.75f),
+                (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = palette.diskMid.alpha * 0.5f),
+                (coreR * 2.7f / diskR) to palette.diskOuter.copy(alpha = palette.diskOuter.alpha * 0.22f),
+                1f to Color.Transparent
+            ) else arrayOf(
+                // 浅色：外缘渐隐改陡——白盘收得果断，像白瓷盘的肩部而不是一团雾（真机反馈「外盘边缘再明确一点」）
+                0f to Color.Transparent,
+                (coreR * 1.05f / diskR) to Color.Transparent,
+                (coreR * 1.25f / diskR) to palette.diskHot,
+                (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = 0.85f),
+                (coreR * 2.55f / diskR) to palette.diskOuter.copy(alpha = 0.55f),
+                (coreR * 2.9f / diskR) to palette.diskOuter.copy(alpha = 0.2f),
+                1f to Color.Transparent
+            )
             drawCircle(
-                brush = Brush.radialGradient(
-                    0f to Color.Transparent,
-                    (coreR * 1.05f / diskR) to Color.Transparent,
-                    (coreR * 1.25f / diskR) to palette.diskHot.copy(alpha = palette.diskHot.alpha * if (palette.isDark) 0.75f else 1f),
-                    (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = palette.diskMid.alpha * if (palette.isDark) 0.5f else 0.82f),
-                    (coreR * 2.7f / diskR) to palette.diskOuter.copy(alpha = palette.diskOuter.alpha * if (palette.isDark) 0.22f else 0.45f),
-                    1f to Color.Transparent,
-                    center = holeCenter,
-                    radius = diskR
-                ),
+                brush = Brush.radialGradient(*diskStops, center = holeCenter, radius = diskR),
                 radius = diskR,
                 center = holeCenter
             )
@@ -764,6 +772,17 @@ private fun BlackHoleGraphReadyContent(
                     size = Size(r * 2f, r * 2f),
                     alpha = (streak.alpha * beaming * if (palette.isDark) 1f else 2.2f).coerceIn(0f, 1f),
                     style = Stroke(width = streak.width * coreR)
+                )
+            }
+            // 浅色外盘收边：1px 细「盘口线」，比米白底深半度的暖灰——设计语言「细边框分层」，
+            // 白盘靠这道细边被裱出来，同时也正是遗忘渐进区（净空带）的边界
+            if (!palette.isDark) {
+                drawCircle(
+                    color = Color(0xFFE0D4BC),
+                    radius = diskR * 0.985f,
+                    center = holeCenter,
+                    alpha = 0.9f,
+                    style = Stroke(width = 1f.dp.toPx())
                 )
             }
 
