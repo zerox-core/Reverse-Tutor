@@ -176,6 +176,7 @@ class BlackHoleGraphEngine(
     private var settled: Boolean = false
     private var draggingId: String? = null
     private var absorbedTotal: Int = 0
+    private var rescuedTotal: Int = 0
     private var simAccum: Float = 0f
 
     /** 入场进度 0->1（真实时间，不随倍率）。 */
@@ -198,6 +199,10 @@ class BlackHoleGraphEngine(
     /** 已被黑洞吞噬的节点总数（渲染「已遗忘 N」）。 */
     val absorbedCount: Int
         get() = absorbedTotal
+
+    /** 已被用户抢救回归的节点总数（D7 点击抢救复习）。 */
+    val rescuedCount: Int
+        get() = rescuedTotal
 
     val exclusionRadius: Float
         get() = holeCoreRadius * physics.exclusionRadiusRatio
@@ -249,6 +254,7 @@ class BlackHoleGraphEngine(
         draggingId = null
         dragOverHole = false
         absorbedTotal = 0
+        rescuedTotal = 0
         simAccum = 0f
         entrance = 0f
     }
@@ -260,6 +266,51 @@ class BlackHoleGraphEngine(
             !node.gone && !node.absorbed && node.mode != BlackHoleNodeMode.Dying &&
                 hypot(node.dispX - x, node.dispY - y) <= node.displayRadius(physics) * 1.35f
         }
+
+    /**
+     * 濒死可抢救命中：漩涡旅程（Dying）且已进入黑洞区域（闪烁呼吸段）的节点。
+     * 命中半径额外放宽，方便用户点中持续移动的小节点（用户 2026-09-19 拍板 D7 点击抢救）。
+     */
+    fun hitTestRescuable(x: Float, y: Float): BlackHoleNode? =
+        nodeList.asReversed().firstOrNull { node ->
+            !node.gone && !node.absorbed && node.mode == BlackHoleNodeMode.Dying &&
+                hypot(node.simX - holeX, node.simY - holeY) <= exclusionRadius &&
+                hypot(node.dispX - x, node.dispY - y) <= node.displayRadius(physics) * 1.35f + 16f
+        }
+
+    /** 节点是否处于「可抢救」状态：断链离散期、已进入黑洞区域闪烁呼吸。 */
+    fun isRescuable(nodeId: String): Boolean {
+        val node = nodeList.firstOrNull { it.id == nodeId && !it.gone && !it.absorbed } ?: return false
+        return node.mode == BlackHoleNodeMode.Dying &&
+            hypot(node.simX - holeX, node.simY - holeY) <= exclusionRadius
+    }
+
+    /**
+     * 抢救 = 用户主动点击、完成复习回顾（用户 2026-09-19 拍板 D7 断链离散方案）：
+     * 遗忘清零、冷却保护重置、放回漩涡旅程起点半径（净空带外沿）、重新接入力场布局。
+     * 数据层连线在离散期从未删除（仅渲染断链），抢救后自动重连、无需建边。
+     */
+    fun rescueNode(nodeId: String): Boolean {
+        if (!isRescuable(nodeId)) return false
+        val node = nodeList.first { it.id == nodeId }
+        node.forget = 0f
+        node.cooling = true
+        node.coolingElapsed = 0f
+        node.mode = BlackHoleNodeMode.Free
+        val r = node.decayStartR.coerceAtLeast(exclusionRadius + node.baseRadius + 6f)
+        node.simX = holeX + cos(node.decayAngle) * r
+        node.simY = holeY + sin(node.decayAngle) * r
+        node.dispX = node.simX
+        node.dispY = node.simY
+        node.vx = 0f
+        node.vy = 0f
+        node.decayStartR = 0f
+        node.decayAngle = 0f
+        node.settlingElapsed = 0f
+        rescuedTotal++
+        wake()
+        return true
+    }
 
     fun isInExclusionZone(x: Float, y: Float): Boolean =
         hypot(x - holeX, y - holeY) <= exclusionRadius
@@ -790,6 +841,9 @@ class BlackHoleGraphEngine(
         return edgeList.mapNotNull { (fromId, toId) ->
             val a = byId[fromId] ?: return@mapNotNull null
             val b = byId[toId] ?: return@mapNotNull null
+            // D7 断链离散：漩涡旅程中的节点视觉上断开与母节点的连线
+            // （数据层 edgeList 未删，抢救回归后自动重连）
+            if (a.mode == BlackHoleNodeMode.Dying || b.mode == BlackHoleNodeMode.Dying) return@mapNotNull null
             val fade = (1f - a.forget) * (1f - b.forget)
             val absorbedFade = (1f - a.absorbFade) * (1f - b.absorbFade)
             BlackHoleRenderEdge(

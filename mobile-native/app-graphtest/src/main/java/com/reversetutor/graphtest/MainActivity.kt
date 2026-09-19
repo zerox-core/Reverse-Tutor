@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val graphState = remember(resetKey) { DemoGraph.state() }
                 BlackHoleGraphScreen(
-                    state = graphState,
+                    state = graphState.copy(selectedNodeId = selectedNodeId),
                     onSelectedNodeChange = { selectedNodeId = it },
                     title = "黑洞图谱测试",
                     subtitle = "演示数据 · 真机交互验证版",

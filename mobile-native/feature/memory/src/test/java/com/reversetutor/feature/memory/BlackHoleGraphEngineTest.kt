@@ -500,4 +500,89 @@ class BlackHoleGraphEngineTest {
         engine.startDrag(node.id)
         assertEquals(BlackHoleNodeMode.Dying, node.mode)
     }
+
+    // ---------- D7 断链离散 · 点击抢救（用户 2026-09-19 拍板） ----------
+
+    /** 把节点推进到「可抢救」状态：过保进入 Dying，再收缩进黑洞区域（闪烁呼吸段）。 */
+    private fun driveToBreathing(engine: BlackHoleGraphEngine, id: String) {
+        val node = engine.nodes.first { it.id == id }
+        node.cooling = false
+        node.forget = 0.05f
+        engine.tick(1f / 60f) // -> Dying，记录 decayStartR/decayAngle
+        node.decayStartR = engine.exclusionRadius
+        node.forget = 0.1f
+        engine.tick(1f / 60f) // r ≈ exclusion * 0.92 < exclusion -> 呼吸段
+    }
+
+    @Test
+    fun rescue_only_when_breathing_inside_hole_zone() {
+        val engine = engineWith(3)
+        val node = engine.nodes.first()
+        node.cooling = false
+        node.forget = 0.05f
+        engine.tick(1f / 60f)
+        assertEquals(BlackHoleNodeMode.Dying, node.mode)
+        // 旅程前段（净空带之外）：不可抢救
+        assertFalse(engine.isRescuable(node.id))
+        assertFalse(engine.rescueNode(node.id))
+        assertEquals(BlackHoleNodeMode.Dying, node.mode)
+        // 进入黑洞区域（呼吸段）：可抢救
+        node.decayStartR = engine.exclusionRadius
+        node.forget = 0.1f
+        engine.tick(1f / 60f)
+        assertTrue(engine.isRescuable(node.id))
+        assertTrue(engine.rescueNode(node.id))
+    }
+
+    @Test
+    fun rescue_restores_state_and_severed_edges_relink() {
+        val engine = engineWith(3, edges = listOf("n1" to "n2", "n2" to "n3"))
+        driveToBreathing(engine, "n1")
+        // 离散期：渲染层断链（数据层 edgeList 未删）
+        assertTrue(engine.renderEdges().none { it.fromId == "n1" || it.toId == "n1" })
+        assertTrue(engine.renderEdges().any { it.fromId == "n2" && it.toId == "n3" })
+        assertTrue(engine.rescueNode("n1"))
+        val node = engine.nodes.first { it.id == "n1" }
+        assertEquals(0f, node.forget, 1e-4f)
+        assertTrue(node.cooling)
+        assertEquals(0f, node.coolingElapsed, 1e-4f)
+        assertEquals(BlackHoleNodeMode.Free, node.mode)
+        assertEquals(0f, node.decayStartR, 1e-4f)
+        val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+        assertTrue("rescued node should be outside breathing zone: d=$d", d >= engine.exclusionRadius)
+        // 重连：渲染层连线恢复
+        assertTrue(engine.renderEdges().any { it.fromId == "n1" && it.toId == "n2" })
+        assertEquals(1, engine.rescuedCount)
+    }
+
+    @Test
+    fun rescue_rejected_for_healthy_or_absorbed_nodes() {
+        val engine = engineWith(3)
+        // 健康节点：不可抢救
+        assertFalse(engine.rescueNode("n1"))
+        // 已被吞噬节点：不可抢救（真实遗忘不可逆，只能重新学习新建）
+        val node = engine.nodes.first { it.id == "n2" }
+        node.cooling = false
+        node.forget = 1f
+        engine.tick(1f / 60f) // 遗忘打满 -> 吞噬
+        assertTrue(node.absorbed || node.gone)
+        assertFalse(engine.rescueNode("n2"))
+        assertEquals(0, engine.rescuedCount)
+    }
+
+    @Test
+    fun rescued_node_rejoins_layout_and_stays_alive() {
+        val engine = engineWith(12, edges = (1 until 12).map { "n$it" to "n${it + 1}" })
+        driveToBreathing(engine, "n6")
+        assertTrue(engine.rescueNode("n6"))
+        tickSeconds(engine, 12f)
+        val node = engine.nodes.first { it.id == "n6" }
+        assertFalse(node.absorbed)
+        assertFalse(node.gone)
+        assertTrue(node.mode != BlackHoleNodeMode.Dying)
+        assertEquals(0f, node.forget, 1e-4f)
+        // 重新接入力场：不被甩飞、不坠核心（净空带硬边界保持）
+        val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+        assertTrue("rescued node drifted into hole: d=$d", d >= engine.exclusionRadius - 0.5f)
+    }
 }

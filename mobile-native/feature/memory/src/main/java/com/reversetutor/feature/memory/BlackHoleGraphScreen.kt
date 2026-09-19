@@ -54,6 +54,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 import kotlin.random.Random
+import kotlinx.coroutines.delay
 
 /** 主操作色（双主题共用）。 */
 private val GraphAccent = Color(0xFF2F5DDF)
@@ -74,7 +75,6 @@ class BlackHoleGraphPalette(
     val dust: Color,
     val dustAlphaBoost: Float,
     val bounceMark: Color,
-    val selectedRing: Color,
     val topBarText: Color,
     val topBarSub: Color,
     val panel: Color,
@@ -109,7 +109,6 @@ object BlackHoleGraphThemes {
         dust = Color(0xFF93A2C4),
         dustAlphaBoost = 1f,
         bounceMark = Color(0xFFD84C4C),
-        selectedRing = Color(0xFF1C2433),
         topBarText = Color(0xFF1C2433),
         topBarSub = Color(0xFF6D778C),
         panel = Color(0xFFFFFFFF),
@@ -152,7 +151,6 @@ object BlackHoleGraphThemes {
         dust = Color(0xFFAFC3E8),
         dustAlphaBoost = 1.5f,
         bounceMark = Color(0xFFD84C4C),
-        selectedRing = Color(0xFFF2F2F7),
         topBarText = Color(0xFFE8ECF4),
         topBarSub = Color(0xFF8FA3C8),
         panel = Color(0xE6141B33),
@@ -420,6 +418,14 @@ private fun BlackHoleGraphReadyContent(
     var viewportWidth by remember { mutableStateOf(0f) }
     var viewportHeight by remember { mutableStateOf(0f) }
     var interacting by remember { mutableStateOf(false) }
+    // 抢救反馈 toast（D7 点击抢救复习；非空即显示，2.4s 后自动消失）
+    var rescueToast by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(rescueToast) {
+        if (rescueToast != null) {
+            delay(2400)
+            rescueToast = null
+        }
+    }
 
     LaunchedEffect(timeScaleIndex) {
         engine.timeScale = timeScales[timeScaleIndex]
@@ -457,10 +463,10 @@ private fun BlackHoleGraphReadyContent(
                     }
                     // 触点落在画布即申请手势所有权（克隆旧屏 onRequestInteraction 语义）
                     onCanvasModeChange(true)
-                    val hit = engine.hitTest(
-                        screenToWorld(down.position).x,
-                        screenToWorld(down.position).y
-                    )
+                    val downWorld = screenToWorld(down.position)
+                    val hit = engine.hitTest(downWorld.x, downWorld.y)
+                    // 普通命中未中时，再探「可抢救」的濒死节点（闪烁呼吸段；普通 hitTest 对 Dying 豁免）
+                    val rescueHit = if (hit == null) engine.hitTestRescuable(downWorld.x, downWorld.y) else null
                     if (hit != null) {
                         // 节点拖动路径（含点按判定）
                         engine.startDrag(hit.id)
@@ -485,6 +491,25 @@ private fun BlackHoleGraphReadyContent(
                         onGraphInteractionChanged(false)
                         if (totalMove < viewConfiguration.touchSlop) {
                             onSelectedNodeChange(if (state.selectedNodeId == hit.id) null else hit.id)
+                        }
+                    } else if (rescueHit != null) {
+                        // 点按闪烁的濒死节点 = 抢救复习（用户 2026-09-19 拍板 D7 断链离散方案）：
+                        // 不做拖动/平移，等抬手且位移小于阈值即触发抢救——遗忘清零、冷却重置、
+                        // 节点回归净空带外沿、与母节点的连线自动重接。
+                        var totalMove = 0f
+                        var active = true
+                        while (active) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                            if (change == null || !change.pressed) {
+                                active = false
+                            } else if (change.positionChanged()) {
+                                totalMove += change.positionChange().getDistance()
+                                change.consume()
+                            }
+                        }
+                        if (totalMove < viewConfiguration.touchSlop && engine.rescueNode(rescueHit.id)) {
+                            rescueToast = "已抢救回归「${rescueHit.label}」：复习完成，遗忘清零"
                         }
                     } else {
                         // 空白：平移 / 双指缩放；位移极小视为点按取消选中
@@ -746,6 +771,8 @@ private fun BlackHoleGraphReadyContent(
                 val alpha = (node.opacity * dim * breathAlpha).coerceIn(0f, 1f)
                 if (r <= 0.5f) return@forEach
                 val base = palette.nodeColor(node.kind)
+                // 选中/抢救提示环用同色相压暗描边（用户 2026-09-19 拍板：不要黑色线框），与米白底和同色光晕都有区分度
+                val ringColor = Color(base.red * 0.72f, base.green * 0.72f, base.blue * 0.72f)
                 // 柔光晕（半径外扩 ~2.1x，渐隐）：浅色用节点同色晕——白色晕在米白底上不可见还会把节点洗淡（R68 用户反馈「太淡」）
                 val glowColor = if (palette.isDark) palette.nodeGlow else base
                 drawCircle(
@@ -771,9 +798,19 @@ private fun BlackHoleGraphReadyContent(
                 )
                 if (state.selectedNodeId == node.id) {
                     drawCircle(
-                        color = palette.selectedRing,
+                        color = ringColor,
                         radius = r + 3.dp.toPx(),
                         center = center,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
+                if (breathing) {
+                    // 可抢救提示环：闪烁呼吸的濒死节点外圈描边，提示「点我抢救」（D7 断链离散设计）
+                    drawCircle(
+                        color = ringColor,
+                        radius = r + 5.dp.toPx(),
+                        center = center,
+                        alpha = breathAlpha,
                         style = Stroke(width = 1.5.dp.toPx())
                     )
                 }
@@ -886,6 +923,27 @@ private fun BlackHoleGraphReadyContent(
                 .align(Alignment.BottomStart)
                 .padding(start = 16.dp, bottom = 16.dp)
         )
+
+        // 抢救反馈 toast（底部居中、自动消失；D7 点击抢救复习）
+        rescueToast?.let { msg ->
+            Surface(
+                color = palette.panel,
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, palette.panelBorder),
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 110.dp)
+                    .testTag("blackhole-rescue-toast")
+            ) {
+                Text(
+                    text = msg,
+                    color = palette.panelText,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
+                )
+            }
+        }
 
         // 选中节点卡（底部，白卡/深卡细边框，保留证据入口）
         val selected = state.selectedNode
