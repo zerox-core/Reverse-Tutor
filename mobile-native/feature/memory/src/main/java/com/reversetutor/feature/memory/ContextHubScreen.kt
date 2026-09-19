@@ -225,7 +225,7 @@ fun GlobalGraphRoute(
     }
 
     val selectedState = state.withSelection(selectedNodeId)
-    FormalGlobalKnowledgeGraphScreen(
+    BlackHoleGraphScreen(
         state = selectedState,
         onSelectedNodeChange = { selectedNodeId = it },
         modifier = modifier,
@@ -241,10 +241,9 @@ fun GlobalGraphRoute(
         onOpenSourceEvidence = { node ->
             node.sourceId?.let(onOpenGraphSourceEvidence)
         },
-        canvasModeActive = canvasModeActive,
-        onCanvasModeChange = onCanvasModeChange,
         onRetry = { refreshKey += 1 },
-        onGraphInteractionChanged = onGraphInteractionChanged
+        onGraphInteractionChanged = onGraphInteractionChanged,
+        onCanvasModeChange = onCanvasModeChange
     )
 }
 
