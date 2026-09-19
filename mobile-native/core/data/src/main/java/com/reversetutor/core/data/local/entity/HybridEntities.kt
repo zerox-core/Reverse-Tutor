@@ -132,6 +132,37 @@ data class TurnRunEntity(
     val errorUserAction: String? = null
 )
 
+/**
+ * Expression-loop slice 3: per-turn generation trajectory (便签 / 输出 /
+ * 校验 / 重说与兜底记录). One row per completed generation, keyed by the
+ * generation token; the latest row's styleFlagsPayload feeds the next
+ * turn's style hint. redLinesPayload / styleFlagsPayload store
+ * comma-joined enum names (see ReplyValidator).
+ */
+@Entity(
+    tableName = "turn_run_trajectories",
+    indices = [
+        Index("sessionId"),
+        Index(value = ["sessionId", "createdAtEpochMillis"])
+    ]
+)
+data class TurnTrajectoryEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val userMessageId: String? = null,
+    val generationToken: String,
+    val turnNoteBlock: String? = null,
+    val outputText: String,
+    val abortedOutputText: String? = null,
+    val redLinesPayload: String = "",
+    val styleFlagsPayload: String = "",
+    val retried: Int = 0,
+    val usedFallback: Int = 0,
+    val selfAssessment: String? = null,
+    val modelId: String = "",
+    val createdAtEpochMillis: Long
+)
+
 @Entity(
     tableName = "study_plan_tasks",
     indices = [Index("spaceId"), Index("state"), Index("sourceSessionId"), Index("updatedAtEpochMillis")]

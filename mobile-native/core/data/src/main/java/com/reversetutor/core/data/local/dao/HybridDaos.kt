@@ -16,6 +16,7 @@ import com.reversetutor.core.data.local.entity.SyncCursorEntity
 import com.reversetutor.core.data.local.entity.SyncOutboxEntity
 import com.reversetutor.core.data.local.entity.TokenUsageRecordEntity
 import com.reversetutor.core.data.local.entity.TurnRunEntity
+import com.reversetutor.core.data.local.entity.TurnTrajectoryEntity
 import com.reversetutor.core.data.local.entity.WeeklySummaryEntity
 import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
 
@@ -89,6 +90,29 @@ interface TurnRunDao {
 
     @Query("DELETE FROM context_snapshots WHERE sessionId = :sessionId")
     suspend fun deleteSnapshotsBySession(sessionId: String): Int
+}
+
+/**
+ * Expression-loop slice 3: generation trajectories. Written once per
+ * completed generation; the latest row per session feeds the next turn's
+ * style hint.
+ */
+@Dao
+interface TurnTrajectoryDao {
+    @Upsert
+    suspend fun upsert(trajectory: TurnTrajectoryEntity)
+
+    @Query("SELECT * FROM turn_run_trajectories WHERE id = :id")
+    suspend fun getById(id: String): TurnTrajectoryEntity?
+
+    @Query("SELECT * FROM turn_run_trajectories WHERE sessionId = :sessionId ORDER BY createdAtEpochMillis DESC LIMIT 1")
+    suspend fun findLatestBySession(sessionId: String): TurnTrajectoryEntity?
+
+    @Query("SELECT * FROM turn_run_trajectories WHERE sessionId = :sessionId ORDER BY createdAtEpochMillis DESC")
+    suspend fun listBySession(sessionId: String): List<TurnTrajectoryEntity>
+
+    @Query("DELETE FROM turn_run_trajectories WHERE sessionId = :sessionId")
+    suspend fun deleteBySession(sessionId: String): Int
 }
 
 @Dao

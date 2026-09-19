@@ -34,6 +34,7 @@ internal class BackgroundTurnPreparationCoordinator(
     private val assembleContext: suspend (String, String, String) -> ConversationContextContract,
     private val enqueueJob: suspend (BackgroundGenerationInput, Long) -> BackgroundGenerationJob,
     private val loadRecentTurnSignals: suspend (String, String) -> RecentTurnSignals = { _, _ -> RecentTurnSignals() },
+    private val loadLastTurnStyleHint: suspend (String) -> String = { "" },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val loadMessages: (String) -> List<ConversationMessageContract> = { emptyList() },
     private val facade: SessionConversationFacade = SessionConversationFacade()
@@ -75,6 +76,16 @@ internal class BackgroundTurnPreparationCoordinator(
                 request.sessionSnapshot.toSessionPolicyInput(request.userText)
             )
 
+            // Expression-loop slice 3: the previous turn's validator style
+            // flags replay as a one-line correction hint (never blocks a turn).
+            val lastTurnStyleHint = try {
+                loadLastTurnStyleHint(request.sessionId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                ""
+            }
+
             // Expression-loop slice 2: assemble the deterministic turn note.
             val turnNote = TurnNoteAssembler.assemble(
                 TurnNoteInput(
@@ -95,7 +106,8 @@ internal class BackgroundTurnPreparationCoordinator(
                         .firstOrNull { it.knowledgePoint == turnPlan.conceptKey }
                         ?.score,
                     lastStuckPoint = context.historicalErrors.firstOrNull()?.description.orEmpty(),
-                    userEmotion = policy.evaluation.userEmotion
+                    userEmotion = policy.evaluation.userEmotion,
+                    styleHint = lastTurnStyleHint
                 )
             ).normalized()
 

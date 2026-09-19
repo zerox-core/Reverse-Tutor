@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 15
+    const val version = 16
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -130,6 +130,14 @@ object DatabaseSchema {
         }
     }
 
+    /** Expression-loop slice 3: per-turn generation trajectories. */
+    val migration15To16: Migration = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            turnTrajectoryTableSql.forEach(db::execSQL)
+            turnTrajectoryIndexSql.forEach(db::execSQL)
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -144,7 +152,8 @@ object DatabaseSchema {
         migration11To12,
         migration12To13,
         migration13To14,
-        migration14To15
+        migration14To15,
+        migration15To16
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -819,6 +828,33 @@ object DatabaseSchema {
 
     private val windowMemoryTokenMeterIndexSql = listOf(
         "CREATE INDEX IF NOT EXISTS index_window_memory_token_meters_sessionId ON window_memory_token_meters(sessionId)"
+    )
+
+    private val turnTrajectoryTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS turn_run_trajectories (
+            id TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            userMessageId TEXT,
+            generationToken TEXT NOT NULL,
+            turnNoteBlock TEXT,
+            outputText TEXT NOT NULL,
+            abortedOutputText TEXT,
+            redLinesPayload TEXT NOT NULL,
+            styleFlagsPayload TEXT NOT NULL,
+            retried INTEGER NOT NULL,
+            usedFallback INTEGER NOT NULL,
+            selfAssessment TEXT,
+            modelId TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val turnTrajectoryIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_turn_run_trajectories_sessionId ON turn_run_trajectories(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_turn_run_trajectories_sessionId_createdAtEpochMillis ON turn_run_trajectories(sessionId, createdAtEpochMillis)"
     )
 }
 

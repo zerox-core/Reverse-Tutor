@@ -83,11 +83,15 @@ class ProductionLlmGenerationRuntime(
 
         return when (val result = runCatching {
             if (request.streaming) {
-                transport.executeStreaming(providerRequest) { line ->
-                    line.sseData().mapNotNull(::parseText).forEach { text ->
-                        request.onStreamChunk?.invoke(text)
-                    }
-                }
+                transport.executeStreaming(
+                    providerRequest,
+                    onLine = { line ->
+                        line.sseData().mapNotNull(::parseText).forEach { text ->
+                            request.onStreamChunk?.invoke(text)
+                        }
+                    },
+                    shouldAbort = { request.streamAbortRequested() }
+                )
             } else {
                 transport.execute(providerRequest)
             }
@@ -191,7 +195,9 @@ private fun buildGeminiPayload(request: LlmGenerationRequest): LlmProviderPayloa
                 mapOf(
                     "role" to "user",
                     "parts" to buildList {
-                        add(mapOf("text" to request.productionUserText()))
+                        // Slice 3: Gemini shares the cache-friendly block
+                        // layout (and the turn note) with the other protocols.
+                        add(mapOf("text" to request.contextualUserText()))
                         request.resolvedImages.forEach { image ->
                             add(mapOf(
                                 "inline_data" to mapOf(
@@ -208,28 +214,6 @@ private fun buildGeminiPayload(request: LlmGenerationRequest): LlmProviderPayloa
     )
 }
 
-private fun LlmGenerationRequest.productionUserText(): String {
-    val context = buildList {
-        reverseTutorStudentPromptBlock()?.let { add(it) }
-        sessionPolicyPromptBlock()?.let { add(it) }
-        guidedLearningPlanPromptBlock()?.let { add(it) }
-        quoteExcerpt?.takeIf { it.isNotBlank() }?.let { add("Quote: ${it.trim()}") }
-        if (contextEvidence.isNotEmpty()) {
-            add(
-                buildString {
-                    append("Context evidence:")
-                    contextEvidence.forEachIndexed { index, evidence ->
-                        append("\n[${index + 1}] ${evidence.kind} - ${evidence.title}: ${evidence.body}")
-                    }
-                    if (contextEvidence.any { it.kind == "Source" }) {
-                        append("\n资料片段优先相信：与你的既有知识冲突时，以资料为准。")
-                    }
-                }
-            )
-        }
-    }
-    return (context + userText).joinToString(separator = "\n\n")
-}
 
 private fun LlmProviderKind.toProviderProtocol(): LlmProviderProtocol =
     when (this) {

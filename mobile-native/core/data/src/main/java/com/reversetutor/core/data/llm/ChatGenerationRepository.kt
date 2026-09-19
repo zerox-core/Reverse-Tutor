@@ -3,6 +3,8 @@ package com.reversetutor.core.data.llm
 import com.reversetutor.core.data.model.ExecutionModelConfiguration
 import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.domain.ReplyValidator
+import com.reversetutor.core.domain.TurnNoteAssembler
 import com.reversetutor.core.domain.TurnPlan
 import com.reversetutor.core.llm.EmbeddingCallResult
 import com.reversetutor.core.llm.EmbeddingModelDiscovery
@@ -41,7 +43,11 @@ class ChatGenerationRepository(
     private val embeddingRuntime: OpenAiCompatibleEmbeddingRuntime? = null,
     /** NEWMP-V1-024 follow-up: asks the channel which embedding model it serves. */
     private val embeddingModelDiscovery: EmbeddingModelDiscovery? = null,
-    private val embeddingModelName: String = "text-embedding-v3"
+    private val embeddingModelName: String = "text-embedding-v3",
+    /** Expression-loop slice 3: per-turn trajectory sink (便签 / 输出 / 校验落库). */
+    private val replyTrajectoryRecorder: suspend (ReplyTrajectory) -> Unit = {},
+    /** Expression-loop slice 3: fired when a red-line abort triggers the one retry. */
+    private val onGenerationRestart: suspend (LlmGenerationToken) -> Unit = {}
 ) {
     suspend fun generateReply(
         input: ChatGenerationInput,
@@ -70,19 +76,48 @@ class ChatGenerationRepository(
             assistantTurnEnvelope = input.assistantTurnEnvelope,
             guidedTurnPlan = input.turnPlan?.toLlmGuidedTurnPlan(),
             turnNoteBlock = input.turnNoteBlock,
-            onStreamChunk = { chunk ->
-                if (isTokenCurrent(input.token)) onChunk(chunk.toVisibleTimelineText())
-            },
             allowPlanDrivenOpening = input.allowPlanDrivenOpening,
             webSearchEnabled = webSearchPreference()
         )
 
-        val request = when (plan) {
+        val plannedRequest = when (plan) {
             is LlmGenerationPlan.Blocked -> return plan.reason.toOutcome()
             is LlmGenerationPlan.Ready -> plan.request
         }
 
-        val result = runtime.generate(request)
+        // Expression-loop slice 3: a red-line watchdog wraps every attempt.
+        // The first hit aborts the stream (streaming transports poll the
+        // abort signal between lines), the preview is reset via
+        // onGenerationRestart, and the turn is retried once with a
+        // strong-constraint directive; a second hit falls back to the
+        // template reply. Style flags never interrupt a reply — they are
+        // recorded into the trajectory and echoed in the NEXT turn's note.
+        val redLines = mutableListOf<ReplyValidator.RedLine>()
+        var abortedOutputText: String? = null
+        var retried = false
+        var attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk)
+        val attemptRequest = plannedRequest.copy(
+            onStreamChunk = attemptWatchdog.onStreamChunk,
+            streamAbortRequested = attemptWatchdog.abortRequested
+        )
+        var result = runtime.generate(attemptRequest)
+        val allowedEvidenceIds = input.contextEvidence.mapNotNull { it.normalized()?.id }.toSet()
+        var finalRedLine = resolveRedLine(attemptWatchdog, result, allowedEvidenceIds)
+        if (finalRedLine != null && isTokenCurrent(input.token)) {
+            redLines += finalRedLine!!
+            abortedOutputText = attemptWatchdog.streamedText().ifBlank { result.visibleTextOrNull() }
+            retried = true
+            onGenerationRestart(input.token)
+            attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk)
+            val retryRequest = attemptRequest.copy(
+                onStreamChunk = attemptWatchdog.onStreamChunk,
+                streamAbortRequested = attemptWatchdog.abortRequested,
+                retryDirective = ReplyValidator.retryDirectiveFor(redLines.last())
+            )
+            result = runtime.generate(retryRequest)
+            finalRedLine = resolveRedLine(attemptWatchdog, result, allowedEvidenceIds)
+        }
+
         if (!isTokenCurrent(input.token) || !canPersistResult()) {
             return ChatGenerationOutcome.Stale
         }
@@ -90,7 +125,13 @@ class ChatGenerationRepository(
         return when (result) {
             is LlmGenerationResult.Success,
             is LlmGenerationResult.Streamed -> {
-                val replyText = result.visibleText
+                val usedFallback = finalRedLine != null
+                if (usedFallback) redLines += finalRedLine!!
+                val replyText = if (usedFallback) {
+                    ReplyValidator.TEMPLATE_FALLBACK_REPLY
+                } else {
+                    result.visibleText
+                }
                 if (replyText.isBlank()) {
                     ChatGenerationOutcome.ProviderFailed("Empty response")
                 } else {
@@ -107,6 +148,29 @@ class ChatGenerationRepository(
                             sessionId = input.sessionId,
                             role = MessageRole.Assistant,
                             text = timelineText,
+                            createdAtEpochMillis = nowEpochMillis
+                        )
+                    )
+                    replyTrajectoryRecorder(
+                        ReplyTrajectory(
+                            sessionId = input.sessionId,
+                            userMessageId = input.userMessageId,
+                            generationToken = input.token.value,
+                            turnNoteBlock = input.turnNoteBlock,
+                            outputText = timelineText,
+                            abortedOutputText = abortedOutputText,
+                            redLines = redLines.distinct(),
+                            styleFlags = if (usedFallback) {
+                                emptyList()
+                            } else {
+                                ReplyValidator.styleFlagsFor(
+                                    timelineText,
+                                    TurnNoteAssembler.tierFromRendered(input.turnNoteBlock)
+                                )
+                            },
+                            retried = retried,
+                            usedFallback = usedFallback,
+                            modelId = plannedRequest.model,
                             createdAtEpochMillis = nowEpochMillis
                         )
                     )
@@ -417,6 +481,64 @@ private fun LlmGenerationBlockReason.toOutcome(): ChatGenerationOutcome =
         LlmGenerationBlockReason.UnsupportedVision -> ChatGenerationOutcome.UnsupportedVision
         LlmGenerationBlockReason.BlankPrompt -> ChatGenerationOutcome.BlankPrompt
     }
+
+/**
+ * Expression-loop slice 3: per-attempt streaming watchdog. Accumulates the
+ * raw stream, stops forwarding chunks to the preview at the first red line,
+ * and exposes the abort signal streaming transports poll between lines.
+ */
+private class StreamWatchdog(
+    private val token: LlmGenerationToken,
+    private val isTokenCurrent: (LlmGenerationToken) -> Boolean,
+    private val onChunk: (String) -> Unit
+) {
+    private val streamed = StringBuilder()
+
+    var redLine: ReplyValidator.RedLine? = null
+        private set
+
+    val onStreamChunk: (String) -> Unit = { chunk ->
+        if (redLine == null) {
+            streamed.append(chunk)
+            val hit = ReplyValidator.findFirstRedLine(streamed.toString())
+            if (hit != null) {
+                redLine = hit
+            } else if (isTokenCurrent(token)) {
+                onChunk(chunk.toVisibleTimelineText())
+            }
+        }
+    }
+
+    val abortRequested: () -> Boolean = { redLine != null }
+
+    fun streamedText(): String = streamed.toString()
+}
+
+private fun resolveRedLine(
+    watchdog: StreamWatchdog,
+    result: LlmGenerationResult,
+    allowedEvidenceIds: Set<String>
+): ReplyValidator.RedLine? =
+    // Chunk-level aborts only gate real streams; fake runtimes replay raw
+    // envelope payloads as chunks for plain Success results, where the
+    // parsed-text check below is the right gate.
+    (watchdog.redLine?.takeIf { result is LlmGenerationResult.Streamed })
+        ?: result.visibleTextOrNull()?.let { raw ->
+        // Structured envelopes carry protocol markers by design; only the
+        // parsed user-visible text is checked. Output that fails envelope
+        // validation still trips OffProtocol on the raw text.
+        val visible = LlmAssistantReplyEnvelopeParser
+            .parseValidated(rawText = raw, allowedEvidenceIds = allowedEvidenceIds)
+            ?.timelineText()
+            ?: raw.toVisibleTimelineText()
+        ReplyValidator.findFirstRedLine(visible)
+    }
+
+private fun LlmGenerationResult.visibleTextOrNull(): String? = when (this) {
+    is LlmGenerationResult.Success -> visibleText
+    is LlmGenerationResult.Streamed -> visibleText
+    else -> null
+}
 
 /**
  * NEWMP-V1-002 Task 2.4: collapse provider diagnostics to stable safe codes.

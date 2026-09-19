@@ -6,7 +6,9 @@ import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.data.llm.LlmProfileRepository
 import com.reversetutor.core.data.local.dao.BackgroundJobDao
 import com.reversetutor.core.data.local.dao.SessionDao
+import com.reversetutor.core.data.local.dao.TurnTrajectoryDao
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
+import com.reversetutor.core.data.local.entity.TurnTrajectoryEntity
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.model.ExecutionModelResolver
 import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
@@ -19,6 +21,7 @@ import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.llm.LlmTurnPlan
 import com.reversetutor.core.llm.LlmWindowContext
 import com.reversetutor.core.llm.StructuredTurnOutcome
+import com.reversetutor.core.domain.ReplyValidator
 import com.reversetutor.core.domain.TurnPlan
 import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageAttachment
@@ -26,18 +29,13 @@ import com.reversetutor.core.model.MessageAttachment
 class BackgroundGenerationRepository(
     private val backgroundJobDao: BackgroundJobDao,
     private val sessionDao: SessionDao,
-    messageRepository: MessageRepository,
-    llmProfileRepository: LlmProfileRepository,
-    runtime: LlmGenerationRuntime,
+    private val messageRepository: MessageRepository,
+    private val llmProfileRepository: LlmProfileRepository,
+    private val runtime: LlmGenerationRuntime,
     private val modelConnectionRepository: ExecutionModelResolver? = null,
-    private val partialStore: GenerationPartialStore = GenerationPartialStore()
+    private val partialStore: GenerationPartialStore = GenerationPartialStore(),
+    private val turnTrajectoryDao: TurnTrajectoryDao? = null
 ) {
-    private val chatGenerationRepository = ChatGenerationRepository(
-        messageRepository = messageRepository,
-        llmProfileRepository = llmProfileRepository,
-        runtime = runtime,
-        modelConnectionRepository = modelConnectionRepository
-    )
 
     suspend fun enqueueGenerationJob(
         input: BackgroundGenerationInput,
@@ -264,7 +262,41 @@ class BackgroundGenerationRepository(
             return discard(running, nowEpochMillis, InitiativeExpiredReason)
         }
 
-        val outcome = chatGenerationRepository.generateReply(
+        var restartNoticePending = false
+        val generationRepository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = llmProfileRepository,
+            runtime = runtime,
+            modelConnectionRepository = modelConnectionRepository,
+            replyTrajectoryRecorder = recorder@{ trajectory ->
+                val dao = turnTrajectoryDao ?: return@recorder
+                dao.upsert(
+                    TurnTrajectoryEntity(
+                        id = "trajectory-" + trajectory.generationToken,
+                        sessionId = trajectory.sessionId,
+                        userMessageId = trajectory.userMessageId,
+                        generationToken = trajectory.generationToken,
+                        turnNoteBlock = trajectory.turnNoteBlock,
+                        outputText = trajectory.outputText,
+                        abortedOutputText = trajectory.abortedOutputText,
+                        redLinesPayload = trajectory.redLines.joinToString(",") { it.name },
+                        styleFlagsPayload = ReplyValidator.payloadForStyleFlags(trajectory.styleFlags),
+                        retried = if (trajectory.retried) 1 else 0,
+                        usedFallback = if (trajectory.usedFallback) 1 else 0,
+                        selfAssessment = null,
+                        modelId = trajectory.modelId,
+                        createdAtEpochMillis = trajectory.createdAtEpochMillis
+                    )
+                )
+            },
+            onGenerationRestart = { token ->
+                restartNoticePending = true
+                partialStore.clear(job.id, token.value)
+                partialStore.append(job.id, token.value, ReplyValidator.RETRY_PREVIEW_NOTICE)
+            }
+        )
+
+        val outcome = generationRepository.generateReply(
             input = ChatGenerationInput(
                 sessionId = job.sessionId,
                 userMessageId = job.userMessageId,
@@ -288,6 +320,10 @@ class BackgroundGenerationRepository(
                 isSessionAvailable(job) && isGenerationTokenCurrent(job)
             },
             onChunk = { chunk ->
+                if (restartNoticePending) {
+                    restartNoticePending = false
+                    partialStore.clear(job.id, job.token.value)
+                }
                 partialStore.append(job.id, job.token.value, chunk)
             }
         )

@@ -43,7 +43,7 @@ data class TurnNote(
     val densityTier: DensityTier = DensityTier.Medium,
     /** Human-readable reasons for the tier decision, kept for audit. */
     val paceSignals: List<String> = emptyList(),
-    /** Reserved for the slice-3 style reviewer; blank until wired. */
+    /** One-line style correction replayed from the previous turn's validator flags. */
     val styleHint: String = ""
 ) {
     val maxChars: Int get() = densityTier.maxChars
@@ -108,7 +108,9 @@ data class TurnNoteInput(
     val masteryScore: Float? = null,
     /** Most recent historical-error description, when one exists. */
     val lastStuckPoint: String = "",
-    val userEmotion: String = UserEmotionWire.NEUTRAL
+    val userEmotion: String = UserEmotionWire.NEUTRAL,
+    /** Style correction hint replayed from the previous turn's trajectory. */
+    val styleHint: String = ""
 )
 
 /**
@@ -174,7 +176,8 @@ object TurnNoteAssembler {
             learningStatus = buildLearningStatus(input),
             suggestedFocus = buildSuggestedFocus(input),
             densityTier = tier,
-            paceSignals = signals
+            paceSignals = signals,
+            styleHint = input.styleHint
         ).normalized()
     }
 
@@ -190,6 +193,20 @@ object TurnNoteAssembler {
         if (trimmed.length <= SHORT_MESSAGE_CHARS) return DensityTier.Low
         return DensityTier.Medium
     }
+
+    /**
+     * Re-derives the density tier from a PRE-RENDERED note block (the text
+     * that rides the generation request), so downstream validators can apply
+     * the same budget without re-running the assembler. Blank or
+     * unrecognised input falls back to [DensityTier.Medium].
+     */
+    fun tierFromRendered(rendered: String?): DensityTier {
+        if (rendered.isNullOrBlank()) return DensityTier.Medium
+        val label = TIER_LABEL.find(rendered)?.groupValues?.get(1) ?: return DensityTier.Medium
+        return DensityTier.values().firstOrNull { it.wireLabel == label } ?: DensityTier.Medium
+    }
+
+    private val TIER_LABEL = Regex("信息密度：([低中高])")
 
     private fun buildLearningStatus(input: TurnNoteInput): String {
         val knowledgePoint = input.knowledgePoint.trim()

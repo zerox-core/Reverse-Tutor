@@ -52,6 +52,12 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
     override suspend fun executeStreaming(
         request: ProviderHttpRequest,
         onLine: (String) -> Unit
+    ): ProviderHttpResult = executeStreaming(request, onLine) { false }
+
+    override suspend fun executeStreaming(
+        request: ProviderHttpRequest,
+        onLine: (String) -> Unit,
+        shouldAbort: () -> Boolean
     ): ProviderHttpResult = withContext(Dispatchers.IO) {
         try {
             val connection = (URL(request.url).openConnection() as HttpURLConnection).apply {
@@ -70,7 +76,12 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
                     ?.bufferedReader(Charsets.UTF_8)
                     ?.use { reader ->
                         buildString {
-                            reader.forEachLine { line ->
+                            // Slice 3: poll the abort signal between lines so a
+                            // red-lined stream is cut early; the aborted line
+                            // itself is never forwarded.
+                            while (!shouldAbort()) {
+                                val line = reader.readLine() ?: break
+                                if (shouldAbort()) break
                                 onLine(line)
                                 append(line).append('\n')
                             }

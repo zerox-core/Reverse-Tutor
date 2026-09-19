@@ -20,6 +20,7 @@ import com.reversetutor.core.data.local.dao.SourceDao
 import com.reversetutor.core.data.local.dao.SpaceDao
 import com.reversetutor.core.data.local.dao.SyncDao
 import com.reversetutor.core.data.local.dao.TurnRunDao
+import com.reversetutor.core.data.local.dao.TurnTrajectoryDao
 import com.reversetutor.core.data.local.dao.WindowTopologyDao
 import com.reversetutor.core.data.local.dao.LearningLedgerDao
 import com.reversetutor.core.data.local.dao.CompanionMemoryDao
@@ -58,6 +59,7 @@ import com.reversetutor.core.data.local.entity.SyncCursorEntity
 import com.reversetutor.core.data.local.entity.SyncOutboxEntity
 import com.reversetutor.core.data.local.entity.TokenUsageRecordEntity
 import com.reversetutor.core.data.local.entity.TurnRunEntity
+import com.reversetutor.core.data.local.entity.TurnTrajectoryEntity
 import com.reversetutor.core.data.local.entity.WeeklySummaryEntity
 import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
 import com.reversetutor.core.data.local.entity.WorldTreeDraftEntity
@@ -108,6 +110,7 @@ import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
         ModelBindingEntity::class,
         ContextSnapshotEntity::class,
         TurnRunEntity::class,
+        TurnTrajectoryEntity::class,
         StudyPlanTaskEntity::class,
         WeeklySummaryEntity::class,
         TokenUsageRecordEntity::class,
@@ -161,6 +164,7 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun exportRecordDao(): ExportRecordDao
     abstract fun modelConnectionDao(): ModelConnectionDao
     abstract fun turnRunDao(): TurnRunDao
+    abstract fun turnTrajectoryDao(): TurnTrajectoryDao
     abstract fun learningDao(): LearningDao
     abstract fun searchDocumentDao(): SearchDocumentDao
     abstract fun syncDao(): SyncDao

@@ -36,6 +36,7 @@ import com.reversetutor.core.data.window.WindowTopologyRepository
 import com.reversetutor.core.data.windowmemory.WindowMemoryRepository
 import com.reversetutor.core.data.windowmemory.WindowTokenMeterRepository
 import com.reversetutor.core.domain.ConversationRunCoordinator
+import com.reversetutor.core.domain.ReplyValidator
 import com.reversetutor.core.domain.SyncCoordinator
 import com.reversetutor.core.domain.WindowKind
 import com.reversetutor.core.domain.WindowMemoryIntakeCoordinator
@@ -325,7 +326,13 @@ class HybridAppGraph private constructor(
                     enqueueJob = { input, now ->
                         backgroundGenerationRepository.enqueueGenerationJob(input, now)
                     },
-                    loadRecentTurnSignals = recentTurnSignalsReader::read
+                    loadRecentTurnSignals = recentTurnSignalsReader::read,
+                    loadLastTurnStyleHint = { sessionId ->
+                        DataModule.database(appContext).turnTrajectoryDao()
+                            .findLatestBySession(sessionId)
+                            ?.let { ReplyValidator.styleHintForPayload(it.styleFlagsPayload) }
+                            .orEmpty()
+                    }
                 )
             val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(
                 sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },

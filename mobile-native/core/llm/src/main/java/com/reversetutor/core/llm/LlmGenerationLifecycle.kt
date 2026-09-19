@@ -37,7 +37,19 @@ data class LlmGenerationRequest(
      */
     val turnNoteBlock: String? = null,
     /** Process-local preview only; never persisted or sent to a provider. */
-    val onStreamChunk: ((String) -> Unit)? = null
+    val onStreamChunk: ((String) -> Unit)? = null,
+    /**
+     * Expression-loop slice 3: red-line watchdog abort signal. Streaming
+     * transports poll it between lines and cut the stream early when the
+     * validator hits; ignored by non-streaming calls.
+     */
+    val streamAbortRequested: () -> Boolean = { false },
+    /**
+     * Expression-loop slice 3: strong-constraint retry directive appended at
+     * the very tail of the prompt (after the user text) when a turn is
+     * retried after a red-line abort. Null on the first attempt.
+     */
+    val retryDirective: String? = null
 )
 
 /**
@@ -636,7 +648,7 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
         LlmGenerationResult.Failure("Live Anthropic-compatible calls are disabled in preview")
 }
 
-private fun LlmGenerationRequest.contextualUserText(): String {
+internal fun LlmGenerationRequest.contextualUserText(): String {
     // Cache-friendly layout (SPEC §4.8): stable persona/contract first, then
     // the low-frequency evidence block, then the per-turn decision blocks; the
     // turn note, quote and current message sit at the tail so the longest
@@ -671,9 +683,14 @@ private fun LlmGenerationRequest.contextualUserText(): String {
             add("Quote: $quoteExcerpt")
         }
     }
-    if (contextLines.isEmpty()) return userText.orEmpty()
-    return (contextLines + listOfNotNull(userText?.takeIf { it.isNotBlank() }))
-        .joinToString(separator = "\n\n")
+    // Slice 3: a retry directive always sits at the very tail — after the
+    // user text — so the cached prefix stays byte-identical on a retry.
+    val tail = listOfNotNull(
+        userText?.takeIf { it.isNotBlank() },
+        retryDirective?.trim()?.takeIf { it.isNotEmpty() }
+    )
+    if (contextLines.isEmpty()) return tail.joinToString(separator = "\n\n")
+    return (contextLines + tail).joinToString(separator = "\n\n")
 }
 
 /**
