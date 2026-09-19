@@ -153,6 +153,18 @@ class SessionGoalDashboardTest {
         assertEquals("[x] 第一站\n[ ] 第二站", restored.state.applied.snapshot.stageMilestones)
     }
 
+    @Test
+    fun `next pending item is first unchecked weekly entry`() {
+        val items = decodeGoalChecklist("[x] 已做完\n[ ] 第一件没做的\n[ ] 第二件没做的")
+        assertEquals("第一件没做的", goalNextPendingItem(items)?.text)
+    }
+
+    @Test
+    fun `next pending item is null when all done or empty`() {
+        assertEquals(null, goalNextPendingItem(decodeGoalChecklist("[x] 全做完")))
+        assertEquals(null, goalNextPendingItem(emptyList()))
+    }
+
     private fun newCoordinator(store: InMemorySessionSettingsStore): SessionSettingsCoordinator =
         SessionSettingsCoordinator(
             sessionId = "session-a",

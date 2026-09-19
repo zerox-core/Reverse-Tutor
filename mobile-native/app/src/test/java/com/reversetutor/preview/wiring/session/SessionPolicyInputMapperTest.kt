@@ -192,4 +192,31 @@ class SessionPolicyInputMapperTest {
         assertEquals("review-session-1", evidence[2].id)
         assertEquals("msg-message-a", evidence[3].id)
     }
+    @Test
+    fun template_evidence_includes_state_deadline_and_milestones() {
+        val evidence = NewSessionConfiguration(
+            title = "代数",
+            goal = "因式分解",
+            plan = "[ ] 刷十道题",
+            deadline = "2026-10-01",
+            currentState = "卡住了",
+            stageMilestones = "[x] 看完讲义\n[ ] 刷题"
+        ).toLlmTemplateEvidence()
+        requireNotNull(evidence)
+        assertTrue(evidence.body.contains("当前状态=卡住了"))
+        assertTrue(evidence.body.contains("截止=2026-10-01"))
+        assertTrue(evidence.body.contains("阶段里程碑=[x] 看完讲义"))
+    }
+
+    @Test
+    fun template_evidence_omits_unset_state_deadline_and_milestones() {
+        val evidence = NewSessionConfiguration(
+            title = "代数",
+            goal = "因式分解"
+        ).toLlmTemplateEvidence()
+        requireNotNull(evidence)
+        assertFalse(evidence.body.contains("当前状态="))
+        assertFalse(evidence.body.contains("截止="))
+        assertFalse(evidence.body.contains("阶段里程碑="))
+    }
 }

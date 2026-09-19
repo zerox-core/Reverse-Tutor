@@ -5,9 +5,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,20 +17,21 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -44,13 +47,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,7 +68,18 @@ import java.util.Locale
 // region 18 · R68 目标看板（方向A 卡片仪表盘）
 //
 // 学习目标与计划页 redesign：主目标英雄卡（倒计时圆环 + 状态 chip）+
-// 阶段里程碑 / 本周聚焦两张可勾选清单卡。
+// 目标拆解卡（阶段里程碑横向旅程 + 本周聚焦）。
+//
+// R69 迭代（按用户反馈）：
+// - 英雄卡加哑光浅色背景（渐变底 + 学习旅程小径图案），副文本说明整页
+//   「主目标 → 里程碑 → 本周」的逐层拆解关系；
+// - 阶段里程碑改横向排版（LazyRow 站点卡，左右拖动），去掉打叉删除，
+//   点卡片勾选、长按删除；
+// - 本周聚焦收进里程碑同一张卡、位于其下，视觉上体现「寄托在里程碑下」；
+//   「本周第一件事」高亮框让人第一眼看到这周最该做的任务；
+// - 状态 chip 不再是摆设：currentState / deadline / stageMilestones 已接线进
+//   生成链路的会话模板证据（见 app 模块 SessionPolicyInputMapper），
+//   每条消息发出时 AI 都能收到。
 //
 // 数据结构不变：SessionGoalPlan 七个 String 字段原样保留，清单勾选态用
 // GitHub task-list 风格编码进文本（"[x] 已做 / [ ] 未做"，逐行一项），
@@ -103,6 +120,10 @@ fun goalChecklistDoneCount(items: List<GoalChecklistItem>): Int = items.count { 
 
 fun goalChecklistProgress(items: List<GoalChecklistItem>): Float =
     if (items.isEmpty()) 0f else goalChecklistDoneCount(items).toFloat() / items.size
+
+/** 本周聚焦里第一件还没做的事——第一眼要看到的那件。 */
+fun goalNextPendingItem(items: List<GoalChecklistItem>): GoalChecklistItem? =
+    items.firstOrNull { !it.done }
 
 enum class GoalDeadlineTone { Calm, Soon, Overdue }
 
@@ -209,12 +230,19 @@ fun GoalDashboardHero(
     var deadlineDraft by remember(deadline) { mutableStateOf(if (deadline == "未设置") "" else deadline) }
     val daysLeft = parseGoalDeadlineDaysLeft(deadline, todayMillis)
 
-    Surface(
-        modifier = modifier.fillMaxWidth().testTag(testTag),
-        shape = RoundedCornerShape(14.dp),
-        color = FormalColors.Surface,
-        border = BorderStroke(1.dp, FormalColors.Divider)
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFFEFF3FF), Color(0xFFFBFCFF))
+                )
+            )
+            .border(1.dp, FormalColors.Divider, RoundedCornerShape(14.dp))
+            .testTag(testTag)
     ) {
+        GoalHeroBackdrop(Modifier.matchParentSize())
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("主要目标", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
@@ -224,6 +252,11 @@ fun GoalDashboardHero(
                     editingGoal = !editingGoal
                 }) { Text(if (editingGoal) "取消" else "修改", fontSize = 13.sp) }
             }
+            Text(
+                text = "先写下终点——这一页会把它逐层拆成几站里程碑和这周的行动。",
+                fontSize = 12.sp,
+                color = FormalColors.Muted
+            )
             if (editingGoal) {
                 OutlinedTextField(
                     value = goalDraft,
@@ -318,7 +351,7 @@ fun GoalDashboardHero(
                                 color = FormalColors.Muted
                             )
                             else -> Text(
-                                text = "设置后会显示倒计时圆环",
+                                text = "定个日期，左边的圆环会替你倒数",
                                 fontSize = 12.sp,
                                 color = FormalColors.Muted
                             )
@@ -328,6 +361,11 @@ fun GoalDashboardHero(
             }
 
             Text("当前状态", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
+            Text(
+                text = "选好后会随每条消息发给 AI，它会照着调整讲课方式。",
+                fontSize = 12.sp,
+                color = FormalColors.Muted
+            )
             @OptIn(ExperimentalLayoutApi::class)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -360,6 +398,39 @@ fun GoalDashboardHero(
                 }
             }
         }
+    }
+}
+
+/** 英雄卡背景：哑光浅蓝渐变底上的「学习旅程」小径与站点，克制不抢字。 */
+@Composable
+internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        if (w <= 0f || h <= 0f) return@Canvas
+        drawCircle(
+            color = FormalColors.PrimarySoft.copy(alpha = 0.5f),
+            radius = h * 0.62f,
+            center = Offset(w * 0.94f, h * 0.04f)
+        )
+        drawCircle(
+            color = FormalColors.SuccessSoft.copy(alpha = 0.45f),
+            radius = h * 0.34f,
+            center = Offset(w * 0.10f, h * 1.02f)
+        )
+        val trail = Path().apply {
+            moveTo(w * 0.05f, h * 0.96f)
+            cubicTo(w * 0.32f, h * 0.78f, w * 0.55f, h * 1.04f, w * 0.82f, h * 0.66f)
+        }
+        drawPath(
+            path = trail,
+            color = FormalColors.Primary.copy(alpha = 0.14f),
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        )
+        val stationColor = FormalColors.Primary.copy(alpha = 0.26f)
+        drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.17f, h * 0.86f))
+        drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.46f, h * 0.90f))
+        drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.71f, h * 0.76f))
     }
 }
 
@@ -457,26 +528,34 @@ internal fun GoalCountdownRing(
     }
 }
 
-// —— 可勾选清单卡（阶段里程碑 / 本周聚焦共用）——
+// —— 目标拆解卡：阶段里程碑（横向旅程）→ 本周聚焦（寄托其下）——
 
 @Composable
-fun GoalChecklistCard(
-    title: String,
-    subtitle: String,
-    rawText: String,
-    onItemsChange: (List<GoalChecklistItem>) -> Unit,
+fun GoalBreakdownCard(
+    milestonesRaw: String,
+    weeklyRaw: String,
+    onMilestonesChange: (List<GoalChecklistItem>) -> Unit,
+    onWeeklyChange: (List<GoalChecklistItem>) -> Unit,
     modifier: Modifier = Modifier,
-    accent: Color = FormalColors.Success,
-    testTag: String = "goal-checklist"
+    testTag: String = "goal-breakdown"
 ) {
-    val items = remember(rawText) { decodeGoalChecklist(rawText) }
-    var draft by remember { mutableStateOf("") }
+    val milestones = remember(milestonesRaw) { decodeGoalChecklist(milestonesRaw) }
+    val weekly = remember(weeklyRaw) { decodeGoalChecklist(weeklyRaw) }
+    var milestoneDraft by remember { mutableStateOf("") }
+    var weeklyDraft by remember { mutableStateOf("") }
 
-    fun submitDraft() {
-        val text = draft.trim()
+    fun submitMilestone() {
+        val text = milestoneDraft.trim()
         if (text.isEmpty()) return
-        onItemsChange(items + GoalChecklistItem(text))
-        draft = ""
+        onMilestonesChange(milestones + GoalChecklistItem(text))
+        milestoneDraft = ""
+    }
+
+    fun submitWeekly() {
+        val text = weeklyDraft.trim()
+        if (text.isEmpty()) return
+        onWeeklyChange(weekly + GoalChecklistItem(text))
+        weeklyDraft = ""
     }
 
     Surface(
@@ -485,95 +564,257 @@ fun GoalChecklistCard(
         color = FormalColors.Surface,
         border = BorderStroke(1.dp, FormalColors.Divider)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // —— 阶段里程碑：横向站点旅程 ——
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                Text("阶段里程碑", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
                 Spacer(Modifier.weight(1f))
-                if (items.isNotEmpty()) {
+                if (milestones.isNotEmpty()) {
                     Text(
-                        text = "${goalChecklistDoneCount(items)}/${items.size}",
+                        text = "${goalChecklistDoneCount(milestones)}/${milestones.size} 站",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = accent
+                        color = FormalColors.Success
                     )
                 }
             }
-            if (subtitle.isNotBlank()) {
-                Text(subtitle, fontSize = 12.sp, color = FormalColors.Muted)
-            }
-            if (items.isNotEmpty()) {
-                val progress by animateFloatAsState(
-                    targetValue = goalChecklistProgress(items),
-                    animationSpec = tween(500),
-                    label = "$testTag-progress"
+            Text(
+                text = "把大目标拆成几站，左右滑动看全程；点卡片勾掉一站，长按可以删掉。",
+                fontSize = 12.sp,
+                color = FormalColors.Muted
+            )
+            if (milestones.isNotEmpty()) {
+                GoalProgressBar(
+                    progress = goalChecklistProgress(milestones),
+                    accent = FormalColors.Success,
+                    testTag = "$testTag-milestone-progress"
                 )
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(999.dp))
-                        .background(FormalColors.Divider)
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("$testTag-milestone-journey")
                 ) {
-                    Box(
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(progress)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(accent)
-                    )
+                    itemsIndexed(milestones) { index, item ->
+                        GoalMilestoneStation(
+                            index = index,
+                            item = item,
+                            onToggle = {
+                                onMilestonesChange(
+                                    milestones.mapIndexed { i, it -> if (i == index) it.copy(done = !it.done) else it }
+                                )
+                            },
+                            onRemove = {
+                                onMilestonesChange(milestones.filterIndexed { i, _ -> i != index })
+                            },
+                            testTag = "$testTag-milestone-item-$index"
+                        )
+                    }
                 }
-            }
-            if (items.isEmpty()) {
+            } else {
                 Text(
-                    text = "还没有条目，在下面添一项吧。",
+                    text = "还没有站点，先在下面添上第一站。",
                     fontSize = 13.sp,
                     color = FormalColors.Muted
                 )
             }
-            items.forEachIndexed { index, item ->
-                GoalChecklistRow(
-                    item = item,
-                    accent = accent,
-                    onToggle = {
-                        onItemsChange(items.mapIndexed { i, it -> if (i == index) it.copy(done = !it.done) else it })
-                    },
-                    onRemove = {
-                        onItemsChange(items.filterIndexed { i, _ -> i != index })
-                    },
-                    testTag = "$testTag-item-$index"
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            GoalAddRow(
+                draft = milestoneDraft,
+                onDraftChange = { milestoneDraft = it },
+                onSubmit = { submitMilestone() },
+                placeholder = "加一站，如「刷完导数基础题」",
+                inputTag = "$testTag-milestone-input",
+                addTag = "$testTag-milestone-add"
+            )
+
+            // —— 拆解连接符 ——
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    modifier = Modifier.weight(1f).testTag("$testTag-input"),
-                    placeholder = { Text("加一项…", fontSize = 13.sp) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { submitDraft() })
+                Icon(
+                    imageVector = Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = FormalColors.Tertiary,
+                    modifier = Modifier.size(18.dp)
                 )
-                TextButton(
-                    onClick = { submitDraft() },
-                    enabled = draft.isNotBlank(),
-                    modifier = Modifier.testTag("$testTag-add")
-                ) { Text("添加") }
+                Text("拆到这一周", fontSize = 11.sp, color = FormalColors.Muted)
             }
+
+            // —— 本周聚焦：寄托在里程碑之下 ——
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("本周聚焦", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                Spacer(Modifier.weight(1f))
+                if (weekly.isNotEmpty()) {
+                    Text(
+                        text = "${goalChecklistDoneCount(weekly)}/${weekly.size}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = FormalColors.Primary
+                    )
+                }
+            }
+            Text(
+                text = "从里程碑里挑出这周够得着的小事，做完就勾。",
+                fontSize = 12.sp,
+                color = FormalColors.Muted
+            )
+            GoalWeeklyNextBanner(weekly = weekly, testTag = "$testTag-weekly-next")
+            if (weekly.isNotEmpty()) {
+                GoalProgressBar(
+                    progress = goalChecklistProgress(weekly),
+                    accent = FormalColors.Primary,
+                    testTag = "$testTag-weekly-progress"
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    weekly.forEachIndexed { index, item ->
+                        GoalWeeklyRow(
+                            item = item,
+                            onToggle = {
+                                onWeeklyChange(
+                                    weekly.mapIndexed { i, it -> if (i == index) it.copy(done = !it.done) else it }
+                                )
+                            },
+                            onRemove = {
+                                onWeeklyChange(weekly.filterIndexed { i, _ -> i != index })
+                            },
+                            testTag = "$testTag-weekly-item-$index"
+                        )
+                    }
+                }
+            }
+            GoalAddRow(
+                draft = weeklyDraft,
+                onDraftChange = { weeklyDraft = it },
+                onSubmit = { submitWeekly() },
+                placeholder = "加一件这周能做的小事…",
+                inputTag = "$testTag-weekly-input",
+                addTag = "$testTag-weekly-add"
+            )
         }
     }
 }
 
+/** 里程碑站点卡：横向旅程里的一站，点按勾选、长按删除。 */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun GoalChecklistRow(
+internal fun GoalMilestoneStation(
+    index: Int,
     item: GoalChecklistItem,
-    accent: Color,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     testTag: String
 ) {
+    val bg by animateColorAsState(
+        targetValue = if (item.done) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle,
+        animationSpec = tween(250),
+        label = "$testTag-bg"
+    )
+    Surface(
+        modifier = Modifier
+            .width(150.dp)
+            .height(102.dp)
+            .testTag(testTag),
+        shape = RoundedCornerShape(12.dp),
+        color = bg,
+        border = BorderStroke(1.dp, if (item.done) FormalColors.Success else FormalColors.Divider)
+    ) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .combinedClickable(onClick = onToggle, onLongClick = onRemove)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "第 ${index + 1} 站",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (item.done) FormalColors.Success else FormalColors.Primary
+                )
+                Spacer(Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .background(if (item.done) FormalColors.Success else Color.Transparent)
+                        .border(1.5.dp, if (item.done) FormalColors.Success else FormalColors.BorderStrong, CircleShape)
+                        .testTag("$testTag-check"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (item.done) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = "已完成",
+                            tint = Color.White,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+            }
+            Text(
+                text = item.text,
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
+                color = if (item.done) FormalColors.Muted else FormalColors.Ink,
+                textDecoration = if (item.done) TextDecoration.LineThrough else null,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+/** 「本周第一件事」高亮框：第一眼就看到这周最该做的任务。 */
+@Composable
+internal fun GoalWeeklyNextBanner(
+    weekly: List<GoalChecklistItem>,
+    testTag: String
+) {
+    val next = goalNextPendingItem(weekly)
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag(testTag),
+        shape = RoundedCornerShape(10.dp),
+        color = FormalColors.PrimarySoft,
+        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.35f))
+    ) {
+        Column(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = "本周第一件事",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FormalColors.Primary
+            )
+            Text(
+                text = when {
+                    next != null -> next.text
+                    weekly.isEmpty() -> "还没有安排，先在下面添一件这周能做的小事。"
+                    else -> "这周的都勾完了，可以往下一周排了。"
+                },
+                fontSize = 15.sp,
+                lineHeight = 21.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = FormalColors.Ink
+            )
+        }
+    }
+}
+
+/** 本周聚焦清单行：点按勾选、长按删除。 */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun GoalWeeklyRow(
+    item: GoalChecklistItem,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+    testTag: String
+) {
+    val accent = FormalColors.Primary
     val checkboxBg by animateColorAsState(
         targetValue = if (item.done) accent else Color.Transparent,
         animationSpec = tween(250),
@@ -588,7 +829,7 @@ internal fun GoalChecklistRow(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onToggle)
+            .combinedClickable(onClick = onToggle, onLongClick = onRemove)
             .padding(vertical = 6.dp, horizontal = 2.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically,
@@ -619,15 +860,65 @@ internal fun GoalChecklistRow(
             textDecoration = if (item.done) TextDecoration.LineThrough else null,
             modifier = Modifier.weight(1f)
         )
-        Icon(
-            imageVector = Icons.Rounded.Close,
-            contentDescription = "删除「${item.text}」",
-            tint = FormalColors.Muted,
-            modifier = Modifier
-                .size(16.dp)
-                .clip(CircleShape)
-                .clickable(onClick = onRemove)
-                .testTag("$testTag-remove")
+    }
+}
+
+/** 添加条目行：输入框 + 添加按钮。 */
+@Composable
+internal fun GoalAddRow(
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    placeholder: String,
+    inputTag: String,
+    addTag: String
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            value = draft,
+            onValueChange = onDraftChange,
+            modifier = Modifier.weight(1f).testTag(inputTag),
+            placeholder = { Text(placeholder, fontSize = 13.sp) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onSubmit() })
+        )
+        TextButton(
+            onClick = onSubmit,
+            enabled = draft.isNotBlank(),
+            modifier = Modifier.testTag(addTag)
+        ) { Text("添加") }
+    }
+}
+
+/** 进度条。 */
+@Composable
+internal fun GoalProgressBar(
+    progress: Float,
+    accent: Color,
+    testTag: String
+) {
+    val animated by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(500),
+        label = "$testTag-anim"
+    )
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .clip(RoundedCornerShape(999.dp))
+            .background(FormalColors.Divider)
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(animated)
+                .height(4.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(accent)
         )
     }
 }

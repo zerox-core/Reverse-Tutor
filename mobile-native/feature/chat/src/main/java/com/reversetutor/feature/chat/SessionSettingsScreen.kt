@@ -685,26 +685,19 @@ private fun GoalPlanPage(
             refresh()
         }
     )
-    GoalChecklistCard(
-        title = "阶段里程碑",
-        subtitle = "把大目标拆成几站，完成一站勾一站。",
-        rawText = value.stageMilestones,
-        onItemsChange = { items ->
+    // R69：拆解卡 = 阶段里程碑（横向站点旅程，可左右拖动）→ 本周聚焦（寄托其下）。
+    GoalBreakdownCard(
+        milestonesRaw = value.stageMilestones,
+        weeklyRaw = value.weeklyPlan,
+        onMilestonesChange = { items ->
             coordinator.applyGoalPlanImmediate { it.copy(stageMilestones = encodeGoalChecklist(items).ifBlank { "未设置" }) }
             refresh()
         },
-        testTag = "milestone-checklist"
-    )
-    GoalChecklistCard(
-        title = "本周聚焦",
-        subtitle = "每周计划拆成这周能做的小事，做完就勾。",
-        rawText = value.weeklyPlan,
-        onItemsChange = { items ->
+        onWeeklyChange = { items ->
             coordinator.applyGoalPlanImmediate { it.copy(weeklyPlan = encodeGoalChecklist(items).ifBlank { "未设置" }) }
             refresh()
         },
-        accent = FormalColors.Primary,
-        testTag = "weekly-checklist"
+        testTag = "goal-breakdown"
     )
     SettingsTextField("模块", value.modules, { next ->
         coordinator.editGoalPlan { current -> current.copy(modules = next) }

@@ -197,6 +197,17 @@ internal fun NewSessionConfiguration?.toLlmTemplateEvidence(): LlmContextEvidenc
         append("画像=").append(snapshot.learnerProfile.ifBlank { "未设置" }).append('\n')
         append("目标=").append(snapshot.goal.ifBlank { snapshot.title }.ifBlank { "未设置" }).append('\n')
         append("计划=").append(snapshot.plan.ifBlank { "未设置" }).append('\n')
+        // R69：状态/截止/里程碑此前只在设置页可见，AI 生成时收不到——
+        // 接线进模板证据，每条消息发出时随会话模板一起送达（未设置则省略）。
+        if (snapshot.deadline.isNotBlank() && snapshot.deadline != "未设置") {
+            append("截止=").append(snapshot.deadline).append('\n')
+        }
+        if (snapshot.currentState.isNotBlank() && snapshot.currentState != "未设置") {
+            append("当前状态=").append(snapshot.currentState).append('\n')
+        }
+        if (snapshot.stageMilestones.isNotBlank() && snapshot.stageMilestones != "未设置") {
+            append("阶段里程碑=").append(snapshot.stageMilestones).append('\n')
+        }
         append("对话策略=").append(snapshot.dialogueStrategy.ifBlank { "未设置" }).append('\n')
         append("语气=").append(snapshot.speakingTone.ifBlank { "自然" })
     }
