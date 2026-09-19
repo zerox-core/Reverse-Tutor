@@ -75,11 +75,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -90,9 +95,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.reversetutor.core.design.FormalColors
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -1158,6 +1165,8 @@ internal fun isQuestionLikeChatInput(text: String): Boolean {
     return questionPrefixes.any { t.startsWith(it) }
 }
 
+private const val ChatFieldEdgeSlopDp = 28
+
 private const val ChatFieldDefaultReAsk = "嗯……这个我不太懂诶，老师直接告诉我答案嘛～"
 
 /**
@@ -1173,6 +1182,33 @@ internal fun ChatFieldQA(
     testTag: String = "chat-field"
 ) {
     val scroll = rememberScrollState()
+    // 南套滚动判定：记录区还能滚时手势全归记录区；顶/底到边后先吃掉一小段过滑（低阈值缓冲），
+    // 继续拖才把余量交给外层整页——刚触边不抢页，继续拖易接力。
+    val edgeSlopPx = with(LocalDensity.current) { ChatFieldEdgeSlopDp.dp.toPx() }
+    val chatNestedScroll = remember(scroll) {
+        object : NestedScrollConnection {
+            private var edgeOver = 0f
+
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source != NestedScrollSource.Drag) return Offset.Zero
+                val dy = available.y
+                if (dy == 0f) return Offset.Zero
+                val atBottomEdge = dy < 0f && scroll.value >= scroll.maxValue
+                val atTopEdge = dy > 0f && scroll.value <= 0
+                if (!atBottomEdge && !atTopEdge) {
+                    edgeOver = 0f
+                    return Offset.Zero
+                }
+                edgeOver += abs(dy)
+                return if (edgeOver <= edgeSlopPx) available else Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                // 记录区内 fling 到边后的剩余速度不外抛，整页接力只认持续拖拽
+                return available
+            }
+        }
+    }
     var editingId by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
     var reAsk by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -1183,6 +1219,7 @@ internal fun ChatFieldQA(
             Modifier
                 .fillMaxWidth()
                 .heightIn(max = 300.dp)
+                .nestedScroll(chatNestedScroll)
                 .verticalScroll(scroll)
         ) {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
