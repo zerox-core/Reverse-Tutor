@@ -45,7 +45,8 @@ class BackgroundGenerationRepository(
         jobId: String = "generation-${input.userMessageId}-${input.token.value}"
     ): BackgroundGenerationJob {
         val modelBindingId = snapshotModelBindingId(input)
-        val persistedEvidence = input.contextEvidence + input.turnPlan.toGuidedPlanEvidence()
+        val persistedEvidence = input.contextEvidence + input.turnPlan.toGuidedPlanEvidence() +
+            input.turnNoteBlock.toTurnNoteEvidence()
         val job = BackgroundJobEntity(
             id = jobId,
             spaceId = input.spaceId,
@@ -278,7 +279,8 @@ class BackgroundGenerationRepository(
                 contextEvidence = job.contextEvidence,
                 sessionPolicy = job.sessionPolicy,
                 assistantTurnEnvelope = job.assistantTurnEnvelope,
-                turnPlan = job.turnPlan
+                turnPlan = job.turnPlan,
+                turnNoteBlock = job.turnNoteBlock
             ),
             nowEpochMillis = nowEpochMillis,
             isTokenCurrent = { it == job.token },
@@ -379,6 +381,8 @@ class BackgroundGenerationRepository(
         val persistedEvidence = contextEvidencePayload.toContextEvidence()
         val guidedTurnPlan = persistedEvidence.firstOrNull { it.kind == GuidedPlanEvidenceKind }
             ?.toGuidedTurnPlan()
+        val turnNoteBlock = persistedEvidence.firstOrNull { it.kind == TurnNoteEvidenceKind }
+            ?.body?.takeIf { it.isNotBlank() }
         return BackgroundGenerationJob(
             id = id,
             kind = kind,
@@ -396,10 +400,13 @@ class BackgroundGenerationRepository(
             errorMessage = errorMessage,
             quoteExcerpt = quoteExcerpt,
             imageAttachments = imageAttachmentsPayload.toImageAttachments(),
-            contextEvidence = persistedEvidence.filterNot { it.kind == GuidedPlanEvidenceKind },
+            contextEvidence = persistedEvidence.filterNot {
+                it.kind == GuidedPlanEvidenceKind || it.kind == TurnNoteEvidenceKind
+            },
             sessionPolicy = sessionPolicyPayload.toSessionPolicy(),
             assistantTurnEnvelope = assistantTurnEnvelopePayload.toEnvelope(),
-            turnPlan = guidedTurnPlan
+            turnPlan = guidedTurnPlan,
+            turnNoteBlock = turnNoteBlock
         )
     }
 
@@ -454,7 +461,9 @@ data class BackgroundGenerationInput(
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
     val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
-    val turnPlan: TurnPlan? = null
+    val turnPlan: TurnPlan? = null,
+    /** Expression-loop slice 2: pre-rendered turn note block (see core/domain TurnNote). */
+    val turnNoteBlock: String? = null
 )
 
 /**
@@ -489,7 +498,9 @@ data class BackgroundGenerationJob(
     val contextEvidence: List<LlmContextEvidence> = emptyList(),
     val sessionPolicy: LlmSessionPolicyContext? = null,
     val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
-    val turnPlan: TurnPlan? = null
+    val turnPlan: TurnPlan? = null,
+    /** Expression-loop slice 2: pre-rendered turn note block (see core/domain TurnNote). */
+    val turnNoteBlock: String? = null
 )
 
 /**
@@ -582,6 +593,20 @@ private fun LlmSessionPolicyContext?.toPayload(): String? =
     }
 
 private const val GuidedPlanEvidenceKind = "GuidedTurnPlan"
+
+/**
+ * Expression-loop slice 2: the pre-rendered turn note survives the queued
+ * background-job round trip exactly like the guided plan — as a dedicated
+ * pseudo-evidence row, so no Room schema change is needed. It is stripped
+ * from [BackgroundGenerationJob.contextEvidence] on restore and delivered via
+ * [BackgroundGenerationJob.turnNoteBlock] instead.
+ */
+private const val TurnNoteEvidenceKind = "TurnNote"
+
+private fun String?.toTurnNoteEvidence(): List<LlmContextEvidence> {
+    val note = this?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    return listOf(LlmContextEvidence("turn-note", "Turn note", note, TurnNoteEvidenceKind))
+}
 
 private fun TurnPlan?.toGuidedPlanEvidence(): List<LlmContextEvidence> {
     val plan = this?.normalized() ?: return emptyList()

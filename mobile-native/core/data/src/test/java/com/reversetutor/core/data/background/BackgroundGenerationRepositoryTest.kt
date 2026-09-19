@@ -442,6 +442,45 @@ class BackgroundGenerationRepositoryTest {
         assertFalse(completed.structuredOutcome.processSummary.contains("Plain old reply"))
     }
 
+    // Expression-loop slice 2: the pre-rendered turn note rides the queued-job
+    // payload like the guided plan and reaches the generation request after a
+    // process restart, without polluting contextEvidence.
+    @Test
+    fun queuedTurnNoteIsForwardedToRecoveredGenerationRequest() = runBlocking {
+        val runtime = CapturingRuntime()
+        val jobDao = FakeBackgroundJobDao()
+        val firstRepository = repository(jobDao = jobDao, runtime = runtime)
+
+        firstRepository.enqueueGenerationJob(
+            input(token = "token-note").copy(turnNoteBlock = "本轮便签：中档"),
+            nowEpochMillis = 10L,
+            jobId = "job-note"
+        )
+
+        val recoveredRepository = repository(jobDao = jobDao, runtime = runtime)
+        recoveredRepository.recoverInterruptedGenerationJobs(nowEpochMillis = 20L)
+        recoveredRepository.runGenerationJob("job-note", nowEpochMillis = 30L)
+
+        assertEquals("本轮便签：中档", runtime.requests.single().turnNoteBlock)
+        assertTrue(runtime.requests.single().contextEvidence.none { it.kind == "TurnNote" })
+        assertEquals("本轮便签：中档", recoveredRepository.getJob("job-note")?.turnNoteBlock)
+    }
+
+    @Test
+    fun legacyJobWithoutTurnNoteForwardsNullToGenerationRequest() = runBlocking {
+        val runtime = CapturingRuntime()
+        val repository = repository(runtime = runtime)
+
+        repository.enqueueGenerationJob(
+            input(token = "token-no-note"),
+            nowEpochMillis = 10L,
+            jobId = "job-no-note"
+        )
+        repository.runGenerationJob("job-no-note", nowEpochMillis = 20L)
+
+        assertNull(runtime.requests.single().turnNoteBlock)
+    }
+
     private fun envelope() = LlmAssistantTurnEnvelope(
         window = LlmWindowContext(windowId = "w1", rootId = "root-1", windowKind = "TASK_ROOT", forkRevision = 7L),
         turnPlan = LlmTurnPlan(

@@ -69,6 +69,7 @@ class ChatGenerationRepository(
             sessionPolicy = input.sessionPolicy,
             assistantTurnEnvelope = input.assistantTurnEnvelope,
             guidedTurnPlan = input.turnPlan?.toLlmGuidedTurnPlan(),
+            turnNoteBlock = input.turnNoteBlock,
             onStreamChunk = { chunk ->
                 if (isTokenCurrent(input.token)) onChunk(chunk.toVisibleTimelineText())
             },
@@ -302,7 +303,12 @@ data class ChatGenerationInput(
      * state remains owned by the local verifier, and a null plan keeps the
      * exact legacy request shape.
      */
-    val turnPlan: TurnPlan? = null
+    val turnPlan: TurnPlan? = null,
+    /**
+     * Expression-loop slice 2: pre-rendered turn note block. Null keeps the
+     * exact legacy request shape.
+     */
+    val turnNoteBlock: String? = null
 )
 
 /**

@@ -5,6 +5,8 @@ import com.reversetutor.core.data.background.BackgroundGenerationJob
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTurnPolicy
+import com.reversetutor.core.domain.TurnNoteAssembler
+import com.reversetutor.core.domain.TurnNoteInput
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.BackgroundTurnPreparationRequest
@@ -73,6 +75,30 @@ internal class BackgroundTurnPreparationCoordinator(
                 request.sessionSnapshot.toSessionPolicyInput(request.userText)
             )
 
+            // Expression-loop slice 2: assemble the deterministic turn note.
+            val turnNote = TurnNoteAssembler.assemble(
+                TurnNoteInput(
+                    userText = request.userText,
+                    recentUserTexts = context.recentMessages
+                        .asSequence()
+                        .filter { it.role == "user" }
+                        .map { it.text }
+                        .toList()
+                        .let { texts ->
+                            // The just-sent message may already be persisted;
+                            // pacing signals only look at earlier turns.
+                            if (texts.firstOrNull() == request.userText.trim()) texts.drop(1) else texts
+                        },
+                    turnPlan = turnPlan,
+                    knowledgePoint = policy.action.knowledgePoint,
+                    masteryScore = context.masteryProjections
+                        .firstOrNull { it.knowledgePoint == turnPlan.conceptKey }
+                        ?.score,
+                    lastStuckPoint = context.historicalErrors.firstOrNull()?.description.orEmpty(),
+                    userEmotion = policy.evaluation.userEmotion
+                )
+            ).normalized()
+
             val job = enqueueJob(
                 BackgroundGenerationInput(
                     spaceId = request.spaceId,
@@ -85,7 +111,8 @@ internal class BackgroundTurnPreparationCoordinator(
                     contextEvidence = listOfNotNull(request.sessionSnapshot.toLlmTemplateEvidence()) +
                         context.toLlmContextEvidence(),
                     sessionPolicy = policy.toLlmSessionPolicyContext(),
-                    turnPlan = turnPlan
+                    turnPlan = turnPlan,
+                    turnNoteBlock = turnNote.render()
                 ),
                 nowEpochMillis()
             )

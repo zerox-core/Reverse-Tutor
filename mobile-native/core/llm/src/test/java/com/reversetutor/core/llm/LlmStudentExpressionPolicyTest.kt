@@ -21,7 +21,8 @@ class LlmStudentExpressionPolicyTest {
         assertTrue(challenge.contains("你错了"))
 
         val clue = LlmStudentExpressionPolicy.sessionPolicyDirectiveFor("clue")
-        assertTrue(clue.contains("老师，据说"))
+        assertTrue(clue.contains("据说"))
+        assertTrue(!clue.contains("用「老师，据说"))
         assertTrue(clue.contains("我来教你"))
 
         val examiner = LlmStudentExpressionPolicy.sessionPolicyDirectiveFor("examiner_verify")
