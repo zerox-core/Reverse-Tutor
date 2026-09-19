@@ -310,6 +310,11 @@ class SessionSettingsCoordinator(
         state = state.copy(form = state.form.copy(goalPlan = transform(state.form.goalPlan)))
     }
 
+    /** R68 目标看板：勾选 / 状态 chip / 截止时间这类点选操作即时生效并持久化（同 setStrategy 语义）。 */
+    fun applyGoalPlanImmediate(transform: (SessionGoalPlan) -> SessionGoalPlan) = applyImmediate { document ->
+        document.copy(goalPlan = transform(document.goalPlan))
+    }
+
     fun commitTextBoundary() {
         val applied = state.applied
         val proposed = state.form.normalized()

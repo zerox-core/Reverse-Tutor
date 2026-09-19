@@ -665,28 +665,51 @@ private fun GoalPlanPage(
     refresh: () -> Unit
 ) = SettingsPage {
     val value = coordinator.state.form.goalPlan
-    listOf(
-        "主要目标" to value.primaryGoal,
-        "截止时间" to value.deadline,
-        "模块" to value.modules,
-        "阶段里程碑" to value.stageMilestones,
-        "每周计划" to value.weeklyPlan,
-        "当前状态" to value.currentState
-    ).forEach { (label, text) ->
-        SettingsTextField(label, text, { next ->
-            coordinator.editGoalPlan { current ->
-                when (label) {
-                    "主要目标" -> current.copy(primaryGoal = next)
-                    "截止时间" -> current.copy(deadline = next)
-                    "模块" -> current.copy(modules = next)
-                    "阶段里程碑" -> current.copy(stageMilestones = next)
-                    "每周计划" -> current.copy(weeklyPlan = next)
-                    else -> current.copy(currentState = next)
-                }
-            }
+    // R68 目标看板（方向A）：主目标英雄卡 + 倒计时圆环 + 状态 chip；
+    // 里程碑 / 每周计划升级为可勾选清单（勾选态编码进文本，数据结构不变）。
+    GoalDashboardHero(
+        goal = value.primaryGoal,
+        deadline = value.deadline,
+        currentState = value.currentState,
+        onGoalCommit = { next ->
+            coordinator.editGoalPlan { it.copy(primaryGoal = next.trim()) }
+            commitBoundary()
             refresh()
-        }, commitBoundary)
-    }
+        },
+        onDeadlineCommit = { next ->
+            coordinator.applyGoalPlanImmediate { it.copy(deadline = next.trim().ifBlank { "未设置" }) }
+            refresh()
+        },
+        onStatusSelect = { status ->
+            coordinator.applyGoalPlanImmediate { it.copy(currentState = status) }
+            refresh()
+        }
+    )
+    GoalChecklistCard(
+        title = "阶段里程碑",
+        subtitle = "把大目标拆成几站，完成一站勾一站。",
+        rawText = value.stageMilestones,
+        onItemsChange = { items ->
+            coordinator.applyGoalPlanImmediate { it.copy(stageMilestones = encodeGoalChecklist(items).ifBlank { "未设置" }) }
+            refresh()
+        },
+        testTag = "milestone-checklist"
+    )
+    GoalChecklistCard(
+        title = "本周聚焦",
+        subtitle = "每周计划拆成这周能做的小事，做完就勾。",
+        rawText = value.weeklyPlan,
+        onItemsChange = { items ->
+            coordinator.applyGoalPlanImmediate { it.copy(weeklyPlan = encodeGoalChecklist(items).ifBlank { "未设置" }) }
+            refresh()
+        },
+        accent = FormalColors.Primary,
+        testTag = "weekly-checklist"
+    )
+    SettingsTextField("模块", value.modules, { next ->
+        coordinator.editGoalPlan { current -> current.copy(modules = next) }
+        refresh()
+    }, commitBoundary)
     SettingsGroup {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("学习范围", fontWeight = FontWeight.SemiBold)
