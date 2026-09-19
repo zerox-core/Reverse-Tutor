@@ -20,8 +20,8 @@ import kotlin.math.sqrt
  * - 力场常量：REPUL=2200 / LINK_ATTR=0.0036 / SPRING_IDEAL=110 / DAMP=0.90
  *   （2026-09-19 用户反馈「节点离得太近、标签全重叠」——斥力与理想连长加大，布局拉开），
  *   alpha=max(0.04, 1-iter/300)；拖动期间 iter 钳 150（alpha 平台 0.5，V30 语义）；
- * - 布局 = 斥力 + 连线弹簧 + 净空带硬边界 + 微引力（R75 恢复：乘 alpha、布局收敛后趋零）；
- *   R65 曾删除全部引力（全量引力把全员吸到中间太丑、没有松弛感），R75 版只在布局期有一点点；
+ * - 布局 = 斥力 + 连线弹簧 + 净空带硬边界：**黑洞没有任何引力**（真机反馈「全员被吸到中间太丑、
+ *   没有松弛感」——R65 起删除 holeGravity/遗忘引力倍率/深度遗忘向心漂移）；
  * - 布局：节点盘状分布于黑洞四周（黑洞坐镇盘心），冷启动全部生成在净空带之外；
  * - 净空带是永久硬边界（1 单位=核心半径，保护区=3 倍单位，用户 2026-09-19 拍板）：推力不再随遗忘衰减 + 积分位置钳制，
  *   任何 Free 节点都进不来，连线永远不会「接进」黑洞；
@@ -77,12 +77,6 @@ data class BlackHolePhysics(
     val dragLinkBoost: Float = 6f,
     /** 弹簧轴向阻尼（相对速度投影系数）：让连线牵引收敛圆润、不振颤（真机反馈「假引力」）。 */
     val springDamping: Float = 0.06f,
-    /** 黑洞微引力（R75 用户拍板「引力还是要有一点点」）：指向洞心的平方反比力，乘 alpha——
-        布局收敛后趋零，只留一点点引力感，不会重蹈 R65 全员被吸到中间的覆辙。 */
-    val holeGravity: Float = 0.06f,
-    /** 惯性滑行引力（px/s²，R75）：甩动节点时速度向量持续向洞心轻微弯折，
-        手感对齐 Obsidian 图谱的拖拽甩动；只作用惯性滑行、不进力场、不影响布局平衡。 */
-    val inertiaGravity: Float = 110f,
     /** 吞噬遗忘门（兜底）：异常出现在核心的节点，遗忘 >= 此值即吞、否则弹开。正常吸收走漩涡旅程终点。 */
     val absorbForgetGate: Float = 0.85f,
     /** 冷却保护时长（秒，1x；占位值——等用户给记忆遗忘曲线算法后替换）。新节点默认在保护期内。 */
@@ -527,14 +521,6 @@ class BlackHoleGraphEngine(
         nodeList.forEach { node ->
             when (node.mode) {
                 BlackHoleNodeMode.InertiaSliding -> {
-                    // 惯性引力弯折（R75）：速度向量持续向洞心偏转，甩动轨迹微弯、手感对齐 Obsidian
-                    val gdx = holeX - node.dispX
-                    val gdy = holeY - node.dispY
-                    val gd = hypot(gdx, gdy)
-                    if (gd > 0.001f) {
-                        node.vx += gdx / gd * physics.inertiaGravity * dt
-                        node.vy += gdy / gd * physics.inertiaGravity * dt
-                    }
                     node.dispX += node.vx * dt
                     node.dispY += node.vy * dt
                     val decay = Math.pow(physics.inertiaDamping.toDouble(), (dt * 60).toDouble()).toFloat()
@@ -651,9 +637,9 @@ class BlackHoleGraphEngine(
             applyForce(b, fx, fy, -ux * f, -uy * f, fromCollision = false)
         }
 
-        // 3) 微引力 + 公转切向 + 净空带硬边界（只作用算法层 Free 节点）。
-        //    R75 恢复极微弱引力：乘 alpha 的平方反比，布局收敛后趋零（R65 的全量引力曾把
-        //    全员吸到中间被批太丑）；遗忘只让公转冷却（切向 ->15%），不额外牵引位置。
+        // 3) 公转切向 + 净空带硬边界（只作用算法层 Free 节点）。
+        //    R65 起黑洞没有任何引力（真机反馈「全员被吸到中间太丑」）：布局只由斥力/弹簧/净空带构成，
+        //    遗忘只让公转冷却（切向 ->15%），不再牵引位置。
         freeNodes.forEach { node ->
             if (node.mode != BlackHoleNodeMode.Free) return@forEach
             val dx = holeX - node.simX
@@ -676,10 +662,6 @@ class BlackHoleGraphEngine(
                 fx[node.id] = (fx[node.id] ?: 0f) - ux * push
                 fy[node.id] = (fy[node.id] ?: 0f) - uy * push
             }
-            // 微引力（R75）：指向洞心、平方反比、乘 alpha——收敛后趋零，公转仍是主导运动
-            val grav = physics.holeGravity * alpha * physics.orbitReferenceRadius * physics.orbitReferenceRadius / (d * d)
-            fx[node.id] = (fx[node.id] ?: 0f) + ux * grav
-            fy[node.id] = (fy[node.id] ?: 0f) + uy * grav
         }
 
         // 5) 积分 + 阻尼 + 速度 clamp + NaN 守卫 + 净空带位置钳制
