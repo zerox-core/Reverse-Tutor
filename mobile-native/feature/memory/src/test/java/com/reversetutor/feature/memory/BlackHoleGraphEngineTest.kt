@@ -14,7 +14,8 @@ import kotlin.math.atan2
  * 黑洞图谱引擎单元测试（V12~V30 定稿规格的落地验收 + 真机反馈整改）。
  * 覆盖：初始布局、力场稳定性、拖拽语义、alpha 平台、松手回归物理层（不停泊）、
  * 弹簧收敛圆润、黑洞弹开不吞噬、吞噬遗忘门（碰撞误入核心只弹不吞）、
- * R65 算法层重构（黑洞无引力、净空带永久硬边界）、
+ * R65 算法层重构（净空带永久硬边界）、R75 微引力（alpha 缩放、布局不塌）+
+ * 惯性引力弯折（甩动轨迹向洞心偏转）、
  * R66 冷却保护模型（保护期内遗忘冻结+原地公转、过保后漩涡旅程螺旋坠入、
  * 坠入节点脱离力场不扰动布局、Dying 不可命中/拖拽）、
  * 页面重置、硬保护（clamp/NaN）、settle 后常驻公转、入场缓动、时间倍率全局缩放。
@@ -584,5 +585,53 @@ class BlackHoleGraphEngineTest {
         // 重新接入力场：不被甩飞、不坠核心（净空带硬边界保持）
         val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
         assertTrue("rescued node drifted into hole: d=$d", d >= engine.exclusionRadius - 0.5f)
+    }
+
+    // ---------- R75 微引力 ----------
+
+    @Test
+    fun inertia_gravity_bends_slide_toward_hole() {
+        // R75 用户拍板「引力还是要有一点点、像黑曜石（Obsidian）拖动」：
+        // 同一起点同一初速向外甩，开惯性引力的引擎滑停后离洞更近（轨迹被弯回）
+        fun slideEndRadius(gravity: Float): Float {
+            val engine = BlackHoleGraphEngine(physics = BlackHolePhysics(inertiaGravity = gravity))
+            engine.populate(
+                graphNodes = listOf(Triple("n1", "节点1", GraphNodeKind.Concept)),
+                edges = emptyList()
+            )
+            engine.nodes.forEach { it.cooling = true; it.coolingElapsed = 0f }
+            val node = engine.nodes.first()
+            engine.startDrag(node.id)
+            engine.dragTo(engine.holeX + 300f, engine.holeY)
+            engine.dragTo(engine.holeX + 300f, engine.holeY) // 第二针位移 0 -> 甩动量清零
+            engine.dragTo(engine.holeX + 780f, engine.holeY) // 单帧外甩 480px（clamp 500 内）
+            engine.endDrag()
+            repeat(600) { engine.tick(1f / 60f) } // 滑停并回归物理层
+            return hypot(node.dispX - engine.holeX, node.dispY - engine.holeY)
+        }
+        val withGravity = slideEndRadius(110f)
+        val noGravity = slideEndRadius(0f)
+        assertTrue(
+            "inertia gravity should bend slide back: with=$withGravity without=$noGravity",
+            withGravity < noGravity - 4f
+        )
+    }
+
+    @Test
+    fun slight_hole_gravity_does_not_collapse_layout() {
+        // R75：力场微引力（alpha 缩放、收敛后趋零）只留一点点引力感——
+        // 布局收敛后节点不散不塌、全部留在净空带外（R65 全量引力曾全员被吸到中间被批太丑）
+        val engine = engineWith(30, edges = (1 until 30).map { "n$it" to "n${it + 1}" })
+        tickSeconds(engine, 8f) // 力场收敛（300 iter 到 alpha 地板）
+        val avgBefore = engine.nodes.map { hypot(it.simX - engine.holeX, it.simY - engine.holeY) }.average()
+        tickSeconds(engine, 8f) // alpha 地板上再跑 8 秒（微引力 + 公转 + 弹簧）
+        val avgAfter = engine.nodes.map { hypot(it.simX - engine.holeX, it.simY - engine.holeY) }.average()
+        engine.nodes.forEach { node ->
+            val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+            assertTrue("node ${node.id} d=$d inside exclusion ${engine.exclusionRadius}",
+                d >= engine.exclusionRadius - 0.5f) // 钳制停在边界上的节点不算进带（d=84.0 是钳制平衡位）
+        }
+        assertTrue("cluster collapsed: avgR $avgBefore -> $avgAfter", avgAfter > avgBefore * 0.85f)
+        assertTrue("cluster blew up: avgR $avgBefore -> $avgAfter", avgAfter < avgBefore * 1.35f)
     }
 }

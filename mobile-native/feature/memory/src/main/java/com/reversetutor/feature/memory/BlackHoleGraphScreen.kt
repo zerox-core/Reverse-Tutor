@@ -91,7 +91,17 @@ class BlackHoleGraphPalette(
     val isDark: Boolean,
     val nodeColors: Map<GraphNodeKind, Color>,
     /** 背景点缀点配色（浅色用）：刻意与节点图谱色拉开色相/明度，避免误认成节点（用户 2026-09-19 拍板）。 */
-    val dustColors: List<Color>
+    val dustColors: List<Color>,
+    /** 黑洞核心边缘色（R75「五颜六色的黑」）：核心径向渐变的外圈，给纯黑核心一圈暗彩层次。 */
+    val holeCoreEdge: Color,
+    /** 黑洞光子环（R75）：核心边缘的细亮环，随呼吸明暗——强引力「吸光」的视觉锚点。 */
+    val holeRim: Color,
+    /** 遗忘渐进区边界环（R75 草图拍板）：环外=正常活动区，环→核心=遗忘渐进区，坠入核心=彻底遗忘。 */
+    val holeZoneRing: Color,
+    /** 遗忘渐进区渐变填充（R75）：越靠近黑洞越浓，视觉表达「引力往洞里收」。 */
+    val holeZoneFill: Color,
+    /** 黑洞核心内微光点配色（R75「能看到它微微的点」）：暗彩小星点缓慢旋绕 + 各自闪烁。 */
+    val holeSparkColors: List<Color>
 ) {
     fun nodeColor(kind: GraphNodeKind): Color =
         nodeColors[kind] ?: nodeColors.getValue(GraphNodeKind.Other)
@@ -137,6 +147,16 @@ object BlackHoleGraphThemes {
             Color(0xFFB5542F),
             Color(0xFF7A8C3F),
             Color(0xFF8C6239)
+        ),
+        holeCoreEdge = Color(0xFF1E1836),
+        holeRim = Color(0xB34A5A8E),
+        holeZoneRing = Color(0x4D273A5E),
+        holeZoneFill = Color(0x14273A5E),
+        holeSparkColors = listOf(
+            Color(0xFFAFC3E8),
+            Color(0xFFB678E8),
+            Color(0xFFFFC978),
+            Color(0xFF7BC98A)
         )
     )
 
@@ -178,6 +198,16 @@ object BlackHoleGraphThemes {
             Color(0xFFB5542F),
             Color(0xFF7A8C3F),
             Color(0xFF8C6239)
+        ),
+        holeCoreEdge = Color(0xFF141C3E),
+        holeRim = Color(0x99AFC3E8),
+        holeZoneRing = Color(0x596FA8F0),
+        holeZoneFill = Color(0x1A6FA8F0),
+        holeSparkColors = listOf(
+            Color(0xFFAFC3E8),
+            Color(0xFFE8B45A),
+            Color(0xFF9B8CE8),
+            Color(0xFF7BC98A)
         )
     )
 }
@@ -212,6 +242,36 @@ private fun buildDust(engine: BlackHoleGraphEngine, colors: List<Color>): List<D
             driftPhase = rng.nextFloat() * 2f * Math.PI.toFloat(),
             driftAmp = 3f + rng.nextFloat() * 7f,
             color = dotColors[rng.nextInt(dotColors.size)]
+        )
+    }
+}
+
+/** 黑洞核心内的微光点（R75「五颜六色的黑、能看到微微的点」）：核心半径归一化坐标，整体缓慢旋绕 + 各自闪烁。 */
+private data class HoleSpark(
+    val nx: Float,
+    val ny: Float,
+    val radius: Float,
+    val alpha: Float,
+    val twinklePhase: Float,
+    val twinkleSpeed: Float,
+    val color: Color
+)
+
+private fun buildHoleSparks(colors: List<Color>): List<HoleSpark> {
+    val rng = Random(20260919L xor 0x5EED)
+    val sparkColors = colors.ifEmpty { listOf(Color(0xFFAFC3E8)) }
+    return List(34) {
+        val angle = rng.nextFloat() * 2f * Math.PI.toFloat()
+        // sqrt 分布让点在圆盘内均匀；收在 0.82 核心半径内，不越过光子环
+        val dist = kotlin.math.sqrt(rng.nextFloat()) * 0.82f
+        HoleSpark(
+            nx = kotlin.math.cos(angle) * dist,
+            ny = kotlin.math.sin(angle) * dist,
+            radius = 0.9f + rng.nextFloat() * 1.5f,
+            alpha = 0.25f + rng.nextFloat() * 0.45f,
+            twinklePhase = rng.nextFloat() * 2f * Math.PI.toFloat(),
+            twinkleSpeed = 0.6f + rng.nextFloat() * 1.4f,
+            color = sparkColors[rng.nextInt(sparkColors.size)]
         )
     }
 }
@@ -409,6 +469,7 @@ private fun BlackHoleGraphReadyContent(
     }
     val camera = remember(engine) { BlackHoleCamera() }
     val dust = remember(engine, palette) { buildDust(engine, palette.dustColors) }
+    val holeSparks = remember(palette) { buildHoleSparks(palette.holeSparkColors) }
     val starfield = remember(engine) { buildStarfield(engine) }
     val nebulae = remember(engine) { buildNebulae(engine) }
     var frame by remember { mutableLongStateOf(0L) }
@@ -671,21 +732,79 @@ private fun BlackHoleGraphReadyContent(
                 }
             }
 
-            // 黑洞光晕：多段径向渐隐，3.6x 核心（真机反馈「光晕不够大」；无光环，V17 起删环）。
+            // 黑洞呼吸（R75）：4.8s 周期，光晕/核心/光子环同步微微起伏——「活着的引力源」
+            val holeBreath = sin(seconds * 1.309f)
+            // 黑洞光晕：多段径向渐隐，3.6x 核心，透明度随呼吸起伏（真机反馈「光晕不够大」；无光环，V17 起删环）。
             // 光晕画在连线下层；黑核本体移到连线之后再画——任何跨洞连线都会被黑核盖住，绝不「接进」黑洞。
             val holeCenter = worldToScreen(engine.holeX, engine.holeY)
             val coreR = engine.holeCoreRadius * camera.scale
             val haloR = engine.holeCoreRadius * 3.6f * camera.scale
+            val haloBreath = 0.88f + 0.12f * holeBreath
             drawCircle(
                 brush = Brush.radialGradient(
-                    0f to palette.holeHalo,
-                    0.45f to palette.holeHalo.copy(alpha = palette.holeHalo.alpha * 0.45f),
+                    0f to palette.holeHalo.copy(alpha = (palette.holeHalo.alpha * haloBreath).coerceIn(0f, 1f)),
+                    0.45f to palette.holeHalo.copy(alpha = (palette.holeHalo.alpha * 0.45f * haloBreath).coerceIn(0f, 1f)),
                     1f to Color.Transparent,
                     center = holeCenter,
                     radius = haloR
                 ),
                 radius = haloR,
                 center = holeCenter
+            )
+
+            // 遗忘渐进区（R75 草图拍板）：环外=正常活动区，环→核心=遗忘渐进区，坠入核心=彻底遗忘。
+            // 常驻可见：径向渐变填充（越近洞越浓）+ 边界环 + 3 段旋转弧（公转感）+ 2 条内侧涡弧（引力漩涡感）。
+            val zoneR = engine.exclusionRadius * camera.scale
+            drawCircle(
+                brush = Brush.radialGradient(
+                    0f to palette.holeZoneFill.copy(alpha = (palette.holeZoneFill.alpha * 1.9f).coerceIn(0f, 1f)),
+                    0.55f to palette.holeZoneFill,
+                    1f to Color.Transparent,
+                    center = holeCenter,
+                    radius = zoneR
+                ),
+                radius = zoneR,
+                center = holeCenter
+            )
+            drawCircle(
+                color = palette.holeZoneRing,
+                radius = zoneR,
+                center = holeCenter,
+                style = Stroke(width = 1.2.dp.toPx())
+            )
+            // 边界环上 3 段旋转弧：78° 扫掠、互成 120°，4°/s 缓慢巡航
+            val zoneArcSpin = seconds * 4f
+            repeat(3) { i ->
+                drawArc(
+                    color = palette.holeZoneRing.copy(alpha = (palette.holeZoneRing.alpha * 2.2f).coerceIn(0f, 1f)),
+                    startAngle = zoneArcSpin + i * 120f,
+                    sweepAngle = 78f,
+                    useCenter = false,
+                    topLeft = androidx.compose.ui.geometry.Offset(holeCenter.x - zoneR, holeCenter.y - zoneR),
+                    size = androidx.compose.ui.geometry.Size(zoneR * 2f, zoneR * 2f),
+                    style = Stroke(width = 2.dp.toPx())
+                )
+            }
+            // 内侧两条涡弧：0.66 / 0.45 区半径，反向异速旋转
+            val swirl1R = zoneR * 0.66f
+            val swirl2R = zoneR * 0.45f
+            drawArc(
+                color = palette.holeZoneRing,
+                startAngle = seconds * 10f,
+                sweepAngle = 120f,
+                useCenter = false,
+                topLeft = androidx.compose.ui.geometry.Offset(holeCenter.x - swirl1R, holeCenter.y - swirl1R),
+                size = androidx.compose.ui.geometry.Size(swirl1R * 2f, swirl1R * 2f),
+                style = Stroke(width = 1.2.dp.toPx())
+            )
+            drawArc(
+                color = palette.holeZoneRing,
+                startAngle = -seconds * 14f + 60f,
+                sweepAngle = 95f,
+                useCenter = false,
+                topLeft = androidx.compose.ui.geometry.Offset(holeCenter.x - swirl2R, holeCenter.y - swirl2R),
+                size = androidx.compose.ui.geometry.Size(swirl2R * 2f, swirl2R * 2f),
+                style = Stroke(width = 1.2.dp.toPx())
             )
 
             // 选中态：邻接保持高亮，其余压暗（聚焦模式）
@@ -723,12 +842,44 @@ private fun BlackHoleGraphReadyContent(
                 )
             }
 
-            // 黑核本体：压在连线之上（真机反馈「线连进黑洞」）——跨洞连线到核边界为止，核面绝无线条穿过
+            // 黑核本体（R75「五颜六色的黑」）：压在连线之上（真机反馈「线连进黑洞」）——跨洞连线到核边界为止。
+            // 径向渐变核心（中心纯黑 → 边缘暗彩）+ 呼吸微缩放 + 光子环 + 内部微光点（缓慢旋绕、各自闪烁）
+            val coreRb = coreR * (1f + 0.035f * holeBreath)
             drawCircle(
-                color = palette.holeCore,
-                radius = coreR,
+                brush = Brush.radialGradient(
+                    0f to palette.holeCore,
+                    0.72f to palette.holeCore,
+                    1f to palette.holeCoreEdge,
+                    center = holeCenter,
+                    radius = coreRb
+                ),
+                radius = coreRb,
                 center = holeCenter
             )
+            // 光子环：核心边缘的细亮环，随呼吸明暗——强引力「吸光」的视觉锚点
+            drawCircle(
+                color = palette.holeRim,
+                radius = coreRb,
+                center = holeCenter,
+                alpha = (0.30f + 0.22f * holeBreath).coerceIn(0f, 1f),
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+            // 微光点：核心内 34 颗暗彩小星点，整体缓慢旋绕（0.12 rad/s）、各自闪烁
+            val sparkSwirl = seconds * 0.12f
+            val sparkCos = kotlin.math.cos(sparkSwirl)
+            val sparkSin = kotlin.math.sin(sparkSwirl)
+            holeSparks.forEach { spark ->
+                val twinkle = 0.55f + 0.45f * sin(seconds * spark.twinkleSpeed + spark.twinklePhase)
+                drawCircle(
+                    color = spark.color,
+                    radius = spark.radius * camera.scale.coerceAtLeast(0.6f),
+                    center = androidx.compose.ui.geometry.Offset(
+                        holeCenter.x + (spark.nx * sparkCos - spark.ny * sparkSin) * coreRb,
+                        holeCenter.y + (spark.nx * sparkSin + spark.ny * sparkCos) * coreRb
+                    ),
+                    alpha = (spark.alpha * twinkle).coerceIn(0f, 1f)
+                )
+            }
 
             // 拖到黑洞上方：净空带警示圈 + 节点 X 标记（松手弹开、不吞噬）
             if (engine.dragOverHole) {
