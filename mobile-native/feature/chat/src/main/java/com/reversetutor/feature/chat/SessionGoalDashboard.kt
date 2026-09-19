@@ -1,7 +1,13 @@
 package com.reversetutor.feature.chat
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -30,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material3.Icon
@@ -80,6 +87,15 @@ import java.util.Locale
 // - 状态 chip 不再是摆设：currentState / deadline / stageMilestones 已接线进
 //   生成链路的会话模板证据（见 app 模块 SessionPolicyInputMapper），
 //   每条消息发出时 AI 都能收到。
+//
+// R70 迭代（按用户反馈，视觉重做）：
+// - 里程碑站点卡重做：编号圆点 + 连接线的「路线」造型取代光秃秃的方框卡；
+//   ≤3 站时整行等宽拉伸铺满（消灭右侧大留白），>3 站改 106dp 窄卡一屏
+//   能同时看到 2~3 站；
+// - 添加按钮改为随行小圆钮（＋ 添加 pill），不再是大号文字按钮；
+// - 英雄卡再升级：旅程小径上有呼吸的柔光圆与沿路径行进的光点（克制的
+//   微动效），分区用细发线隔开，层级更清；
+// - 区块标题统一加 3dp 色条引导，计数改为胶囊徽章，全页排版对齐收紧。
 //
 // 数据结构不变：SessionGoalPlan 七个 String 字段原样保留，清单勾选态用
 // GitHub task-list 风格编码进文本（"[x] 已做 / [ ] 未做"，逐行一项），
@@ -210,6 +226,46 @@ internal fun goalDeadlineToneColor(tone: GoalDeadlineTone): Color = when (tone) 
     GoalDeadlineTone.Overdue -> FormalColors.Danger
 }
 
+// —— 通用小部件 ——
+
+/** 分区标题：3dp 色条 + 标题文字。 */
+@Composable
+internal fun GoalSectionTitle(text: String, tick: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(14.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(tick)
+        )
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+    }
+}
+
+/** 计数胶囊徽章。 */
+@Composable
+internal fun GoalCountBadge(text: String, bg: Color, fg: Color) {
+    Surface(shape = RoundedCornerShape(999.dp), color = bg) {
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+        )
+    }
+}
+
+/** 细发线分隔。 */
+@Composable
+internal fun GoalHairline() {
+    Box(Modifier.fillMaxWidth().height(1.dp).background(FormalColors.Divider))
+}
+
 // —— 主目标英雄卡 ——
 
 @Composable
@@ -233,36 +289,38 @@ fun GoalDashboardHero(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(
                 Brush.verticalGradient(
                     listOf(Color(0xFFEFF3FF), Color(0xFFFBFCFF))
                 )
             )
-            .border(1.dp, FormalColors.Divider, RoundedCornerShape(14.dp))
+            .border(1.dp, FormalColors.Divider, RoundedCornerShape(16.dp))
             .testTag(testTag)
     ) {
         GoalHeroBackdrop(Modifier.matchParentSize())
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("主要目标", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
+                Text(
+                    "主要目标",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = FormalColors.Muted,
+                    letterSpacing = 1.sp
+                )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = {
                     if (editingGoal) goalDraft = goal
                     editingGoal = !editingGoal
                 }) { Text(if (editingGoal) "取消" else "修改", fontSize = 13.sp) }
             }
-            Text(
-                text = "先写下终点——这一页会把它逐层拆成几站里程碑和这周的行动。",
-                fontSize = 12.sp,
-                color = FormalColors.Muted
-            )
             if (editingGoal) {
                 OutlinedTextField(
                     value = goalDraft,
                     onValueChange = { goalDraft = it },
                     modifier = Modifier.fillMaxWidth().testTag("$testTag-goal-input"),
                     placeholder = { Text("用自己的话写下这次要攻克的目标") },
+                    shape = RoundedCornerShape(10.dp),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
                         onGoalCommit(goalDraft)
@@ -289,6 +347,13 @@ fun GoalDashboardHero(
                     color = if (goal.isBlank()) FormalColors.Muted else FormalColors.Ink
                 )
             }
+            Text(
+                text = "写下终点，这一页会把它逐层拆成几站里程碑和这周的行动。",
+                fontSize = 12.sp,
+                color = FormalColors.Muted
+            )
+
+            GoalHairline()
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -306,6 +371,7 @@ fun GoalDashboardHero(
                             modifier = Modifier.fillMaxWidth().testTag("$testTag-deadline-input"),
                             placeholder = { Text("如 2026-10-01 或 10月1日") },
                             singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(onDone = {
                                 onDeadlineCommit(deadlineDraft)
@@ -360,6 +426,8 @@ fun GoalDashboardHero(
                 }
             }
 
+            GoalHairline()
+
             Text("当前状态", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
             Text(
                 text = "选好后会随每条消息发给 AI，它会照着调整讲课方式。",
@@ -401,26 +469,43 @@ fun GoalDashboardHero(
     }
 }
 
-/** 英雄卡背景：哑光浅蓝渐变底上的「学习旅程」小径与站点，克制不抢字。 */
+/** 英雄卡背景：哑光浅蓝渐变底上的「学习旅程」小径，柔光圆轻轻呼吸、光点沿路径行进。 */
 @Composable
 internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "goal-hero-bg")
+    val trailT by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(8000, easing = LinearEasing), RepeatMode.Restart),
+        label = "goal-hero-trail"
+    )
+    val breath by transition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(4200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "goal-hero-breath"
+    )
     Canvas(modifier) {
         val w = size.width
         val h = size.height
         if (w <= 0f || h <= 0f) return@Canvas
         drawCircle(
-            color = FormalColors.PrimarySoft.copy(alpha = 0.5f),
+            color = FormalColors.PrimarySoft.copy(alpha = 0.5f * breath),
             radius = h * 0.62f,
             center = Offset(w * 0.94f, h * 0.04f)
         )
         drawCircle(
-            color = FormalColors.SuccessSoft.copy(alpha = 0.45f),
+            color = FormalColors.SuccessSoft.copy(alpha = 0.45f * breath),
             radius = h * 0.34f,
             center = Offset(w * 0.10f, h * 1.02f)
         )
+        val p0 = Offset(w * 0.05f, h * 0.96f)
+        val c1 = Offset(w * 0.32f, h * 0.78f)
+        val c2 = Offset(w * 0.55f, h * 1.04f)
+        val p1 = Offset(w * 0.82f, h * 0.66f)
         val trail = Path().apply {
-            moveTo(w * 0.05f, h * 0.96f)
-            cubicTo(w * 0.32f, h * 0.78f, w * 0.55f, h * 1.04f, w * 0.82f, h * 0.66f)
+            moveTo(p0.x, p0.y)
+            cubicTo(c1.x, c1.y, c2.x, c2.y, p1.x, p1.y)
         }
         drawPath(
             path = trail,
@@ -431,6 +516,22 @@ internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
         drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.17f, h * 0.86f))
         drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.46f, h * 0.90f))
         drawCircle(stationColor, 3.dp.toPx(), Offset(w * 0.71f, h * 0.76f))
+        // 终点小旗环
+        drawCircle(
+            color = FormalColors.Primary.copy(alpha = 0.30f),
+            radius = 5.dp.toPx(),
+            center = p1,
+            style = Stroke(width = 1.5.dp.toPx())
+        )
+        // 沿路径行进的光点
+        val t = trailT
+        val u = 1f - t
+        val pos = Offset(
+            x = u * u * u * p0.x + 3f * u * u * t * c1.x + 3f * u * t * t * c2.x + t * t * t * p1.x,
+            y = u * u * u * p0.y + 3f * u * u * t * c1.y + 3f * u * t * t * c2.y + t * t * t * p1.y
+        )
+        drawCircle(FormalColors.Primary.copy(alpha = 0.10f), 7.dp.toPx(), pos)
+        drawCircle(FormalColors.Primary.copy(alpha = 0.34f), 3.5.dp.toPx(), pos)
     }
 }
 
@@ -560,26 +661,25 @@ fun GoalBreakdownCard(
 
     Surface(
         modifier = modifier.fillMaxWidth().testTag(testTag),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(16.dp),
         color = FormalColors.Surface,
         border = BorderStroke(1.dp, FormalColors.Divider)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // —— 阶段里程碑：横向站点旅程 ——
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // —— 阶段里程碑：编号圆点 + 连接线的路线旅程 ——
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("阶段里程碑", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                GoalSectionTitle("阶段里程碑", tick = FormalColors.Success)
                 Spacer(Modifier.weight(1f))
                 if (milestones.isNotEmpty()) {
-                    Text(
+                    GoalCountBadge(
                         text = "${goalChecklistDoneCount(milestones)}/${milestones.size} 站",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = FormalColors.Success
+                        bg = FormalColors.SuccessSoft,
+                        fg = FormalColors.Success
                     )
                 }
             }
             Text(
-                text = "把大目标拆成几站，左右滑动看全程；点卡片勾掉一站，长按可以删掉。",
+                text = "把大目标拆成几站；点卡片勾掉一站，长按可以删掉。",
                 fontSize = 12.sp,
                 color = FormalColors.Muted
             )
@@ -589,24 +689,52 @@ fun GoalBreakdownCard(
                     accent = FormalColors.Success,
                     testTag = "$testTag-milestone-progress"
                 )
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth().testTag("$testTag-milestone-journey")
-                ) {
-                    itemsIndexed(milestones) { index, item ->
-                        GoalMilestoneStation(
-                            index = index,
-                            item = item,
-                            onToggle = {
-                                onMilestonesChange(
-                                    milestones.mapIndexed { i, it -> if (i == index) it.copy(done = !it.done) else it }
-                                )
-                            },
-                            onRemove = {
-                                onMilestonesChange(milestones.filterIndexed { i, _ -> i != index })
-                            },
-                            testTag = "$testTag-milestone-item-$index"
-                        )
+                if (milestones.size <= 3) {
+                    // 站少时整行等宽拉伸铺满，不留右侧空白
+                    Row(
+                        modifier = Modifier.fillMaxWidth().testTag("$testTag-milestone-journey"),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        milestones.forEachIndexed { index, item ->
+                            GoalMilestoneStation(
+                                index = index,
+                                item = item,
+                                isLast = index == milestones.lastIndex,
+                                onToggle = {
+                                    onMilestonesChange(
+                                        milestones.mapIndexed { i, it -> if (i == index) it.copy(done = !it.done) else it }
+                                    )
+                                },
+                                onRemove = {
+                                    onMilestonesChange(milestones.filterIndexed { i, _ -> i != index })
+                                },
+                                modifier = Modifier.weight(1f),
+                                testTag = "$testTag-milestone-item-$index"
+                            )
+                        }
+                    }
+                } else {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth().testTag("$testTag-milestone-journey")
+                    ) {
+                        itemsIndexed(milestones) { index, item ->
+                            GoalMilestoneStation(
+                                index = index,
+                                item = item,
+                                isLast = index == milestones.lastIndex,
+                                onToggle = {
+                                    onMilestonesChange(
+                                        milestones.mapIndexed { i, it -> if (i == index) it.copy(done = !it.done) else it }
+                                    )
+                                },
+                                onRemove = {
+                                    onMilestonesChange(milestones.filterIndexed { i, _ -> i != index })
+                                },
+                                modifier = Modifier.width(106.dp),
+                                testTag = "$testTag-milestone-item-$index"
+                            )
+                        }
                     }
                 }
             } else {
@@ -641,14 +769,13 @@ fun GoalBreakdownCard(
 
             // —— 本周聚焦：寄托在里程碑之下 ——
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("本周聚焦", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                GoalSectionTitle("本周聚焦", tick = FormalColors.Primary)
                 Spacer(Modifier.weight(1f))
                 if (weekly.isNotEmpty()) {
-                    Text(
+                    GoalCountBadge(
                         text = "${goalChecklistDoneCount(weekly)}/${weekly.size}",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = FormalColors.Primary
+                        bg = FormalColors.PrimarySoft,
+                        fg = FormalColors.Primary
                     )
                 }
             }
@@ -693,76 +820,99 @@ fun GoalBreakdownCard(
     }
 }
 
-/** 里程碑站点卡：横向旅程里的一站，点按勾选、长按删除。 */
+/** 里程碑站点：上方编号圆点 + 连接线，下方小卡；点按勾选、长按删除。 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun GoalMilestoneStation(
     index: Int,
     item: GoalChecklistItem,
+    isLast: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
     testTag: String
 ) {
-    val bg by animateColorAsState(
-        targetValue = if (item.done) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle,
-        animationSpec = tween(250),
-        label = "$testTag-bg"
-    )
-    Surface(
-        modifier = Modifier
-            .width(150.dp)
-            .height(102.dp)
-            .testTag(testTag),
-        shape = RoundedCornerShape(12.dp),
-        color = bg,
-        border = BorderStroke(1.dp, if (item.done) FormalColors.Success else FormalColors.Divider)
-    ) {
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .combinedClickable(onClick = onToggle, onLongClick = onRemove)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+    Column(modifier = modifier.testTag(testTag)) {
+        // 路线行：编号圆点 + 通往下一站的连接线
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(if (item.done) FormalColors.Success else FormalColors.Surface)
+                    .border(
+                        1.5.dp,
+                        if (item.done) FormalColors.Success else FormalColors.Primary.copy(alpha = 0.55f),
+                        CircleShape
+                    )
+                    .testTag("$testTag-check"),
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "第 ${index + 1} 站",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (item.done) FormalColors.Success else FormalColors.Primary
-                )
-                Spacer(Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(if (item.done) FormalColors.Success else Color.Transparent)
-                        .border(1.5.dp, if (item.done) FormalColors.Success else FormalColors.BorderStrong, CircleShape)
-                        .testTag("$testTag-check"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (item.done) {
-                        Icon(
-                            imageVector = Icons.Rounded.Check,
-                            contentDescription = "已完成",
-                            tint = Color.White,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
+                if (item.done) {
+                    Icon(
+                        imageVector = Icons.Rounded.Check,
+                        contentDescription = "已完成",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                } else {
+                    Text(
+                        text = "${index + 1}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = FormalColors.Primary
+                    )
                 }
             }
-            Text(
-                text = item.text,
-                fontSize = 14.sp,
-                lineHeight = 19.sp,
-                color = if (item.done) FormalColors.Muted else FormalColors.Ink,
-                textDecoration = if (item.done) TextDecoration.LineThrough else null,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+            if (!isLast) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .padding(horizontal = 3.dp)
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(
+                            if (item.done) FormalColors.Success.copy(alpha = 0.7f) else FormalColors.Divider
+                        )
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        val bg by animateColorAsState(
+            targetValue = if (item.done) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle,
+            animationSpec = tween(250),
+            label = "$testTag-bg"
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(60.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = bg,
+            border = BorderStroke(
+                1.dp,
+                if (item.done) FormalColors.Success.copy(alpha = 0.55f) else FormalColors.Divider
             )
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .combinedClickable(onClick = onToggle, onLongClick = onRemove)
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = item.text,
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    color = if (item.done) FormalColors.Muted else FormalColors.Ink,
+                    textDecoration = if (item.done) TextDecoration.LineThrough else null,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -776,7 +926,7 @@ internal fun GoalWeeklyNextBanner(
     val next = goalNextPendingItem(weekly)
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(testTag),
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = FormalColors.PrimarySoft,
         border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.35f))
     ) {
@@ -863,7 +1013,7 @@ internal fun GoalWeeklyRow(
     }
 }
 
-/** 添加条目行：输入框 + 添加按钮。 */
+/** 添加条目行：输入框 + 随行小圆钮。 */
 @Composable
 internal fun GoalAddRow(
     draft: String,
@@ -873,6 +1023,7 @@ internal fun GoalAddRow(
     inputTag: String,
     addTag: String
 ) {
+    val enabled = draft.isNotBlank()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -883,14 +1034,37 @@ internal fun GoalAddRow(
             modifier = Modifier.weight(1f).testTag(inputTag),
             placeholder = { Text(placeholder, fontSize = 13.sp) },
             singleLine = true,
+            shape = RoundedCornerShape(10.dp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { onSubmit() })
         )
-        TextButton(
-            onClick = onSubmit,
-            enabled = draft.isNotBlank(),
-            modifier = Modifier.testTag(addTag)
-        ) { Text("添加") }
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .clickable(enabled = enabled, onClick = onSubmit)
+                .testTag(addTag),
+            shape = RoundedCornerShape(999.dp),
+            color = if (enabled) FormalColors.Primary else FormalColors.SurfaceSubtle
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = null,
+                    tint = if (enabled) Color.White else FormalColors.Muted,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    text = "添加",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (enabled) Color.White else FormalColors.Muted
+                )
+            }
+        }
     }
 }
 
@@ -909,14 +1083,14 @@ internal fun GoalProgressBar(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(4.dp)
+            .height(5.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(FormalColors.Divider)
     ) {
         Box(
             Modifier
                 .fillMaxWidth(animated)
-                .height(4.dp)
+                .height(5.dp)
                 .clip(RoundedCornerShape(999.dp))
                 .background(accent)
         )
