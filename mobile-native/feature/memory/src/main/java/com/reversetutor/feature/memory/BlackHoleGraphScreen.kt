@@ -68,13 +68,13 @@ private const val CameraPanFactor = 0.72f
 class BlackHoleGraphPalette(
     val background: Color,
     val holeCore: Color,
-    /** 光子环：贴事件视界边缘的暖金窄亮环（开源社区主流黑洞设计：EHT 照片 / 星际穿越 Gargantua）。 */
+    /** 光子环：贴事件视界边缘的亮白窄环（用户 2026-09-19 拍板：线条/光晕一律纯白）。 */
     val photonRing: Color,
-    /** 吸积盘内缘高温色（近白暖黄）。 */
+    /** 吸积盘内缘色（最亮的白）。 */
     val diskHot: Color,
-    /** 吸积盘中段色（橙）。 */
+    /** 吸积盘中段色（白，靠透明度分层）。 */
     val diskMid: Color,
-    /** 吸积盘外缘色（深红，向外渐隐）。 */
+    /** 吸积盘外缘色（白，向外渐隐）。 */
     val diskOuter: Color,
     val holeExclusionHint: Color,
     val edge: Color,
@@ -109,10 +109,10 @@ object BlackHoleGraphThemes {
     val Light = BlackHoleGraphPalette(
         background = Color(0xFFF7F1E4),
         holeCore = Color(0xFF0B0E14),
-        photonRing = Color(0xFFF2C078),
-        diskHot = Color(0xFFFFE3AE),
-        diskMid = Color(0xFFE8863B),
-        diskOuter = Color(0xFFAE2F1B),
+        photonRing = Color(0xFFFFFFFF),
+        diskHot = Color(0xFFFFFFFF),
+        diskMid = Color(0xFFFFFFFF),
+        diskOuter = Color(0xFFFFFFFF),
         holeExclusionHint = Color(0x14273A5E),
         edge = Color(0xFF8E9AB8),
         label = Color(0xFF46506B),
@@ -154,10 +154,10 @@ object BlackHoleGraphThemes {
     val Dark = BlackHoleGraphPalette(
         background = Color(0xFF0B1026),
         holeCore = Color(0xFF05060D),
-        photonRing = Color(0xFFFFD9A0),
-        diskHot = Color(0xFFFFF0D2),
-        diskMid = Color(0xFFF2994A),
-        diskOuter = Color(0xFFC23B22),
+        photonRing = Color(0xFFFFFFFF),
+        diskHot = Color(0xFFFFFFFF),
+        diskMid = Color(0xFFEDF1F8),
+        diskOuter = Color(0xFFC9D2E4),
         holeExclusionHint = Color(0x336FA8F0),
         edge = Color(0xFF8FA3C8),
         label = Color(0xFFE8ECF4),
@@ -727,14 +727,14 @@ private fun BlackHoleGraphReadyContent(
             val holeCenter = worldToScreen(engine.holeX, engine.holeY)
             val coreR = engine.holeCoreRadius * camera.scale
             val diskR = engine.exclusionRadius * camera.scale
-            // 盘底色：径向温度梯度（内缘近白高温 → 橙 → 外缘深红渐隐）
+            // 盘底色：径向亮度梯度（内缘最亮 → 外缘渐隐；用户拍板纯白盘）
             drawCircle(
                 brush = Brush.radialGradient(
                     0f to Color.Transparent,
                     (coreR * 1.05f / diskR) to Color.Transparent,
-                    (coreR * 1.25f / diskR) to palette.diskHot.copy(alpha = palette.diskHot.alpha * 0.75f),
-                    (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = palette.diskMid.alpha * 0.5f),
-                    (coreR * 2.7f / diskR) to palette.diskOuter.copy(alpha = palette.diskOuter.alpha * 0.22f),
+                    (coreR * 1.25f / diskR) to palette.diskHot.copy(alpha = palette.diskHot.alpha * if (palette.isDark) 0.75f else 1f),
+                    (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = palette.diskMid.alpha * if (palette.isDark) 0.5f else 0.82f),
+                    (coreR * 2.7f / diskR) to palette.diskOuter.copy(alpha = palette.diskOuter.alpha * if (palette.isDark) 0.22f else 0.45f),
                     1f to Color.Transparent,
                     center = holeCenter,
                     radius = diskR
@@ -762,7 +762,7 @@ private fun BlackHoleGraphReadyContent(
                     useCenter = false,
                     topLeft = Offset(holeCenter.x - r, holeCenter.y - r),
                     size = Size(r * 2f, r * 2f),
-                    alpha = (streak.alpha * beaming).coerceIn(0f, 1f),
+                    alpha = (streak.alpha * beaming * if (palette.isDark) 1f else 2.2f).coerceIn(0f, 1f),
                     style = Stroke(width = streak.width * coreR)
                 )
             }
