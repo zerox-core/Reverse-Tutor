@@ -2,7 +2,11 @@ package com.reversetutor.feature.chat
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -71,8 +75,17 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.math.PI
+import kotlin.math.sin
 
 // region 18 · R68 目标看板（方向A 卡片仪表盘）
+//
+// R78 迭代（按用户反馈）：
+// - 英雄卡小径入场描绘完成后，加三点波浪脉冲沿路径缓缓流动（哑光低存在感，
+//   保留设计感不加复杂动画）；
+// - 分类标签按「方案A + E + F 结合」落地：里程碑站卡/本周清单行加彩色填充
+//   状态胶囊（A），本周聚焦加分段筛选器「全部/待做/已勾」（E），两个区块的
+//   进度条升级为「名称 + 完成数/总数 · 百分比 + 进度条」的标签行（F）。
 //
 // 学习目标与计划页 redesign：主目标英雄卡（倒计时圆环 + 状态 chip）+
 // 目标拆解卡（阶段里程碑横向旅程 + 本周聚焦）。
@@ -149,6 +162,17 @@ fun goalChecklistProgress(items: List<GoalChecklistItem>): Float =
 /** 本周聚焦里第一件还没做的事——第一眼要看到的那件。 */
 fun goalNextPendingItem(items: List<GoalChecklistItem>): GoalChecklistItem? =
     items.firstOrNull { !it.done }
+
+/** 里程碑站点状态：已完成 / 进行中（首站未完成的那一站）/ 未开始。 */
+fun goalMilestoneStage(items: List<GoalChecklistItem>, index: Int): String = when {
+    items.getOrNull(index)?.done == true -> "已完成"
+    items.take(index).all { it.done } -> "进行中"
+    else -> "未开始"
+}
+
+/** 清单完成百分比（0..100），空清单为 0。 */
+fun goalChecklistPercent(items: List<GoalChecklistItem>): Int =
+    if (items.isEmpty()) 0 else (goalChecklistProgress(items) * 100).toInt()
 
 enum class GoalDeadlineTone { Calm, Soon, Overdue }
 
@@ -447,6 +471,14 @@ internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
         label = "goal-hero-draw"
     )
     LaunchedEffect(Unit) { started = true }
+    // 波浪流动：入场描绘完成后，三点脉冲沿小径缓缓流动（哑光低存在感）
+    val flowTransition = rememberInfiniteTransition(label = "goal-hero-flow")
+    val flowT by flowTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(3600, easing = LinearEasing)),
+        label = "goal-hero-flow-t"
+    )
     Canvas(modifier) {
         val w = size.width
         val h = size.height
@@ -479,6 +511,22 @@ internal fun GoalHeroBackdrop(modifier: Modifier = Modifier) {
             center = p1,
             style = Stroke(width = 1.5.dp.toPx())
         )
+        if (drawT > 0.98f) {
+            for (i in 0..2) {
+                val t = (flowT + i / 3f) % 1f
+                val distance = t * measure.length
+                val pos = measure.getPosition(distance)
+                val tangent = measure.getTangent(distance)
+                val perp = Offset(-tangent.y, tangent.x)
+                val wobble = sin(t * 4f * PI.toFloat()) * 3.dp.toPx()
+                val alpha = (sin(t * PI.toFloat()) * 0.20f).coerceAtLeast(0f)
+                drawCircle(
+                    color = FormalColors.Primary.copy(alpha = alpha),
+                    radius = 2.6.dp.toPx(),
+                    center = pos + perp * wobble
+                )
+            }
+        }
     }
 }
 
@@ -550,6 +598,7 @@ fun GoalBreakdownCard(
     val weekly = remember(weeklyRaw) { decodeGoalChecklist(weeklyRaw) }
     var milestoneDraft by remember { mutableStateOf("") }
     var weeklyDraft by remember { mutableStateOf("") }
+    var weeklyFilter by remember { mutableStateOf("全部") }
 
     fun submitMilestone() {
         val text = milestoneDraft.trim()
@@ -590,8 +639,9 @@ fun GoalBreakdownCard(
                 color = FormalColors.Muted
             )
             if (milestones.isNotEmpty()) {
-                GoalProgressBar(
-                    progress = goalChecklistProgress(milestones),
+                GoalProgressLabel(
+                    label = "站点进度",
+                    items = milestones,
                     accent = FormalColors.Success,
                     testTag = "$testTag-milestone-progress"
                 )
@@ -605,6 +655,7 @@ fun GoalBreakdownCard(
                             GoalMilestoneStation(
                                 index = index,
                                 item = item,
+                                stage = goalMilestoneStage(milestones, index),
                                 isLast = index == milestones.lastIndex,
                                 onToggle = {
                                     onMilestonesChange(
@@ -628,6 +679,7 @@ fun GoalBreakdownCard(
                             GoalMilestoneStation(
                                 index = index,
                                 item = item,
+                                stage = goalMilestoneStage(milestones, index),
                                 isLast = index == milestones.lastIndex,
                                 onToggle = {
                                     onMilestonesChange(
@@ -676,15 +728,31 @@ fun GoalBreakdownCard(
                 fontSize = 12.sp,
                 color = FormalColors.Muted
             )
+            if (weekly.isNotEmpty()) {
+                GoalSegmentedFilter(
+                    options = listOf("全部", "待做", "已勾"),
+                    selected = weeklyFilter,
+                    onSelect = { weeklyFilter = it },
+                    testTag = "$testTag-weekly-filter"
+                )
+            }
             GoalWeeklyNextBanner(weekly = weekly, testTag = "$testTag-weekly-next")
             if (weekly.isNotEmpty()) {
-                GoalProgressBar(
-                    progress = goalChecklistProgress(weekly),
+                GoalProgressLabel(
+                    label = "本周进度",
+                    items = weekly,
                     accent = FormalColors.Primary,
                     testTag = "$testTag-weekly-progress"
                 )
+                val shown = weekly.withIndex().filter { (_, it) ->
+                    when (weeklyFilter) {
+                        "待做" -> !it.done
+                        "已勾" -> it.done
+                        else -> true
+                    }
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    weekly.forEachIndexed { index, item ->
+                    shown.forEach { (index, item) ->
                         GoalWeeklyRow(
                             item = item,
                             onToggle = {
@@ -696,6 +764,13 @@ fun GoalBreakdownCard(
                                 onWeeklyChange(weekly.filterIndexed { i, _ -> i != index })
                             },
                             testTag = "$testTag-weekly-item-$index"
+                        )
+                    }
+                    if (shown.isEmpty()) {
+                        Text(
+                            text = if (weeklyFilter == "待做") "这周的都勾完了，切到「已勾」看看成果。" else "还没有勾完的，切到「待做」继续。",
+                            fontSize = 12.sp,
+                            color = FormalColors.Muted
                         )
                     }
                 }
@@ -712,12 +787,33 @@ fun GoalBreakdownCard(
     }
 }
 
+/** 阶段状态小胶囊：彩色填充标签（设计 A）。 */
+@Composable
+internal fun GoalStageCapsule(stage: String) {
+    val (bg, fg) = when (stage) {
+        "已完成", "已勾" -> FormalColors.Success to Color.White
+        "进行中" -> FormalColors.Primary to Color.White
+        "待做" -> FormalColors.PrimarySoft to FormalColors.Primary
+        else -> FormalColors.SurfaceSubtle to FormalColors.Muted
+    }
+    Surface(shape = RoundedCornerShape(999.dp), color = bg) {
+        Text(
+            text = stage,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+        )
+    }
+}
+
 /** 里程碑站点：上方编号圆点 + 连接线，下方小卡；点按勾选、长按删除。 */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun GoalMilestoneStation(
     index: Int,
     item: GoalChecklistItem,
+    stage: String,
     isLast: Boolean,
     onToggle: () -> Unit,
     onRemove: () -> Unit,
@@ -781,7 +877,7 @@ internal fun GoalMilestoneStation(
             label = "$testTag-bg"
         )
         Surface(
-            modifier = Modifier.fillMaxWidth().height(60.dp),
+            modifier = Modifier.fillMaxWidth().height(76.dp),
             shape = RoundedCornerShape(10.dp),
             color = bg,
             border = BorderStroke(
@@ -789,11 +885,12 @@ internal fun GoalMilestoneStation(
                 if (item.done) FormalColors.Success.copy(alpha = 0.55f) else FormalColors.Divider
             )
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .combinedClickable(onClick = onToggle, onLongClick = onRemove)
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = item.text,
@@ -804,6 +901,49 @@ internal fun GoalMilestoneStation(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                GoalStageCapsule(stage = stage)
+            }
+        }
+    }
+}
+
+/** 分段筛选器：互斥切换（设计 E）。 */
+@Composable
+internal fun GoalSegmentedFilter(
+    options: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    testTag: String
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().testTag(testTag),
+        shape = RoundedCornerShape(999.dp),
+        color = FormalColors.SurfaceSubtle
+    ) {
+        Row(Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            options.forEach { option ->
+                val active = option == selected
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(999.dp))
+                        .clickable { onSelect(option) }
+                        .testTag("$testTag-$option"),
+                    shape = RoundedCornerShape(999.dp),
+                    color = if (active) FormalColors.Ink else Color.Transparent
+                ) {
+                    Box(
+                        Modifier.padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = option,
+                            fontSize = 12.sp,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (active) Color.White else FormalColors.Muted
+                        )
+                    }
+                }
             }
         }
     }
@@ -902,6 +1042,7 @@ internal fun GoalWeeklyRow(
             textDecoration = if (item.done) TextDecoration.LineThrough else null,
             modifier = Modifier.weight(1f)
         )
+        GoalStageCapsule(stage = if (item.done) "已勾" else "待做")
     }
 }
 
@@ -957,6 +1098,30 @@ internal fun GoalAddRow(
                 )
             }
         }
+    }
+}
+
+/** 进度标签行：名称 + 「完成数/总数 · 百分比」+ 进度条（设计 F，有数据）。 */
+@Composable
+internal fun GoalProgressLabel(
+    label: String,
+    items: List<GoalChecklistItem>,
+    accent: Color,
+    testTag: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "${goalChecklistDoneCount(items)}/${items.size} · ${goalChecklistPercent(items)}%",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = accent,
+                modifier = Modifier.testTag("$testTag-value")
+            )
+        }
+        GoalProgressBar(progress = goalChecklistProgress(items), accent = accent, testTag = testTag)
     }
 }
 

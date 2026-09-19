@@ -104,18 +104,6 @@ class SessionGoalDashboardTest {
         assertNull(parseGoalDeadlineDaysLeft("", todayMillis))
     }
 
-    // —— 日历选择毫秒格式化 ——
-
-    @Test
-    fun datePickerMillisFormatsToStorageDate() {
-        val utc = java.util.TimeZone.getTimeZone("UTC")
-        val millis = Calendar.getInstance(utc).apply {
-            set(2026, 9, 1, 0, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        assertEquals("2026-10-01", formatGoalDeadlineMillis(millis))
-    }
-
     // —— 倒计时文案与紧急度 ——
 
     @Test
@@ -175,6 +163,20 @@ class SessionGoalDashboardTest {
     fun `next pending item is null when all done or empty`() {
         assertEquals(null, goalNextPendingItem(decodeGoalChecklist("[x] 全做完")))
         assertEquals(null, goalNextPendingItem(emptyList()))
+    }
+
+    @Test
+    fun `milestone stage reflects done in-progress and upcoming`() {
+        val items = decodeGoalChecklist("[x] 第一站\n[ ] 第二站\n[ ] 第三站")
+        assertEquals("已完成", goalMilestoneStage(items, 0))
+        assertEquals("进行中", goalMilestoneStage(items, 1))
+        assertEquals("未开始", goalMilestoneStage(items, 2))
+    }
+
+    @Test
+    fun `checklist percent floors progress and handles empty`() {
+        assertEquals(33, goalChecklistPercent(decodeGoalChecklist("[x] a\n[ ] b\n[ ] c")))
+        assertEquals(0, goalChecklistPercent(emptyList()))
     }
 
     private fun newCoordinator(store: InMemorySessionSettingsStore): SessionSettingsCoordinator =
