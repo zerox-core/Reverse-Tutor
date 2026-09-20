@@ -160,4 +160,5 @@
 - ⑨ 红线只管「说出口的正文」，不管内心独白/思考链：思考链抽屉（切片 4）默认折叠，独白即使暴露教学策略也不拦截、不触发重说/兜底——用户知道 AI 在陪演，能理解独白内容；真正要保护的只有学生直接看到的正文。
 - ⑩ 兜底话术必须低频：红线中止 + 重说仅限正文真泄露的场景；「我刚把自己绕进去了」出现频率纳入切片 5 实测观察项，若 turn_run_trajectories 统计显示命中率过高，优先回头调红线清单与 prompt，而不是加码拦截。
 - ⑪ 生成提速走轻量路线（2026-09-20 用户拍板：1 和 3 做、2 暂不做；方案 2 DeepSeek 官方端点等正式完工真实使用时可能接入）。根因实测：~60s 延迟 = prompt 预填充（小 prompt TTFT 4.6s；4k 字 27~32s；百炼端点无前缀缓存）。方案 1 = prompt 双档瘦身：闲聊/目标切换轮（OffTopic/GoalChange）只带模板人设 + 最近 2 条消息（单条 body ≤400 字，整包 ~1.5k 字）；学习轮保留 Summary/Gaps/Review/Memory/Source 证据、消息只带最近 2 条、掌握度与历史错误不再进证据（由确定性便签承载，便签已含 masteryScore/lastStuckPoint）。方案 3 = 等待呼吸态（见⑫）。
-- ⑫ 等待呼吸态（2026-09-20 拍板）：生成期等待指示从静态「•••」/「正在输入…」升级为错相位呼吸点（StartOffset 170ms 错开）+ alpha 呼吸（900ms Reverse），预填充等待窗口读起来是「在活动」而不是「卡住了」。
+- ⑫ 等待呼吸态（2026-09-20 拍板）：生成期等待指示从静态「•••」/「正在输入…」升级为错相位呼吸点 + alpha 呼吸（900ms Reverse；Compose 1.5.8 无 initialStartOffset，实现为单相位 0→1 三角波 (phase+i/3)%1 数学错相位，效果等价），预填充等待窗口读起来是「在活动」而不是「卡住了」。
+- ⑬ 流式预览接通（2026-09-20 拍板，翻转 2026-09-10「后台生成有意无流式预览」设计）：链路本就全通——传输层 SSE 逐 chunk 回调 → StreamWatchdog 红线边收边检（命中即停发预览并中止流）→ BackgroundGenerationRepository.onChunk → 进程内 GenerationPartialStore（≤1200 字符、token 门控、取消/失败/完成即清）。本次只接最后一公里：ChatScreen 轮询循环 250→150ms，Running 期间读 getGenerationPreview 透出为 Streaming 状态逐字上屏，重进会话恢复路径同样带预览；Queued/终态不透出（完整回复仍只由持久化消息发布一次）；backgroundGenerationUiState 新增 preview 可选参数（默认 null 向后兼容）；会话卡片（SessionCardGeneration）保持只显状态不放文本。

@@ -196,7 +196,9 @@ sealed interface ChatGenerationUiState {
  */
 fun backgroundGenerationUiState(
     status: BackgroundJobStatus,
-    errorMessage: String?
+    errorMessage: String?,
+    /** 2026-09-20 拍板接通：Running 期间从 GenerationPartialStore 读到的流式增量文本。 */
+    preview: String? = null
 ): ChatGenerationUiState = when (status) {
     BackgroundJobStatus.Failed -> when (errorMessage) {
         NoModelConfiguredReason -> ChatGenerationUiState.NoModel
@@ -207,8 +209,10 @@ fun backgroundGenerationUiState(
     BackgroundJobStatus.Cancelled,
     BackgroundJobStatus.Discarded,
     BackgroundJobStatus.Completed -> ChatGenerationUiState.Idle
-    BackgroundJobStatus.Queued,
-    BackgroundJobStatus.Running -> ChatGenerationUiState.Pending
+    BackgroundJobStatus.Queued -> ChatGenerationUiState.Pending
+    BackgroundJobStatus.Running -> preview?.takeIf { it.isNotBlank() }
+        ?.let { ChatGenerationUiState.Streaming(it) }
+        ?: ChatGenerationUiState.Pending
 }
 
 internal const val NoModelConfiguredReason = "No model configured"

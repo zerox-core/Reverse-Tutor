@@ -267,10 +267,15 @@ fun ChatRoute(
         // page keeps observing the same Worker-owned turn instead of showing
         // the already-persisted user message as an orphan.
         if (activeBackgroundJobId == null) {
-            backgroundGenerationRepository?.findActiveJobForSession(sessionId)?.let { activeJob ->
+            val repository = backgroundGenerationRepository
+            repository?.findActiveJobForSession(sessionId)?.let { activeJob ->
                 activeGenerationToken = activeJob.token
                 activeBackgroundJobId = activeJob.id
-                generation = backgroundGenerationUiState(activeJob.status, activeJob.errorMessage)
+                generation = backgroundGenerationUiState(
+                    activeJob.status,
+                    activeJob.errorMessage,
+                    repository.getGenerationPreview(activeJob.id, activeJob.token)
+                )
             }
         }
     }
@@ -329,11 +334,8 @@ fun ChatRoute(
         val jobId = activeBackgroundJobId ?: return@LaunchedEffect
         val repository = backgroundGenerationRepository ?: return@LaunchedEffect
         while (activeBackgroundJobId == jobId) {
-            delay(250L)
+            delay(150L)
             val job = repository.getJob(jobId) ?: return@LaunchedEffect
-            // Background generation intentionally shows no streaming preview:
-            // the pending indicator covers the whole run and the terminal
-            // branch below publishes the full reply once (design confirmed 2026-09-10).
             if (job.status in TerminalGenerationStatuses) {
                 if (activeGenerationToken == job.token) {
                     activeGenerationToken = null
@@ -344,6 +346,14 @@ fun ChatRoute(
                 reload()
                 return@LaunchedEffect
             }
+            // 2026-09-20 用户拍板：接通流式预览（翻转 2026-09-10 的无预览设计）。
+            // Running 期间把 partialStore 的增量文本透出为 Streaming 状态逐字上屏；
+            // 终态仍走上面分支——完整回复只由持久化消息发布一次，预览随终态清空。
+            generation = backgroundGenerationUiState(
+                job.status,
+                job.errorMessage,
+                repository.getGenerationPreview(jobId, job.token)
+            )
         }
     }
 
