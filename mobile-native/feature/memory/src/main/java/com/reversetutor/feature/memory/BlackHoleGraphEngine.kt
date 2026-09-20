@@ -688,8 +688,10 @@ class BlackHoleGraphEngine(
 
     /**
      * R83 连线绕行净空带：直线段若穿洞（距洞心 < 净空带+边距），返回绕行折线
-     * 「径向引出 -> 沿带外沿圆弧（短弧）-> 径向接入」的世界坐标序列 [x0,y0,x1,y1,...]；
-     * 不穿洞返回 null（画直线）。径向段与圆弧全部位于带外，连线绝不横穿黑洞区域（用户拍板）。
+     * 「径向引出 -> 带外鼓包弧线（短弧）-> 径向接入」的世界坐标序列 [x0,y0,x1,y1,...]；
+     * 不穿洞返回 null（画直线）。径向段与弧线全部位于带外，连线绝不横穿黑洞区域（用户拍板）。
+     * R84 用户拍板：手画的红圈只是数值范围参考，绝不允许在实机上描出一个统一的圈——
+     * 绕行弧不再贴恒定半径，每条边按自身弦长向外鼓出不同高度，众边合起来不成圆。
      */
     fun routeEdgeAroundZone(fromX: Float, fromY: Float, toX: Float, toY: Float): FloatArray? {
         val z = exclusionRadius + physics.edgeZoneMargin
@@ -716,10 +718,15 @@ class BlackHoleGraphEngine(
         pts.add(holeX + cos(angA) * z)
         pts.add(holeY + sin(angA) * z)
         val steps = 14
+        // 鼓包高度按弦长取 22~64px：弦长随节点运动连续变化，鼓包逐帧稳定不跳变；
+        // 各边弦长不同 -> 鼓包高度各异 -> 不会共同描出统一半径的圆；sin 恒非负 -> r 恒 >= z。
+        val chord = hypot(toX - fromX, toY - fromY)
+        val extra = (0.22f * chord).coerceIn(22f, 64f)
         for (i in 1..steps) {
             val a = angA + sweep * i / steps
-            pts.add(holeX + cos(a) * z)
-            pts.add(holeY + sin(a) * z)
+            val r = z + extra * sin(PI.toFloat() * i / steps)
+            pts.add(holeX + cos(a) * r)
+            pts.add(holeY + sin(a) * r)
         }
         pts.add(toX)
         pts.add(toY)

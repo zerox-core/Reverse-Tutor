@@ -691,7 +691,7 @@ class BlackHoleGraphEngineTest {
     @Test
     fun edge_route_bends_around_exclusion_zone() {
         // 连线绝不横穿黑洞区域：洞两侧对径点的连线必须绕行，折线上每一点都在带外；
-        // 同侧不穿洞的连线保持直线
+        // 同侧不穿洞的连线保持直线；R84：绕行是鼓包弧线、半径逐点变化，不许描出统一的圈
         val engine = engineWith(2)
         val z = engine.exclusionRadius
         val r = z + 120f
@@ -706,6 +706,17 @@ class BlackHoleGraphEngineTest {
             i += 2
         }
         assertTrue("route dips into zone: minD=$minD exclusion=$z", minD >= z - 1f)
+        // R84 用户拍板：手画红圈只是数值范围参考，不得在实机上描出一个统一的圈——
+        // 绕行弧按边长向外鼓包，半径沿弧变化（maxD 明显高于 minD），众边不再合成一个圆
+        var maxD = 0f
+        i = 0
+        while (i + 1 < pts.size) {
+            val d = hypot(pts[i] - engine.holeX, pts[i + 1] - engine.holeY)
+            if (d > maxD) maxD = d
+            i += 2
+        }
+        assertTrue("route still traces a constant-radius circle: minD=$minD maxD=$maxD",
+            maxD > minD + 10f)
         val straight = engine.routeEdgeAroundZone(
             engine.holeX - r, engine.holeY - r, engine.holeX - r - 100f, engine.holeY - r + 40f)
         assertNull(straight)
