@@ -1,4 +1,4 @@
-﻿package com.reversetutor.feature.chat
+package com.reversetutor.feature.chat
 
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -699,32 +699,70 @@ private fun GoalPlanPage(
         },
         testTag = "goal-breakdown"
     )
-    SettingsTextField("模块", value.modules, { next ->
-        coordinator.editGoalPlan { current -> current.copy(modules = next) }
-        refresh()
-    }, commitBoundary)
+    // V1 旅程版式：底部三个设置板块卡片化 + 分区标题色条 + 计数胶囊，
+    // 与英雄卡/里程碑站点卡同一设计语言；只改本页局部样式，
+    // 共享的 SettingsGroup/TokenField/TagLibraryPicker 本体与其他设置页不动。
+    GoalSettingsCard(title = "模块", tick = FormalColors.Primary) {
+        SessionConfigurationTextField(
+            label = "模块内容",
+            value = value.modules,
+            onBoundary = commitBoundary,
+            onValueChange = { next ->
+                coordinator.editGoalPlan { current -> current.copy(modules = next) }
+                refresh()
+            }
+        )
+    }
+    GoalSettingsCard(title = "学习范围", tick = FormalColors.Success) {
+        TokenField(
+            value = value.learningScope,
+            onValueChange = { next -> coordinator.editGoalPlan { current -> current.copy(learningScope = next) }; refresh() }
+        )
+        Text("输入知识点后回车或点「添加」变成标签，例如：立体几何、导数、概率统计。", color = FormalColors.Muted)
+    }
+    val goalTagSelection = coordinator.state.form.quickTags["goal"] ?: TagFieldSelection()
+    GoalSettingsCard(
+        title = "分类快捷标签",
+        tick = FormalColors.Primary,
+        badge = "已选 ${goalTagSelection.values.size}"
+    ) {
+        TagLibraryPicker(
+            state = tagState,
+            selection = goalTagSelection,
+            editor = tagEditor,
+            onStateChange = onTagStateChange,
+            onToggle = { coordinator.toggleQuickTag("goal", TagSelectionValue(it.id, it.name)); refresh() },
+            onExpansionChange = { groupId, expanded ->
+                tagEditor.setGroupExpanded(groupId, expanded)
+                onTagStateChange(tagEditor.state)
+            }
+        )
+    }
+}
+
+/** V1 旅程版式：目标页底部设置板块卡片容器（白卡细边 + 分区标题色条 + 可选计数胶囊）。 */
+@Composable
+private fun GoalSettingsCard(
+    title: String,
+    tick: Color,
+    badge: String? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
     SettingsGroup {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("学习范围", fontWeight = FontWeight.SemiBold)
-            TokenField(
-                value = value.learningScope,
-                onValueChange = { next -> coordinator.editGoalPlan { current -> current.copy(learningScope = next) }; refresh() }
-            )
-            Text("输入知识点后回车或点「添加」变成标签，例如：立体几何、导数、概率统计。", color = FormalColors.Muted)
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GoalSectionTitle(title, tick)
+                if (badge != null) {
+                    Spacer(Modifier.weight(1f))
+                    GoalCountBadge(badge, FormalColors.PrimarySoft, FormalColors.Primary)
+                }
+            }
+            content()
         }
     }
-    Text("分类快捷标签", fontWeight = FontWeight.SemiBold)
-    TagLibraryPicker(
-        state = tagState,
-        selection = coordinator.state.form.quickTags["goal"] ?: TagFieldSelection(),
-        editor = tagEditor,
-        onStateChange = onTagStateChange,
-        onToggle = { coordinator.toggleQuickTag("goal", TagSelectionValue(it.id, it.name)); refresh() },
-        onExpansionChange = { groupId, expanded ->
-            tagEditor.setGroupExpanded(groupId, expanded)
-            onTagStateChange(tagEditor.state)
-        }
-    )
 }
 
 @Composable
