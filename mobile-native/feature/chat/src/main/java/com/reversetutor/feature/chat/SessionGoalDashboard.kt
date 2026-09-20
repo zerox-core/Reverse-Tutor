@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -320,16 +322,33 @@ fun GoalDashboardHero(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFFEFF3FF), Color(0xFFFBFCFF))
+                Brush.linearGradient(
+                    listOf(Color(0xFFE3EBFF), Color(0xFFF0F5FF), Color(0xFFFBFCFF))
                 )
             )
-            .border(1.dp, FormalColors.Divider, RoundedCornerShape(16.dp))
+            .border(1.dp, FormalColors.Primary.copy(alpha = 0.18f), RoundedCornerShape(16.dp))
             .testTag(testTag)
     ) {
         GoalHeroBackdrop(Modifier.matchParentSize())
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(FormalColors.Primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Flag,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
                 Text(
                     "主要目标",
                     fontSize = 12.sp,
@@ -751,7 +770,7 @@ fun GoalBreakdownCard(
                         else -> true
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     shown.forEach { (index, item) ->
                         GoalWeeklyRow(
                             item = item,
@@ -821,21 +840,29 @@ internal fun GoalMilestoneStation(
     testTag: String
 ) {
     Column(modifier = modifier.testTag(testTag)) {
-        // 路线行：编号圆点 + 通往下一站的连接线
+        val doing = stage == "进行中"
+        // 路线行：编号圆点 + 通往下一站的渐变连接线
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val dotBg = when {
+                item.done -> FormalColors.Success
+                doing -> FormalColors.Primary
+                else -> FormalColors.Surface
+            }
+            val dotBorder = when {
+                item.done -> FormalColors.Success
+                doing -> FormalColors.Primary
+                else -> FormalColors.Primary.copy(alpha = 0.55f)
+            }
+            val dotTextColor = if (item.done || doing) Color.White else FormalColors.Primary
             Box(
                 modifier = Modifier
-                    .size(26.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
-                    .background(if (item.done) FormalColors.Success else FormalColors.Surface)
-                    .border(
-                        1.5.dp,
-                        if (item.done) FormalColors.Success else FormalColors.Primary.copy(alpha = 0.55f),
-                        CircleShape
-                    )
+                    .background(dotBg)
+                    .border(1.5.dp, dotBorder, CircleShape)
                     .testTag("$testTag-check"),
                 contentAlignment = Alignment.Center
             ) {
@@ -844,27 +871,37 @@ internal fun GoalMilestoneStation(
                         imageVector = Icons.Rounded.Check,
                         contentDescription = "已完成",
                         tint = Color.White,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 } else {
                     Text(
                         text = "${index + 1}",
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = FormalColors.Primary
+                        color = dotTextColor
                     )
                 }
             }
             if (!isLast) {
+                val lineBrush = when {
+                    item.done -> Brush.horizontalGradient(
+                        listOf(
+                            FormalColors.Success.copy(alpha = 0.75f),
+                            FormalColors.Success.copy(alpha = 0.75f)
+                        )
+                    )
+                    doing -> Brush.horizontalGradient(
+                        listOf(FormalColors.Primary.copy(alpha = 0.55f), FormalColors.Divider)
+                    )
+                    else -> Brush.horizontalGradient(listOf(FormalColors.Divider, FormalColors.Divider))
+                }
                 Box(
                     Modifier
                         .weight(1f)
-                        .padding(horizontal = 3.dp)
-                        .height(2.dp)
+                        .padding(horizontal = 4.dp)
+                        .height(2.5.dp)
                         .clip(RoundedCornerShape(999.dp))
-                        .background(
-                            if (item.done) FormalColors.Success.copy(alpha = 0.7f) else FormalColors.Divider
-                        )
+                        .background(lineBrush)
                 )
             } else {
                 Spacer(Modifier.weight(1f))
@@ -872,26 +909,49 @@ internal fun GoalMilestoneStation(
         }
         Spacer(Modifier.height(6.dp))
         val bg by animateColorAsState(
-            targetValue = if (item.done) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle,
+            targetValue = when {
+                item.done -> FormalColors.SuccessSoft
+                doing -> FormalColors.PrimarySoft
+                else -> FormalColors.SurfaceSubtle
+            },
             animationSpec = tween(250),
             label = "$testTag-bg"
         )
+        val stageBar = when {
+            item.done -> FormalColors.Success
+            doing -> FormalColors.Primary
+            else -> FormalColors.Divider
+        }
         Surface(
-            modifier = Modifier.fillMaxWidth().height(76.dp),
+            modifier = Modifier.fillMaxWidth().height(82.dp),
             shape = RoundedCornerShape(10.dp),
             color = bg,
             border = BorderStroke(
                 1.dp,
-                if (item.done) FormalColors.Success.copy(alpha = 0.55f) else FormalColors.Divider
+                when {
+                    item.done -> FormalColors.Success.copy(alpha = 0.55f)
+                    doing -> FormalColors.Primary.copy(alpha = 0.45f)
+                    else -> FormalColors.Divider
+                }
             )
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
                     .combinedClickable(onClick = onToggle, onLongClick = onRemove)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Box(
+                    Modifier
+                        .width(3.5.dp)
+                        .fillMaxHeight()
+                        .background(stageBar)
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                 Text(
                     text = item.text,
                     fontSize = 12.5.sp,
@@ -902,6 +962,7 @@ internal fun GoalMilestoneStation(
                     overflow = TextOverflow.Ellipsis
                 )
                 GoalStageCapsule(stage = stage)
+                }
             }
         }
     }
@@ -1010,9 +1071,10 @@ internal fun GoalWeeklyRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (item.done) FormalColors.SuccessSoft else FormalColors.SurfaceSubtle)
             .combinedClickable(onClick = onToggle, onLongClick = onRemove)
-            .padding(vertical = 6.dp, horizontal = 2.dp)
+            .padding(vertical = 8.dp, horizontal = 10.dp)
             .testTag(testTag),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
