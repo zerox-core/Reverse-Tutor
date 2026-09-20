@@ -175,6 +175,7 @@ class BlackHoleGraphEngine(
     private var iter: Int = 0
     private var settled: Boolean = false
     private var draggingId: String? = null
+    private var dragWasDying: Boolean = false
     private var absorbedTotal: Int = 0
     private var rescuedTotal: Int = 0
     private var simAccum: Float = 0f
@@ -252,6 +253,7 @@ class BlackHoleGraphEngine(
         iter = 0
         settled = false
         draggingId = null
+        dragWasDying = false
         dragOverHole = false
         absorbedTotal = 0
         rescuedTotal = 0
@@ -261,9 +263,10 @@ class BlackHoleGraphEngine(
 
     // ---------- 查询 ----------
 
+    /** R81：濒死（Dying）节点同样可命中——拖回来=复习抢救，不再整段旅程不可交互（用户反馈「没办法拖动了」）。 */
     fun hitTest(x: Float, y: Float): BlackHoleNode? =
         nodeList.asReversed().firstOrNull { node ->
-            !node.gone && !node.absorbed && node.mode != BlackHoleNodeMode.Dying &&
+            !node.gone && !node.absorbed &&
                 hypot(node.dispX - x, node.dispY - y) <= node.displayRadius(physics) * 1.35f
         }
 
@@ -349,8 +352,9 @@ class BlackHoleGraphEngine(
 
     fun startDrag(nodeId: String) {
         val node = nodeList.firstOrNull {
-            it.id == nodeId && !it.gone && !it.absorbed && it.mode != BlackHoleNodeMode.Dying
+            it.id == nodeId && !it.gone && !it.absorbed
         } ?: return
+        dragWasDying = node.mode == BlackHoleNodeMode.Dying
         draggingId = node.id
         node.mode = BlackHoleNodeMode.Dragging
         node.vx = 0f
@@ -380,12 +384,18 @@ class BlackHoleGraphEngine(
         iter = min(iter, physics.wakeIterationCap)
     }
 
-    /** 松手：净空带内 -> 弹开（不吞噬）；普通位置 -> 惯性滑停 -> 回归物理层由弹簧收敛（不停泊）。 */
-    fun endDrag() {
+    /**
+     * 松手：净空带内 -> 弹开（不吞噬）；普通位置 -> 惯性滑停 -> 回归物理层由弹簧收敛（不停泊）。
+     * R81：拖动濒死（Dying）节点 = 抓回来复习——松手即抢救（遗忘清零、冷却重置、回到力场），
+     * 返回被抢救的节点 id；普通节点返回 null。
+     */
+    fun endDrag(): String? {
         val node = nodeList.firstOrNull { it.id == draggingId }
+        val wasDying = dragWasDying
         draggingId = null
+        dragWasDying = false
         dragOverHole = false
-        if (node == null) return
+        if (node == null) return null
         if (isInExclusionZone(node.dispX, node.dispY)) {
             val dx = node.dispX - holeX
             val dy = node.dispY - holeY
@@ -394,7 +404,16 @@ class BlackHoleGraphEngine(
             node.vy = dy / len * physics.bounceSpeed
         }
         node.mode = BlackHoleNodeMode.InertiaSliding
+        if (wasDying) {
+            node.forget = 0f
+            node.cooling = true
+            node.coolingElapsed = 0f
+            rescuedTotal++
+            wake()
+            return node.id
+        }
         wake()
+        return null
     }
 
     /** 页面关闭/重进回归：全部展示位置回归算法层（V23-4）。 */

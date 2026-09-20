@@ -16,7 +16,7 @@ import kotlin.math.atan2
  * 弹簧收敛圆润、黑洞弹开不吞噬、吞噬遗忘门（碰撞误入核心只弹不吞）、
  * R65 算法层重构（黑洞无引力、净空带永久硬边界）、
  * R66 冷却保护模型（保护期内遗忘冻结+原地公转、过保后漩涡旅程螺旋坠入、
- * 坠入节点脱离力场不扰动布局、Dying 不可命中/拖拽）、
+ * 坠入节点脱离力场不扰动布局、Dying 可拖回=松手抢救（R81））、
  * 页面重置、硬保护（clamp/NaN）、settle 后常驻公转、入场缓动、时间倍率全局缩放。
  */
 class BlackHoleGraphEngineTest {
@@ -489,16 +489,34 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
-    fun dying_node_cannot_be_hit_tested_or_dragged() {
-        // 漩涡旅程中的节点不可点中、不可拖拽（它是「正在遗忘」的展示态，不再是可操作对象）
+    fun dying_node_can_be_hit_dragged_and_revives_on_release() {
+        // R81 修复「节点没办法拖动」：濒死节点也可命中、可拖拽——松手即抢救（遗忘清零、冷却重置、回力场）
         val engine = engineWith(2)
         val node = engine.nodes.first()
         node.cooling = false
         engine.tick(1f / 60f)
         assertEquals(BlackHoleNodeMode.Dying, node.mode)
-        assertNull(engine.hitTest(node.dispX, node.dispY))
+        assertNotNull(engine.hitTest(node.dispX, node.dispY))
         engine.startDrag(node.id)
-        assertEquals(BlackHoleNodeMode.Dying, node.mode)
+        assertEquals(BlackHoleNodeMode.Dragging, node.mode)
+        engine.dragTo(node.dispX + 40f, node.dispY + 40f)
+        val rescued = engine.endDrag()
+        assertEquals(node.id, rescued)
+        assertEquals(0f, node.forget)
+        assertTrue(node.cooling)
+        assertEquals(BlackHoleNodeMode.InertiaSliding, node.mode)
+        assertEquals(1, engine.rescuedCount)
+    }
+
+    @Test
+    fun healthy_node_drag_release_does_not_rescue() {
+        // 普通节点拖放返回 null、不计抢救数（点按选中路径不受影响）
+        val engine = engineWith(2)
+        val node = engine.nodes.first()
+        engine.startDrag(node.id)
+        assertEquals(null, engine.endDrag())
+        assertEquals(BlackHoleNodeMode.InertiaSliding, node.mode)
+        assertEquals(0, engine.rescuedCount)
     }
 
     // ---------- D7 断链离散 · 点击抢救（用户 2026-09-19 拍板） ----------

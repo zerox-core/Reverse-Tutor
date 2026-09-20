@@ -177,7 +177,7 @@ object BlackHoleGraphThemes {
         chipIdleBg = Color(0x33141B33),
         chipIdleText = Color(0xFF9AA7C7),
         nodeGlow = Color(0xFF3A466E),
-        nodeGlowAlpha = 0.35f,
+        nodeGlowAlpha = 0.55f, // R81：深色同步浅色发光强度（用户拍板）
         nodeBorder = Color(0xFF1A2242),
         isDark = true,
         nodeColors = mapOf(
@@ -548,9 +548,9 @@ private fun BlackHoleGraphReadyContent(
                     // 触点落在画布即申请手势所有权（克隆旧屏 onRequestInteraction 语义）
                     onCanvasModeChange(true)
                     val downWorld = screenToWorld(down.position)
+                    // R81：所有可见节点（含濒死 Dying）都可命中——拖动/点按濒死节点按「复习」抢救处理，
+                    // 修复「节点没办法拖动」（此前 Dying 整段旅程 hitTest 豁免，手势全部落到平移分支）
                     val hit = engine.hitTest(downWorld.x, downWorld.y)
-                    // 普通命中未中时，再探「可抢救」的濒死节点（闪烁呼吸段；普通 hitTest 对 Dying 豁免）
-                    val rescueHit = if (hit == null) engine.hitTestRescuable(downWorld.x, downWorld.y) else null
                     if (hit != null) {
                         // 节点拖动路径（含点按判定）
                         engine.startDrag(hit.id)
@@ -570,30 +570,15 @@ private fun BlackHoleGraphReadyContent(
                                 change.consume()
                             }
                         }
-                        engine.endDrag()
+                        // 松手即判定：拖的是濒死节点 -> 抢救复活（点按松手同样算复习；R81 统一原抢救分支与拖动）
+                        val rescuedId = engine.endDrag()
                         interacting = false
                         onGraphInteractionChanged(false)
-                        if (totalMove < viewConfiguration.touchSlop) {
+                        if (rescuedId != null) {
+                            val label = layoutNodes.firstOrNull { it.id == rescuedId }?.label ?: rescuedId
+                            rescueToast = "已抢救回归「$label」：复习完成，遗忘清零"
+                        } else if (totalMove < viewConfiguration.touchSlop) {
                             onSelectedNodeChange(if (state.selectedNodeId == hit.id) null else hit.id)
-                        }
-                    } else if (rescueHit != null) {
-                        // 点按闪烁的濒死节点 = 抢救复习（用户 2026-09-19 拍板 D7 断链离散方案）：
-                        // 不做拖动/平移，等抬手且位移小于阈值即触发抢救——遗忘清零、冷却重置、
-                        // 节点回归净空带外沿、与母节点的连线自动重接。
-                        var totalMove = 0f
-                        var active = true
-                        while (active) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id }
-                            if (change == null || !change.pressed) {
-                                active = false
-                            } else if (change.positionChanged()) {
-                                totalMove += change.positionChange().getDistance()
-                                change.consume()
-                            }
-                        }
-                        if (totalMove < viewConfiguration.touchSlop && engine.rescueNode(rescueHit.id)) {
-                            rescueToast = "已抢救回归「${rescueHit.label}」：复习完成，遗忘清零"
                         }
                     } else {
                         // 空白：平移 / 双指缩放；位移极小视为点按取消选中
@@ -761,7 +746,7 @@ private fun BlackHoleGraphReadyContent(
             // 盘画在连线下层；黑核本体移到连线之后再画——任何跨洞连线都会被黑核盖住，绝不「接进」黑洞。
             val holeCenter = worldToScreen(engine.holeX, engine.holeY)
             val coreR = engine.holeCoreRadius * camera.scale
-            val diskR = engine.exclusionRadius * camera.scale
+            val diskR = engine.exclusionRadius * camera.scale * 2f // R81：光盘半径增大一倍（用户拍板）
             // 盘底色：径向亮度梯度（内缘最亮 → 外缘渐隐；用户拍板纯白盘）
             val diskStops = if (palette.isDark) arrayOf(
                 0f to Color.Transparent,
@@ -788,7 +773,7 @@ private fun BlackHoleGraphReadyContent(
             // 湍流条纹：开普勒差速（内快外慢）+ 多普勒亮边（一侧更亮，亮边方向极缓慢摆动）
             val beamAngle = 3.5779f + 0.25f * sin(seconds * 0.11f)
             diskStreaks.forEach { streak ->
-                val r = streak.rNorm * coreR
+                val r = streak.rNorm * coreR * 2f // R81：条纹随盘外扩一倍
                 val theta = streak.angle0 + seconds * streak.omega
                 val rel = kotlin.math.cos(theta - beamAngle)
                 val beaming = 0.62f + 0.55f * rel * rel
@@ -984,8 +969,8 @@ private fun BlackHoleGraphReadyContent(
                 val base = palette.nodeColor(node.kind)
                 // 选中/抢救提示环用同色相压暗描边（用户 2026-09-19 拍板：不要黑色线框），与米白底和同色光晕都有区分度
                 val ringColor = Color(base.red * 0.72f, base.green * 0.72f, base.blue * 0.72f)
-                // 柔光晕（半径外扩 ~2.1x，渐隐）：浅色用节点同色晕——白色晕在米白底上不可见还会把节点洗淡（R68 用户反馈「太淡」）
-                val glowColor = if (palette.isDark) palette.nodeGlow else base
+                // 柔光晕（半径外扩 ~2.1x，渐隐）：节点同色晕（R81 深色同步浅色做法——深色统一蓝紫晕与浅色同色晕观感割裂）
+                val glowColor = base
                 drawCircle(
                     brush = Brush.radialGradient(
                         colors = listOf(
