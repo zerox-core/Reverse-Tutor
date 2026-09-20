@@ -426,34 +426,78 @@ fun GoalDashboardHero(
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("截止时间", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FormalColors.Muted)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (deadline.isBlank() || deadline == "未设置") {
+                        // R79 控件重做：没设时间时不再是「不设置时间 + 改」的被动标签，
+                        // 改成行动优先的入口——点一下直接开日历；不设也完全合法。
                         Text(
-                            text = deadlineText,
-                            fontSize = 15.sp,
-                            color = FormalColors.Ink
-                        )
-                        TextButton(
-                            onClick = { showDeadlinePicker = true },
-                            modifier = Modifier.testTag("$testTag-deadline-edit")
-                        ) { Text("改", fontSize = 13.sp) }
-                    }
-                    when {
-                        daysLeft != null -> Text(
-                            text = goalDeadlineLabel(daysLeft),
+                            text = "＋ 设置截止时间",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = goalDeadlineToneColor(goalDeadlineTone(daysLeft))
+                            color = FormalColors.Primary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(FormalColors.Primary.copy(alpha = 0.08f))
+                                .border(1.dp, FormalColors.Primary.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                .clickable { showDeadlinePicker = true }
+                                .padding(horizontal = 12.dp, vertical = 7.dp)
+                                .testTag("$testTag-deadline-edit")
                         )
-                        deadline.isNotBlank() && deadline != "未设置" -> Text(
-                            text = "暂时认不出这个日期，点「改」从日历里重新选",
+                        Text(
+                            text = "设个终点，左边的圆环会替你倒数；一直不设也行",
                             fontSize = 12.sp,
                             color = FormalColors.Muted
                         )
-                        else -> Text(
-                            text = "点「改」从日历里挑一天，左边的圆环会替你倒数",
-                            fontSize = 12.sp,
-                            color = FormalColors.Muted
-                        )
+                    } else {
+                        // 已设置：日期本体可点按改期，旁边两个明示动作「改期 / 清除」。
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = deadlineText,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = FormalColors.Ink,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { showDeadlinePicker = true }
+                                    .testTag("$testTag-deadline-edit")
+                            )
+                            Text(
+                                text = "改期",
+                                fontSize = 13.sp,
+                                color = FormalColors.Primary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { showDeadlinePicker = true }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    .testTag("$testTag-deadline-reschedule")
+                            )
+                            Text(
+                                text = "清除",
+                                fontSize = 13.sp,
+                                color = FormalColors.Muted,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { onDeadlineCommit("") }
+                                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                                    .testTag("$testTag-deadline-clear-inline")
+                            )
+                        }
+                        if (daysLeft != null) {
+                            Text(
+                                text = goalDeadlineLabel(daysLeft),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = goalDeadlineToneColor(goalDeadlineTone(daysLeft))
+                            )
+                        } else {
+                            Text(
+                                text = "暂时认不出这个日期，点「改期」从日历里重新选",
+                                fontSize = 12.sp,
+                                color = FormalColors.Muted
+                            )
+                        }
                     }
                 }
             }
@@ -464,30 +508,108 @@ fun GoalDashboardHero(
                 )
                 DatePickerDialog(
                     onDismissRequest = { showDeadlinePicker = false },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                pickerState.selectedDateMillis?.let { onDeadlineCommit(formatGoalDeadlineMillis(it)) }
-                                showDeadlinePicker = false
-                            },
-                            enabled = pickerState.selectedDateMillis != null,
-                            modifier = Modifier.testTag("$testTag-deadline-confirm")
-                        ) { Text("确定") }
-                    },
-                    dismissButton = {
-                        Row {
-                            TextButton(
-                                onClick = {
-                                    onDeadlineCommit("")
-                                    showDeadlinePicker = false
-                                },
-                                modifier = Modifier.testTag("$testTag-deadline-clear")
-                            ) { Text("不设置时间") }
-                            TextButton(onClick = { showDeadlinePicker = false }) { Text("取消") }
-                        }
-                    }
+                    // R79：M3 弹窗的 confirm/dismiss 按钮槽在这个组合下标签不渲染
+                    // （像素级验证：三个按钮 0 文字像素，只有圆角阴影），且弹窗底部
+                    // 区域连自绘行的文字也不渲染、点击不响应。动作控件全部改为在
+                    // 内容列顶部自绘（日历上方），此处按钮槽留空。
+                    confirmButton = {}
                 ) {
-                    DatePicker(state = pickerState)
+                    Column {
+                        // R79 布局定论：这个 M3 弹窗的底部区域（无论 M3 按钮槽还是
+                        // 自绘行）文字一律不渲染、点击不响应；而日历上方的元素全部
+                        // 正常（快选 chips 像素与点击均已验证）。因此动作控件全部上移
+                        // 到日历上方，弹窗底部不再摆任何按钮。
+                        // 工具栏：左「取消」右「确定」；确定为主样式，未选日期时点了不关弹窗。
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "取消",
+                                fontSize = 13.sp,
+                                color = FormalColors.Muted,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showDeadlinePicker = false }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                                    .testTag("$testTag-deadline-cancel")
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                text = "确定",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = FormalColors.Primary,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(FormalColors.Primary.copy(alpha = 0.08f))
+                                    .border(1.dp, FormalColors.Primary.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        val selected = pickerState.selectedDateMillis
+                                        if (selected != null) {
+                                            onDeadlineCommit(formatGoalDeadlineMillis(selected))
+                                            showDeadlinePicker = false
+                                        }
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    .testTag("$testTag-deadline-confirm")
+                            )
+                        }
+                        // R79 快选：常见周期一键到位，不用在日历里翻页数格子；
+                        // 行尾「不设置时间」一键清除截止时间。title 置空：工具栏和
+                        // 快选行已占标题位，日历自带的大标题块去掉，避免弹窗过高。
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 4.dp)
+                        ) {
+                            listOf(7 to "7 天", 30 to "30 天", 90 to "90 天").forEach { (days, label) ->
+                                Text(
+                                    text = label,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = FormalColors.Primary,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(FormalColors.Primary.copy(alpha = 0.08f))
+                                        .border(1.dp, FormalColors.Primary.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
+                                        .clickable { pickerState.selectedDateMillis = todayMillis + days * 86_400_000L }
+                                        .padding(horizontal = 12.dp, vertical = 5.dp)
+                                        .testTag("$testTag-deadline-quick-$days")
+                                )
+                            }
+                            Text(
+                                text = "不设置时间",
+                                fontSize = 13.sp,
+                                color = FormalColors.Muted,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(1.dp, FormalColors.Muted.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        onDeadlineCommit("")
+                                        showDeadlinePicker = false
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                                    .testTag("$testTag-deadline-clear")
+                            )
+                        }
+                        DatePicker(
+                            state = pickerState,
+                            title = {},
+                            showModeToggle = false,
+                            // R79：默认 headline 是英文「Selected date」，换成中文日期展示。
+                            headline = {
+                                Text(
+                                    text = pickerState.selectedDateMillis?.let { formatGoalDeadlineMillis(it) }
+                                        ?: "选个截止日期",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = FormalColors.Ink
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
