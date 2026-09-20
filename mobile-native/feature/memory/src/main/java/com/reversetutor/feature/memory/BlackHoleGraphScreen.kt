@@ -482,7 +482,8 @@ private fun BlackHoleGraphReadyContent(
     val snapshot = state.renderSnapshot(true)
     val layoutNodes = state.allNodes
     val engine = remember(snapshot) {
-        BlackHoleGraphEngine().apply {
+        // R82 用户拍板：暂不做真实遗忘——保护期不过期，全部节点保持刚创建状态正常公转（待后端遗忘曲线）。
+        BlackHoleGraphEngine(physics = BlackHolePhysics(protectionSeconds = Float.MAX_VALUE)).apply {
             populate(
                 graphNodes = layoutNodes.map { Triple(it.id, it.label, it.kind) },
                 edges = snapshot.edges.map { it.fromNodeId to it.toNodeId }
@@ -746,7 +747,7 @@ private fun BlackHoleGraphReadyContent(
             // 盘画在连线下层；黑核本体移到连线之后再画——任何跨洞连线都会被黑核盖住，绝不「接进」黑洞。
             val holeCenter = worldToScreen(engine.holeX, engine.holeY)
             val coreR = engine.holeCoreRadius * camera.scale
-            val diskR = engine.exclusionRadius * camera.scale * 2f // R81：光盘半径增大一倍（用户拍板）
+            val diskR = engine.exclusionRadius * camera.scale // R82：光盘=遗忘区本体（半径比 3→6 由引擎承担，绘制随引擎值）
             // 盘底色：径向亮度梯度（内缘最亮 → 外缘渐隐；用户拍板纯白盘）
             val diskStops = if (palette.isDark) arrayOf(
                 0f to Color.Transparent,
@@ -773,7 +774,7 @@ private fun BlackHoleGraphReadyContent(
             // 湍流条纹：开普勒差速（内快外慢）+ 多普勒亮边（一侧更亮，亮边方向极缓慢摆动）
             val beamAngle = 3.5779f + 0.25f * sin(seconds * 0.11f)
             diskStreaks.forEach { streak ->
-                val r = streak.rNorm * coreR * 2f // R81：条纹随盘外扩一倍
+                val r = streak.rNorm * coreR // R82：条纹回退核心内圈点缀（外扩由遗忘区盘本体承担）
                 val theta = streak.angle0 + seconds * streak.omega
                 val rel = kotlin.math.cos(theta - beamAngle)
                 val beaming = 0.62f + 0.55f * rel * rel

@@ -55,8 +55,8 @@ data class BlackHolePhysics(
     val springIdeal: Float = 110f,
     val velocityClamp: Float = 30f,
     val dragDeltaClamp: Float = 500f,
-    /** 净空带（保护区）半径比：1 单位=黑洞核心半径，保护区=3 倍单位（用户 2026-09-19 拍板）。 */
-    val exclusionRadiusRatio: Float = 3.0f,
+    /** 净空带（遗忘区）半径比：1 单位=黑洞核心半径。R82 用户拍板：黑洞与节点之间的「遗忘区」半径翻倍 → 6 倍单位（2026-09-20，「光盘半径再增大一倍」所指即此区）。 */
+    val exclusionRadiusRatio: Float = 6.0f,
     val exclusionPush: Float = 6.0f,
     val settlingSeconds: Float = 0.8f,
     val orbitPeriodSeconds: Float = 420f,
@@ -241,11 +241,10 @@ class BlackHoleGraphEngine(
                 degree = degreeById[id] ?: 0,
                 simX = holeX + cos(angle) * ring,
                 simY = holeY + sin(angle) * ring,
-                // 演示分布：55% 新节点（保护期内、遗忘 0）；45% 已过保、遗忘中段——
-                // 打开页面即可看到「正常节点 + 漩涡坠入中」两种状态共存。
-                forget = run { val stag = hash % 100; if (stag < 55) 0f else (stag - 55) / 100f }
+                // R82 用户拍板：暂不做真实遗忘——全员「刚创建状态」：保护期内、遗忘 0、
+                // 正常绕黑洞公转（真实遗忘曲线等后端设计稿，届时恢复分阶段播种）。
+                forget = 0f
             )
-            if (node.forget > 0f) node.cooling = false
             nodeList.add(node)
         }
         val ids = nodeList.mapTo(HashSet()) { it.id }
@@ -522,7 +521,9 @@ class BlackHoleGraphEngine(
             node.decayAngle += orbitOmegaAt(dNow) * physics.decayOrbitBoost * scaled
             val remaining = (1f - node.forget).coerceIn(0f, 1f)
             val r = node.decayStartR * Math.pow(remaining.toDouble(), physics.decayRadiusPow.toDouble()).toFloat()
-            if (r <= holeCoreRadius * 0.6f || node.forget >= 1f) {
+            // R82：物理位置已抵核同样即吞——净空带翻倍（半径比 3→6）后，深遗忘节点若在带内
+            // 进入 Dying，decayStartR 被钳到净空带半径会把它「从核心弹回带外」、旅程凭空变长。
+            if (r <= holeCoreRadius * 0.6f || node.forget >= 1f || dNow <= holeCoreRadius * 0.6f) {
                 // 抵达核心：吞噬 = 真实遗忘（漩涡旅程的唯一终点）
                 node.absorbed = true
                 node.absorbFade = 0f

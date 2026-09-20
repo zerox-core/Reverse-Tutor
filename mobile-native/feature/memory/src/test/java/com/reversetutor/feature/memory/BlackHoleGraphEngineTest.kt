@@ -63,10 +63,17 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
-    fun populate_staggers_initial_forget_so_multiple_stages_visible() {
-        val engine = engineWith(24)
-        val distinct = engine.nodes.map { (it.forget * 100).toInt() }.toSet()
-        assertTrue("expected staggered forget values, got $distinct", distinct.size >= 8)
+    fun populate_seeds_all_nodes_fresh_and_protected() {
+        // R82 用户拍板：暂不做真实遗忘——播种全员刚创建状态（遗忘 0、保护期内）
+        val engine = BlackHoleGraphEngine()
+        engine.populate(
+            graphNodes = (1..24).map { Triple("n$it", "节点$it", GraphNodeKind.Concept) },
+            edges = emptyList()
+        )
+        engine.nodes.forEach { node ->
+            assertEquals(0f, node.forget, 1e-6f)
+            assertTrue("node ${node.id} not cooling", node.cooling)
+        }
     }
 
     // ---------- 力场稳定性 ----------
@@ -231,8 +238,11 @@ class BlackHoleGraphEngineTest {
         val n1 = engine.nodes.first { it.id == "n1" }
         val n2 = engine.nodes.first { it.id == "n2" }
         val d0 = hypot(n1.simX - n2.simX, n1.simY - n2.simY)
-        // 把 n1 拖到远离 n2 的位置松手
-        dragToAndRelease(engine, n1.id, n1.dispX + 300f, n1.dispY)
+        // 沿「远离 n2」方向拖开 320 松手（R82：净空带翻倍后布局半径变大，固定 +x 拖拽
+        // 与两节点相对方位无关，分离量不再有方向保证）
+        val ux = (n1.dispX - n2.dispX) / d0
+        val uy = (n1.dispY - n2.dispY) / d0
+        dragToAndRelease(engine, n1.id, n1.dispX + ux * 320f, n1.dispY + uy * 320f)
         val d1 = hypot(n1.dispX - n2.dispX, n1.dispY - n2.dispY)
         assertTrue("drag did not separate: d0=$d0 d1=$d1", d1 > d0 + 150f)
         tickSeconds(engine, 4f)
