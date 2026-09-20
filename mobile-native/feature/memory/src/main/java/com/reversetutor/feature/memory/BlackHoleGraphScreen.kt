@@ -816,18 +816,37 @@ private fun BlackHoleGraphReadyContent(
             }
             val edgeBaseWidthPx = max(1.2f, 1.dp.toPx())
             engine.renderEdges().forEach { edge ->
-                val a = worldToScreen(edge.fromX, edge.fromY)
-                val b = worldToScreen(edge.toX, edge.toY)
                 val dim = if (selectedId != null &&
                     edge.fromId != selectedId && edge.toId != selectedId
                 ) 0.22f else 1f
-                drawLine(
-                    color = palette.edge,
-                    start = a,
-                    end = b,
-                    strokeWidth = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f),
-                    alpha = (0.25f * edgeGate * edge.opacityFactor * dim).coerceIn(0f, 1f)
-                )
+                val edgeStroke = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f)
+                val edgeAlpha = (0.25f * edgeGate * edge.opacityFactor * dim).coerceIn(0f, 1f)
+                // R83 用户拍板：关系线不可横穿黑洞区域——穿洞直线改为
+                // 「径向引出 -> 沿净空带外沿短弧 -> 径向接入」的绕行折线（世界坐标算好再映射到屏幕）
+                val bend = engine.routeEdgeAroundZone(edge.fromX, edge.fromY, edge.toX, edge.toY)
+                if (bend == null) {
+                    drawLine(
+                        color = palette.edge,
+                        start = worldToScreen(edge.fromX, edge.fromY),
+                        end = worldToScreen(edge.toX, edge.toY),
+                        strokeWidth = edgeStroke,
+                        alpha = edgeAlpha
+                    )
+                } else {
+                    val path = Path()
+                    var i = 0
+                    while (i + 1 < bend.size) {
+                        val p = worldToScreen(bend[i], bend[i + 1])
+                        if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                        i += 2
+                    }
+                    drawPath(
+                        path = path,
+                        color = palette.edge,
+                        alpha = edgeAlpha,
+                        style = Stroke(width = edgeStroke, cap = StrokeCap.Round)
+                    )
+                }
             }
 
             // 黑核本体：压在连线之上（真机反馈「线连进黑洞」）——跨洞连线到核边界为止，核面绝无线条穿过

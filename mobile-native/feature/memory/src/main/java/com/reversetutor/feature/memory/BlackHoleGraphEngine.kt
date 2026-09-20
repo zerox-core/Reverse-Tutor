@@ -5,6 +5,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -26,6 +27,9 @@ import kotlin.math.sqrt
  * - 净空带是永久硬边界（1 单位=核心半径，保护区=3 倍单位，用户 2026-09-19 拍板）：推力不再随遗忘衰减 + 积分位置钳制，
  *   任何 Free 节点都进不来，连线永远不会「接进」黑洞；
  * - 公转是常驻运动：settle 后仍按轨道角速度继续旋转（大图走轻量轨道路径，性能闸）；
+ * - R83 层级轨道（用户 2026-09-20 拍板）：度数最高的 <=3 个节点为根（绕黑洞公转的行星），
+ *   其余节点多源 BFS 挂母——子节点各自以母节点为轨道中心公转（卫星），整族随母节点绕洞转动；
+ *   连线绝不横穿净空带：穿洞直线改为「径向引出->沿带外沿短弧->径向接入」的绕行折线（routeEdgeAroundZone）；
  * - 遗忘生命周期 = 冷却保护模型（用户 R66 拍板，曲线数值为占位、等记忆遗忘曲线算法替换）：
  *   新节点默认在保护期（cooling，占位 90s）内——正常节点状态 + 缓慢绕洞公转，遗忘冻结为 0；
  *   过保后遗忘开始增长，节点即刻脱离力场、独自保持旋转并向黑洞中心漩涡靠拢；
@@ -86,7 +90,13 @@ data class BlackHolePhysics(
     /** 半径-遗忘映射曲率：radius = startR * (1-forget)^pow；pow<1 时前段慢、后段加速坠入。 */
     val decayRadiusPow: Float = 0.8f,
     val entranceSeconds: Float = 0.9f,
-    val fullForceNodeCap: Int = 140
+    val fullForceNodeCap: Int = 140,
+    /** R83 层级轨道：子节点绕母节点公转的周期（秒，1x）——母节点绕黑洞、子节点绕母节点，太阳系式嵌套。 */
+    val childOrbitPeriodSeconds: Float = 60f,
+    /** R83 层级轨道：子节点绕母节点的基础轨道半径（世界单位）。 */
+    val childOrbitRadius: Float = 95f,
+    /** R83 连线绕行：折线沿净空带外沿绕行的边距（世界单位），保证关系线绝不横穿黑洞区域。 */
+    val edgeZoneMargin: Float = 18f
 )
 
 enum class BlackHoleNodeMode {
@@ -125,6 +135,15 @@ class BlackHoleNode(
     var decayStartR: Float = 0f
     /** 漩涡旅程当前角度（保持公转方向继续加速旋转）。 */
     var decayAngle: Float = 0f
+
+    /** R83 层级轨道：母节点 id（null=根节点，走黑洞力场+绕洞公转；非空=以母节点为轨道中心公转）。 */
+    var parentId: String? = null
+    /** R83 层级轨道：子节点绕母节点的当前相位角（弧度）。 */
+    var orbitAngle: Float = 0f
+    /** R83 层级轨道：子节点当前轨道半径（拖拽拉伸后向 orbitRTarget 缓慢回弹）。 */
+    var orbitR: Float = 0f
+    /** R83 层级轨道：子节点轨道半径的回弹目标。 */
+    var orbitRTarget: Float = 0f
 
     /** 节点基础半径：9+2.4√degree → 10.5+2.8√degree（R68 用户反馈节点太小太淡，整体放大 ~17%）。 */
     val baseRadius: Float
@@ -258,6 +277,83 @@ class BlackHoleGraphEngine(
         rescuedTotal = 0
         simAccum = 0f
         entrance = 0f
+        // R83 层级轨道：按度数选根（<=3 个），多源 BFS 定母节点——
+        // 子节点不再挤在净空带外的环带上，而是各自以母节点为中心公转（用户 2026-09-20 拍板）
+        assignHierarchy()
+    }
+
+    /**
+     * R83 层级轨道分配：度数最高的 min(3, max(1, N/6)) 个节点为根（黑洞的直接行星），
+     * 其余节点多源 BFS 挂到最近的母节点下（卫星）。子节点初始位置 = 母节点 + 极角(相位, 半径)，
+     * 同母节点的兄弟姐妹相位均匀散开；不可达/孤立节点一律为根。子节点同样钳制在净空带外。
+     */
+    private fun assignHierarchy() {
+        if (nodeList.isEmpty()) return
+        val byId = nodeList.associateBy { it.id }
+        val rootCount = min(3, max(1, nodeList.size / 6))
+        val roots = nodeList.sortedWith(
+            compareByDescending<BlackHoleNode> { it.degree }.thenBy { it.id }
+        ).take(rootCount)
+        val parentOf = HashMap<String, String>()
+        val queue = ArrayDeque<String>()
+        roots.forEach { root ->
+            queue.add(root.id)
+            parentOf[root.id] = "" // 根标记（空串）
+        }
+        val bfsOrder = mutableListOf<String>()
+        val adj = HashMap<String, MutableList<String>>()
+        edgeList.forEach { (a, b) ->
+            adj.getOrPut(a) { mutableListOf() }.add(b)
+            adj.getOrPut(b) { mutableListOf() }.add(a)
+        }
+        while (queue.isNotEmpty()) {
+            val cur = queue.removeFirst()
+            bfsOrder.add(cur)
+            adj[cur]?.forEach { next ->
+                if (!parentOf.containsKey(next)) {
+                    parentOf[next] = cur
+                    queue.add(next)
+                }
+            }
+        }
+        nodeList.forEach { node ->
+            node.parentId = null
+            node.orbitAngle = 0f
+            node.orbitR = 0f
+            node.orbitRTarget = 0f
+        }
+        val childrenOf = HashMap<String, MutableList<BlackHoleNode>>()
+        nodeList.forEach { node ->
+            val p = parentOf[node.id]
+            if (!p.isNullOrEmpty()) {
+                node.parentId = p
+                childrenOf.getOrPut(p) { mutableListOf() }.add(node)
+            }
+        }
+        // BFS 顺序逐层摆放：母节点位置先定，孩子相对母亲计算
+        bfsOrder.forEach { pid ->
+            val kids = childrenOf[pid] ?: return@forEach
+            val parent = byId[pid] ?: return@forEach
+            val base = (pid.fold(0) { acc, c -> (acc * 31 + c.code) and 0x7fffffff } % 628) / 100f
+            kids.forEachIndexed { i, kid ->
+                kid.orbitAngle = base + i * (2f * PI.toFloat() / kids.size)
+                kid.orbitRTarget = physics.childOrbitRadius + 14f * (i % 3)
+                kid.orbitR = kid.orbitRTarget
+                var x = parent.simX + cos(kid.orbitAngle) * kid.orbitR
+                var y = parent.simY + sin(kid.orbitAngle) * kid.orbitR
+                val d = hypot(x - holeX, y - holeY)
+                val minD = exclusionRadius + kid.displayRadius(physics) + 4f
+                if (d < minD && d > 0.001f) {
+                    val k = minD / d
+                    x = holeX + (x - holeX) * k
+                    y = holeY + (y - holeY) * k
+                }
+                kid.simX = x
+                kid.simY = y
+                kid.dispX = x
+                kid.dispY = y
+            }
+        }
     }
 
     // ---------- 查询 ----------
@@ -309,6 +405,19 @@ class BlackHoleGraphEngine(
         node.decayStartR = 0f
         node.decayAngle = 0f
         node.settlingElapsed = 0f
+        // R83：被抢救的子节点以母节点为中心重建轨道（从放回点起算相位/半径，向目标回弹归队）
+        if (node.parentId != null) {
+            val parent = nodeList.firstOrNull { it.id == node.parentId }
+            if (parent != null) {
+                val dx = node.simX - parent.dispX
+                val dy = node.simY - parent.dispY
+                var d = hypot(dx, dy)
+                if (d < 24f) d = 24f
+                node.orbitAngle = atan2(dy, dx)
+                if (node.orbitRTarget <= 0.001f) node.orbitRTarget = physics.childOrbitRadius
+                node.orbitR = d
+            }
+        }
         rescuedTotal++
         wake()
         return true
@@ -399,10 +508,38 @@ class BlackHoleGraphEngine(
             val dx = node.dispX - holeX
             val dy = node.dispY - holeY
             val len = hypot(dx, dy).takeIf { it > 0.001f } ?: 1f
-            node.vx = dx / len * physics.bounceSpeed
-            node.vy = dy / len * physics.bounceSpeed
+            if (node.parentId != null) {
+                // R83：子节点不带洞上弹射惯性——先径向钳出净空带，再回到母节点轨道
+                val k = exclusionRadius / len.coerceAtLeast(0.001f)
+                node.dispX = holeX + dx * k
+                node.dispY = holeY + dy * k
+            } else {
+                node.vx = dx / len * physics.bounceSpeed
+                node.vy = dy / len * physics.bounceSpeed
+            }
         }
-        node.mode = BlackHoleNodeMode.InertiaSliding
+        if (node.parentId != null) {
+            // R83：子节点松手不走惯性滑停——以母节点为中心重建轨道
+            // （半径保持当前拉伸量，向 orbitRTarget 缓慢回弹 = 橡皮筋手感）
+            val parent = nodeList.firstOrNull { it.id == node.parentId }
+            if (parent != null && !parent.gone && !parent.absorbed && parent.mode != BlackHoleNodeMode.Dying) {
+                val dx = node.dispX - parent.dispX
+                val dy = node.dispY - parent.dispY
+                var d = hypot(dx, dy)
+                if (d < 24f) d = 24f
+                node.orbitAngle = atan2(dy, dx)
+                if (node.orbitRTarget <= 0.001f) node.orbitRTarget = physics.childOrbitRadius
+                node.orbitR = d
+                node.vx = 0f
+                node.vy = 0f
+                node.mode = BlackHoleNodeMode.Free
+            } else {
+                node.parentId = null
+                node.mode = BlackHoleNodeMode.InertiaSliding
+            }
+        } else {
+            node.mode = BlackHoleNodeMode.InertiaSliding
+        }
         if (wasDying) {
             node.forget = 0f
             node.cooling = true
@@ -438,6 +575,10 @@ class BlackHoleGraphEngine(
         simAccum = 0f
     }
 
+    /** R83 层级轨道：子节点在 Free 态是运动学节点（位置由母节点+轨道决定），不积分任何力。 */
+    private fun isKinematic(node: BlackHoleNode): Boolean =
+        node.parentId != null && node.mode == BlackHoleNodeMode.Free
+
     // ---------- 主循环 ----------
 
     /**
@@ -455,6 +596,7 @@ class BlackHoleGraphEngine(
         advanceForgetting(dt)
         advanceDying(dt)
         advanceDisplayModes(dt)
+        advanceChildren(dt)
         if (settled && nodeList.size > physics.fullForceNodeCap) {
             orbitLightPath(dt)
         } else {
@@ -493,11 +635,110 @@ class BlackHoleGraphEngine(
         }
     }
 
+    /**
+     * R83 层级轨道推进：子节点以母节点为轨道中心公转（相位等速推进 + 轨道半径向目标回弹），
+     * 位置 = 母节点当前位置 + 极角(orbitAngle, orbitR)——母节点绕黑洞公转时整族随之转动。
+     * 母节点已离散/被吞（不在表里）-> 子节点晋升为根，直接受黑洞力场管辖（断链离散语义）。
+     * 净空带硬边界同样对子节点生效：轨道压进带内时径向钳出到带外。
+     */
+    private fun advanceChildren(dt: Float) {
+        if (nodeList.none { it.parentId != null }) return
+        val scaled = dt * timeScale
+        val byId = nodeList.associateBy { it.id }
+        val childOmega = 2f * PI.toFloat() / physics.childOrbitPeriodSeconds
+        nodeList.forEach { node ->
+            val pid = node.parentId ?: return@forEach
+            if (node.gone || node.absorbed || node.mode == BlackHoleNodeMode.Dying) return@forEach
+            val parent = byId[pid]
+            if (parent == null || parent.gone || parent.absorbed || parent.mode == BlackHoleNodeMode.Dying) {
+                // 母节点已离散/被吞：晋升为根，回到黑洞力场（位置就地继承）
+                node.parentId = null
+                node.orbitR = 0f
+                node.orbitRTarget = 0f
+                wake()
+                return@forEach
+            }
+            if (node.mode != BlackHoleNodeMode.Free) return@forEach // 拖拽/惯性中由手势层管
+            node.orbitAngle += childOmega * scaled
+            if (node.orbitR != node.orbitRTarget) {
+                node.orbitR += (node.orbitRTarget - node.orbitR) * (1f - exp(-2.5f * scaled)).coerceIn(0f, 1f)
+            }
+            var x = parent.dispX + cos(node.orbitAngle) * node.orbitR
+            var y = parent.dispY + sin(node.orbitAngle) * node.orbitR
+            val d = hypot(x - holeX, y - holeY)
+            val minD = exclusionRadius + node.displayRadius(physics) + 4f
+            if (d < minD) {
+                if (d <= 0.001f) {
+                    x = holeX + minD
+                    y = holeY
+                } else {
+                    val k = minD / d
+                    x = holeX + (x - holeX) * k
+                    y = holeY + (y - holeY) * k
+                }
+            }
+            node.simX = x
+            node.simY = y
+            node.dispX = x
+            node.dispY = y
+            node.vx = 0f
+            node.vy = 0f
+        }
+    }
+
+    /**
+     * R83 连线绕行净空带：直线段若穿洞（距洞心 < 净空带+边距），返回绕行折线
+     * 「径向引出 -> 沿带外沿圆弧（短弧）-> 径向接入」的世界坐标序列 [x0,y0,x1,y1,...]；
+     * 不穿洞返回 null（画直线）。径向段与圆弧全部位于带外，连线绝不横穿黑洞区域（用户拍板）。
+     */
+    fun routeEdgeAroundZone(fromX: Float, fromY: Float, toX: Float, toY: Float): FloatArray? {
+        val z = exclusionRadius + physics.edgeZoneMargin
+        val dA = hypot(fromX - holeX, fromY - holeY)
+        val dB = hypot(toX - holeX, toY - holeY)
+        if (dA >= z && dB >= z) {
+            val abx = toX - fromX
+            val aby = toY - fromY
+            val len2 = abx * abx + aby * aby
+            val t = if (len2 < 1e-6f) 0f
+            else (((holeX - fromX) * abx + (holeY - fromY) * aby) / len2).coerceIn(0f, 1f)
+            val px = fromX + abx * t
+            val py = fromY + aby * t
+            if (hypot(px - holeX, py - holeY) >= z) return null
+        }
+        val angA = atan2(fromY - holeY, fromX - holeX)
+        val angB = atan2(toY - holeY, toX - holeX)
+        var sweep = angB - angA
+        val tau = 2f * PI.toFloat()
+        while (sweep > PI.toFloat()) sweep -= tau
+        while (sweep < -PI.toFloat()) sweep += tau
+        val pts = mutableListOf(fromX, fromY)
+        // 径向引出：从 from 沿其极角走到带外沿圆周（from 在带外，全程 >= 净空带）
+        pts.add(holeX + cos(angA) * z)
+        pts.add(holeY + sin(angA) * z)
+        val steps = 14
+        for (i in 1..steps) {
+            val a = angA + sweep * i / steps
+            pts.add(holeX + cos(a) * z)
+            pts.add(holeY + sin(a) * z)
+        }
+        pts.add(toX)
+        pts.add(toY)
+        return pts.toFloatArray()
+    }
+
     /** 进入漩涡旅程：脱离力场、清零速度，记录当前半径/角度作为收缩与旋转基准。 */
     private fun enterDying(node: BlackHoleNode) {
         node.mode = BlackHoleNodeMode.Dying
         node.vx = 0f
         node.vy = 0f
+        // R83：母节点离散（断链）——它的子节点不能跟着坠洞，就地晋升为根回到黑洞力场
+        nodeList.forEach { c ->
+            if (c.parentId == node.id) {
+                c.parentId = null
+                c.orbitR = 0f
+                c.orbitRTarget = 0f
+            }
+        }
         if (node.decayStartR <= 0.001f) {
             val dx = node.simX - holeX
             val dy = node.simY - holeY
@@ -572,6 +813,8 @@ class BlackHoleGraphEngine(
         val scaled = dt * timeScale
         nodeList.forEach { node ->
             if (node.gone || node.absorbed || node.mode != BlackHoleNodeMode.Free) return@forEach
+            // R83：子节点随母节点整体转动（advanceChildren），自身不绕洞旋转
+            if (node.parentId != null) return@forEach
             val dx = node.simX - holeX
             val dy = node.simY - holeY
             val d = hypot(dx, dy)
@@ -587,7 +830,9 @@ class BlackHoleGraphEngine(
             node.dispY = node.simY
         }
         nodeList.forEach { node ->
-            if (!node.gone && !node.absorbed && node.mode == BlackHoleNodeMode.Free && node.forget < 0.5f) {
+            if (node.parentId == null && !node.gone && !node.absorbed &&
+                node.mode == BlackHoleNodeMode.Free && node.forget < 0.5f
+            ) {
                 val d = hypot(node.simX - holeX, node.simY - holeY)
                 if (d < exclusionRadius * 0.95f) wake()
             }
@@ -638,6 +883,8 @@ class BlackHoleGraphEngine(
         edgeList.forEach { (fromId, toId) ->
             val a = freeNodes.firstOrNull { it.id == fromId } ?: return@forEach
             val b = freeNodes.firstOrNull { it.id == toId } ?: return@forEach
+            // R83：树边（母-子）不施弹簧——子节点位置由轨道决定，母节点也不该被孩子拽着跑
+            if (b.parentId == a.id || a.parentId == b.id) return@forEach
             val ax = if (a.mode == BlackHoleNodeMode.Free) a.simX else a.dispX
             val ay = if (a.mode == BlackHoleNodeMode.Free) a.simY else a.dispY
             val bx = if (b.mode == BlackHoleNodeMode.Free) b.simX else b.dispX
@@ -662,6 +909,8 @@ class BlackHoleGraphEngine(
         //    遗忘只让公转冷却（切向 ->15%），不再牵引位置。
         freeNodes.forEach { node ->
             if (node.mode != BlackHoleNodeMode.Free) return@forEach
+            // R83：子节点绕母节点公转（advanceChildren），不参与绕洞切向收敛；带钳制同样在轨道层做
+            if (isKinematic(node)) return@forEach
             val dx = holeX - node.simX
             val dy = holeY - node.simY
             val d = hypot(dx, dy).takeIf { it > 0.001f } ?: 0.001f
@@ -686,6 +935,7 @@ class BlackHoleGraphEngine(
 
         // 5) 积分 + 阻尼 + 速度 clamp + NaN 守卫 + 净空带位置钳制
         freeNodes.forEach { node ->
+            if (isKinematic(node)) return@forEach // R83：子节点位置只由 advanceChildren 决定
             when (node.mode) {
                 BlackHoleNodeMode.Free -> {
                     node.vx = (node.vx + (fx[node.id] ?: 0f)) * physics.damping
@@ -739,8 +989,11 @@ class BlackHoleGraphEngine(
     ) {
         when (node.mode) {
             BlackHoleNodeMode.Free -> {
-                fx[node.id] = (fx[node.id] ?: 0f) + x
-                fy[node.id] = (fy[node.id] ?: 0f) + y
+                // R83：运动学子节点（绕母节点公转）只施力不受力
+                if (!isKinematic(node)) {
+                    fx[node.id] = (fx[node.id] ?: 0f) + x
+                    fy[node.id] = (fy[node.id] ?: 0f) + y
+                }
             }
             BlackHoleNodeMode.Settling -> {
                 if (fromCollision) {

@@ -231,24 +231,27 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
-    fun released_node_springs_back_toward_linked_neighbor() {
-        // 真机反馈「假引力」：松手回归物理层后，连线弹簧应把节点拉回邻居、收敛圆润
+    fun dragged_root_carries_child_and_child_stays_parent_centered() {
+        // R83 用户拍板：节点以母节点为中心公转。度数并列取 id 序 -> n1 为根、n2 为其子节点。
+        // 拖动母节点时子节点整族跟走（母子距离保持轨道半径），松手后子节点仍绕母节点公转不散伙
         val engine = engineWith(2, edges = listOf("n1" to "n2"))
         tickSeconds(engine, 3f) // 布局稳定
         val n1 = engine.nodes.first { it.id == "n1" }
         val n2 = engine.nodes.first { it.id == "n2" }
-        val d0 = hypot(n1.simX - n2.simX, n1.simY - n2.simY)
-        // 沿「远离 n2」方向拖开 320 松手（R82：净空带翻倍后布局半径变大，固定 +x 拖拽
-        // 与两节点相对方位无关，分离量不再有方向保证）
-        val ux = (n1.dispX - n2.dispX) / d0
-        val uy = (n1.dispY - n2.dispY) / d0
-        dragToAndRelease(engine, n1.id, n1.dispX + ux * 320f, n1.dispY + uy * 320f)
-        val d1 = hypot(n1.dispX - n2.dispX, n1.dispY - n2.dispY)
-        assertTrue("drag did not separate: d0=$d0 d1=$d1", d1 > d0 + 150f)
-        tickSeconds(engine, 4f)
-        assertEquals(BlackHoleNodeMode.Free, n1.mode)
+        assertEquals(null, n1.parentId)
+        assertEquals("n1", n2.parentId)
+        // 把母节点拖远 300px：子节点跟走，母子距离保持在轨道半径附近
+        dragToAndRelease(engine, n1.id, n1.dispX + 300f, n1.dispY)
+        tickSeconds(engine, 2f)
+        val d = hypot(n1.dispX - n2.dispX, n1.dispY - n2.dispY)
+        assertTrue("child not tracking parent: d=$d target=${n2.orbitRTarget}", d <= n2.orbitRTarget + 60f)
+        // 松手后母节点回物理层；子节点持续绕母节点公转（相对角度持续推进）
+        val a0 = atan2((n2.dispY - n1.dispY).toDouble(), (n2.dispX - n1.dispX).toDouble())
+        tickSeconds(engine, 3f)
+        val a1 = atan2((n2.dispY - n1.dispY).toDouble(), (n2.dispX - n1.dispX).toDouble())
+        assertTrue("child not orbiting parent: a0=$a0 a1=$a1", kotlin.math.abs(a1 - a0) > 0.01)
         val d2 = hypot(n1.dispX - n2.dispX, n1.dispY - n2.dispY)
-        assertTrue("no spring-back: d1=$d1 d2=$d2", d2 < d1 - 40f)
+        assertTrue("child drifted off parent orbit: d2=$d2", d2 <= n2.orbitRTarget + 80f)
     }
 
     // ---------- 遗忘 ----------
@@ -612,5 +615,119 @@ class BlackHoleGraphEngineTest {
         // 重新接入力场：不被甩飞、不坠核心（净空带硬边界保持）
         val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
         assertTrue("rescued node drifted into hole: d=$d", d >= engine.exclusionRadius - 0.5f)
+    }
+
+    // ---------- R83 层级轨道 + 连线绕行（用户 2026-09-20 拍板） ----------
+
+    @Test
+    fun hierarchy_assigns_few_roots_and_all_others_get_parents() {
+        // 根数 = min(3, max(1, 12/6)) = 2，取度数最高（并列按 id 序）；其余全部挂母；
+        // 全员落在净空带外，子节点初始距离 = 轨道半径（带内钳出只缩不破）
+        val edges = listOf("n1" to "n2", "n1" to "n3", "n2" to "n4", "n3" to "n5",
+            "n4" to "n6", "n5" to "n7", "n6" to "n8", "n7" to "n9",
+            "n8" to "n10", "n9" to "n11", "n10" to "n12")
+        val engine = engineWith(12, edges)
+        val roots = engine.nodes.filter { it.parentId == null }
+        assertEquals(listOf("n1", "n10"), roots.map { it.id }.sorted())
+        engine.nodes.forEach { node ->
+            val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+            assertTrue("node ${node.id} inside exclusion: d=$d", d > engine.exclusionRadius)
+            val pid = node.parentId
+            if (pid != null) {
+                val parent = engine.nodes.firstOrNull { it.id == pid }
+                assertNotNull(parent)
+                assertTrue("no orbit target for ${node.id}", node.orbitRTarget > 0f)
+                val dp = hypot(node.simX - parent!!.simX, node.simY - parent.simY)
+                assertTrue("child ${node.id} off initial orbit: dp=$dp r=${node.orbitR}", dp <= node.orbitR + 24f)
+            }
+        }
+    }
+
+    @Test
+    fun child_keeps_orbiting_parent_who_orbits_hole() {
+        // 双层公转：母节点绕黑洞公转（绝对角度推进），子节点绕母节点公转（相对角度推进），
+        // 母子距离稳定在轨道半径（净空带钳制只缩不破）
+        val engine = engineWith(6, edges = (1 until 6).map { "n1" to "n${it + 1}" })
+        tickSeconds(engine, 3f)
+        val root = engine.nodes.first { it.id == "n1" }
+        assertEquals(null, root.parentId)
+        val child = engine.nodes.first { it.id == "n2" }
+        assertEquals("n1", child.parentId)
+        val holeA0 = atan2((root.simY - engine.holeY).toDouble(), (root.simX - engine.holeX).toDouble())
+        val relA0 = atan2((child.dispY - root.dispY).toDouble(), (child.dispX - root.dispX).toDouble())
+        tickSeconds(engine, 4f)
+        val holeA1 = atan2((root.simY - engine.holeY).toDouble(), (root.simX - engine.holeX).toDouble())
+        val relA1 = atan2((child.dispY - root.dispY).toDouble(), (child.dispX - root.dispX).toDouble())
+        assertTrue("root not orbiting hole: ${holeA1 - holeA0}", kotlin.math.abs(holeA1 - holeA0) > 0.001)
+        assertTrue("child not orbiting parent: ${relA1 - relA0}", kotlin.math.abs(relA1 - relA0) > 0.02)
+        val d = hypot(child.dispX - root.dispX, child.dispY - root.dispY)
+        assertTrue("child distance off orbit: d=$d r=${child.orbitR}", d <= child.orbitR + 24f && d > 24f)
+    }
+
+    @Test
+    fun released_child_rubber_bands_back_to_parent_orbit() {
+        // 拖子节点远离母节点松手：轨道半径保持拉伸、随后向 orbitRTarget 缓慢回弹（橡皮筋）
+        val engine = engineWith(6, edges = (1 until 6).map { "n1" to "n${it + 1}" })
+        tickSeconds(engine, 3f)
+        val parent = engine.nodes.first { it.id == "n1" }
+        val child = engine.nodes.first { it.id == "n2" }
+        assertEquals("n1", child.parentId)
+        // 沿远离母节点方向拖开 260px
+        val dx = child.dispX - parent.dispX
+        val dy = child.dispY - parent.dispY
+        val len = hypot(dx, dy).coerceAtLeast(0.001f)
+        dragToAndRelease(engine, child.id, child.dispX + dx / len * 260f, child.dispY + dy / len * 260f)
+        // 松手即回运动学轨道：母子距离 = 拉伸后的轨道半径
+        val d1 = hypot(child.dispX - parent.dispX, child.dispY - parent.dispY)
+        assertEquals(child.orbitR, d1, 2f)
+        assertTrue("no stretch: d1=$d1", d1 > child.orbitRTarget + 100f)
+        // 回弹：数秒后向目标收敛
+        tickSeconds(engine, 4f)
+        val d2 = hypot(child.dispX - parent.dispX, child.dispY - parent.dispY)
+        assertTrue("no rubber-band back: d1=$d1 d2=$d2 target=${child.orbitRTarget}", d2 < d1 - 60f)
+        assertEquals(BlackHoleNodeMode.Free, child.mode)
+    }
+
+    @Test
+    fun edge_route_bends_around_exclusion_zone() {
+        // 连线绝不横穿黑洞区域：洞两侧对径点的连线必须绕行，折线上每一点都在带外；
+        // 同侧不穿洞的连线保持直线
+        val engine = engineWith(2)
+        val z = engine.exclusionRadius
+        val r = z + 120f
+        val pts = engine.routeEdgeAroundZone(engine.holeX - r, engine.holeY, engine.holeX + r, engine.holeY)
+        assertNotNull(pts)
+        assertTrue("polyline too short: ${pts!!.size}", pts.size >= 10)
+        var i = 0
+        var minD = Float.MAX_VALUE
+        while (i + 1 < pts.size) {
+            val d = hypot(pts[i] - engine.holeX, pts[i + 1] - engine.holeY)
+            if (d < minD) minD = d
+            i += 2
+        }
+        assertTrue("route dips into zone: minD=$minD exclusion=$z", minD >= z - 1f)
+        val straight = engine.routeEdgeAroundZone(
+            engine.holeX - r, engine.holeY - r, engine.holeX - r - 100f, engine.holeY - r + 40f)
+        assertNull(straight)
+    }
+
+    @Test
+    fun dying_parent_detaches_children_to_roots() {
+        // 母节点离散（断链）：子节点不能跟着坠洞——就地晋升为根，回到黑洞力场绕洞公转
+        val engine = engineWith(4, edges = listOf("n1" to "n2", "n2" to "n3", "n3" to "n4"))
+        tickSeconds(engine, 2f)
+        val n2 = engine.nodes.first { it.id == "n2" }
+        val n3 = engine.nodes.first { it.id == "n3" }
+        assertEquals("n2", n3.parentId)
+        n2.cooling = false
+        n2.forget = 0.4f
+        engine.tick(1f / 60f)
+        assertEquals(BlackHoleNodeMode.Dying, n2.mode)
+        assertEquals(null, n3.parentId) // 晋升为根
+        tickSeconds(engine, 2f)
+        // 晋升后的根回到力场：绕洞公转、不坠洞、不进净空带
+        assertEquals(BlackHoleNodeMode.Free, n3.mode)
+        val d = hypot(n3.simX - engine.holeX, n3.simY - engine.holeY)
+        assertTrue("promoted root crossed zone: d=$d", d >= engine.exclusionRadius - 1f)
     }
 }
