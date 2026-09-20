@@ -29,7 +29,7 @@ import kotlin.math.sqrt
  * - 公转是常驻运动：settle 后仍按轨道角速度继续旋转（大图走轻量轨道路径，性能闸）；
  * - R83 层级轨道（用户 2026-09-20 拍板）：度数最高的 <=3 个节点为根（绕黑洞公转的行星），
  *   其余节点多源 BFS 挂母——子节点各自以母节点为轨道中心公转（卫星），整族随母节点绕洞转动；
- *   连线绝不横穿净空带：穿洞直线改为「径向引出->沿带外沿短弧->径向接入」的绕行折线（routeEdgeAroundZone）；
+ *   R85（用户拍板）：关系线一律直线，绝不弯曲——圆感靠公转与边数量自然形成，不强制绕行；
  * - 遗忘生命周期 = 冷却保护模型（用户 R66 拍板，曲线数值为占位、等记忆遗忘曲线算法替换）：
  *   新节点默认在保护期（cooling，占位 90s）内——正常节点状态 + 缓慢绕洞公转，遗忘冻结为 0；
  *   过保后遗忘开始增长，节点即刻脱离力场、独自保持旋转并向黑洞中心漩涡靠拢；
@@ -686,52 +686,6 @@ class BlackHoleGraphEngine(
         }
     }
 
-    /**
-     * R83 连线绕行净空带：直线段若穿洞（距洞心 < 净空带+边距），返回绕行折线
-     * 「径向引出 -> 带外鼓包弧线（短弧）-> 径向接入」的世界坐标序列 [x0,y0,x1,y1,...]；
-     * 不穿洞返回 null（画直线）。径向段与弧线全部位于带外，连线绝不横穿黑洞区域（用户拍板）。
-     * R84 用户拍板：手画的红圈只是数值范围参考，绝不允许在实机上描出一个统一的圈——
-     * 绕行弧不再贴恒定半径，每条边按自身弦长向外鼓出不同高度，众边合起来不成圆。
-     */
-    fun routeEdgeAroundZone(fromX: Float, fromY: Float, toX: Float, toY: Float): FloatArray? {
-        val z = exclusionRadius + physics.edgeZoneMargin
-        val dA = hypot(fromX - holeX, fromY - holeY)
-        val dB = hypot(toX - holeX, toY - holeY)
-        if (dA >= z && dB >= z) {
-            val abx = toX - fromX
-            val aby = toY - fromY
-            val len2 = abx * abx + aby * aby
-            val t = if (len2 < 1e-6f) 0f
-            else (((holeX - fromX) * abx + (holeY - fromY) * aby) / len2).coerceIn(0f, 1f)
-            val px = fromX + abx * t
-            val py = fromY + aby * t
-            if (hypot(px - holeX, py - holeY) >= z) return null
-        }
-        val angA = atan2(fromY - holeY, fromX - holeX)
-        val angB = atan2(toY - holeY, toX - holeX)
-        var sweep = angB - angA
-        val tau = 2f * PI.toFloat()
-        while (sweep > PI.toFloat()) sweep -= tau
-        while (sweep < -PI.toFloat()) sweep += tau
-        val pts = mutableListOf(fromX, fromY)
-        // 径向引出：从 from 沿其极角走到带外沿圆周（from 在带外，全程 >= 净空带）
-        pts.add(holeX + cos(angA) * z)
-        pts.add(holeY + sin(angA) * z)
-        val steps = 14
-        // 鼓包高度按弦长取 22~64px：弦长随节点运动连续变化，鼓包逐帧稳定不跳变；
-        // 各边弦长不同 -> 鼓包高度各异 -> 不会共同描出统一半径的圆；sin 恒非负 -> r 恒 >= z。
-        val chord = hypot(toX - fromX, toY - fromY)
-        val extra = (0.22f * chord).coerceIn(22f, 64f)
-        for (i in 1..steps) {
-            val a = angA + sweep * i / steps
-            val r = z + extra * sin(PI.toFloat() * i / steps)
-            pts.add(holeX + cos(a) * r)
-            pts.add(holeY + sin(a) * r)
-        }
-        pts.add(toX)
-        pts.add(toY)
-        return pts.toFloatArray()
-    }
 
     /** 进入漩涡旅程：脱离力场、清零速度，记录当前半径/角度作为收缩与旋转基准。 */
     private fun enterDying(node: BlackHoleNode) {

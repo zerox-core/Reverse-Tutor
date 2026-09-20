@@ -821,32 +821,15 @@ private fun BlackHoleGraphReadyContent(
                 ) 0.22f else 1f
                 val edgeStroke = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f)
                 val edgeAlpha = (0.25f * edgeGate * edge.opacityFactor * dim).coerceIn(0f, 1f)
-                // R83 用户拍板：关系线不可横穿黑洞区域——穿洞直线改为
-                // 「径向引出 -> 沿净空带外沿短弧 -> 径向接入」的绕行折线（世界坐标算好再映射到屏幕）
-                val bend = engine.routeEdgeAroundZone(edge.fromX, edge.fromY, edge.toX, edge.toY)
-                if (bend == null) {
-                    drawLine(
-                        color = palette.edge,
-                        start = worldToScreen(edge.fromX, edge.fromY),
-                        end = worldToScreen(edge.toX, edge.toY),
-                        strokeWidth = edgeStroke,
-                        alpha = edgeAlpha
-                    )
-                } else {
-                    val path = Path()
-                    var i = 0
-                    while (i + 1 < bend.size) {
-                        val p = worldToScreen(bend[i], bend[i + 1])
-                        if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
-                        i += 2
-                    }
-                    drawPath(
-                        path = path,
-                        color = palette.edge,
-                        alpha = edgeAlpha,
-                        style = Stroke(width = edgeStroke, cap = StrokeCap.Round)
-                    )
-                }
+                // R85 用户拍板：关系线优先保持直线，绝不为「成圆」而弯曲——撤销 R83 绕行折线；
+                // 圆感靠公转运动与边数量自然形成，不强制。黑核本体画在连线之上，核面仍无线条穿过。
+                drawLine(
+                    color = palette.edge,
+                    start = worldToScreen(edge.fromX, edge.fromY),
+                    end = worldToScreen(edge.toX, edge.toY),
+                    strokeWidth = edgeStroke,
+                    alpha = edgeAlpha
+                )
             }
 
             // 黑核本体：压在连线之上（真机反馈「线连进黑洞」）——跨洞连线到核边界为止，核面绝无线条穿过
