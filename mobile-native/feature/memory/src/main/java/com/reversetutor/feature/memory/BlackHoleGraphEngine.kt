@@ -21,23 +21,27 @@ import kotlin.math.sqrt
  * - 力场常量：REPUL=2200 / LINK_ATTR=0.0036 / SPRING_IDEAL=110 / DAMP=0.90
  *   （2026-09-19 用户反馈「节点离得太近、标签全重叠」——斥力与理想连长加大，布局拉开），
  *   alpha=max(0.04, 1-iter/300)；拖动期间 iter 钳 150（alpha 平台 0.5，V30 语义）；
- * - 布局 = 斥力 + 连线弹簧 + 净空带硬边界：**黑洞没有任何引力**（真机反馈「全员被吸到中间太丑、
- *   没有松弛感」——R65 起删除 holeGravity/遗忘引力倍率/深度遗忘向心漂移）；
+ * - 布局 = 斥力 + 连线弹簧 + 净空带硬边界 + 黑洞引力（R87 开普勒模型，见下；引力极弱、
+ *   只负责弯曲公转轨迹，远小于布局力，不会重演 R65「全员被吸到中间」）；
  * - 布局：节点盘状分布于黑洞四周（黑洞坐镇盘心），冷启动全部生成在净空带之外；
- * - 净空带是永久硬边界（1 单位=核心半径，保护区=3 倍单位，用户 2026-09-19 拍板）：推力不再随遗忘衰减 + 积分位置钳制，
- *   任何 Free 节点都进不来，连线永远不会「接进」黑洞；
- * - 公转是常驻运动：settle 后仍按轨道角速度继续旋转（大图走轻量轨道路径，性能闸）；
+ * - 净空带硬边界（1 单位=核心半径，遗忘区=6 倍单位，R82 拍板）：健康节点（保护期/低遗忘）
+ *   推力 + 积分位置钳制，绝进不来；R87 起屏障随遗忘渗透——遗忘加深屏障渐软，衰减节点可穿入；
+ * - 公转是常驻运动：settle 后仍继续旋转（大图走轻量轨道路径，性能闸）；
  * - R83 层级轨道（用户 2026-09-20 拍板）：度数最高的 <=3 个节点为根（绕黑洞公转的行星），
  *   其余节点多源 BFS 挂母——子节点各自以母节点为轨道中心公转（卫星），整族随母节点绕洞转动；
  *   R85（用户拍板）：关系线一律直线，绝不弯曲——圆感靠公转与边数量自然形成，不强制绕行；
- * - 遗忘生命周期 = 冷却保护模型（用户 R66 拍板，曲线数值为占位、等记忆遗忘曲线算法替换）：
- *   新节点默认在保护期（cooling，占位 90s）内——正常节点状态 + 缓慢绕洞公转，遗忘冻结为 0；
- *   过保后遗忘开始增长，节点即刻脱离力场、独自保持旋转并向黑洞中心漩涡靠拢；
- *   完全进入黑洞区域后由界面层做闪烁呼吸（即将遗忘的警告）；
- *   坠入核心 = 真实遗忘（0.15s 淡出后消失）；
- * - 漩涡旅程（Dying）：r = 起点半径 * (1-forget)^0.8，角速度 = 轨道角速度 * 1.6（越近越快），
- *   吸收只来自这段旅程的终点，且只动自己——脱离弹簧/斥力后不会拖着邻居进洞，
- *   全局布局全程不变；碰撞/拖拽误入核心的普通节点一律径向弹出，绝不算吸收；
+ *   R87（用户拍板）：直线几何不动，遗忘区内渲染渐隐遮断（界面层分段 alpha），视觉不穿越；
+ * - R87 开普勒引力模型（用户 2026-09-20 拍板，废止 R65「黑洞无引力」）：
+ *   黑洞对节点有真实引力 F=GM/d²，节点出生自带圆轨道速度 v=√(GM/d)，引力恰好充当向心力
+ *   ——公转不再是脚本切向推进，是引力与初速度的真实平衡；阻尼拆径向（强，吸收扰动）/
+ *   切向（零，保住公转），外加弱「潮汐正则化」把切向速度缓推向 v_circ、维持圆轨道；
+ * - 遗忘 = 轨道衰减（R87）：过保后遗忘增长，切向速度目标按 (1-forget) 抽走（刹车），
+ *   引力占优、轨道自然内旋——活动区 -> 遗忘区 -> 核心，连续渐进、绝无到点瞬移；
+ *   进入遗忘区后界面层闪烁呼吸（即将遗忘警告）；触核（遗忘过门）= 真实遗忘（0.15s 淡出）；
+ *   抢救 = 重新注入轨道速度（遗忘清零 + 冷却重置 + v=v_circ），可逆；
+ *   全程不脱离力场：衰减节点仍参与斥力/碰撞/弹簧，不拖邻居进洞（引力只作用于自身）；
+ *   曲线数值仍是占位，等后端记忆遗忘曲线算法接管；
+ * - 误入核心的健康节点（碰撞/拖拽）一律径向弹出，绝不算吸收；
  * - 拖动：跟手 + 甩动量 vx=位移*1.1，被拖节点不积分力但全程施力（含 x6 放大连线弹簧，
  *   关联节点被拖着走）；松手惯性滑停后回归物理层（不停泊），弹簧（胡克力+轴向阻尼）
  *   把节点收敛回圆润簇；黑洞上方（净空带内）显示 X、松手弹开不吞噬；
@@ -63,13 +67,22 @@ data class BlackHolePhysics(
     val exclusionRadiusRatio: Float = 6.0f,
     val exclusionPush: Float = 6.0f,
     val settlingSeconds: Float = 0.8f,
-    val orbitPeriodSeconds: Float = 420f,
-    val orbitDifferential: Float = 0.5f,
-    val orbitReferenceRadius: Float = 200f,
-    val orbitConvergence: Float = 0.5f,
+    /** R87 开普勒引力常数（引擎子步单位）：圆轨道条件 v_sub=√(GM/d)。
+     *  取值锚点：200px 半径公转周期 ~420s（v≈3px/s=0.05px/子步）→ GM=v²·d=0.5。
+     *  引力极弱（200px 处 ~1.25e-5/子步），远小于布局力，只负责弯曲轨迹、不动布局。 */
+    val holeGravityGM: Float = 0.5f,
+    /** R87 潮汐正则化强度（每子步）：切向速度缓推向 v_circ(d)×(1-forget)。
+     *  0.01/子步 ≈ 时间常数 1.7s——扰动后重新圆化；遗忘加深时表现为渐进刹车。 */
+    val orbitRegularization: Float = 0.01f,
+    /** R87 切向阻尼：1.0=不衰减（公转靠引力+初速度自持）；径向仍用 damping=0.90 强吸收。 */
+    val tangentialDamping: Float = 1.0f,
+    /** R87 屏障渗透门：遗忘 >= 此值后净空带位置钳制失效，衰减节点可穿入遗忘区。 */
+    val barrierForgetGate: Float = 0.5f,
+    /** R87 衰减节点径向阻尼：远弱于健康节点（damping=0.90 会把内旋冻成爬行），
+     *  让刹车后的轨道能以可见速度渐进内旋、最终坠入核心。 */
+    val decayRadialDamping: Float = 0.99f,
     val forgettingFullSeconds: Float = 240f,
     val absorbFadeSeconds: Float = 0.15f,
-    val deepForgetTangentialRatio: Float = 0.15f,
     val minNodeOpacity: Float = 0.28f,
     val minNodeScale: Float = 0.6f,
     val labelHideForget: Float = 0.5f,
@@ -81,14 +94,10 @@ data class BlackHolePhysics(
     val dragLinkBoost: Float = 6f,
     /** 弹簧轴向阻尼（相对速度投影系数）：让连线牵引收敛圆润、不振颤（真机反馈「假引力」）。 */
     val springDamping: Float = 0.06f,
-    /** 吞噬遗忘门（兜底）：异常出现在核心的节点，遗忘 >= 此值即吞、否则弹开。正常吸收走漩涡旅程终点。 */
+    /** 吞噬遗忘门：触核节点遗忘 >= 此值即吞（R87 正常吸收的终点），健康误闯者弹开。 */
     val absorbForgetGate: Float = 0.85f,
     /** 冷却保护时长（秒，1x；占位值——等用户给记忆遗忘曲线算法后替换）。新节点默认在保护期内。 */
     val protectionSeconds: Float = 90f,
-    /** 漩涡靠拢角提速倍率：过保节点保持绕黑洞旋转，且越靠近转得越快（漩涡感）。 */
-    val decayOrbitBoost: Float = 1.6f,
-    /** 半径-遗忘映射曲率：radius = startR * (1-forget)^pow；pow<1 时前段慢、后段加速坠入。 */
-    val decayRadiusPow: Float = 0.8f,
     val entranceSeconds: Float = 0.9f,
     val fullForceNodeCap: Int = 140,
     /** R83 层级轨道：子节点绕母节点公转的周期（秒，1x）——母节点绕黑洞、子节点绕母节点，太阳系式嵌套。 */
@@ -103,8 +112,6 @@ enum class BlackHoleNodeMode {
     Free,
     Dragging,
     InertiaSliding,
-    /** 螺旋坠入中：遗忘过门、脱离力场、独自旋进黑洞，不参与任何力/碰撞/命中。 */
-    Dying,
     Parked,
     Settling
 }
@@ -127,14 +134,10 @@ class BlackHoleNode(
     var absorbed: Boolean = false
     var absorbFade: Float = 0f
     var gone: Boolean = false
-    /** 冷却保护中：新节点默认开——正常力场布局 + 缓慢绕洞公转，遗忘冻结为 0、绝不坠入。 */
+    /** 冷却保护中：新节点默认开——正常力场布局 + 绕洞公转，遗忘冻结为 0、绝不坠入。 */
     var cooling: Boolean = true
     /** 保护期已过的时长（秒，随倍率）；达到 physics.protectionSeconds 即过保、开始遗忘。 */
     var coolingElapsed: Float = 0f
-    /** 漩涡旅程起点半径（进入 Dying 瞬间到黑洞中心的距离，作为收缩基准）。 */
-    var decayStartR: Float = 0f
-    /** 漩涡旅程当前角度（保持公转方向继续加速旋转）。 */
-    var decayAngle: Float = 0f
 
     /** R83 层级轨道：母节点 id（null=根节点，走黑洞力场+绕洞公转；非空=以母节点为轨道中心公转）。 */
     var parentId: String? = null
@@ -194,7 +197,8 @@ class BlackHoleGraphEngine(
     private var iter: Int = 0
     private var settled: Boolean = false
     private var draggingId: String? = null
-    private var dragWasDying: Boolean = false
+    /** R87：按下时节点是否处于衰减期（过保且遗忘>0）——松手即复习抢救（R81 语义延续）。 */
+    private var dragWasDecaying: Boolean = false
     private var absorbedTotal: Int = 0
     private var rescuedTotal: Int = 0
     private var simAccum: Float = 0f
@@ -271,7 +275,7 @@ class BlackHoleGraphEngine(
         iter = 0
         settled = false
         draggingId = null
-        dragWasDying = false
+        dragWasDecaying = false
         dragOverHole = false
         absorbedTotal = 0
         rescuedTotal = 0
@@ -280,7 +284,28 @@ class BlackHoleGraphEngine(
         // R83 层级轨道：按度数选根（<=3 个），多源 BFS 定母节点——
         // 子节点不再挤在净空带外的环带上，而是各自以母节点为中心公转（用户 2026-09-20 拍板）
         assignHierarchy()
+        // R87 开普勒初速度：根节点出生自带圆轨道切向速度 v=√(GM/d)（引力充当向心力）
+        nodeList.forEach { node ->
+            if (node.parentId == null) injectOrbitalVelocity(node)
+        }
     }
+
+    /**
+     * R87：给节点注入当前半径的圆轨道切向速度（per-子步单位）。
+     * 方向与历史公转一致（外向径向 u 下取 t=(uy,-ux)）；抢救/晋升等「重新入轨」场景同用。
+     */
+    private fun injectOrbitalVelocity(node: BlackHoleNode) {
+        val dx = node.simX - holeX
+        val dy = node.simY - holeY
+        val d = hypot(dx, dy).coerceAtLeast(1f)
+        val v = sqrt(physics.holeGravityGM / d)
+        node.vx = (dy / d) * v
+        node.vy = (-dx / d) * v
+    }
+
+    /** R87：节点是否处于衰减期（过保、遗忘增长中）——屏障对其渗透、可点按/拖拽抢救。 */
+    private fun isDecaying(node: BlackHoleNode): Boolean =
+        !node.cooling && node.forget > 0f && !node.absorbed && !node.gone
 
     /**
      * R83 层级轨道分配：度数最高的 min(3, max(1, N/6)) 个节点为根（黑洞的直接行星），
@@ -358,7 +383,7 @@ class BlackHoleGraphEngine(
 
     // ---------- 查询 ----------
 
-    /** R81：濒死（Dying）节点同样可命中——拖回来=复习抢救，不再整段旅程不可交互（用户反馈「没办法拖动了」）。 */
+    /** R81/R87：衰减期节点同样可命中——拖回来=复习抢救，全程可交互（用户反馈「没办法拖动了」）。 */
     fun hitTest(x: Float, y: Float): BlackHoleNode? =
         nodeList.asReversed().firstOrNull { node ->
             !node.gone && !node.absorbed &&
@@ -366,27 +391,27 @@ class BlackHoleGraphEngine(
         }
 
     /**
-     * 濒死可抢救命中：漩涡旅程（Dying）且已进入黑洞区域（闪烁呼吸段）的节点。
+     * 可抢救命中（R87）：衰减期（过保、遗忘>0）且已进入遗忘区（闪烁呼吸段）的节点。
      * 命中半径额外放宽，方便用户点中持续移动的小节点（用户 2026-09-19 拍板 D7 点击抢救）。
      */
     fun hitTestRescuable(x: Float, y: Float): BlackHoleNode? =
         nodeList.asReversed().firstOrNull { node ->
-            !node.gone && !node.absorbed && node.mode == BlackHoleNodeMode.Dying &&
+            isDecaying(node) &&
                 hypot(node.simX - holeX, node.simY - holeY) <= exclusionRadius &&
                 hypot(node.dispX - x, node.dispY - y) <= node.displayRadius(physics) * 1.35f + 16f
         }
 
-    /** 节点是否处于「可抢救」状态：断链离散期、已进入黑洞区域闪烁呼吸。 */
+    /** 节点是否处于「可抢救」状态：衰减期、已进入遗忘区闪烁呼吸。 */
     fun isRescuable(nodeId: String): Boolean {
         val node = nodeList.firstOrNull { it.id == nodeId && !it.gone && !it.absorbed } ?: return false
-        return node.mode == BlackHoleNodeMode.Dying &&
+        return isDecaying(node) &&
             hypot(node.simX - holeX, node.simY - holeY) <= exclusionRadius
     }
 
     /**
-     * 抢救 = 用户主动点击、完成复习回顾（用户 2026-09-19 拍板 D7 断链离散方案）：
-     * 遗忘清零、冷却保护重置、放回漩涡旅程起点半径（净空带外沿）、重新接入力场布局。
-     * 数据层连线在离散期从未删除（仅渲染断链），抢救后自动重连、无需建边。
+     * 抢救 = 用户主动点击、完成复习回顾（用户 2026-09-19 拍板 D7；R87 开普勒化）：
+     * 遗忘清零、冷却保护重置、**重新注入轨道速度**（放回遗忘区外沿 + v=v_circ 圆轨道速度），
+     * 节点即刻恢复稳定公转。数据层连线在衰减期从未断开，抢救后自然恢复亮度、无需建边。
      */
     fun rescueNode(nodeId: String): Boolean {
         if (!isRescuable(nodeId)) return false
@@ -395,28 +420,33 @@ class BlackHoleGraphEngine(
         node.cooling = true
         node.coolingElapsed = 0f
         node.mode = BlackHoleNodeMode.Free
-        val r = node.decayStartR.coerceAtLeast(exclusionRadius + node.baseRadius + 6f)
-        node.simX = holeX + cos(node.decayAngle) * r
-        node.simY = holeY + sin(node.decayAngle) * r
+        // 保持当前方位角，放回遗忘区外沿
+        val dx = node.simX - holeX
+        val dy = node.simY - holeY
+        val angle = atan2(dy, dx)
+        val r = exclusionRadius + node.baseRadius + 6f
+        node.simX = holeX + cos(angle) * r
+        node.simY = holeY + sin(angle) * r
         node.dispX = node.simX
         node.dispY = node.simY
-        node.vx = 0f
-        node.vy = 0f
-        node.decayStartR = 0f
-        node.decayAngle = 0f
         node.settlingElapsed = 0f
         // R83：被抢救的子节点以母节点为中心重建轨道（从放回点起算相位/半径，向目标回弹归队）
         if (node.parentId != null) {
             val parent = nodeList.firstOrNull { it.id == node.parentId }
             if (parent != null) {
-                val dx = node.simX - parent.dispX
-                val dy = node.simY - parent.dispY
-                var d = hypot(dx, dy)
+                val pdx = node.simX - parent.dispX
+                val pdy = node.simY - parent.dispY
+                var d = hypot(pdx, pdy)
                 if (d < 24f) d = 24f
-                node.orbitAngle = atan2(dy, dx)
+                node.orbitAngle = atan2(pdy, pdx)
                 if (node.orbitRTarget <= 0.001f) node.orbitRTarget = physics.childOrbitRadius
                 node.orbitR = d
             }
+            node.vx = 0f
+            node.vy = 0f
+        } else {
+            // R87 抢救 = 重新注入轨道速度：v=v_circ，恢复稳定公转
+            injectOrbitalVelocity(node)
         }
         rescuedTotal++
         wake()
@@ -449,12 +479,9 @@ class BlackHoleGraphEngine(
         return m.coerceAtLeast(1f)
     }
 
-    /** 轨道角速度（rad/s，1x）：近快远慢差速 omega = base * (d0/d)^differential。 */
-    fun orbitOmegaAt(d: Float): Float {
-        val base = 2f * PI.toFloat() / physics.orbitPeriodSeconds
-        val ratio = physics.orbitReferenceRadius / d.coerceAtLeast(1f)
-        return base * Math.pow(ratio.toDouble(), physics.orbitDifferential.toDouble()).toFloat()
-    }
+    /** R87：半径 d 处的圆轨道线速度（px/子步）——v=√(GM/d)，近快远慢天然开普勒差速。 */
+    fun circularOrbitSpeedAt(d: Float): Float =
+        sqrt(physics.holeGravityGM / d.coerceAtLeast(1f))
 
     // ---------- 拖动 ----------
 
@@ -462,7 +489,7 @@ class BlackHoleGraphEngine(
         val node = nodeList.firstOrNull {
             it.id == nodeId && !it.gone && !it.absorbed
         } ?: return
-        dragWasDying = node.mode == BlackHoleNodeMode.Dying
+        dragWasDecaying = isDecaying(node)
         draggingId = node.id
         node.mode = BlackHoleNodeMode.Dragging
         node.vx = 0f
@@ -494,17 +521,17 @@ class BlackHoleGraphEngine(
 
     /**
      * 松手：净空带内 -> 弹开（不吞噬）；普通位置 -> 惯性滑停 -> 回归物理层由弹簧收敛（不停泊）。
-     * R81：拖动濒死（Dying）节点 = 抓回来复习——松手即抢救（遗忘清零、冷却重置、回到力场），
+     * R81/R87：拖动衰减期节点 = 抓回来复习——松手即抢救（遗忘清零、冷却重置、重新入轨），
      * 返回被抢救的节点 id；普通节点返回 null。
      */
     fun endDrag(): String? {
         val node = nodeList.firstOrNull { it.id == draggingId }
-        val wasDying = dragWasDying
+        val wasDecaying = dragWasDecaying
         draggingId = null
-        dragWasDying = false
+        dragWasDecaying = false
         dragOverHole = false
         if (node == null) return null
-        if (isInExclusionZone(node.dispX, node.dispY)) {
+        if (isInExclusionZone(node.dispX, node.dispY) && !wasDecaying) {
             val dx = node.dispX - holeX
             val dy = node.dispY - holeY
             val len = hypot(dx, dy).takeIf { it > 0.001f } ?: 1f
@@ -522,7 +549,7 @@ class BlackHoleGraphEngine(
             // R83：子节点松手不走惯性滑停——以母节点为中心重建轨道
             // （半径保持当前拉伸量，向 orbitRTarget 缓慢回弹 = 橡皮筋手感）
             val parent = nodeList.firstOrNull { it.id == node.parentId }
-            if (parent != null && !parent.gone && !parent.absorbed && parent.mode != BlackHoleNodeMode.Dying) {
+            if (parent != null && !parent.gone && !parent.absorbed && !isDecaying(parent)) {
                 val dx = node.dispX - parent.dispX
                 val dy = node.dispY - parent.dispY
                 var d = hypot(dx, dy)
@@ -540,7 +567,7 @@ class BlackHoleGraphEngine(
         } else {
             node.mode = BlackHoleNodeMode.InertiaSliding
         }
-        if (wasDying) {
+        if (wasDecaying) {
             node.forget = 0f
             node.cooling = true
             node.coolingElapsed = 0f
@@ -594,7 +621,6 @@ class BlackHoleGraphEngine(
             entrance = min(1f, entrance + dt / physics.entranceSeconds)
         }
         advanceForgetting(dt)
-        advanceDying(dt)
         advanceDisplayModes(dt)
         advanceChildren(dt)
         if (settled && nodeList.size > physics.fullForceNodeCap) {
@@ -614,10 +640,11 @@ class BlackHoleGraphEngine(
     }
 
     /**
-     * 遗忘推进（冷却保护模型，用户 R66 拍板）：
-     * - 保护期内（新节点默认）：遗忘冻结为 0，节点正常力场布局 + 缓慢绕洞公转，绝不坠入；
-     * - 保护期结束：遗忘开始增长，该节点即刻脱离力场、独自沿漩涡轨道向黑洞中心靠拢
-     *   （保持旋转、逐渐加速），直到坠入核心 = 真实遗忘（消失）。
+     * 遗忘推进（冷却保护模型，用户 R66 拍板；R87 开普勒化）：
+     * - 保护期内（新节点默认）：遗忘冻结为 0，节点正常力场布局 + 绕洞公转，绝不坠入；
+     * - 保护期结束：遗忘开始增长，节点**不脱离力场**——切向速度目标按 (1-forget) 抽走
+     *   （刹车），引力占优、轨道自然内旋（见 simulateForces 第 3 节），连续渐进绝无瞬移；
+     *   过保瞬间其子节点晋升为根（断链离散语义：孩子不跟着坠洞）。
      * 具体曲线数值为占位，等用户给记忆遗忘曲线算法后替换。
      */
     private fun advanceForgetting(dt: Float) {
@@ -627,11 +654,21 @@ class BlackHoleGraphEngine(
             if (node.gone || node.absorbed) return@forEach
             if (node.cooling) {
                 node.coolingElapsed += scaled
-                if (node.coolingElapsed >= physics.protectionSeconds) node.cooling = false
+                if (node.coolingElapsed >= physics.protectionSeconds) {
+                    node.cooling = false
+                    // R83/R87：母节点开始衰减——子节点就地晋升为根并注入圆轨道速度，不跟坠
+                    nodeList.forEach { c ->
+                        if (c.parentId == node.id) {
+                            c.parentId = null
+                            c.orbitR = 0f
+                            c.orbitRTarget = 0f
+                            injectOrbitalVelocity(c)
+                        }
+                    }
+                }
                 return@forEach
             }
             node.forget = (node.forget + step).coerceAtMost(1f)
-            if (node.mode == BlackHoleNodeMode.Free) enterDying(node)
         }
     }
 
@@ -648,13 +685,23 @@ class BlackHoleGraphEngine(
         val childOmega = 2f * PI.toFloat() / physics.childOrbitPeriodSeconds
         nodeList.forEach { node ->
             val pid = node.parentId ?: return@forEach
-            if (node.gone || node.absorbed || node.mode == BlackHoleNodeMode.Dying) return@forEach
-            val parent = byId[pid]
-            if (parent == null || parent.gone || parent.absorbed || parent.mode == BlackHoleNodeMode.Dying) {
-                // 母节点已离散/被吞：晋升为根，回到黑洞力场（位置就地继承）
+            if (node.gone || node.absorbed) return@forEach
+            if (isDecaying(node)) {
+                // R87：子节点自身进入衰减——脱离母节点轨道，归为根受黑洞引力管辖（刹车内旋）
                 node.parentId = null
                 node.orbitR = 0f
                 node.orbitRTarget = 0f
+                if (node.mode == BlackHoleNodeMode.Free) injectOrbitalVelocity(node)
+                wake()
+                return@forEach
+            }
+            val parent = byId[pid]
+            if (parent == null || parent.gone || parent.absorbed || isDecaying(parent)) {
+                // 母节点已离散/被吞/进入衰减：晋升为根，回到黑洞力场（位置就地继承 + 注入轨道速度）
+                node.parentId = null
+                node.orbitR = 0f
+                node.orbitRTarget = 0f
+                if (node.mode == BlackHoleNodeMode.Free) injectOrbitalVelocity(node)
                 wake()
                 return@forEach
             }
@@ -687,57 +734,9 @@ class BlackHoleGraphEngine(
     }
 
 
-    /** 进入漩涡旅程：脱离力场、清零速度，记录当前半径/角度作为收缩与旋转基准。 */
-    private fun enterDying(node: BlackHoleNode) {
-        node.mode = BlackHoleNodeMode.Dying
-        node.vx = 0f
-        node.vy = 0f
-        // R83：母节点离散（断链）——它的子节点不能跟着坠洞，就地晋升为根回到黑洞力场
-        nodeList.forEach { c ->
-            if (c.parentId == node.id) {
-                c.parentId = null
-                c.orbitR = 0f
-                c.orbitRTarget = 0f
-            }
-        }
-        if (node.decayStartR <= 0.001f) {
-            val dx = node.simX - holeX
-            val dy = node.simY - holeY
-            node.decayStartR = hypot(dx, dy).coerceAtLeast(exclusionRadius)
-            node.decayAngle = atan2(dy, dx)
-        }
-    }
-
-    /**
-     * 漩涡旅程（Dying）：过保节点独自旋进黑洞——保持公转方向加速旋转（越近越快），
-     * 半径按遗忘进度从起点平滑收缩：r = startR * (1-forget)^pow，抵核（0.6x 核心半径）
-     * 或遗忘打满即被吞 = 真实遗忘。不参与力场/碰撞/命中，不扰动其他任何节点；
-     * 全局布局全程不变（真机反馈算法层重构 + 用户冷却保护设计）。
-     */
-    private fun advanceDying(dt: Float) {
-        val scaled = dt * timeScale
-        nodeList.forEach { node ->
-            if (node.gone || node.absorbed || node.mode != BlackHoleNodeMode.Dying) return@forEach
-            if (node.decayStartR <= 0.001f) enterDying(node)
-            val dNow = hypot(node.simX - holeX, node.simY - holeY).coerceAtLeast(1f)
-            node.decayAngle += orbitOmegaAt(dNow) * physics.decayOrbitBoost * scaled
-            val remaining = (1f - node.forget).coerceIn(0f, 1f)
-            val r = node.decayStartR * Math.pow(remaining.toDouble(), physics.decayRadiusPow.toDouble()).toFloat()
-            // R82：物理位置已抵核同样即吞——净空带翻倍（半径比 3→6）后，深遗忘节点若在带内
-            // 进入 Dying，decayStartR 被钳到净空带半径会把它「从核心弹回带外」、旅程凭空变长。
-            if (r <= holeCoreRadius * 0.6f || node.forget >= 1f || dNow <= holeCoreRadius * 0.6f) {
-                // 抵达核心：吞噬 = 真实遗忘（漩涡旅程的唯一终点）
-                node.absorbed = true
-                node.absorbFade = 0f
-                absorbedTotal++
-                return@forEach
-            }
-            node.simX = holeX + cos(node.decayAngle) * r
-            node.simY = holeY + sin(node.decayAngle) * r
-            node.dispX = node.simX
-            node.dispY = node.simY
-        }
-    }
+    // R87：Dying 脚本化漩涡旅程已退役——遗忘衰减全程由开普勒力学驱动（刹车内旋，见
+    // simulateForces 第 3 节），触核吸收见 checkAbsorption，呼吸警告由界面层按
+    // 「衰减期且位于遗忘区内」判定。
 
     private fun advanceDisplayModes(dt: Float) {
         nodeList.forEach { node ->
@@ -769,30 +768,54 @@ class BlackHoleGraphEngine(
         }
     }
 
-    /** settle 后大图的轻量路径：刚性公转 + 净空带违规唤醒（V19；R65 起无向心漂移——遗忘不再牵引位置）。 */
+    /**
+     * settle 后大图的轻量路径（V19 性能闸；R87 开普勒化）：不再脚本摆位，
+     * 只做 O(n) 速度积分——引力加速 + 潮汐正则化 + 按速度前进，与全力场路径同一套物理。
+     * 衰减节点在此路径同样刹车内旋；健康节点越界（被拖入带）仍唤醒回全力场。
+     */
     private fun orbitLightPath(dt: Float) {
         val scaled = dt * timeScale
+        val steps = (scaled * 60f).toInt().coerceIn(0, 12)
+        if (steps <= 0) return
         nodeList.forEach { node ->
             if (node.gone || node.absorbed || node.mode != BlackHoleNodeMode.Free) return@forEach
             // R83：子节点随母节点整体转动（advanceChildren），自身不绕洞旋转
             if (node.parentId != null) return@forEach
-            val dx = node.simX - holeX
-            val dy = node.simY - holeY
-            val d = hypot(dx, dy)
-            if (d <= 0.001f) return@forEach
-            val omega = orbitOmegaAt(d) * scaled
-            val cosA = cos(omega)
-            val sinA = sin(omega)
-            val nx = dx * cosA - dy * sinA
-            val ny = dx * sinA + dy * cosA
-            node.simX = holeX + nx
-            node.simY = holeY + ny
+            repeat(steps) {
+                val dx = node.simX - holeX
+                val dy = node.simY - holeY
+                val d = hypot(dx, dy)
+                if (d <= 1f) return@repeat
+                val ux = dx / d
+                val uy = dy / d
+                // 引力（向心）
+                val g = physics.holeGravityGM / (d * d)
+                node.vx -= ux * g
+                node.vy -= uy * g
+                // 潮汐正则化：切向速度缓推向 v_circ×(1-forget)（衰减=刹车内旋）
+                val tx = uy
+                val ty = -ux
+                val vtTarget = circularOrbitSpeedAt(d) * (1f - node.forget.coerceIn(0f, 1f))
+                val vt = node.vx * tx + node.vy * ty
+                val reg = (vtTarget - vt) * physics.orbitRegularization
+                node.vx += tx * reg
+                node.vy += ty * reg
+                // R87b 踢动保护：切向速度超出 1.3×v_circ（逃逸余量 √2 以内）说明是
+                // 碰撞/拖拽踢动而非公转——强阻尼快速放掉异常能量，防节点逃逸出屏
+                val vtAfter = node.vx * tx + node.vy * ty
+                if (abs(vtAfter) > 1.3f * circularOrbitSpeedAt(d)) {
+                    node.vx += tx * (vtAfter * (physics.damping - 1f))
+                    node.vy += ty * (vtAfter * (physics.damping - 1f))
+                }
+                node.simX += node.vx
+                node.simY += node.vy
+            }
             node.dispX = node.simX
             node.dispY = node.simY
         }
         nodeList.forEach { node ->
             if (node.parentId == null && !node.gone && !node.absorbed &&
-                node.mode == BlackHoleNodeMode.Free && node.forget < 0.5f
+                node.mode == BlackHoleNodeMode.Free && node.forget < physics.barrierForgetGate
             ) {
                 val d = hypot(node.simX - holeX, node.simY - holeY)
                 if (d < exclusionRadius * 0.95f) wake()
@@ -802,9 +825,9 @@ class BlackHoleGraphEngine(
 
     private fun simulateForces() {
         val alpha = max(physics.alphaFloor, 1f - iter.toFloat() / physics.alphaIterations)
-        // Dying（螺旋坠入中）彻底脱离力场：不受力也不施力
+        // R87：衰减期节点仍全程参与力场（受力也施力）——只有被吞/消失者退出
         val freeNodes = nodeList.filter {
-            !it.gone && !it.absorbed && it.mode != BlackHoleNodeMode.Dying
+            !it.gone && !it.absorbed
         }
         val fx = HashMap<String, Float>(freeNodes.size * 2)
         val fy = HashMap<String, Float>(freeNodes.size * 2)
@@ -865,52 +888,83 @@ class BlackHoleGraphEngine(
             applyForce(b, fx, fy, -ux * f, -uy * f, fromCollision = false)
         }
 
-        // 3) 公转切向 + 净空带硬边界（只作用算法层 Free 节点）。
-        //    R65 起黑洞没有任何引力（真机反馈「全员被吸到中间太丑」）：布局只由斥力/弹簧/净空带构成，
-        //    遗忘只让公转冷却（切向 ->15%），不再牵引位置。
+        // 3) R87 开普勒引力 + 潮汐正则化 + 可渗透屏障（只作用算法层 Free 根节点）。
+        //    引力 F=GM/d² 向心，与出生自带的 v=√(GM/d) 切向初速度构成真实公转平衡；
+        //    正则化把切向速度缓推向 v_circ×(1-forget)——遗忘加深=刹车，引力占优=轨道内旋；
+        //    屏障（推力+位置钳制）随遗忘渗透：健康节点硬边界，衰减节点（forget≥门限）可穿入。
         freeNodes.forEach { node ->
             if (node.mode != BlackHoleNodeMode.Free) return@forEach
-            // R83：子节点绕母节点公转（advanceChildren），不参与绕洞切向收敛；带钳制同样在轨道层做
+            // R83：子节点绕母节点公转（advanceChildren），不参与绕洞引力；带钳制同样在轨道层做
             if (isKinematic(node)) return@forEach
             val dx = holeX - node.simX
             val dy = holeY - node.simY
-            val d = hypot(dx, dy).takeIf { it > 0.001f } ?: 0.001f
+            val d = hypot(dx, dy).takeIf { it > 1f } ?: 1f
             val ux = dx / d
             val uy = dy / d
-            // 公转：切向速度向轨道目标收敛（常驻运动，不随 alpha 冷却消失；遗忘加深 -> 冷却变慢）
-            val tangentialRatio = 1f - (1f - physics.deepForgetTangentialRatio) * node.forget
-            val targetT = orbitOmegaAt(d) * d * tangentialRatio / 60f
-            val tx = -uy
-            val ty = ux
+            // 引力（向心，常力、不随 alpha 冷却）
+            val g = physics.holeGravityGM / (d * d)
+            fx[node.id] = (fx[node.id] ?: 0f) + ux * g
+            fy[node.id] = (fy[node.id] ?: 0f) + uy * g
+            // 潮汐正则化：切向速度缓推向 v_circ(d)×(1-forget)（外向径向下 t=(uy,-ux)）
+            val tx = uy
+            val ty = -ux
+            val vtTarget = circularOrbitSpeedAt(d) * (1f - node.forget.coerceIn(0f, 1f))
             val currentT = node.vx * tx + node.vy * ty
-            val nudge = (targetT - currentT) * physics.orbitConvergence
-            fx[node.id] = (fx[node.id] ?: 0f) + tx * nudge
-            fy[node.id] = (fy[node.id] ?: 0f) + ty * nudge
-            // 4) 净空带永久硬边界：推力不随遗忘衰减——任何 Free 节点都不得靠近黑洞
-            if (d < exclusionRadius) {
-                val push = physics.exclusionPush * (exclusionRadius - d) / exclusionRadius
+            val reg = (vtTarget - currentT) * physics.orbitRegularization
+            fx[node.id] = (fx[node.id] ?: 0f) + tx * reg
+            fy[node.id] = (fy[node.id] ?: 0f) + ty * reg
+            // 4) 屏障随遗忘渗透：仅健康节点外推（推力按 1-forget 软化），遗忘过门后不再外推
+            val healthyForBarrier = node.cooling || node.forget < physics.barrierForgetGate
+            if (healthyForBarrier && d < exclusionRadius) {
+                val barrier = (1f - node.forget.coerceIn(0f, 1f))
+                val push = physics.exclusionPush * (exclusionRadius - d) / exclusionRadius * barrier
                 fx[node.id] = (fx[node.id] ?: 0f) - ux * push
                 fy[node.id] = (fy[node.id] ?: 0f) - uy * push
             }
         }
 
-        // 5) 积分 + 阻尼 + 速度 clamp + NaN 守卫 + 净空带位置钳制
+        // 5) 积分 + 径向/切向分离阻尼 + 速度 clamp + NaN 守卫 + 屏障位置钳制（仅健康节点）
         freeNodes.forEach { node ->
             if (isKinematic(node)) return@forEach // R83：子节点位置只由 advanceChildren 决定
             when (node.mode) {
                 BlackHoleNodeMode.Free -> {
-                    node.vx = (node.vx + (fx[node.id] ?: 0f)) * physics.damping
-                    node.vy = (node.vy + (fy[node.id] ?: 0f)) * physics.damping
+                    node.vx += fx[node.id] ?: 0f
+                    node.vy += fy[node.id] ?: 0f
+                    // R87 阻尼拆分：径向强阻尼（健康 0.90，吸收扰动/圆形化轨道；衰减 0.99，
+                    // 让刹车后的轨道渐进内旋），切向零阻尼（保住公转）；
+                    // R87b 踢动保护：切向速度超出 1.3×v_circ（逃逸余量 √2 以内）说明是
+                    // 碰撞/弹簧踢动而非公转——改强阻尼快速放掉异常能量，防节点逃逸出屏
+                    val radialDamp = if (isDecaying(node)) physics.decayRadialDamping else physics.damping
+                    val rdx = node.simX - holeX
+                    val rdy = node.simY - holeY
+                    val rd = hypot(rdx, rdy)
+                    if (rd > 1f) {
+                        val ux = rdx / rd
+                        val uy = rdy / rd
+                        val tx = uy
+                        val ty = -ux
+                        val vr = (node.vx * ux + node.vy * uy) * radialDamp
+                        val vtRaw = node.vx * tx + node.vy * ty
+                        val tDamp = if (abs(vtRaw) > 1.3f * circularOrbitSpeedAt(rd))
+                            physics.damping else physics.tangentialDamping
+                        val vt = vtRaw * tDamp
+                        node.vx = ux * vr + tx * vt
+                        node.vy = uy * vr + ty * vt
+                    } else {
+                        node.vx *= physics.damping
+                        node.vy *= physics.damping
+                    }
                     clampVelocity(node)
                     if (guardNaN(node)) return@forEach
                     node.simX += node.vx
                     node.simY += node.vy
-                    // 净空带位置钳制：任何 Free 节点都不得停留在净空带内，
-                    // 连线端点永远在带外，连线自然不会「接进」黑洞（真机反馈）
+                    // 屏障位置钳制（仅健康节点：保护期或遗忘未过门）——衰减节点可穿入遗忘区，
+                    // 健康节点永远停留在带外，连线自然不会「接进」黑洞（真机反馈）
+                    val healthy = node.cooling || node.forget < physics.barrierForgetGate
                     val cdx = node.simX - holeX
                     val cdy = node.simY - holeY
                     val cd = hypot(cdx, cdy)
-                    if (cd < exclusionRadius && cd > 0.001f) {
+                    if (healthy && cd < exclusionRadius && cd > 0.001f) {
                         val k = exclusionRadius / cd
                         node.simX = holeX + cdx * k
                         node.simY = holeY + cdy * k
@@ -989,9 +1043,9 @@ class BlackHoleGraphEngine(
     }
 
     /**
-     * 吞噬收尾： absorbed 淡出 -> gone 并清边；触核判定兜底——正常吸收走 Dying 螺旋坠入
-     * （advanceDying 抵核置 absorbed），这里只处理「直接出现在核心」的异常情形：
-     * 遗忘过门者即吞，普通节点（碰撞/拖拽误入）径向弹出、绝不算吸收（真机反馈）。
+     * 吞噬收尾（R87）：absorbed 淡出 -> gone 并清边。触核判定——衰减节点轨道内旋抵核
+     * 且遗忘过门（>=absorbForgetGate）即吞 = 真实遗忘（正常吸收的唯一终点）；
+     * 健康节点（碰撞/拖拽误闯核心）径向弹出、绝不算吸收（真机反馈）。
      * 每帧、全体、拖拽豁免（V17/V23；淡出随倍率）。
      */
     private fun checkAbsorption(dt: Float) {
@@ -1013,10 +1067,6 @@ class BlackHoleGraphEngine(
                 continue
             }
             if (node.mode == BlackHoleNodeMode.Dragging) continue
-            // 漩涡旅程中的节点豁免触核兜底——旅程后段本来就要穿越核心邻域，
-            // 它的终点只由 advanceDying 判定（抵核/遗忘打满 -> absorbed）；
-            // 若在这里按「误闯核心」弹开，会把末段旅程的节点甩回净空带、旅程永远走不完。
-            if (node.mode == BlackHoleNodeMode.Dying) continue
             val r = node.displayRadius(physics)
             if (hypot(node.simX - holeX, node.simY - holeY) <= holeCoreRadius + r) {
                 if (node.forget >= physics.absorbForgetGate) {
@@ -1075,9 +1125,7 @@ class BlackHoleGraphEngine(
         return edgeList.mapNotNull { (fromId, toId) ->
             val a = byId[fromId] ?: return@mapNotNull null
             val b = byId[toId] ?: return@mapNotNull null
-            // D7 断链离散：漩涡旅程中的节点视觉上断开与母节点的连线
-            // （数据层 edgeList 未删，抢救回归后自动重连）
-            if (a.mode == BlackHoleNodeMode.Dying || b.mode == BlackHoleNodeMode.Dying) return@mapNotNull null
+            // R87：衰减期连线不再断开——按两端遗忘度渐暗（数据层从未断，抢救后自然恢复亮度）
             val fade = (1f - a.forget) * (1f - b.forget)
             val absorbedFade = (1f - a.absorbFade) * (1f - b.absorbFade)
             BlackHoleRenderEdge(

@@ -14,9 +14,9 @@ import kotlin.math.atan2
  * 黑洞图谱引擎单元测试（V12~V30 定稿规格的落地验收 + 真机反馈整改）。
  * 覆盖：初始布局、力场稳定性、拖拽语义、alpha 平台、松手回归物理层（不停泊）、
  * 弹簧收敛圆润、黑洞弹开不吞噬、吞噬遗忘门（碰撞误入核心只弹不吞）、
- * R65 算法层重构（黑洞无引力、净空带永久硬边界）、
- * R66 冷却保护模型（保护期内遗忘冻结+原地公转、过保后漩涡旅程螺旋坠入、
- * 坠入节点脱离力场不扰动布局、Dying 可拖回=松手抢救（R81））、
+ * R87 开普勒引力模型（真实引力 F=GM/d² + 出生自带圆轨道速度 v=√(GM/d)；
+ * 遗忘=切向刹车 → 轨道渐进内旋：活动区 → 遗忘区 → 坠入核心；屏障随遗忘渗透；
+ * 衰减节点不脱离力场、可拖回=松手抢救（R81）、点按抢救=重新注入轨道速度）、
  * 页面重置、硬保护（clamp/NaN）、settle 后常驻公转、入场缓动、时间倍率全局缩放。
  */
 class BlackHoleGraphEngineTest {
@@ -226,7 +226,7 @@ class BlackHoleGraphEngineTest {
         assertEquals(0, engine.absorbedCount)
         val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
         assertTrue("bounced node d=$d exclusion=${engine.exclusionRadius}",
-            d >= engine.exclusionRadius)
+            d >= engine.exclusionRadius - 0.5f) // 钳制落点 float 精度容忍
         assertEquals(BlackHoleNodeMode.Free, node.mode)
     }
 
@@ -435,7 +435,7 @@ class BlackHoleGraphEngineTest {
             n2Move > n3Move + 30f)
     }
 
-    // ---------- R66 冷却保护模型（用户拍板，曲线数值为占位） ----------
+    // ---------- R87 开普勒引力 · 冷却保护模型（用户拍板，曲线数值为占位） ----------
 
     @Test
     fun protected_node_orbits_in_place_without_drifting_inward() {
@@ -443,7 +443,7 @@ class BlackHoleGraphEngineTest {
         val engine = engineWith(6)
         tickSeconds(engine, 5f) // 布局稳定
         val node = engine.nodes.first()
-        node.forget = 0f // 新节点语义：保护期内遗忘为 0（populate 演示分布会给部分节点预置遗忘）
+        node.forget = 0f // 新节点语义：保护期内遗忘为 0
         val d0 = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
         tickSeconds(engine, 6f)
         val d1 = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
@@ -454,45 +454,130 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
+    fun root_nodes_are_born_with_circular_orbit_velocity() {
+        // R87 开普勒模型：根节点出生自带圆轨道速度——切向 v=√(GM/d)、径向分量为 0
+        val engine = BlackHoleGraphEngine()
+        engine.populate(
+            graphNodes = (1..24).map { Triple("n$it", "节点$it", GraphNodeKind.Concept) },
+            edges = emptyList()
+        )
+        engine.nodes.filter { it.parentId == null }.forEach { node ->
+            val dx = node.simX - engine.holeX
+            val dy = node.simY - engine.holeY
+            val d = hypot(dx, dy)
+            val ux = dx / d
+            val uy = dy / d
+            val vr = node.vx * ux + node.vy * uy
+            val vt = node.vx * uy + node.vy * (-ux) // t=(uy,-ux)，与注入方向一致
+            assertEquals("root ${node.id} radial speed: $vr", 0f, vr, 0.01f)
+            assertEquals("root ${node.id} vt=$vt d=$d",
+                engine.circularOrbitSpeedAt(d), vt, 0.01f)
+        }
+    }
+
+    @Test
     fun cooling_protection_expires_then_decay_begins() {
-        // 保护期结束 -> 遗忘开始增长 -> 即刻脱离力场进入漩涡旅程
+        // 保护期结束 -> 遗忘开始增长；R87：节点不脱离力场（保持 Free），切向刹车渐进内旋
         val engine = engineWith(1)
         val node = engine.nodes.first()
         engine.timeScale = 10f
         tickSeconds(engine, 10f) // 100s 虚拟时间 > 90s 保护期
         assertFalse(node.cooling)
         assertTrue("forget not advancing after protection: ${node.forget}", node.forget > 0f)
-        assertEquals(BlackHoleNodeMode.Dying, node.mode)
+        assertEquals(BlackHoleNodeMode.Free, node.mode)
     }
 
     @Test
-    fun decaying_node_spirals_inward_and_absorbs_at_journey_end() {
-        // 漩涡旅程：半径持续收缩（保持旋转），遗忘打满/抵核即被吞 = 真实遗忘
+    fun decaying_node_brakes_tangential_velocity() {
+        // R87 遗忘=刹车：切向速度被缓推向 v_circ(d)×(1-forget)
+        val engine = engineWith(1)
+        val node = engine.nodes.first()
+        node.cooling = false
+        node.forget = 0.5f
+        val d0 = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+        val ux0 = (node.simX - engine.holeX) / d0
+        val uy0 = (node.simY - engine.holeY) / d0
+        val vt0 = node.vx * uy0 + node.vy * (-ux0)
+        assertEquals(engine.circularOrbitSpeedAt(d0), vt0, 0.01f) // 出生即圆轨道速度
+        tickSeconds(engine, 5f) // 正则化时间常数 ~1.7s -> 5s 已充分收敛向目标
+        val d1 = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+        val ux1 = (node.simX - engine.holeX) / d1
+        val uy1 = (node.simY - engine.holeY) / d1
+        val vt1 = node.vx * uy1 + node.vy * (-ux1)
+        assertTrue("no braking: vt0=$vt0 vt1=$vt1", vt1 < vt0 - 0.01f)
+        assertTrue("node flew outward: d0=$d0 d1=$d1", d1 <= d0 + 1f)
+    }
+
+    @Test
+    fun decaying_orbit_decays_inward_continuously() {
+        // R87 轨道衰减：不脱离力场、不瞬移——连续渐进内旋（活动区 -> 遗忘区方向）
         val engine = engineWith(3, edges = listOf("n1" to "n2", "n2" to "n3"))
-        val victim = engine.nodes[1] // n2
+        val victim = engine.nodes[1] // n2（度数最高 -> 根节点）
         victim.cooling = false
-        victim.forget = 0.5f
+        victim.forget = 0.6f
         engine.tick(1f / 60f)
-        assertEquals(BlackHoleNodeMode.Dying, victim.mode)
+        assertEquals(BlackHoleNodeMode.Free, victim.mode) // 衰减期仍是力场成员
         val d0 = hypot(victim.simX - engine.holeX, victim.simY - engine.holeY)
-        tickSeconds(engine, 1f)
+        tickSeconds(engine, 30f)
         val d1 = hypot(victim.simX - engine.holeX, victim.simY - engine.holeY)
-        assertTrue("dying node not spiraling inward: d0=$d0 d1=$d1", d1 < d0)
-        engine.timeScale = 10f
-        tickSeconds(engine, 12f) // 120s 虚拟 -> 遗忘打满/抵核
-        assertTrue(victim.absorbed)
-        assertTrue(victim.gone)
-        assertEquals(1, engine.absorbedCount)
-        assertTrue(engine.renderEdges().none { it.fromId == "n2" || it.toId == "n2" })
+        assertTrue("not decaying inward: d0=$d0 d1=$d1", d1 < d0 - 2f)
+        assertFalse("decay must be gradual, not teleport-to-core", victim.absorbed)
+    }
+
+    @Test
+    fun kicked_node_recovers_orbit_without_escaping() {
+        // R87b 踢动保护：逃逸速度仅 √2×v_circ（≈4.2px/s），而碰撞/弹簧踢动可达
+        // 60~600px/s——零切向阻尼下任何踢动都是双曲逃逸（真机实测全图节点 8s 飞光）。
+        // 保护机制：|vt| > 1.3×v_circ 判定为踢动、改强阻尼放掉异常能量；
+        // 节点应被引力重新捕获、留在黑洞附近恢复公转，而不是飞出画布。
+        val engine = engineWith(1)
+        val node = engine.nodes.first()
+        val d0 = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+        val ux = (node.simX - engine.holeX) / d0
+        val uy = (node.simY - engine.holeY) / d0
+        val kick = 20f * engine.circularOrbitSpeedAt(d0) // 远超逃逸速度 √2×v_circ
+        node.vx += uy * kick
+        node.vy += (-ux) * kick
+        tickSeconds(engine, 5f)
+        val d1 = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
+        val ux1 = (node.simX - engine.holeX) / d1
+        val uy1 = (node.simY - engine.holeY) / d1
+        val vt1 = node.vx * uy1 + node.vy * (-ux1)
+        assertTrue("node escaped: d0=$d0 d1=$d1", d1 < d0 + 200f)
+        assertTrue(
+            "orbit not recovered: vt1=$vt1 v_circ=${engine.circularOrbitSpeedAt(d1)}",
+            kotlin.math.abs(vt1) < 2.5f * engine.circularOrbitSpeedAt(d1)
+        )
+    }
+
+    @Test
+    fun barrier_clamps_healthy_but_permeable_for_decaying() {
+        // R87 屏障渗透：健康节点（保护期/遗忘未过门）放带内 -> 位置钳出；
+        // 衰减过门节点（forget>=0.5）放带内 -> 不再钳制、不再外推，可停留在遗忘区
+        val engine = engineWith(2)
+        val healthy = engine.nodes[0]
+        val decaying = engine.nodes[1]
+        healthy.simX = engine.holeX + engine.exclusionRadius - 20f
+        healthy.simY = engine.holeY
+        engine.tick(1f / 60f)
+        val dh = hypot(healthy.simX - engine.holeX, healthy.simY - engine.holeY)
+        assertTrue("healthy node not clamped out: d=$dh", dh >= engine.exclusionRadius - 0.5f)
+        decaying.cooling = false
+        decaying.forget = 0.6f
+        decaying.simX = engine.holeX - (engine.exclusionRadius - 20f) // 反向放置，远离 healthy 防碰撞干扰
+        decaying.simY = engine.holeY
+        engine.tick(1f / 60f)
+        val dd = hypot(decaying.simX - engine.holeX, decaying.simY - engine.holeY)
+        assertTrue("decaying node clamped/pushed out: d=$dd", dd < engine.exclusionRadius)
     }
 
     @Test
     fun decaying_node_detaches_but_protected_never_cross_ring() {
-        // 坠入节点脱离力场独自进洞；保护期内的节点（哪怕有连线）永远不进净空带
+        // 衰减节点可穿入遗忘区；保护期内的节点（哪怕有连线）永远不进净空带
         val engine = engineWith(16, edges = (1 until 16).map { "n$it" to "n${it + 1}" })
-        val dying = engine.nodes.first()
-        dying.cooling = false
-        dying.forget = 0.3f
+        val decaying = engine.nodes.first()
+        decaying.cooling = false
+        decaying.forget = 0.3f
         tickSeconds(engine, 10f)
         engine.nodes.filter { it.cooling && !it.gone }.forEach { node ->
             val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
@@ -502,13 +587,14 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
-    fun dying_node_can_be_hit_dragged_and_revives_on_release() {
-        // R81 修复「节点没办法拖动」：濒死节点也可命中、可拖拽——松手即抢救（遗忘清零、冷却重置、回力场）
+    fun decaying_node_can_be_hit_dragged_and_revives_on_release() {
+        // R81 修复「节点没办法拖动」：衰减节点也可命中、可拖拽——松手即抢救（遗忘清零、冷却重置）
         val engine = engineWith(2)
         val node = engine.nodes.first()
         node.cooling = false
+        node.forget = 0.3f
         engine.tick(1f / 60f)
-        assertEquals(BlackHoleNodeMode.Dying, node.mode)
+        assertEquals(BlackHoleNodeMode.Free, node.mode) // R87：衰减期不脱离力场
         assertNotNull(engine.hitTest(node.dispX, node.dispY))
         engine.startDrag(node.id)
         assertEquals(BlackHoleNodeMode.Dragging, node.mode)
@@ -534,15 +620,19 @@ class BlackHoleGraphEngineTest {
 
     // ---------- D7 断链离散 · 点击抢救（用户 2026-09-19 拍板） ----------
 
-    /** 把节点推进到「可抢救」状态：过保进入 Dying，再收缩进黑洞区域（闪烁呼吸段）。 */
+    /** 把节点推进到「可抢救」状态：过保且遗忘过门，直接放入遗忘区（闪烁呼吸段）。 */
     private fun driveToBreathing(engine: BlackHoleGraphEngine, id: String) {
         val node = engine.nodes.first { it.id == id }
         node.cooling = false
-        node.forget = 0.05f
-        engine.tick(1f / 60f) // -> Dying，记录 decayStartR/decayAngle
-        node.decayStartR = engine.exclusionRadius
-        node.forget = 0.1f
-        engine.tick(1f / 60f) // r ≈ exclusion * 0.92 < exclusion -> 呼吸段
+        node.forget = 0.6f // 过屏障渗透门（0.5）：可停留遗忘区
+        val angle = atan2(node.simY - engine.holeY, node.simX - engine.holeX)
+        node.simX = engine.holeX + kotlin.math.cos(angle) * (engine.exclusionRadius - 10f)
+        node.simY = engine.holeY + kotlin.math.sin(angle) * (engine.exclusionRadius - 10f)
+        node.dispX = node.simX
+        node.dispY = node.simY
+        node.vx = 0f
+        node.vy = 0f
+        engine.tick(1f / 60f)
     }
 
     @Test
@@ -550,27 +640,25 @@ class BlackHoleGraphEngineTest {
         val engine = engineWith(3)
         val node = engine.nodes.first()
         node.cooling = false
-        node.forget = 0.05f
+        node.forget = 0.3f
         engine.tick(1f / 60f)
-        assertEquals(BlackHoleNodeMode.Dying, node.mode)
-        // 旅程前段（净空带之外）：不可抢救
+        assertEquals(BlackHoleNodeMode.Free, node.mode) // R87：衰减期不脱离力场
+        // 活动区（净空带之外）：不可抢救
         assertFalse(engine.isRescuable(node.id))
         assertFalse(engine.rescueNode(node.id))
-        assertEquals(BlackHoleNodeMode.Dying, node.mode)
-        // 进入黑洞区域（呼吸段）：可抢救
-        node.decayStartR = engine.exclusionRadius
-        node.forget = 0.1f
-        engine.tick(1f / 60f)
+        // 进入遗忘区（呼吸段）：可抢救
+        driveToBreathing(engine, node.id)
         assertTrue(engine.isRescuable(node.id))
         assertTrue(engine.rescueNode(node.id))
     }
 
     @Test
-    fun rescue_restores_state_and_severed_edges_relink() {
+    fun rescue_restores_state_and_faded_edges_brighten() {
         val engine = engineWith(3, edges = listOf("n1" to "n2", "n2" to "n3"))
         driveToBreathing(engine, "n1")
-        // 离散期：渲染层断链（数据层 edgeList 未删）
-        assertTrue(engine.renderEdges().none { it.fromId == "n1" || it.toId == "n1" })
+        // R87：衰减期连线不再断开——按两端遗忘度渐暗（数据层从未断）
+        val dimmed = engine.renderEdges().first { it.fromId == "n1" && it.toId == "n2" }
+        assertTrue("edge not faded by forget: ${dimmed.opacityFactor}", dimmed.opacityFactor < 0.5f)
         assertTrue(engine.renderEdges().any { it.fromId == "n2" && it.toId == "n3" })
         assertTrue(engine.rescueNode("n1"))
         val node = engine.nodes.first { it.id == "n1" }
@@ -578,11 +666,16 @@ class BlackHoleGraphEngineTest {
         assertTrue(node.cooling)
         assertEquals(0f, node.coolingElapsed, 1e-4f)
         assertEquals(BlackHoleNodeMode.Free, node.mode)
-        assertEquals(0f, node.decayStartR, 1e-4f)
         val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
         assertTrue("rescued node should be outside breathing zone: d=$d", d >= engine.exclusionRadius)
-        // 重连：渲染层连线恢复
-        assertTrue(engine.renderEdges().any { it.fromId == "n1" && it.toId == "n2" })
+        // R87 抢救=重新注入轨道速度：恢复公转（根节点）
+        if (node.parentId == null) {
+            assertTrue("no orbital velocity re-injected", hypot(node.vx, node.vy) > 0.01f)
+        }
+        // 遗忘清零 -> 连线自然恢复亮度
+        val brightened = engine.renderEdges().first { it.fromId == "n1" && it.toId == "n2" }
+        assertTrue("edge not brightened after rescue: ${brightened.opacityFactor} vs ${dimmed.opacityFactor}",
+            brightened.opacityFactor > dimmed.opacityFactor * 2f)
         assertEquals(1, engine.rescuedCount)
     }
 
@@ -595,7 +688,11 @@ class BlackHoleGraphEngineTest {
         val node = engine.nodes.first { it.id == "n2" }
         node.cooling = false
         node.forget = 1f
-        engine.tick(1f / 60f) // 遗忘打满 -> 吞噬
+        node.simX = engine.holeX + 5f // 深度遗忘触核 -> 吞噬
+        node.simY = engine.holeY
+        node.dispX = node.simX
+        node.dispY = node.simY
+        engine.tick(1f / 60f)
         assertTrue(node.absorbed || node.gone)
         assertFalse(engine.rescueNode("n2"))
         assertEquals(0, engine.rescuedCount)
@@ -610,9 +707,9 @@ class BlackHoleGraphEngineTest {
         val node = engine.nodes.first { it.id == "n6" }
         assertFalse(node.absorbed)
         assertFalse(node.gone)
-        assertTrue(node.mode != BlackHoleNodeMode.Dying)
+        assertEquals(BlackHoleNodeMode.Free, node.mode)
         assertEquals(0f, node.forget, 1e-4f)
-        // 重新接入力场：不被甩飞、不坠核心（净空带硬边界保持）
+        // 重新接入力场：不被甩飞、不坠核心（健康节点净空带硬边界保持）
         val d = hypot(node.simX - engine.holeX, node.simY - engine.holeY)
         assertTrue("rescued node drifted into hole: d=$d", d >= engine.exclusionRadius - 0.5f)
     }
@@ -690,8 +787,8 @@ class BlackHoleGraphEngineTest {
 
 
     @Test
-    fun dying_parent_detaches_children_to_roots() {
-        // 母节点离散（断链）：子节点不能跟着坠洞——就地晋升为根，回到黑洞力场绕洞公转
+    fun decaying_parent_promotes_children_to_roots() {
+        // 母节点进入衰减：子节点不能跟着坠洞——就地晋升为根并注入圆轨道速度，绕洞公转
         val engine = engineWith(4, edges = listOf("n1" to "n2", "n2" to "n3", "n3" to "n4"))
         tickSeconds(engine, 2f)
         val n2 = engine.nodes.first { it.id == "n2" }
@@ -700,12 +797,28 @@ class BlackHoleGraphEngineTest {
         n2.cooling = false
         n2.forget = 0.4f
         engine.tick(1f / 60f)
-        assertEquals(BlackHoleNodeMode.Dying, n2.mode)
+        assertEquals(BlackHoleNodeMode.Free, n2.mode) // R87：衰减期仍是力场成员
         assertEquals(null, n3.parentId) // 晋升为根
+        assertTrue("promoted root has no orbital velocity", hypot(n3.vx, n3.vy) > 0.01f)
         tickSeconds(engine, 2f)
         // 晋升后的根回到力场：绕洞公转、不坠洞、不进净空带
         assertEquals(BlackHoleNodeMode.Free, n3.mode)
         val d = hypot(n3.simX - engine.holeX, n3.simY - engine.holeY)
         assertTrue("promoted root crossed zone: d=$d", d >= engine.exclusionRadius - 1f)
+    }
+
+    @Test
+    fun decaying_child_promotes_itself_to_root() {
+        // R87：子节点自身进入衰减——脱离母节点轨道、晋升为根，受黑洞引力管辖（刹车内旋）
+        val engine = engineWith(4, edges = listOf("n1" to "n2", "n2" to "n3", "n3" to "n4"))
+        tickSeconds(engine, 2f)
+        val n3 = engine.nodes.first { it.id == "n3" }
+        assertEquals("n2", n3.parentId)
+        n3.cooling = false
+        n3.forget = 0.3f
+        engine.tick(1f / 60f)
+        assertEquals(null, n3.parentId)
+        assertEquals(BlackHoleNodeMode.Free, n3.mode)
+        assertTrue("self-promoted root has no orbital velocity", hypot(n3.vx, n3.vy) > 0.01f)
     }
 }

@@ -549,8 +549,8 @@ private fun BlackHoleGraphReadyContent(
                     // 触点落在画布即申请手势所有权（克隆旧屏 onRequestInteraction 语义）
                     onCanvasModeChange(true)
                     val downWorld = screenToWorld(down.position)
-                    // R81：所有可见节点（含濒死 Dying）都可命中——拖动/点按濒死节点按「复习」抢救处理，
-                    // 修复「节点没办法拖动」（此前 Dying 整段旅程 hitTest 豁免，手势全部落到平移分支）
+                    // R81/R87：所有可见节点（含衰减期节点）都可命中——拖动/点按衰减节点按「复习」抢救处理，
+                    // 修复「节点没办法拖动」（衰减节点 hitTest 豁免时手势全部落到平移分支）
                     val hit = engine.hitTest(downWorld.x, downWorld.y)
                     if (hit != null) {
                         // 节点拖动路径（含点按判定）
@@ -823,13 +823,32 @@ private fun BlackHoleGraphReadyContent(
                 val edgeAlpha = (0.25f * edgeGate * edge.opacityFactor * dim).coerceIn(0f, 1f)
                 // R85 用户拍板：关系线优先保持直线，绝不为「成圆」而弯曲——撤销 R83 绕行折线；
                 // 圆感靠公转运动与边数量自然形成，不强制。黑核本体画在连线之上，核面仍无线条穿过。
-                drawLine(
-                    color = palette.edge,
-                    start = worldToScreen(edge.fromX, edge.fromY),
-                    end = worldToScreen(edge.toX, edge.toY),
-                    strokeWidth = edgeStroke,
-                    alpha = edgeAlpha
-                )
+                // R87 用户拍板：直线几何不动，遗忘区内渐隐遮断——分段绘制、按段中点到洞心
+                // 距离在 [exclusionRadius, +fadeMargin] 内做 alpha 渐隐，视觉上不穿越遗忘区。
+                val fadeMargin = 0.3f * engine.holeCoreRadius
+                val segments = 24
+                var prevX = edge.fromX
+                var prevY = edge.fromY
+                for (seg in 1..segments) {
+                    val t = seg.toFloat() / segments
+                    val cx = edge.fromX + (edge.toX - edge.fromX) * t
+                    val cy = edge.fromY + (edge.toY - edge.fromY) * t
+                    val midX = (prevX + cx) * 0.5f
+                    val midY = (prevY + cy) * 0.5f
+                    val dMid = kotlin.math.hypot(midX - engine.holeX, midY - engine.holeY)
+                    val vis = ((dMid - engine.exclusionRadius) / fadeMargin).coerceIn(0f, 1f)
+                    if (vis > 0.01f) {
+                        drawLine(
+                            color = palette.edge,
+                            start = worldToScreen(prevX, prevY),
+                            end = worldToScreen(cx, cy),
+                            strokeWidth = edgeStroke,
+                            alpha = (edgeAlpha * vis).coerceIn(0f, 1f)
+                        )
+                    }
+                    prevX = cx
+                    prevY = cy
+                }
             }
 
             // 黑核本体：压在连线之上（真机反馈「线连进黑洞」）——跨洞连线到核边界为止，核面绝无线条穿过
@@ -961,9 +980,9 @@ private fun BlackHoleGraphReadyContent(
                 val center = worldToScreen(node.x, node.y)
                 val r = node.radius * camera.scale
                 val dim = if (selectedId != null && node.id !in neighborIds) 0.22f else 1f
-                // 漩涡旅程末段（完全进入黑洞区域）做闪烁呼吸 = 「即将遗忘」的警告（用户 R66 设计）
+                // 衰减节点进入遗忘区后做闪烁呼吸 = 「即将遗忘」的警告（R66 设计，R87 判定改为遗忘>0）
                 val dToHole = kotlin.math.hypot(node.x - engine.holeX, node.y - engine.holeY)
-                val breathing = node.mode == BlackHoleNodeMode.Dying && dToHole <= engine.exclusionRadius
+                val breathing = node.forget > 0f && dToHole <= engine.exclusionRadius
                 val breathAlpha = if (breathing) {
                     0.45f + 0.55f * (0.5f + 0.5f * kotlin.math.sin(seconds * 5.5f))
                 } else 1f
