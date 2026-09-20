@@ -47,6 +47,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +64,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -557,6 +559,18 @@ fun GoalDashboardHero(
                                     .testTag("$testTag-deadline-confirm")
                             )
                         }
+                        // R81：选中日期行——未选时给提示，已选显示「x年x月x日」，
+                        // 取代原来 DatePicker headline 槽（槽位自带大块留白，显得一大一小）。
+                        Text(
+                            text = pickerState.selectedDateMillis?.let { millis ->
+                                val cal = Calendar.getInstance().apply { timeInMillis = millis }
+                                "${cal.get(Calendar.YEAR)}年${cal.get(Calendar.MONTH) + 1}月${cal.get(Calendar.DAY_OF_MONTH)}日"
+                            } ?: "选个截止日期，或点下面的快捷天数",
+                            fontSize = 15.sp,
+                            fontWeight = if (pickerState.selectedDateMillis != null) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (pickerState.selectedDateMillis != null) FormalColors.Ink else FormalColors.Muted,
+                            modifier = Modifier.padding(start = 14.dp, top = 2.dp, bottom = 2.dp)
+                        )
                         // R79 快选：常见周期一键到位，不用在日历里翻页数格子；
                         // 行尾「不设置时间」一键清除截止时间。title 置空：工具栏和
                         // 快选行已占标题位，日历自带的大标题块去掉，避免弹窗过高。
@@ -574,7 +588,13 @@ fun GoalDashboardHero(
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(FormalColors.Primary.copy(alpha = 0.08f))
                                         .border(1.dp, FormalColors.Primary.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
-                                        .clickable { pickerState.selectedDateMillis = todayMillis + days * 86_400_000L }
+                                        .clickable {
+                                            // R81：同时把日历视图翻到目标月份，
+                                            // 否则选中高亮落在屏外看不到。
+                                            val target = todayMillis + days * 86_400_000L
+                                            pickerState.selectedDateMillis = target
+                                            pickerState.displayedMonthMillis = target
+                                        }
                                         .padding(horizontal = 12.dp, vertical = 5.dp)
                                         .testTag("$testTag-deadline-quick-$days")
                                 )
@@ -594,21 +614,22 @@ fun GoalDashboardHero(
                                     .testTag("$testTag-deadline-clear")
                             )
                         }
-                        DatePicker(
-                            state = pickerState,
-                            title = {},
-                            showModeToggle = false,
-                            // R79：默认 headline 是英文「Selected date」，换成中文日期展示。
-                            headline = {
-                                Text(
-                                    text = pickerState.selectedDateMillis?.let { formatGoalDeadlineMillis(it) }
-                                        ?: "选个截止日期",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = FormalColors.Ink
-                                )
-                            }
-                        )
+                        // R81：日历组件跟随系统 locale，英文系统的设备/模拟器会显示
+                        // "September 2026 / S M T W T F S"；强制中文区域后，月份标题
+                        // 与星期表头始终显示中文，与系统语言无关。title/headline 传 null
+                        // （不是空 lambda）——空 lambda 仍占槽位留白，null 才彻底不组合，
+                        // 选中日期已在上方自绘行展示。
+                        val zhConfig = android.content.res.Configuration(LocalConfiguration.current).apply {
+                            setLocale(java.util.Locale.SIMPLIFIED_CHINESE)
+                        }
+                        CompositionLocalProvider(LocalConfiguration provides zhConfig) {
+                            DatePicker(
+                                state = pickerState,
+                                title = null,
+                                headline = null,
+                                showModeToggle = false
+                            )
+                        }
                     }
                 }
             }
