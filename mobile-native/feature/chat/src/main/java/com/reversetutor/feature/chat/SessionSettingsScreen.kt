@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -86,7 +84,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -230,10 +227,6 @@ fun SessionSettingsScreen(
                 )
                 SessionSettingsSection.GoalPlan -> GoalPlanPage(
                     coordinator,
-                    tagEditor,
-                    tagState,
-                    onTagStateChange = { tagState = it },
-                    commitBoundary,
                     refresh
                 )
                 SessionSettingsSection.ConversationStrategy -> StrategyPage(coordinator, refresh)
@@ -664,10 +657,6 @@ private fun BasicProfilePage(
 @Composable
 private fun GoalPlanPage(
     coordinator: SessionSettingsCoordinator,
-    tagEditor: TagLibraryEditor,
-    tagState: TagLibraryEditorState,
-    onTagStateChange: (TagLibraryEditorState) -> Unit,
-    commitBoundary: () -> Unit,
     refresh: () -> Unit
 ) = SettingsPage {
     val value = coordinator.state.form.goalPlan
@@ -679,8 +668,10 @@ private fun GoalPlanPage(
         goal = value.primaryGoal,
         deadline = value.deadline,
         onGoalCommit = { next ->
-            coordinator.editGoalPlan { it.copy(primaryGoal = next.trim()) }
-            commitBoundary()
+            // R77 微调主目标：主目标在 protectedDifferences 保护清单里，走 editGoalPlan+commitBoundary
+            // 会弹「确认修改」卡片、不点确认就被 safe 分支丢弃（重启回未设置）。
+            // 用户拍板目标调整必须零摩擦——与截止时间/里程碑同语义：即时应用+落盘，无弹窗。
+            coordinator.applyGoalPlanImmediate { it.copy(primaryGoal = next.trim().ifBlank { "未设置" }) }
             refresh()
         },
         onDeadlineCommit = { next ->
@@ -702,126 +693,6 @@ private fun GoalPlanPage(
         },
         testTag = "goal-breakdown"
     )
-    // V1 旅程版式：底部三个设置板块卡片化 + 分区标题色条 + 计数胶囊，
-    // 与英雄卡/里程碑站点卡同一设计语言；只改本页局部样式，
-    // 共享的 SettingsGroup/TokenField/TagLibraryPicker 本体与其他设置页不动。
-    GoalSettingsCard(title = "模块", tick = FormalColors.Primary) {
-        SessionConfigurationTextField(
-            label = "模块内容",
-            value = value.modules,
-            onBoundary = commitBoundary,
-            onValueChange = { next ->
-                coordinator.editGoalPlan { current -> current.copy(modules = next) }
-                refresh()
-            }
-        )
-    }
-    GoalSettingsCard(title = "学习范围", tick = FormalColors.Success) {
-        TokenField(
-            value = if (value.learningScope == "未设置") "" else value.learningScope,
-            onValueChange = { next -> coordinator.editGoalPlan { current -> current.copy(learningScope = next.ifBlank { "未设置" }) }; refresh() }
-        )
-        Text("输入知识点后回车或点「添加」变成标签，例如：立体几何、导数、概率统计。", color = FormalColors.Muted)
-    }
-    val goalTagSelection = coordinator.state.form.quickTags["goal"] ?: TagFieldSelection()
-    GoalSettingsCard(
-        title = "分类快捷标签",
-        tick = FormalColors.Primary,
-        badge = "已选 ${goalTagSelection.values.size}"
-    ) {
-        GoalQuickTagPicker(
-            state = tagState,
-            selection = goalTagSelection,
-            onToggle = { coordinator.toggleQuickTag("goal", TagSelectionValue(it.id, it.name)); refresh() }
-        )
-    }
-}
-
-/** 目标页快捷标签紧凑版：分组小标题 + 自然换行标签行；去掉展开/收起与拖拽（管理仍走「管理快捷标签」页）。 */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun GoalQuickTagPicker(
-    state: TagLibraryEditorState,
-    selection: TagFieldSelection,
-    onToggle: (QuickTag) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        state.library.groups.forEach { group ->
-            val tags = group.tagIds.mapNotNull(state.library.tags::get)
-            if (tags.isEmpty()) return@forEach
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(group.name, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = FormalColors.Muted)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    tags.forEach { tag -> GoalQuickTagChip(tag, selection, group.colorIndex, onToggle) }
-                }
-            }
-        }
-        val ungrouped = state.library.ungroupedTagIds.mapNotNull(state.library.tags::get)
-        if (ungrouped.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("未分组", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = FormalColors.Muted)
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    ungrouped.forEach { tag -> GoalQuickTagChip(tag, selection, 11, onToggle) }
-                }
-            }
-        }
-    }
-}
-
-/** 快捷标签小胶囊：选中=分组哑光色，未选=浅灰细边。 */
-@Composable
-private fun GoalQuickTagChip(
-    tag: QuickTag,
-    selection: TagFieldSelection,
-    colorIndex: Int,
-    onToggle: (QuickTag) -> Unit
-) {
-    val selected = selection.values.any { it.tagId == tag.id }
-    Surface(
-        onClick = { onToggle(tag) },
-        shape = RoundedCornerShape(999.dp),
-        color = if (selected) Color(TagColorPalette.swatches[colorIndex].argb) else FormalColors.SurfaceSubtle,
-        border = if (selected) null else BorderStroke(1.dp, FormalColors.Divider),
-        modifier = Modifier.testTag("quick-tag-${tag.id}")
-    ) {
-        Text(
-            tag.name,
-            fontSize = 13.sp,
-            color = FormalColors.Ink,
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
-        )
-    }
-}
-
-/** V1 旅程版式：目标页底部设置板块卡片容器（白卡细边 + 分区标题色条 + 可选计数胶囊）。 */
-@Composable
-private fun GoalSettingsCard(
-    title: String,
-    tick: Color,
-    badge: String? = null,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    SettingsGroup {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                GoalSectionTitle(title, tick)
-                if (badge != null) {
-                    Spacer(Modifier.weight(1f))
-                    GoalCountBadge(badge, FormalColors.PrimarySoft, FormalColors.Primary)
-                }
-            }
-            content()
-        }
-    }
 }
 
 @Composable

@@ -179,6 +179,23 @@ class SessionGoalDashboardTest {
         assertEquals(0, goalChecklistPercent(emptyList()))
     }
 
+    @Test
+    fun primaryGoalImmediateEditAppliesPersistsAndNeedsNoConfirmation() {
+        val store = InMemorySessionSettingsStore()
+        val coordinator = newCoordinator(store)
+
+        // R77：主目标微调走 applyGoalPlanImmediate——即时应用 + 落盘，不产生受保护变更确认。
+        coordinator.applyGoalPlanImmediate { it.copy(primaryGoal = "掌握图论并能独立证明") }
+
+        assertEquals("掌握图论并能独立证明", coordinator.state.applied.goalPlan.primaryGoal)
+        assertEquals("掌握图论并能独立证明", coordinator.state.form.goalPlan.primaryGoal)
+        assertEquals("掌握图论并能独立证明", coordinator.state.applied.snapshot.goal)
+        assertNull(coordinator.state.pendingConfirmation)
+
+        val restored = newCoordinator(store)
+        assertEquals("掌握图论并能独立证明", restored.state.applied.goalPlan.primaryGoal)
+    }
+
     private fun newCoordinator(store: InMemorySessionSettingsStore): SessionSettingsCoordinator =
         SessionSettingsCoordinator(
             sessionId = "session-a",

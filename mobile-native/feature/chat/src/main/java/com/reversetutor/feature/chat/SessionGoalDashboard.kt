@@ -312,7 +312,9 @@ fun GoalDashboardHero(
     testTag: String = "goal-hero"
 ) {
     var editingGoal by remember { mutableStateOf(false) }
-    var goalDraft by remember(goal) { mutableStateOf(goal) }
+    // 数据层把「没设目标」存成字符串「未设置」——展示/编辑前归一化为空，编辑框永远预填真实目标而不是「未设置」。
+    val goalText = if (goal == "未设置") "" else goal
+    var goalDraft by remember(goal) { mutableStateOf(goalText) }
     var showDeadlinePicker by remember { mutableStateOf(false) }
     val daysLeft = parseGoalDeadlineDaysLeft(deadline, todayMillis)
     val deadlineText = if (deadline.isBlank() || deadline == "未设置") "不设置时间" else deadline
@@ -358,7 +360,7 @@ fun GoalDashboardHero(
                 )
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = {
-                    if (editingGoal) goalDraft = goal
+                    if (editingGoal) goalDraft = goalText
                     editingGoal = !editingGoal
                 }) { Text(if (editingGoal) "取消" else "修改", fontSize = 13.sp) }
             }
@@ -369,6 +371,8 @@ fun GoalDashboardHero(
                     modifier = Modifier.fillMaxWidth().testTag("$testTag-goal-input"),
                     placeholder = { Text("用自己的话写下这次要攻克的目标") },
                     shape = RoundedCornerShape(10.dp),
+                    // 目标是一句话：单行输入，IME 的 Done/回车才真正触发提交（多行会插换行）。
+                    singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = {
                         onGoalCommit(goalDraft)
@@ -387,12 +391,22 @@ fun GoalDashboardHero(
                     ) { Text("完成") }
                 }
             } else {
+                // 微调主入口：直接点目标文字进入编辑，输入框预填现值，改的永远是「在原目标上微调」。
                 Text(
-                    text = goal.ifBlank { "点右上角「修改」，写下这次要攻克的目标" },
+                    text = goalText.ifBlank { "点这里，一句话说出这次要攻克的目标" },
                     fontSize = 20.sp,
                     lineHeight = 28.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (goal.isBlank()) FormalColors.Muted else FormalColors.Ink
+                    color = if (goalText.isBlank()) FormalColors.Muted else FormalColors.Ink,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(6.dp))
+                        .clickable {
+                            // 预填用归一化文本：没设过目标时是空串，绝不能把「未设置」这个占位字面量带进输入框。
+                            goalDraft = goalText
+                            editingGoal = true
+                        }
+                        .testTag("$testTag-goal-display")
                 )
             }
             Text(
