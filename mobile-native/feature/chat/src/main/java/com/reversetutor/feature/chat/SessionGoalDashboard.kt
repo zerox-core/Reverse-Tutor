@@ -743,19 +743,24 @@ internal fun GoalCountdownRing(
                 style = style
             )
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "${if (daysLeft < 0) -daysLeft else daysLeft}",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold,
-                color = accent
-            )
-            Text(
-                text = if (daysLeft < 0) "超期" else "天",
-                fontSize = 9.sp,
-                color = FormalColors.Muted
-            )
-        }
+        // R82：天数数字严格钉在圆环几何中心（之前用 Column 上下排，
+        // 「天」字把数字顶得偏上，视觉上不居中）；「天/超期」小字改为
+        // 贴圆环内下缘，不再挤占中心位置。
+        Text(
+            text = "${if (daysLeft < 0) -daysLeft else daysLeft}",
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+            modifier = Modifier.align(Alignment.Center)
+        )
+        Text(
+            text = if (daysLeft < 0) "超期" else "天",
+            fontSize = 9.sp,
+            color = FormalColors.Muted,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 10.dp)
+        )
     }
 }
 
