@@ -177,6 +177,37 @@ class BlackHoleGraphEngineTest {
         assertTrue("double released still stacked: d=$d bodies=$bodies", d >= bodies - 1.5f)
     }
 
+    @Test
+    fun positional_correction_separates_overlap_without_kicking() {
+        // R88：位置级碰撞修正——重叠立即分开，且不注入速度（结构上不可能形成能量棘轮；
+        // 力式碰撞在密集公转区持续踢动曾两次撕裂图谱，故改为此方案）
+        val engine = engineWith(2)
+        val a = engine.nodes[0]
+        val b = engine.nodes[1]
+        val px = engine.holeX + engine.exclusionRadius + 600f
+        val py = engine.holeY
+        a.mode = BlackHoleNodeMode.Free
+        b.mode = BlackHoleNodeMode.Free
+        a.simX = px; a.simY = py
+        b.simX = px + 4f; b.simY = py // 几乎完全重叠
+        a.vx = 0f; a.vy = 0f; b.vx = 0f; b.vy = 0f
+        a.dispX = a.simX; a.dispY = a.simY
+        b.dispX = b.simX; b.dispY = b.simY
+        val minD = a.displayRadius(engine.physics) + b.displayRadius(engine.physics) +
+            engine.physics.collisionPadding
+        engine.tick(1f / 60f)
+        val d1 = hypot(a.simX - b.simX, a.simY - b.simY)
+        assertTrue("positional correction did not separate: d=$d1 minD=$minD", d1 >= minD - 1f)
+        // 继续跑 2s：保持分开，且速度留在公转量级（零初速下若被踢动会远超此值）
+        tickSeconds(engine, 2f)
+        val d2 = hypot(a.simX - b.simX, a.simY - b.simY)
+        val bodies = a.displayRadius(engine.physics) + b.displayRadius(engine.physics)
+        assertTrue("overlap returned: d=$d2 bodies=$bodies", d2 >= bodies - 0.5f)
+        val sa = hypot(a.vx, a.vy)
+        val sb = hypot(b.vx, b.vy)
+        assertTrue("correction kicked node: |va|=$sa |vb|=$sb", sa < 0.5f && sb < 0.5f)
+    }
+
     // ---------- 黑洞交互 ----------
 
     @Test

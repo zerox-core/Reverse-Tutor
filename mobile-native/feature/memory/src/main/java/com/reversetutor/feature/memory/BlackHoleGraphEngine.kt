@@ -50,7 +50,7 @@ import kotlin.math.sqrt
  * - 硬保护：速度 clamp 30 / NaN 重置 / 单帧拖拽位移 clamp 500（V26）。
  */
 data class BlackHolePhysics(
-    val repulsion: Float = 2200f,
+    val repulsion: Float = 2200f, // 节点自带斥力（a3d426c 实测稳定值；R88 试 2600/加宽 padding 均撕裂图谱，已回退——重叠改由位置级修正解决）
     val linkAttraction: Float = 0.0036f,
     val damping: Float = 0.90f,
     val alphaFloor: Float = 0.04f,
@@ -860,6 +860,35 @@ class BlackHoleGraphEngine(
                 val uy = dy / d
                 applyForce(a, fx, fy, -ux * f, -uy * f, fromCollision = d < minD)
                 applyForce(b, fx, fy, ux * f, uy * f, fromCollision = d < minD)
+                // R88 位置级碰撞修正：重叠节点沿轴线直接分开（只改位置、不注入速度），
+                // 并卸掉互相接近的相对速度分量（非弹性、只减能不加能）。
+                // 力式碰撞在密集公转区会持续踢动形成能量棘轮（R88 两次调参均撕裂图谱），
+                // 位置修正在结构上不可能积累能量，且立刻保证不重叠
+                if (d < minD) {
+                    val overlap = minD - d
+                    val aMovable = a.mode == BlackHoleNodeMode.Free && !isKinematic(a)
+                    val bMovable = b.mode == BlackHoleNodeMode.Free && !isKinematic(b)
+                    if (aMovable && bMovable) {
+                        val half = overlap / 2f
+                        a.simX -= ux * half; a.simY -= uy * half
+                        b.simX += ux * half; b.simY += uy * half
+                        // relV = (vb-va)·u，<0 为互相接近——清零该分量（双方各担一半）
+                        val relV = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy
+                        if (relV < 0f) {
+                            val h = relV / 2f
+                            a.vx += ux * h; a.vy += uy * h
+                            b.vx -= ux * h; b.vy -= uy * h
+                        }
+                    } else if (aMovable) {
+                        a.simX -= ux * overlap; a.simY -= uy * overlap
+                        val vIn = a.vx * ux + a.vy * uy // a 朝向 b 的分量
+                        if (vIn > 0f) { a.vx -= ux * vIn; a.vy -= uy * vIn }
+                    } else if (bMovable) {
+                        b.simX += ux * overlap; b.simY += uy * overlap
+                        val vIn = b.vx * ux + b.vy * uy // b 朝向 a 是 -u 方向
+                        if (vIn < 0f) { b.vx -= ux * vIn; b.vy -= uy * vIn }
+                    }
+                }
             }
         }
 

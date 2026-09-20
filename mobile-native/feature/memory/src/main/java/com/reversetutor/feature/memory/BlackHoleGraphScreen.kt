@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -973,8 +974,9 @@ private fun BlackHoleGraphReadyContent(
             }
             val borderPx = max(1.5f, 1.8.dp.toPx())
             // 标签候选：循环内只收集，循环后做防重叠剔除再统一绘制
-            // （用户反馈「字体全都重复在一起」——选中节点最优先，其余按节点大小，矩形相交则跳过）
-            class LabelCandidate(val text: String, val x: Float, val y: Float, val selected: Boolean, val r: Float)
+            // （用户反馈「字体全都重复在一起」——选中节点最优先，其余按节点大小，矩形相交则跳过；
+            //  R88 再加缩放分级预算 + 半透底衬：默认视角只留最重要的少数标签，放大才显示更多）
+            class LabelCandidate(val text: String, val x: Float, val y: Float, val selected: Boolean, val neighbor: Boolean, val r: Float)
             val labelCandidates = mutableListOf<LabelCandidate>()
             engine.renderNodes().forEach { node ->
                 val center = worldToScreen(node.x, node.y)
@@ -1046,26 +1048,47 @@ private fun BlackHoleGraphReadyContent(
                             center.x,
                             center.y + r + 13.dp.toPx(),
                             state.selectedNodeId == node.id,
+                            node.id != state.selectedNodeId && node.id in neighborIds,
                             r
                         )
                     )
                 }
             }
-            // 标签防重叠剔除：选中节点最优先，其余按节点半径从大到小；与已画矩形相交则跳过
+            // 标签绘制：R88 缩放分级预算（默认视角只留 6 个最重要的，1.4× 以上才全量），
+            // 选中 > 选中节点的邻居 > 节点半径；矩形相交跳过；半透底衬保证文字不被连线/尘埃/光晕干扰
+            val labelBudget = when {
+                camera.scale < 1.0f -> 6
+                camera.scale < 1.4f -> 12
+                else -> Int.MAX_VALUE
+            }
             val drawnLabelRects = mutableListOf<android.graphics.RectF>()
+            var labelsDrawn = 0
             labelCandidates
-                .sortedWith(compareByDescending<LabelCandidate> { it.selected }.thenByDescending { it.r })
+                .sortedWith(
+                    compareByDescending<LabelCandidate> { it.selected }
+                        .thenByDescending { it.neighbor }
+                        .thenByDescending { it.r }
+                )
                 .forEach { c ->
+                    if (labelsDrawn >= labelBudget) return@forEach
                     val w = labelPaint.measureText(c.text)
                     val rect = android.graphics.RectF(
-                        c.x - w / 2f - 4.dp.toPx(),
+                        c.x - w / 2f - 5.dp.toPx(),
                         c.y - 12.dp.toPx(),
-                        c.x + w / 2f + 4.dp.toPx(),
-                        c.y + 4.dp.toPx()
+                        c.x + w / 2f + 5.dp.toPx(),
+                        c.y + 3.dp.toPx()
                     )
                     if (drawnLabelRects.none { android.graphics.RectF.intersects(it, rect) }) {
                         drawnLabelRects.add(rect)
+                        drawRoundRect(
+                            color = palette.panel,
+                            topLeft = Offset(rect.left, rect.top),
+                            size = Size(rect.width(), rect.height()),
+                            cornerRadius = CornerRadius(6.dp.toPx()),
+                            alpha = 0.78f
+                        )
                         drawContext.canvas.nativeCanvas.drawText(c.text, c.x, c.y, labelPaint)
+                        labelsDrawn++
                     }
                 }
         }
