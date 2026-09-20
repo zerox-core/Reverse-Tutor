@@ -57,6 +57,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -246,11 +247,11 @@ internal fun ReverseTeachingChatScreen(
     val streamingLength = (state.generation as? ChatGenerationUiState.Streaming)?.text?.length ?: 0
     val timelineItemCount = run {
         val messageItems = if (state.messages.isEmpty()) 1 else buildChatTimelineEntries(state.messages).size
-        messageItems + (if (state.generationStatusLabel != null) 1 else 0) + (if (sessionContract != null) 1 else 0)
+        messageItems + (if (sessionContract != null) 1 else 0)
     }
     var previousTimelineItemCount by remember(state.sessionTitle) { mutableStateOf(timelineItemCount) }
     var scrollRestoreGuard by remember(state.sessionTitle) { mutableStateOf(true) }
-    LaunchedEffect(timelineItemCount, streamingLength) {
+    LaunchedEffect(timelineItemCount, streamingLength, state.generationStatusLabel != null) {
         val countChanged = timelineItemCount != previousTimelineItemCount
         previousTimelineItemCount = timelineItemCount
         if (scrollRestoreGuard) {
@@ -358,33 +359,49 @@ internal fun ReverseTeachingChatScreen(
                     }
                 }
             }
-            state.generationStatusLabel?.let { label ->
-                item {
-                    val partial = (state.generation as? ChatGenerationUiState.Streaming)?.text
-                    if (partial.isNullOrBlank()) {
-                        GenerationRow(
-                            learnerName = state.learnerName,
-                            learnerAvatarReference = state.learnerAvatarReference,
-                            avatarVisible = state.avatarVisible,
-                            label = label,
-                            onOpenSettings = onOpenModelSettings,
-                            onRetry = null
-                        )
-                    } else {
-                        StreamingGenerationRow(
-                            learnerName = state.learnerName,
-                            learnerAvatarReference = state.learnerAvatarReference,
-                            avatarVisible = state.avatarVisible,
-                            text = partial
-                        )
-                    }
-                }
-            }
             sessionContract?.let { contract ->
                 item {
                     SessionAssistantReplyHint(
                         contract = contract,
                         onInteraction = onAssistantInteraction
+                    )
+                }
+            }
+        }
+        // 生成状态行固定在输入框上方（2026-09-20 拍板）：此前是 LazyColumn 尾部
+        // item；列表只组合可视区 item，指示器一旦滚出视口就不渲染，表现为间歇性
+        // 消失。挪出列表后始终可见；流式气泡限高内滚、随文本增长自动贴尾。
+        state.generationStatusLabel?.let { label ->
+            val partial = (state.generation as? ChatGenerationUiState.Streaming)?.text
+            val generationRowScroll = rememberScrollState()
+            LaunchedEffect(partial?.length) {
+                if (generationRowScroll.maxValue > 0) {
+                    generationRowScroll.scrollTo(generationRowScroll.maxValue)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xEAF3F5FA))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .heightIn(max = 280.dp)
+                    .verticalScroll(generationRowScroll)
+            ) {
+                if (partial.isNullOrBlank()) {
+                    GenerationRow(
+                        learnerName = state.learnerName,
+                        learnerAvatarReference = state.learnerAvatarReference,
+                        avatarVisible = state.avatarVisible,
+                        label = label,
+                        onOpenSettings = onOpenModelSettings,
+                        onRetry = null
+                    )
+                } else {
+                    StreamingGenerationRow(
+                        learnerName = state.learnerName,
+                        learnerAvatarReference = state.learnerAvatarReference,
+                        avatarVisible = state.avatarVisible,
+                        text = partial
                     )
                 }
             }

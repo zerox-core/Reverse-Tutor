@@ -115,6 +115,16 @@ class ProductionLlmGenerationRuntime(
             LlmProviderProtocol.AnthropicCompatible ->
                 AnthropicCompatibleGenerationRuntime().buildPayload(request)
             LlmProviderProtocol.GeminiNative -> buildGeminiPayload(request)
+        }.let { base ->
+            // 2026-09-20 实测（RTSTREAM 探针）：reasoning 模型的 delta.content
+            // 集中在结尾爆发（269 行 reasoning_content 流了约 6 秒、正文 7 段
+            // 在 160ms 内放完），App 端观感就是“一整坨上屏”。请求关闭思考，
+            // 让正文从头逐段流出；不认识该字段的供应商会忽略它。
+            if (protocol == LlmProviderProtocol.OpenAiCompatible && request.streaming) {
+                base.copy(body = base.body + ("enable_thinking" to false))
+            } else {
+                base
+            }
         }
         if (!payload.endpoint.isSafeHttpEndpoint()) return null
 
