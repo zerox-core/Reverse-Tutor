@@ -13,6 +13,8 @@ import com.reversetutor.feature.chat.NewSessionConfiguration
 
 private const val MaxContextEvidence = 6
 private const val MaxEvidenceBodyChars = 900
+private const val MaxRecentMessageEvidence = 2
+private const val MaxLightweightEvidenceBodyChars = 400
 
 /**
  * Legacy engine's due-review soft hint (old `build_system_prompt`): a due
@@ -78,10 +80,12 @@ internal fun SessionPolicyOutput.toLlmSessionPolicyContext(): LlmSessionPolicyCo
     )
 
 /**
- * Converts a [ConversationContextContract] into bounded [LlmContextEvidence].
- * Uses only recent messages, memory, mastery projections, sources, gaps,
- * review points, and historical errors. Text is capped with
- * [SessionTurnContracts.sanitizeContractText].
+ * Converts a [ConversationContextContract] into bounded [LlmContextEvidence]
+ * for learning turns. Uses only the [MaxRecentMessageEvidence] most recent
+ * messages, memory, sources, gaps and review points; per-concept mastery
+ * and historical errors are decision-layer inputs already folded into the
+ * deterministic turn note, so they are not duplicated here. Text is capped
+ * with [SessionTurnContracts.sanitizeContractText].
  */
 internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContextEvidence> {
     val evidence = mutableListOf<LlmContextEvidence>()
@@ -128,7 +132,7 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
         ))
     }
 
-    recentMessages.forEach { msg ->
+    recentMessages.take(MaxRecentMessageEvidence).forEach { msg ->
         evidence.add(LlmContextEvidence(
             id = "msg-${msg.messageId}",
             title = SessionTurnContracts.sanitizeContractText(msg.role, maxLength = 48),
@@ -147,17 +151,10 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
         ))
     }
 
-    masteryProjections.forEach { mastery ->
-        evidence.add(LlmContextEvidence(
-            id = "mastery-${mastery.knowledgePoint}",
-            title = "Mastery",
-            body = SessionTurnContracts.sanitizeContractText(
-                "${mastery.knowledgePoint} ${mastery.score.toInt()}/100",
-                maxLength = MaxEvidenceBodyChars
-            ),
-            kind = "Mastery"
-        ))
-    }
+    // Expression-loop speed pass (2026-09-20 拍板): per-concept mastery rows
+    // are decision-layer inputs — the deterministic turn note already carries
+    // the current concept's mastery score, so they are not duplicated into
+    // prompt evidence.
 
     sourceEvidence.forEach { src ->
         evidence.add(LlmContextEvidence(
@@ -172,17 +169,29 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
         ))
     }
 
-    historicalErrors.forEach { err ->
-        evidence.add(LlmContextEvidence(
-            id = err.id,
-            title = SessionTurnContracts.sanitizeContractText(err.errorType, maxLength = 48),
-            body = SessionTurnContracts.sanitizeContractText(err.description, maxLength = MaxEvidenceBodyChars),
-            kind = "Error"
-        ))
-    }
-
     return evidence.take(MaxContextEvidence)
 }
+
+/**
+ * Expression-loop speed pass (2026-09-20 拍板): casual (OffTopic) and
+ * goal-change turns carry only the [MaxRecentMessageEvidence] most recent
+ * messages, bounded tighter than the learning path. The digest, aggregates,
+ * memory, sources and errors are all skipped — such a reply only needs the
+ * persona (the caller still adds the session-template evidence) plus the
+ * freshest conversational context, which keeps the whole prompt in the
+ * ~1.5k-char range so provider prefill stops dominating casual-turn latency.
+ */
+internal fun ConversationContextContract.toLlmLightweightContextEvidence(): List<LlmContextEvidence> =
+    recentMessages.take(MaxRecentMessageEvidence).map { msg ->
+        LlmContextEvidence(
+            id = "msg-${msg.messageId}",
+            title = SessionTurnContracts.sanitizeContractText(msg.role, maxLength = 48),
+            body = SessionTurnContracts.sanitizeContractText(msg.text, maxLength = MaxLightweightEvidenceBodyChars),
+            kind = "Message",
+            sourceMessageId = msg.messageId
+        )
+    }
+
 
 /**
  * Projects the immutable session template into one bounded evidence item so

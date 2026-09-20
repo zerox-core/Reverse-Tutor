@@ -115,7 +115,12 @@ class SessionPolicyInputMapperTest {
             warnings = emptyList()
         ).toLlmContextEvidence()
 
-        assertEquals(6, evidence.size)
+        // 学习路径只保留最近两条消息证据（提速拍板 2026-09-20）
+        assertEquals(3, evidence.size)
+        assertEquals(
+            listOf("msg-message-1", "msg-message-2"),
+            evidence.filter { it.kind == "Message" }.map { it.id }
+        )
         val review = evidence.first { it.kind == "Review" }
         assertEquals("review-session-1", review.id)
         assertTrue(review.body.contains("因式分解"))
@@ -125,7 +130,7 @@ class SessionPolicyInputMapperTest {
     }
 
     @Test
-    fun mastery_projections_map_to_evidence_after_messages() {
+    fun mastery_projections_are_folded_into_the_turn_note_not_evidence() {
         val evidence = ConversationContextContract(
             spaceId = "space-1",
             sessionId = "session-1",
@@ -148,13 +153,53 @@ class SessionPolicyInputMapperTest {
             )
         ).toLlmContextEvidence()
 
-        assertEquals(2, evidence.size)
+        // 表达层提速（2026-09-20 拍板）：掌握度不再进证据，由确定性便签承载
+        assertEquals(1, evidence.size)
         assertEquals("msg-message-a", evidence[0].id)
-        assertEquals("mastery-因式分解", evidence[1].id)
-        assertEquals("Mastery", evidence[1].kind)
-        assertEquals("Mastery", evidence[1].title)
-        assertTrue(evidence[1].body.contains("因式分解"))
-        assertTrue(evidence[1].body.contains("51/100"))
+        assertTrue(evidence.none { it.kind == "Mastery" })
+    }
+
+    @Test
+    fun lightweight_evidence_carries_only_two_recent_messages() {
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = listOf("先掌握定义"),
+            relatedMemory = emptyList(),
+            sourceEvidence = emptyList(),
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = listOf("函数单调性"),
+            recentMessages = listOf(
+                ContextMessage("message-a", "user", "第一条", 1L),
+                ContextMessage("message-b", "assistant", "第二条", 2L),
+                ContextMessage("message-c", "user", "第三条", 3L)
+            ),
+            warnings = emptyList(),
+            earlyHistoryDigest = "早期摘要"
+        ).toLlmLightweightContextEvidence()
+
+        assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.map { it.id })
+        assertTrue(evidence.all { it.kind == "Message" })
+        assertTrue(evidence.none { it.kind == "Summary" || it.kind == "Gaps" || it.kind == "Review" })
+    }
+
+    @Test
+    fun lightweight_message_bodies_are_capped_tighter() {
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = emptyList(),
+            relatedMemory = emptyList(),
+            sourceEvidence = emptyList(),
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = emptyList(),
+            recentMessages = listOf(
+                ContextMessage("message-a", "assistant", "长".repeat(600), 1L)
+            ),
+            warnings = emptyList()
+        ).toLlmLightweightContextEvidence()
+
+        assertTrue(evidence.single().body.length <= 400)
     }
 
     @Test

@@ -7,6 +7,7 @@ import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTurnPolicy
 import com.reversetutor.core.domain.TurnNoteAssembler
 import com.reversetutor.core.domain.TurnNoteInput
+import com.reversetutor.core.domain.UserIntent
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.BackgroundTurnPreparationRequest
@@ -111,6 +112,14 @@ internal class BackgroundTurnPreparationCoordinator(
                 )
             ).normalized()
 
+            // Expression-loop speed pass (2026-09-20 拍板): casual small talk
+            // and goal changes don't need the learning evidence pack — the
+            // template persona plus the two freshest messages keep these
+            // prompts near ~1.5k chars so provider prefill stops dominating
+            // casual-turn latency.
+            val lightweightEvidenceTurn = guidedInput.userIntentHint == UserIntent.OffTopic ||
+                guidedInput.userIntentHint == UserIntent.GoalChange
+
             val job = enqueueJob(
                 BackgroundGenerationInput(
                     spaceId = request.spaceId,
@@ -121,7 +130,11 @@ internal class BackgroundTurnPreparationCoordinator(
                     quoteExcerpt = request.quoteExcerpt,
                     imageAttachments = request.imageAttachments,
                     contextEvidence = listOfNotNull(request.sessionSnapshot.toLlmTemplateEvidence()) +
-                        context.toLlmContextEvidence(),
+                        if (lightweightEvidenceTurn) {
+                            context.toLlmLightweightContextEvidence()
+                        } else {
+                            context.toLlmContextEvidence()
+                        },
                     sessionPolicy = policy.toLlmSessionPolicyContext(),
                     turnPlan = turnPlan,
                     turnNoteBlock = turnNote.render()

@@ -12,6 +12,13 @@ import android.provider.MediaStore
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.BorderStroke
@@ -1664,6 +1671,32 @@ private fun EvidenceTimelineMessage(text: String) {
     }
 }
 
+// 表达层提速（2026-09-20 拍板）：预填充首字前的等待指示从静态「•••」改为
+// 错相位呼吸点，长等待窗口读起来是「在活动」而不是「卡住了」。
+@Composable
+private fun BreathingDots() {
+    // 当前 Compose 版本的 animateFloat 没有 initialStartOffset 错相位参数，
+    // 改用单个 0→1 相位动画 + 三角波数学错相位：效果等价，不依赖新 API。
+    val breath = rememberInfiniteTransition(label = "generation-wait")
+    val phase by breath.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1240, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "generation-wait-phase"
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        repeat(3) { index ->
+            val shifted = (phase + index / 3f) % 1f
+            val triangle = if (shifted < 0.5f) shifted * 2f else (1f - shifted) * 2f
+            val alpha = 0.2f + 0.8f * triangle
+            Text("•", color = Color(0xFF6077B3).copy(alpha = alpha), fontSize = 12.sp)
+        }
+    }
+}
+
 @Composable
 private fun GenerationRow(
     learnerName: String,
@@ -1693,7 +1726,7 @@ private fun GenerationRow(
             label.startsWith("生成失败") && onRetry != null -> TextButton(onClick = onRetry) {
                 Text("重试", color = Color(0xFF4264C7), fontSize = 11.sp)
             }
-            else -> Text("•••", color = Color(0xFF6077B3), fontSize = 12.sp)
+            else -> BreathingDots()
         }
     }
 }
@@ -1719,7 +1752,19 @@ private fun StreamingGenerationRow(
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(text, fontSize = 14.sp, lineHeight = 21.sp)
-                Text("正在输入…", color = ChatMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+                // 表达层提速（2026-09-20 拍板）：等待期让状态文字呼吸，
+                // 长等待窗口读起来是「在活动」而不是「卡住了」。
+                val typingBreath = rememberInfiniteTransition(label = "streaming-breath")
+                val typingAlpha by typingBreath.animateFloat(
+                    initialValue = 0.35f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 900, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "streaming-typing-alpha"
+                )
+                Text("正在输入…", color = ChatMuted.copy(alpha = typingAlpha), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
             }
         }
     }

@@ -334,4 +334,80 @@ class BackgroundTurnPreparationCoordinatorTest {
         assertTrue(secondEvidence.any { it.id == "source:src-1:rev-src-1-900" })
         assertTrue(secondEvidence.none { it.id == "source:src-1:rev-src-1-100" })
     }
+
+    // ---- Expression-loop speed pass (2026-09-20 拍板) ----
+
+    private fun richContext() = ConversationContextContract(
+        spaceId = "space-1",
+        sessionId = "session-1",
+        prerequisiteGaps = listOf("先掌握定义"),
+        relatedMemory = emptyList(),
+        sourceEvidence = emptyList(),
+        historicalErrors = emptyList(),
+        pendingReviewKnowledgePoints = listOf("函数单调性"),
+        recentMessages = listOf(
+            ContextMessage("message-a", "user", "第一条", 1L),
+            ContextMessage("message-b", "assistant", "第二条", 2L),
+            ContextMessage("message-c", "user", "第三条", 3L)
+        ),
+        warnings = emptyList(),
+        earlyHistoryDigest = "早期摘要"
+    )
+
+    private fun recordingCoordinator() = BackgroundTurnPreparationCoordinator(
+        isSessionDeleted = { false },
+        assembleContext = { _, _, _ -> richContext() },
+        enqueueJob = { input, now ->
+            queuedInputs.add(input)
+            BackgroundGenerationJob(
+                id = "job-speed-${queuedInputs.size}", spaceId = input.spaceId, sessionId = input.sessionId,
+                userMessageId = input.userMessageId, userText = input.userText,
+                token = input.token, modelBindingId = null,
+                status = BackgroundJobStatus.Queued, createdAtEpochMillis = now,
+                startedAtEpochMillis = null, completedAtEpochMillis = null,
+                errorMessage = null, capabilities = null, quoteExcerpt = null,
+                imageAttachments = input.imageAttachments,
+                contextEvidence = input.contextEvidence, sessionPolicy = input.sessionPolicy
+            )
+        },
+        nowEpochMillis = { 1000L }
+    )
+
+    @Test
+    fun casual_small_talk_turn_carries_only_lightweight_evidence() = runBlocking {
+        queuedInputs.clear()
+        val result = recordingCoordinator().prepareAndEnqueue(request("早上好呀"))
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+
+        val evidence = queuedInputs.single().contextEvidence
+        assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.map { it.id })
+        assertTrue(evidence.all { it.kind == "Message" })
+        assertTrue(evidence.none { it.kind in setOf("Summary", "Gaps", "Review", "Memory", "Mastery", "Source", "Error") })
+    }
+
+    @Test
+    fun goal_change_turn_carries_only_lightweight_evidence() = runBlocking {
+        queuedInputs.clear()
+        val result = recordingCoordinator().prepareAndEnqueue(request("我想改学物理"))
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+
+        val evidence = queuedInputs.single().contextEvidence
+        assertTrue(evidence.all { it.kind == "Message" })
+        assertTrue(evidence.none { it.kind in setOf("Summary", "Gaps", "Review", "Memory", "Mastery", "Source", "Error") })
+    }
+
+    @Test
+    fun learning_turn_keeps_full_evidence_pack_with_two_recent_messages() = runBlocking {
+        queuedInputs.clear()
+        val result = recordingCoordinator().prepareAndEnqueue(request("我不会"))
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+
+        val evidence = queuedInputs.single().contextEvidence
+        val kinds = evidence.map { it.kind }
+        assertTrue("Summary" in kinds)
+        assertTrue("Gaps" in kinds)
+        assertTrue("Review" in kinds)
+        assertEquals(2, evidence.count { it.kind == "Message" })
+        assertTrue("Mastery" !in kinds)
+    }
 }
