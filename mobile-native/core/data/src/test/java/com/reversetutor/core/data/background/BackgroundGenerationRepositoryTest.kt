@@ -280,6 +280,35 @@ class BackgroundGenerationRepositoryTest {
     }
 
     @Test
+    fun findLatestJobForSessionReturnsNewestGenerationJobIncludingTerminalFailures() = runBlocking {
+        val jobDao = FakeBackgroundJobDao()
+        val repository = repository(jobDao = jobDao)
+        repository.enqueueGenerationJob(input(token = "token-old"), nowEpochMillis = 10L, jobId = "job-old")
+        repository.enqueueGenerationJob(input(token = "token-new"), nowEpochMillis = 20L, jobId = "job-new")
+        jobDao.forceStatus("job-old", "Completed")
+        jobDao.forceStatus("job-new", "Failed", startedAtEpochMillis = 21L)
+        jobDao.forceUpsert(
+            BackgroundJobEntity(
+                id = "job-initiative",
+                spaceId = "default-space",
+                kind = "Initiative",
+                status = "Queued",
+                createdAtEpochMillis = 30L,
+                sessionId = "session-1",
+                userMessageId = null,
+                userText = null,
+                generationToken = "token-initiative"
+            )
+        )
+
+        val latest = repository.findLatestJobForSession("session-1")
+
+        assertEquals("job-new", latest?.id)
+        assertEquals(BackgroundJobStatus.Failed, latest?.status)
+        assertEquals(null, repository.findLatestJobForSession("another-session"))
+    }
+
+    @Test
     fun richReplyIsCarriedByCompletionWithoutAnotherAssistantWrite() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
         val repository = repository(

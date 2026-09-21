@@ -206,6 +206,7 @@ internal fun ReverseTeachingChatScreen(
     onMoveAttachment: (Int, Int) -> Unit = { _, _ -> },
     onRetrySend: () -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
+    onRetryGeneration: (() -> Unit)? = null,
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     modifier: Modifier = Modifier
@@ -226,9 +227,18 @@ internal fun ReverseTeachingChatScreen(
     )
 
     LaunchedEffect(listState) {
-        snapshotFlow { ChatScrollPosition(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+        // 2026-09-21 修复：消息异步加载期间列表为空，(0,0) 发射会覆盖掉
+        // ChatScrollMemory 记住的位置（恢复自我破坏）——空列表时不向外发射。
+        snapshotFlow {
+            listState.layoutInfo.totalItemsCount to ChatScrollPosition(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }
             .distinctUntilChanged()
-            .collect(onScrollPositionChanged)
+            .collect { (count, position) ->
+                if (count > 0) onScrollPositionChanged(position)
+            }
     }
 
     LaunchedEffect(evidenceTargetMessageId, state.messages) {
@@ -257,12 +267,28 @@ internal fun ReverseTeachingChatScreen(
     }
     var previousTimelineItemCount by remember(state.sessionTitle) { mutableStateOf(timelineItemCount) }
     var scrollRestoreGuard by remember(state.sessionTitle) { mutableStateOf(true) }
+    // 2026-09-21 修复：没有记住的位置时（默认 (0,0)），进会话应落在底部
+    // 最新一条，而不是停在列表顶部；消息可能异步到达，等内容出现后再落底。
+    var pendingInitialBottom by remember(state.sessionTitle) {
+        mutableStateOf(initialScrollPosition.index == 0 && initialScrollPosition.offset == 0)
+    }
     LaunchedEffect(timelineItemCount, streamingLength, state.generationStatusLabel != null) {
         val countChanged = timelineItemCount != previousTimelineItemCount
         previousTimelineItemCount = timelineItemCount
         if (scrollRestoreGuard) {
             // 首次组合跳过，保留 initialScrollPosition 的位置恢复语义
             scrollRestoreGuard = false
+            if (pendingInitialBottom && timelineItemCount > 1) {
+                pendingInitialBottom = false
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+            }
+            return@LaunchedEffect
+        }
+        if (pendingInitialBottom) {
+            if (timelineItemCount > 1) {
+                pendingInitialBottom = false
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+            }
             return@LaunchedEffect
         }
         if (timelineItemCount <= 0) return@LaunchedEffect
@@ -415,7 +441,7 @@ internal fun ReverseTeachingChatScreen(
                         avatarVisible = state.avatarVisible,
                         label = label,
                         onOpenSettings = onOpenModelSettings,
-                        onRetry = null
+                        onRetry = onRetryGeneration
                     )
                 } else {
                     StreamingGenerationRow(

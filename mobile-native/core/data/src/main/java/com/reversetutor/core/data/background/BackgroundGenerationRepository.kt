@@ -126,6 +126,19 @@ class BackgroundGenerationRepository(
             ?.toGenerationJob()
 
     /**
+     * Reentry replay (2026-09-21): the latest generation job of this session in
+     * any status. The chat screen uses it to surface a terminal failure that
+     * finished while the screen was away, so the persisted user message is
+     * never left as an orphan with no visible state. Read-only: status
+     * transitions stay with the Worker and startup recovery.
+     */
+    suspend fun findLatestJobForSession(sessionId: String): BackgroundGenerationJob? =
+        backgroundJobDao.listGenerationBySession(sessionId.trim())
+            .asReversed()
+            .firstOrNull { it.kind == GenerationKind }
+            ?.toGenerationJob()
+
+    /**
      * Returns only the bounded, structured plans of this window's completed
      * user turns.  This is deliberately not a general job-history API: caller
      * code never receives user text, assistant text, context evidence, model
