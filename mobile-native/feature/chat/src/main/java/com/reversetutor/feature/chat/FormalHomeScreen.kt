@@ -5,7 +5,9 @@
 
 package com.reversetutor.feature.chat
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -63,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalElevations
@@ -1176,6 +1179,13 @@ private fun FormalNewSessionSheet(
     onCustomCreate: () -> Unit,
     onImportDocument: () -> Unit
 ) {
+    var entered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { entered = true }
+    val sheetOffset by animateDpAsState(
+        targetValue = if (entered) 0.dp else 580.dp,
+        animationSpec = tween(durationMillis = 300),
+        label = "new-session-sheet-enter"
+    )
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -1187,7 +1197,8 @@ private fun FormalNewSessionSheet(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(492.dp)
+                .height(580.dp)
+                .offset { IntOffset(0, sheetOffset.roundToPx()) }
                 .shadow(
                     elevation = 10.dp,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -1215,7 +1226,6 @@ private fun FormalNewSessionSheet(
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             NewSessionSheetContent(
-                onDismiss = onDismiss,
                 onStartLearningSetup = onStartLearningSetup,
                 onCustomCreate = onCustomCreate,
                 onImportDocument = onImportDocument
@@ -1226,13 +1236,14 @@ private fun FormalNewSessionSheet(
 
 @Composable
 private fun NewSessionSheetContent(
-    onDismiss: () -> Unit,
     onStartLearningSetup: () -> Unit,
     onCustomCreate: () -> Unit,
     onImportDocument: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
     val modes = formalNewSessionModes()
+    var selectedMode by remember { mutableStateOf(NewSessionMode.Learning) }
+    var selectedMethod by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1245,34 +1256,13 @@ private fun NewSessionSheetContent(
                 .align(Alignment.CenterHorizontally)
                 .background(Color(0x577A8599), RoundedCornerShape(3.dp))
         )
-        Row(
-            modifier = Modifier
-                .padding(top = 19.dp)
-                .fillMaxWidth()
-                .height(48.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "新建会话",
-                style = type.style(20f, 28f, FontWeight.Bold, FormalColors.Ink)
-            )
-            Surface(
-                onClick = onDismiss,
-                modifier = Modifier.size(36.dp),
-                shape = RoundedCornerShape(18.dp),
-                color = Color(0xFFE5EBF5)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "\u00d7",
-                        style = type.style(18f, 22f, color = Color(0xFF454F63))
-                    )
-                }
-            }
-        }
         Text(
-            text = "选一种创建方式，模式默认为学习。",
+            text = "新建会话",
+            style = type.style(20f, 28f, FontWeight.Bold, FormalColors.Ink),
+            modifier = Modifier.padding(top = 19.dp)
+        )
+        Text(
+            text = "选择会话模式和创建方式，然后开始。",
             style = type.style(11f, 16f, color = FormalColors.Muted),
             modifier = Modifier.padding(top = 4.dp)
         )
@@ -1288,21 +1278,14 @@ private fun NewSessionSheetContent(
                 .height(82.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            NewSessionModeCard(
-                spec = modes[0],
-                onClick = onCustomCreate,
-                modifier = Modifier.weight(1f)
-            )
-            NewSessionModeCard(
-                spec = modes[1],
-                onClick = onCustomCreate,
-                modifier = Modifier.weight(1f)
-            )
-            NewSessionModeCard(
-                spec = modes[2],
-                onClick = onCustomCreate,
-                modifier = Modifier.weight(1f)
-            )
+            modes.forEach { spec ->
+                NewSessionModeCard(
+                    spec = spec,
+                    selected = spec.mode == selectedMode,
+                    onClick = { if (spec.enabled) selectedMode = spec.mode },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
         Text(
             text = "创建方式",
@@ -1319,7 +1302,8 @@ private fun NewSessionSheetContent(
                 title = "自定义",
                 description = "和 AI 直接聊，越聊越懂你",
                 badge = "推荐",
-                onClick = onCustomCreate,
+                selected = selectedMethod == "custom",
+                onClick = { selectedMethod = "custom" },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("home_new_session_custom")
@@ -1327,7 +1311,8 @@ private fun NewSessionSheetContent(
             NewSessionOptionRow(
                 title = "模板",
                 description = "从预设模板里挑一个开始",
-                onClick = onStartLearningSetup,
+                selected = selectedMethod == "template",
+                onClick = { selectedMethod = "template" },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("home_new_session_template")
@@ -1335,11 +1320,42 @@ private fun NewSessionSheetContent(
             NewSessionOptionRow(
                 title = "导入",
                 description = "上传教材或试卷，边分析边创建",
-                onClick = onImportDocument,
+                selected = selectedMethod == "import",
+                onClick = { selectedMethod = "import" },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("home_new_session_import")
             )
+        }
+        Spacer(Modifier.weight(1f))
+        val ready = selectedMethod != null
+        Surface(
+            onClick = {
+                when (selectedMethod) {
+                    "custom" -> onCustomCreate()
+                    "template" -> onStartLearningSetup()
+                    "import" -> onImportDocument()
+                }
+            },
+            enabled = ready,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 20.dp)
+                .height(50.dp)
+                .testTag("home_new_session_confirm"),
+            color = if (ready) FormalColors.Primary else Color(0xFFE7EAF0),
+            shape = RoundedCornerShape(FormalShapes.CardRadius),
+            shadowElevation = if (ready) FormalElevations.Raised else 0.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = "开始创建",
+                    style = type.style(
+                        13f, 18f, FontWeight.Bold,
+                        if (ready) Color.White else Color(0xFF7D8798)
+                    )
+                )
+            }
         }
     }
 }
@@ -1348,6 +1364,7 @@ private fun NewSessionSheetContent(
 private fun NewSessionOptionRow(
     title: String,
     description: String,
+    selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     badge: String? = null
@@ -1356,9 +1373,9 @@ private fun NewSessionOptionRow(
     Surface(
         onClick = onClick,
         modifier = modifier.height(60.dp),
-        color = FormalColors.SurfaceElevated,
+        color = if (selected) FormalColors.PrimarySoft else FormalColors.SurfaceElevated,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, FormalColors.BorderStrong)
+        border = BorderStroke(1.dp, if (selected) FormalColors.Primary else FormalColors.BorderStrong)
     ) {
         Row(
             modifier = Modifier
@@ -1396,10 +1413,25 @@ private fun NewSessionOptionRow(
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = "\u2192",
-                style = type.style(13f, 18f, FontWeight.Bold, color = Color(0xFF8A94A5))
-            )
+            Surface(
+                shape = CircleShape,
+                color = if (selected) FormalColors.Primary else Color.Transparent,
+                border = BorderStroke(
+                    1.5.dp,
+                    if (selected) FormalColors.Primary else Color(0xFFB9C1D0)
+                ),
+                modifier = Modifier.size(18.dp)
+            ) {
+                if (selected) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(Color.White, CircleShape)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1407,29 +1439,30 @@ private fun NewSessionOptionRow(
 @Composable
 private fun NewSessionModeCard(
     spec: NewSessionModeSpec,
+    selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val type = LocalFormalTypeScale.current
     val container = when {
-        spec.selected -> FormalColors.Primary
+        selected -> FormalColors.Primary
         spec.enabled -> FormalColors.SurfaceElevated
         else -> Color(0xFFE7EAF0)
     }
     val titleColor = when {
-        spec.selected -> Color.White
+        selected -> Color.White
         spec.enabled -> FormalColors.Ink
         else -> Color(0xFF7D8798)
     }
-    val detailColor = if (spec.selected) Color(0xFFD1DEFF) else Color(0xFF8A94A5)
+    val detailColor = if (selected) Color(0xFFD1DEFF) else Color(0xFF8A94A5)
     Surface(
         onClick = onClick,
         enabled = spec.enabled,
         modifier = modifier.height(78.dp),
         color = container,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = if (spec.selected) null else BorderStroke(1.dp, FormalColors.BorderStrong),
-        shadowElevation = if (spec.selected) FormalElevations.Raised else 0.dp
+        border = if (selected) null else BorderStroke(1.dp, FormalColors.BorderStrong),
+        shadowElevation = if (selected) FormalElevations.Raised else 0.dp
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

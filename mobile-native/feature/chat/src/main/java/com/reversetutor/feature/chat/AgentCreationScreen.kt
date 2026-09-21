@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,7 +35,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.AlertDialog
@@ -69,8 +69,8 @@ import kotlinx.coroutines.launch
 /**
  * C1 · Agent 对话式创建屏（设计方案 v3 · 第二章）。
  *
- * 顶部「了解程度」进度条 + 对话流（助手/用户/文件卡/草案卡）
- * + 底部消息输入框（附件按钮 + 发送）+「创建并进入聊天」主按钮。
+ * 顶部极简行（返回 + 右上「创建并进入聊天」）+「了解程度」进度条
+ * + 对话流（助手/用户/文件卡/草案卡）+ 底部消息输入框（附件按钮 + 发送）。
  * R-A 由 FakeAgentCreationGateway 驱动；R-B 起换生产网关。
  */
 @Composable
@@ -203,8 +203,14 @@ fun AgentCreationRoute(
             modifier = Modifier
                 .width(maxWidth.coerceAtMost(390.dp))
                 .fillMaxHeight()
+                .statusBarsPadding()
         ) {
-            AgentCreationTopBar(onBack = onBack, understanding = state.displayedUnderstanding)
+            CreationTopRow(
+                onBack = onBack,
+                canCreate = state.canCreate,
+                creating = creating,
+                onCreate = ::handleCreateClick
+            )
             UnderstandingBar(understanding = state.displayedUnderstanding)
             Column(
                 modifier = Modifier
@@ -254,12 +260,7 @@ fun AgentCreationRoute(
                 onInputChange = { input = it },
                 onSend = ::send,
                 onAttach = ::launchPicker,
-                canCreate = state.canCreate,
-                understandingHigh = state.understandingHigh,
-                creating = creating,
-                onCreate = ::handleCreateClick,
-                createError = createError,
-                onDismissError = { createError = null }
+                createError = createError
             )
         }
     }
@@ -283,37 +284,60 @@ fun AgentCreationRoute(
 }
 
 @Composable
-private fun AgentCreationTopBar(onBack: () -> Unit, understanding: Int) {
+private fun CreationTopRow(
+    onBack: () -> Unit,
+    canCreate: Boolean,
+    creating: Boolean,
+    onCreate: () -> Unit
+) {
     val type = LocalFormalTypeScale.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
             onClick = onBack,
-            modifier = Modifier.size(44.dp),
+            modifier = Modifier
+                .size(40.dp)
+                .testTag("agent_creation_back"),
             color = FormalColors.Surface,
             shape = CircleShape,
             border = BorderStroke(1.dp, FormalColors.Border)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    tint = FormalColors.Ink
+                )
             }
         }
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = "新建会话",
-                style = type.style(17f, 24f, FontWeight.Bold, FormalColors.Ink)
-            )
+        Spacer(Modifier.weight(1f))
+        Surface(
+            onClick = onCreate,
+            enabled = canCreate && !creating,
+            modifier = Modifier
+                .height(40.dp)
+                .testTag("agent_creation_create"),
+            color = if (canCreate) FormalColors.Primary else FormalColors.SurfaceSubtle,
+            shape = RoundedCornerShape(FormalShapes.PillRadius),
+            border = if (canCreate) null else BorderStroke(1.dp, FormalColors.Border)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = if (creating) "创建中…" else "创建并进入聊天",
+                    style = type.style(
+                        12f, 16f, FontWeight.Bold,
+                        if (canCreate) androidx.compose.ui.graphics.Color.White else FormalColors.Muted
+                    )
+                )
+            }
         }
-        Text(
-            text = "Agent 创建",
-            style = type.style(9f, 13f, color = FormalColors.Muted)
-        )
     }
 }
 
@@ -589,12 +613,7 @@ private fun BottomComposer(
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onAttach: () -> Unit,
-    canCreate: Boolean,
-    understandingHigh: Boolean,
-    creating: Boolean,
-    onCreate: () -> Unit,
-    createError: String?,
-    onDismissError: () -> Unit
+    createError: String?
 ) {
     val type = LocalFormalTypeScale.current
     val attachHighlight by animateDpAsState(
@@ -616,41 +635,6 @@ private fun BottomComposer(
                 .background(FormalColors.Divider)
         )
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-            if (requestDocumentActive) {
-                Surface(
-                    color = FormalColors.WarningSoft,
-                    shape = RoundedCornerShape(FormalShapes.CompactRadius),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("agent_creation_send_file_hint")
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Filled.AttachFile,
-                            contentDescription = null,
-                            tint = FormalColors.Warning,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "创建助手想要一份资料 · 点右侧附件按钮发给他",
-                            style = type.style(11f, 16f, color = FormalColors.Warning),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Text(
-                            text = "发送文件",
-                            style = type.style(11f, 16f, FontWeight.Bold, FormalColors.Warning),
-                            modifier = Modifier.testTag("agent_creation_send_file")
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-            }
             if (createError != null) {
                 Text(
                     text = createError,
@@ -703,34 +687,6 @@ private fun BottomComposer(
                             tint = if (input.isNotBlank() && !busy) androidx.compose.ui.graphics.Color.White else FormalColors.Border
                         )
                     }
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Surface(
-                onClick = onCreate,
-                enabled = canCreate && !creating,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .testTag("agent_creation_create"),
-                color = if (canCreate) FormalColors.Primary else FormalColors.SurfaceSubtle,
-                shape = RoundedCornerShape(FormalShapes.CardRadius),
-                border = if (canCreate) null else BorderStroke(1.dp, FormalColors.Border),
-                shadowElevation = if (canCreate && understandingHigh) FormalElevations.Raised else 0.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = when {
-                            creating -> "创建中…"
-                            !canCreate -> "创建并进入聊天（先聊出名称和角色）"
-                            understandingHigh -> "创建并进入聊天（推荐）"
-                            else -> "创建并进入聊天"
-                        },
-                        style = type.style(
-                            13f, 18f, FontWeight.Bold,
-                            if (canCreate) androidx.compose.ui.graphics.Color.White else FormalColors.Muted
-                        )
-                    )
                 }
             }
         }
