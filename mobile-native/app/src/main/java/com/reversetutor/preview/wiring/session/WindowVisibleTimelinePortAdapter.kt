@@ -31,6 +31,7 @@ class WindowVisibleTimelinePortAdapter(
                     )
                 },
                 quoteLabel = record.quote?.let { "正在回复：${it.excerpt}" },
+                monologue = record.message.monologue,
                 origin = if (visible.inherited) {
                     WindowTimelineOrigin.INHERITED_READ_ONLY
                 } else {

@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 16
+    const val version = 17
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -138,6 +138,13 @@ object DatabaseSchema {
         }
     }
 
+    /** Expression-loop slice 4: message-borne monologue for the thinking drawer. */
+    val migration16To17: Migration = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE messages ADD COLUMN monologue TEXT")
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -153,7 +160,8 @@ object DatabaseSchema {
         migration12To13,
         migration13To14,
         migration14To15,
-        migration15To16
+        migration15To16,
+        migration16To17
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {

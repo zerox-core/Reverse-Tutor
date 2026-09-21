@@ -713,6 +713,7 @@ internal fun LlmGenerationRequest.reverseTutorStudentPromptBlock(): String? =
             - 举例就说成你自己的尝试：带具体数字或场景，讲完自然地问一句这样理解对不对。
             - 这一轮可以只是听：可以不推进任何东西，陪聊和废话都不是失误。
             - 最多问老师一个问题，问完就停，绝不自问自答。
+            - 每次回复的最开头，先用 <thinking> 和 </thinking> 包住一两句你此刻的第一人称内心独白（卡在哪、想怎么问），紧接着另起一段写给老师的正文；独白不是正文的一部分。
         """.trimIndent()
     }
 

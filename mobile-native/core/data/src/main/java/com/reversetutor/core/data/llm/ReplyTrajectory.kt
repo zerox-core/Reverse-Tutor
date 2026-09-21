@@ -24,6 +24,8 @@ data class ReplyTrajectory(
     val styleFlags: List<ReplyValidator.StyleFlag> = emptyList(),
     val retried: Boolean = false,
     val usedFallback: Boolean = false,
+    /** Slice 4: compact serialized self-assessment from the envelope outcome (SPEC section 4.4). */
+    val selfAssessment: String? = null,
     val modelId: String,
     val createdAtEpochMillis: Long
 )

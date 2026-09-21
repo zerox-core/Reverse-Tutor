@@ -998,6 +998,12 @@ private fun LearnerTimelineMessage(
                 }
                 if (item.inheritedReadOnly) InheritedMessageLabel()
                 if (item.remembered) RememberedMessageLabel()
+                // Expression-loop slice 4 (SPEC section 4.7 route C): collapsed
+                // thinking-chain drawer under the spoken bubble; it consumes
+                // its own taps and never triggers bubble selection.
+                item.monologue?.let { monologue ->
+                    MonologueDrawer(monologue = monologue)
+                }
             }
             if (selected) MessageMetadataRow(item)
         }

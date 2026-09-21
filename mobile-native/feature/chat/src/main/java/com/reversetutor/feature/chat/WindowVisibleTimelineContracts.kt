@@ -20,7 +20,9 @@ data class WindowVisibleTimelineEntry(
     val attachmentLabels: List<String>,
     val attachments: List<ChatAttachmentUi>,
     val quoteLabel: String?,
-    val origin: WindowTimelineOrigin
+    val origin: WindowTimelineOrigin,
+    /** Expression-loop slice 4: thinking-drawer monologue; null when absent. */
+    val monologue: String? = null
 )
 
 enum class WindowTimelineOrigin {

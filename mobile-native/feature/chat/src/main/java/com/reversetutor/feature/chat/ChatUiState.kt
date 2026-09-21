@@ -73,7 +73,8 @@ data class ChatUiState(
                                 )
                             },
                             quoteLabel = record.quote?.let { "正在回复：${it.excerpt}" },
-                            remembered = record.message.id in rememberedMessageIds
+                            remembered = record.message.id in rememberedMessageIds,
+                            monologue = record.message.monologue
                         )
                     },
                 composer = composer,
@@ -121,7 +122,8 @@ data class ChatUiState(
                         attachments = entry.attachments,
                         quoteLabel = entry.quoteLabel,
                         remembered = entry.id in rememberedMessageIds,
-                        inheritedReadOnly = entry.origin == WindowTimelineOrigin.INHERITED_READ_ONLY
+                        inheritedReadOnly = entry.origin == WindowTimelineOrigin.INHERITED_READ_ONLY,
+                        monologue = entry.monologue
                     )
                 },
                 composer = composer,
@@ -239,7 +241,9 @@ data class ChatTimelineItem(
     val attachments: List<ChatAttachmentUi>,
     val quoteLabel: String?,
     val remembered: Boolean = false,
-    val inheritedReadOnly: Boolean = false
+    val inheritedReadOnly: Boolean = false,
+    /** Expression-loop slice 4: thinking-drawer monologue; null on legacy messages. */
+    val monologue: String? = null
 )
 
 data class ChatAttachmentUi(

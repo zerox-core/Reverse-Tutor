@@ -13,6 +13,8 @@ import com.reversetutor.core.llm.LlmGuidedTurnPlan
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelope
 import com.reversetutor.core.llm.LlmAssistantTurnEnvelope
 import com.reversetutor.core.llm.LlmAssistantReplyEnvelopeParser
+import com.reversetutor.core.llm.MonologueEnvelope
+import com.reversetutor.core.llm.MonologueStreamSplitter
 import com.reversetutor.core.llm.timelineText
 import com.reversetutor.core.llm.toVisibleTimelineText
 import com.reversetutor.core.llm.LlmContextEvidence
@@ -135,11 +137,17 @@ class ChatGenerationRepository(
                 if (replyText.isBlank()) {
                     ChatGenerationOutcome.ProviderFailed("Empty response")
                 } else {
+                    // Slice 4: peel the leading monologue off the raw reply
+                    // before any parsing or validating; legacy replies without
+                    // the marker keep the whole text as the body.
+                    val split = MonologueEnvelope.splitComplete(replyText)
+                    val monologue = if (usedFallback) null else split.monologue
+                    val bodyText = split.body
                     val parsedReply = LlmAssistantReplyEnvelopeParser.parseValidated(
-                        rawText = replyText,
+                        rawText = bodyText,
                         allowedEvidenceIds = input.contextEvidence.mapNotNull { it.normalized()?.id }.toSet()
                     )
-                    val timelineText = parsedReply?.timelineText() ?: replyText.toVisibleTimelineText()
+                    val timelineText = parsedReply?.timelineText() ?: bodyText.toVisibleTimelineText()
                     val assistantMessageId = "assistant-${input.token.value}"
                     messageRepository.saveMessage(
                         Message(
@@ -148,7 +156,8 @@ class ChatGenerationRepository(
                             sessionId = input.sessionId,
                             role = MessageRole.Assistant,
                             text = timelineText,
-                            createdAtEpochMillis = nowEpochMillis
+                            createdAtEpochMillis = nowEpochMillis,
+                            monologue = monologue
                         )
                     )
                     replyTrajectoryRecorder(
@@ -170,6 +179,7 @@ class ChatGenerationRepository(
                             },
                             retried = retried,
                             usedFallback = usedFallback,
+                            selfAssessment = parsedReply?.outcome?.let(MonologueEnvelope::selfAssessmentPayload),
                             modelId = plannedRequest.model,
                             createdAtEpochMillis = nowEpochMillis
                         )
@@ -493,6 +503,8 @@ private class StreamWatchdog(
     private val onChunk: (String) -> Unit
 ) {
     private val streamed = StringBuilder()
+    private val visibleBody = StringBuilder()
+    private val splitter = MonologueStreamSplitter()
 
     var redLine: ReplyValidator.RedLine? = null
         private set
@@ -500,11 +512,18 @@ private class StreamWatchdog(
     val onStreamChunk: (String) -> Unit = { chunk ->
         if (redLine == null) {
             streamed.append(chunk)
-            val hit = ReplyValidator.findFirstRedLine(streamed.toString())
-            if (hit != null) {
-                redLine = hit
-            } else if (isTokenCurrent(token)) {
-                onChunk(chunk.toVisibleTimelineText())
+            // Slice 4: the leading monologue segment is held back; only the
+            // spoken body ever reaches the preview and the red-line check
+            // (SPEC section 10 decision 9: red lines govern the spoken text).
+            val visibleDelta = splitter.onChunk(chunk)
+            if (visibleDelta != null) {
+                visibleBody.append(visibleDelta)
+                val hit = ReplyValidator.findFirstRedLine(visibleBody.toString())
+                if (hit != null) {
+                    redLine = hit
+                } else if (isTokenCurrent(token)) {
+                    onChunk(visibleDelta.toVisibleTimelineText())
+                }
             }
         }
     }

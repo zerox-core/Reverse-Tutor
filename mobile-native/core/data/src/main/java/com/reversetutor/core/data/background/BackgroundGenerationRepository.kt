@@ -283,7 +283,7 @@ class BackgroundGenerationRepository(
                         styleFlagsPayload = ReplyValidator.payloadForStyleFlags(trajectory.styleFlags),
                         retried = if (trajectory.retried) 1 else 0,
                         usedFallback = if (trajectory.usedFallback) 1 else 0,
-                        selfAssessment = null,
+                        selfAssessment = trajectory.selfAssessment,
                         modelId = trajectory.modelId,
                         createdAtEpochMillis = trajectory.createdAtEpochMillis
                     )

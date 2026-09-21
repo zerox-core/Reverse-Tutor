@@ -61,7 +61,9 @@ data class MessageEntity(
     val text: String,
     val createdAtEpochMillis: Long,
     val parentMessageId: String? = null,
-    val sourceImportId: String? = null
+    val sourceImportId: String? = null,
+    /** Expression-loop slice 4: leading first-person monologue (thinking drawer). */
+    val monologue: String? = null
 )
 
 @Entity(tableName = "message_attachments", indices = [Index("spaceId"), Index("messageId")])
@@ -385,7 +387,8 @@ fun Message.toEntity(): MessageEntity = MessageEntity(
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
     parentMessageId = parentMessageId,
-    sourceImportId = sourceImportId
+    sourceImportId = sourceImportId,
+    monologue = monologue
 )
 
 fun MessageEntity.toDomain(): Message = Message(
@@ -396,7 +399,8 @@ fun MessageEntity.toDomain(): Message = Message(
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
     parentMessageId = parentMessageId,
-    sourceImportId = sourceImportId
+    sourceImportId = sourceImportId,
+    monologue = monologue
 )
 
 fun MessageAttachment.toEntity(): MessageAttachmentEntity = MessageAttachmentEntity(
