@@ -281,67 +281,22 @@ private fun buildNebulae(engine: BlackHoleGraphEngine): List<NebulaGlow> {
     )
 }
 
-/** R97 浅色绢纸纤维：竖向细丝纹（世界坐标，确定性种子，竖向渐隐、极淡描纹）。 */
-private data class PaperFiber(
-    val x: Float,
-    val y: Float,
-    val width: Float,
-    val height: Float,
+/** R98 动态流线规格：抽象线条感、微微下流（无具体雨滴），三层 = 前后渐进（远慢淡细 / 近快显粗）。 */
+private data class FlowLayer(
+    val spacingX: Float,
+    val speed: Float,
+    val len: Float,
+    val widthPx: Float,
     val alpha: Float,
-    val parallax: Float
+    val parallax: Float,
+    val seed: Int
 )
 
-private fun buildPaperFibers(engine: BlackHoleGraphEngine): List<PaperFiber> {
-    val rng = Random(20260921)
-    val extent = engine.clusterExtent().coerceAtLeast(400f)
-    val field = 170f + extent * 2.2f
-    return List(36) {
-        PaperFiber(
-            x = engine.holeX + (rng.nextFloat() - 0.5f) * 2f * field,
-            y = engine.holeY + (rng.nextFloat() - 0.5f) * 2f * field,
-            width = 5f + rng.nextFloat() * 18f,
-            height = extent * (0.9f + rng.nextFloat() * 1.3f),
-            alpha = 0.03f + rng.nextFloat() * 0.03f,
-            parallax = 0.7f
-        )
-    }
-}
-
-/** R97 浅色云斑晕染：暖调大面积低透明径向渐变（世界坐标，中景视差），像宣纸上的淡彩。 */
-private data class CloudWash(
-    val x: Float,
-    val y: Float,
-    val radius: Float,
-    val color: Color,
-    val parallax: Float
-)
-
-private fun buildCloudWashes(engine: BlackHoleGraphEngine): List<CloudWash> {
-    val extent = engine.clusterExtent().coerceAtLeast(400f)
-    // 大地暖调四色（与彩点同族）：琥珀 / 赭红 / 橄榄 / 可可的极淡晕染
-    return listOf(
-        CloudWash(engine.holeX - extent * 0.85f, engine.holeY - extent * 0.5f, extent * 0.95f, Color(0x0DE8C078), 0.5f),
-        CloudWash(engine.holeX + extent * 1.0f, engine.holeY + extent * 0.65f, extent * 0.8f, Color(0x0CD8A080), 0.5f),
-        CloudWash(engine.holeX + extent * 0.55f, engine.holeY - extent * 0.85f, extent * 0.7f, Color(0x0BA8B878), 0.5f),
-        CloudWash(engine.holeX - extent * 0.6f, engine.holeY + extent * 0.9f, extent * 0.75f, Color(0x0CE0C098), 0.5f)
-    )
-}
-
-/** R97 浅色纸面颗粒：前景静态细点（世界坐标，不闪烁，宣纸肌理）。 */
-private data class GrainDot(val x: Float, val y: Float, val radius: Float, val alpha: Float)
-
-private fun buildGrain(engine: BlackHoleGraphEngine): List<GrainDot> {
-    val rng = Random(20260922)
-    val extent = engine.clusterExtent().coerceAtLeast(400f)
-    val field = 170f + extent * 2.2f
-    return List(420) {
-        GrainDot(
-            x = engine.holeX + (rng.nextFloat() - 0.5f) * 2f * field,
-            y = engine.holeY + (rng.nextFloat() - 0.5f) * 2f * field,
-            radius = 0.5f + rng.nextFloat() * 0.7f,
-            alpha = 0.04f + rng.nextFloat() * 0.06f
-        )
-    }
+/** R98 流线确定性哈希：同一下标永远同一随机值（0..1），流线位置逐帧稳定不抖。 */
+private fun flowHash01(index: Int, seed: Int): Float {
+    var h = index * 374761393 + seed * 668265263
+    h = (h xor (h ushr 13)) * 1274126177
+    return ((h xor (h ushr 16)) and 0x7fffffff) / 2147483647f
 }
 
 /** 相机：世界坐标中心 + 缩放；平移降敏（x0.72）、松手滑移惯性衰减 0.93（Obsidian 式微惯性）、缩放范围 0.45~3.2。 */
@@ -508,10 +463,14 @@ private fun BlackHoleGraphReadyContent(
     val dust = remember(engine, palette) { buildDust(engine, palette.dustColors) }
     val starfield = remember(engine) { buildStarfield(engine) }
     val nebulae = remember(engine) { buildNebulae(engine) }
-    // R97 浅色绢纸晨光背景三件套
-    val paperFibers = remember(engine) { buildPaperFibers(engine) }
-    val cloudWashes = remember(engine) { buildCloudWashes(engine) }
-    val grain = remember(engine) { buildGrain(engine) }
+    // R98 动态流线三层规格（远 -> 近：慢/淡/细 -> 快/显/粗 = 前后渐进）
+    val flowLayers = remember {
+        listOf(
+            FlowLayer(spacingX = 110f, speed = 14f, len = 60f, widthPx = 1f, alpha = 0.05f, parallax = 0.3f, seed = 101),
+            FlowLayer(spacingX = 78f, speed = 26f, len = 92f, widthPx = 1.3f, alpha = 0.07f, parallax = 0.55f, seed = 202),
+            FlowLayer(spacingX = 52f, speed = 42f, len = 130f, widthPx = 1.6f, alpha = 0.09f, parallax = 0.85f, seed = 303)
+        )
+    }
     var frame by remember { mutableLongStateOf(0L) }
     var timeScaleIndex by remember { mutableIntStateOf(0) }
     val timeScales = remember { listOf(1f, 0.3f, 3f) }
@@ -749,83 +708,33 @@ private fun BlackHoleGraphReadyContent(
                     )
                 }
             } else {
-                // R97 浅色「绢纸晨光」背景（用户反馈浅色太单调、喜欢深色银河的层次感）：
-                // 晨光斜带 -> 云斑晕染 -> 绢纸纤维 -> 纸面颗粒 -> 彩点 -> 边角轻压，
-                // 全部哑光、低透明、暖调，走书卷气纸感（不做发光渐变套路）。
-                val fiberColor = Color(0xFF8C7A5C)
-                val grainColor = Color(0xFF7A6A50)
-
-                // 晨光带：与深色银河带同构的斜向柔光带（暖白，随相机 0.2 倍慢漂）
-                withTransform({
-                    rotate(degrees = -22f, pivot = Offset(size.width / 2f, size.height / 2f))
-                }) {
-                    val bandH = size.height * 0.62f
-                    val bandDrift = -(camera.centerY - engine.holeY) * 0.2f * camera.scale
-                    val bandTop = size.height * 0.5f - bandH / 2f - size.height * 0.08f + bandDrift
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.34f to Color(0x0AFFDFB0),
-                            0.5f to Color(0x12FFEDCB),
-                            0.66f to Color(0x0AFFDFB0),
-                            1f to Color.Transparent,
-                            startY = bandTop,
-                            endY = bandTop + bandH
-                        ),
-                        topLeft = Offset(-size.width * 0.5f, bandTop),
-                        size = Size(size.width * 2f, bandH)
-                    )
-                }
-
-                // 云斑晕染（中景视差）：暖调大面积低透明径向渐变，像宣纸上的淡彩
-                cloudWashes.forEach { wash ->
-                    val c = bgToScreen(wash.x, wash.y, wash.parallax)
-                    val r = wash.radius * camera.scale
-                    if (r > 1f) {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(wash.color, Color.Transparent),
-                                center = c,
-                                radius = r
-                            ),
-                            radius = r,
-                            center = c
+                // R98 动态流线（用户拍板换掉绢纸晨光：抽象线条感、微微下流、前后渐进、跟随窗口铺满）：
+                // 屏幕空间无限平铺——相机平移 / 缩放到哪流线都在，不再有「划走就空」的区域；
+                // 三层视差 = 前后渐进（远慢淡细 / 近快显粗），确定性哈希保证流线逐帧稳定不抖。
+                val flowColor = Color(0xFF8C7A5C)
+                flowLayers.forEach { layer ->
+                    val spacing = layer.spacingX
+                    val driftX = -(camera.centerX - engine.holeX) * layer.parallax * camera.scale
+                    val driftY = -(camera.centerY - engine.holeY) * layer.parallax * camera.scale
+                    val startK = kotlin.math.floor((-spacing - driftX) / spacing).toInt()
+                    val endK = kotlin.math.ceil((size.width + spacing - driftX) / spacing).toInt()
+                    val travel = size.height + layer.len * 2f
+                    var k = startK
+                    while (k <= endK) {
+                        val x = k * spacing + driftX + flowHash01(k, layer.seed) * spacing * 0.5f
+                        val phase = flowHash01(k, layer.seed + 7)
+                        val lenScale = 0.7f + flowHash01(k, layer.seed + 13) * 0.6f
+                        val y = ((seconds * layer.speed + phase * travel + driftY) % travel + travel) % travel - layer.len
+                        drawLine(
+                            color = flowColor,
+                            start = Offset(x, y),
+                            end = Offset(x, y + layer.len * lenScale),
+                            strokeWidth = layer.widthPx,
+                            cap = StrokeCap.Round,
+                            alpha = layer.alpha
                         )
+                        k++
                     }
-                }
-
-                // 绢纸纤维：竖向细丝纹（偏弱视差），竖向渐隐、极淡
-                paperFibers.forEach { fiber ->
-                    val c = bgToScreen(fiber.x, fiber.y, fiber.parallax)
-                    val h = fiber.height * camera.scale
-                    val w = fiber.width * camera.scale
-                    if (h > 8f && w > 0.6f) {
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                0.5f to fiberColor.copy(alpha = fiber.alpha),
-                                1f to Color.Transparent,
-                                startY = c.y - h / 2f,
-                                endY = c.y + h / 2f
-                            ),
-                            topLeft = Offset(c.x - w / 2f, c.y - h / 2f),
-                            size = Size(w, h)
-                        )
-                    }
-                }
-
-                // 纸面颗粒：前景静态细点（不闪烁），宣纸肌理
-                grain.forEach { g ->
-                    val c = worldToScreen(g.x, g.y)
-                    if (c.x < -4f || c.x > size.width + 4f || c.y < -4f || c.y > size.height + 4f) {
-                        return@forEach
-                    }
-                    drawCircle(
-                        color = grainColor,
-                        radius = (g.radius * camera.scale).coerceAtLeast(0.4f),
-                        center = c,
-                        alpha = g.alpha
-                    )
                 }
 
                 // 彩色点缀点：漂移 + 闪烁（浅色主题，取大地暖调四色）
