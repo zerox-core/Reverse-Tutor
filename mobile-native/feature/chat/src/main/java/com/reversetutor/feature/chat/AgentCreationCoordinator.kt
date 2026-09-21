@@ -8,6 +8,11 @@ import kotlinx.coroutines.CancellationException
  * Idle → AnalyzingDocument ⇄ Conversing → Creating → Created
  * 必填字段（title / learnerRole）任一为空时，展示了解程度封顶 60；
  * 解析失败自动原样重试 1 次，仍失败按生成失败降级（对话与草案保留）。
+ *
+ * 第十章算法（R-B 起）：追问优先级、同字段 2 次降级、8 轮软上限、
+ * 「别问了」立即收敛、了解度双源融合与 title 兜底提案全部由
+ * [AgentCreationFollowUpPlanner] / [AgentCreationUnderstanding] 在客户端确定性执行，
+ * LLM 只按策略快照生成措辞与草案补丁，客户端最后把关。
  */
 enum class AgentCreationPhase {
     Idle,
@@ -30,7 +35,7 @@ data class AgentCreationUiState(
     /** 兜底钳制：必填缺失时封顶 60（设计方案 §三）。 */
     val displayedUnderstanding: Int
         get() = if (draft.title.isBlank() || draft.learnerRole.isBlank()) {
-            rawUnderstanding.coerceAtMost(60)
+            rawUnderstanding.coerceAtMost(AgentCreationUnderstanding.CAP_REQUIRED_MISSING)
         } else {
             rawUnderstanding
         }
@@ -50,6 +55,7 @@ class AgentCreationCoordinator(
         private set
 
     private val history = mutableListOf<AgentCreationHistoryTurn>()
+    private val planner = AgentCreationFollowUpPlanner()
     private var entrySequence = 0
 
     fun start() {
@@ -71,6 +77,10 @@ class AgentCreationCoordinator(
     suspend fun sendUserText(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || state.busy || state.phase != AgentCreationPhase.Conversing) return
+        // 10.3：用户明确说「别问了 / 直接生成」→ 立即收敛，本轮即按收敛策略执行。
+        if (AgentCreationFollowUpPlanner.isStopAsking(trimmed)) {
+            planner.forceConverge()
+        }
         appendUser(trimmed)
         history += AgentCreationHistoryTurn(isUser = true, text = trimmed)
         converseTurn(trimmed)
@@ -135,8 +145,15 @@ class AgentCreationCoordinator(
     fun configuration(): NewSessionConfiguration = state.draft.deepCopy()
 
     private suspend fun converseTurn(userText: String) {
+        // 10.1 第 2 步：调用网关前生成策略快照（追问目标 / 收敛 / title 提案义务）。
+        val hasDoc = state.docAnalysis != null
+        val strategy = planner.strategyFor(
+            draft = state.draft,
+            detScore = AgentCreationUnderstanding.deterministicScore(state.draft, hasDoc),
+            documentAvailable = hasDoc
+        )
         state = state.copy(busy = true, generationError = null)
-        val result = runConverseWithRetry(userText)
+        val result = runConverseWithRetry(userText, strategy)
         state = state.copy(busy = false)
         val turn = result ?: run {
             state = state.copy(
@@ -145,17 +162,57 @@ class AgentCreationCoordinator(
             appendAssistant("刚才这轮生成出了点问题。你再说一遍，或者换个说法也行。")
             return
         }
-        val newDraft = turn.draft?.applyTo(state.draft) ?: state.draft
+        // 本轮完成：按策略快照记录（追问计数以客户端指令为准，不信模型自觉）。
+        planner.recordRound(strategy.targetFollowUpField)
+
+        var newDraft = turn.draft?.applyTo(state.draft) ?: state.draft
+        // 10.4 title 提案的客户端兜底：goal 已明确而 title 仍空时直接合成提案，
+        // 不等 LLM 下一轮自觉——避免了解度一直卡 60 封顶。
+        if (newDraft.title.isBlank() && newDraft.goal.isNotBlank()) {
+            newDraft = newDraft.copy(title = AgentCreationUnderstanding.proposeTitle(newDraft.goal))
+        }
         val draftChanged = newDraft != state.draft
-        state = state.copy(
-            rawUnderstanding = turn.understanding,
-            draft = newDraft,
-            requestDocumentActive = turn.requestDocument && state.docAnalysis == null
+
+        // 10.2 双源融合：u_raw = 0.5×u_llm + 0.5×u_det，封顶 + 单调不减。
+        val requiredReady = newDraft.title.isNotBlank() && newDraft.learnerRole.isNotBlank()
+        val fused = AgentCreationUnderstanding.fuse(
+            llmScore = turn.understanding,
+            detScore = AgentCreationUnderstanding.deterministicScore(newDraft, hasDoc),
+            previousFused = state.rawUnderstanding,
+            requiredFieldsReady = requiredReady
         )
-        val spoken = turn.assistantNote ?: turn.followUpQuestion ?: "我更新了一下草案，继续聊聊？"
+
+        // 10.3 requestDocument 客户端门槛：goal+role 就绪、无文档、满 2 轮才放行。
+        val allowRequestDocument = turn.requestDocument &&
+            !hasDoc &&
+            newDraft.goal.isNotBlank() &&
+            newDraft.learnerRole.isNotBlank() &&
+            planner.rounds >= 2
+
+        state = state.copy(
+            rawUnderstanding = fused,
+            draft = newDraft,
+            requestDocumentActive = allowRequestDocument
+        )
+
+        // 追问把关（10.3）：收敛或高分一律不追问；低分（<40）必问，LLM 没问用兜底话术补上。
+        val converging = strategy.converge || planner.shouldConverge()
+        var followUp = turn.followUpQuestion
+        if (converging || fused >= 70) {
+            followUp = null
+        } else if (fused < 40 && followUp == null && strategy.targetFollowUpField != null) {
+            followUp = planner.fieldByLabel(strategy.targetFollowUpField)?.fallbackQuestion
+        }
+
+        val note = turn.assistantNote ?: if (converging) {
+            "好的，不问了。草案缺的我按常规补上了，你看看有没有要改的，没问题就点右上角创建。"
+        } else {
+            null
+        }
+        val spoken = note ?: followUp ?: "我更新了一下草案，继续聊聊？"
         appendAssistant(spoken)
-        if (turn.followUpQuestion != null && turn.assistantNote != null) {
-            appendAssistant(turn.followUpQuestion)
+        if (followUp != null && note != null) {
+            appendAssistant(followUp)
         }
         if (draftChanged) {
             state = state.copy(
@@ -168,10 +225,13 @@ class AgentCreationCoordinator(
     }
 
     /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。 */
-    private suspend fun runConverseWithRetry(userText: String): AgentCreationTurnResult? {
+    private suspend fun runConverseWithRetry(
+        userText: String,
+        strategy: AgentCreationTurnStrategy
+    ): AgentCreationTurnResult? {
         repeat(2) { attempt ->
             val outcome = runCatching {
-                gateway.converse(history, userText, state.draft, state.docAnalysis)
+                gateway.converse(history, userText, state.draft, state.docAnalysis, strategy)
             }
             outcome.fold(
                 onSuccess = { return it },

@@ -1398,7 +1398,8 @@ private fun DestinationContent(
                 onCreated = onSessionCreated,
                 onBack = onCloseNewSession,
                 openPickerOnStart = agentCreationImportRequested,
-                onOpenPickerConsumed = onAgentCreationImportConsumed
+                onOpenPickerConsumed = onAgentCreationImportConsumed,
+                gateway = hybridAppGraph.agentCreationGateway
             )
             return@ReverseTutorScreenSurface
         }

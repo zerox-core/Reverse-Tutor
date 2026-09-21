@@ -41,8 +41,11 @@ import com.reversetutor.core.remote.HttpOnlineApi
 import com.reversetutor.core.remote.OnlineAuthSessionManager
 import com.reversetutor.core.remote.OnlineAuthTokenProvider
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
+import com.reversetutor.feature.chat.AgentCreationGateway
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
+import com.reversetutor.feature.chat.FakeAgentCreationGateway
 import com.reversetutor.feature.chat.HeartbeatTurnDispatchPort
+import com.reversetutor.feature.chat.RealAgentCreationGateway
 import com.reversetutor.feature.chat.SessionRichReplyPort
 import com.reversetutor.preview.wiring.session.DefaultHeartbeatTurnDispatchPort
 import com.reversetutor.feature.chat.ChatRunsPortViewModelFactory
@@ -159,7 +162,9 @@ class HybridAppGraph private constructor(
     val nativeExportRepository: NativeExportRepository,
     val online: HybridOnlineServices?,
     val challengeRuntimeCoordinator: ChallengeRuntimeCoordinator,
-    val frontend: HybridFrontendFactories
+    val frontend: HybridFrontendFactories,
+    /** R-B：Agent 创建对话网关（Fake 演示 / Production 真实 LLM）。 */
+    val agentCreationGateway: AgentCreationGateway
 ) {
     companion object {
         fun create(
@@ -229,6 +234,19 @@ class HybridAppGraph private constructor(
                     DataModule.backgroundGenerationRepository(appContext, runtime = previewRuntime)
                 HybridLlmRuntimeMode.Production ->
                     DataModule.backgroundGenerationRepository(appContext)
+            }
+            // R-B：Agent 创建对话网关随运行模式切换——Fake 走脚本化演示，
+            // Production 复用 core/llm transport + 当前启用的 LlmProfile。
+            val agentCreationGateway: AgentCreationGateway = when (llmRuntimeMode) {
+                HybridLlmRuntimeMode.Fake -> FakeAgentCreationGateway()
+                HybridLlmRuntimeMode.Production -> RealAgentCreationGateway(
+                    runtime = DataModule.productionGenerationRuntime(appContext),
+                    activeProfile = {
+                        DataModule.llmProfileRepository(appContext)
+                            .listProfiles()
+                            .firstOrNull { it.enabled }
+                    }
+                )
             }
             val sourceRepository = DataModule.sourceRepository(appContext)
             val memoryRepository = DataModule.memoryRepository(appContext)
@@ -346,6 +364,7 @@ class HybridAppGraph private constructor(
                 nativeExportRepository = DataModule.nativeExportRepository(appContext),
                 online = onlineServices,
                 challengeRuntimeCoordinator = challengeRuntimeCoordinator,
+                agentCreationGateway = agentCreationGateway,
                 frontend = createFrontendFactories(
                     context = appContext,
                     sessionRepository = sessionRepository,

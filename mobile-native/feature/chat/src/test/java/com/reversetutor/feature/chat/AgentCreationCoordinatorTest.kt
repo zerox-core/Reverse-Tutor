@@ -17,14 +17,17 @@ class AgentCreationCoordinatorTest {
         var converseCalls = 0
         var analyzeCalls = 0
         var failConverse = false
+        var lastStrategy: AgentCreationTurnStrategy? = null
 
         override suspend fun converse(
             history: List<AgentCreationHistoryTurn>,
             userText: String,
             currentDraft: NewSessionConfiguration,
-            docAnalysis: AgentCreationDocAnalysis?
+            docAnalysis: AgentCreationDocAnalysis?,
+            strategy: AgentCreationTurnStrategy
         ): AgentCreationTurnResult {
             converseCalls++
+            lastStrategy = strategy
             if (failConverse) throw IllegalStateException("gateway down")
             return turnResults[converseCalls.coerceAtMost(turnResults.size) - 1]
         }
@@ -84,7 +87,8 @@ class AgentCreationCoordinatorTest {
 
         val state = coordinator.state
         assertFalse(state.busy)
-        assertEquals(30, state.rawUnderstanding)
+        // 融合分：0.5×30(u_llm) + 0.5×35(u_det=title15+role20) = 33
+        assertEquals(33, state.rawUnderstanding)
         assertEquals("浮力·讲学练会话", state.draft.title)
         assertEquals("初二学生", state.draft.learnerRole)
         // 开场 + user + note + followUp + draft 卡
@@ -113,14 +117,16 @@ class AgentCreationCoordinatorTest {
         coordinator.start()
 
         coordinator.sendUserText("第一句")
-        assertEquals(85, coordinator.state.rawUnderstanding)
-        assertEquals(60, coordinator.state.displayedUnderstanding)
+        // 融合分：0.5×85 + 0.5×15(u_det=title15) = 50，必填缺 learnerRole 封顶 60 不生效
+        assertEquals(50, coordinator.state.rawUnderstanding)
+        assertEquals(50, coordinator.state.displayedUnderstanding)
         assertFalse(coordinator.state.understandingHigh)
         assertFalse(coordinator.state.canCreate)
 
         coordinator.sendUserText("第二句")
-        assertEquals(85, coordinator.state.displayedUnderstanding)
-        assertTrue(coordinator.state.understandingHigh)
+        // 融合分：0.5×85 + 0.5×35(u_det=title15+role20) = 60
+        assertEquals(60, coordinator.state.displayedUnderstanding)
+        assertFalse(coordinator.state.understandingHigh)
         assertTrue(coordinator.state.canCreate)
     }
 
@@ -150,7 +156,8 @@ class AgentCreationCoordinatorTest {
         assertEquals("旧标题", config.title)
         assertEquals("初二学生", config.learnerRole)
         assertEquals("期末冲刺", config.goal)
-        assertEquals(60, coordinator.state.rawUnderstanding)
+        // 融合分：0.5×60 + 0.5×55(u_det=goal20+title15+role20) = 58
+        assertEquals(58, coordinator.state.rawUnderstanding)
     }
 
     @Test
@@ -158,19 +165,70 @@ class AgentCreationCoordinatorTest {
         val gateway = ScriptedGateway(
             listOf(
                 AgentCreationTurnResult(
-                    understanding = 65,
-                    followUpQuestion = "有教材吗？",
-                    requestDocument = true,
-                    draft = AgentCreationDraftPatch(title = "t", learnerRole = "r")
+                    understanding = 50,
+                    followUpQuestion = "基础怎么样？",
+                    draft = AgentCreationDraftPatch(goal = "期末冲刺", title = "t", learnerRole = "r")
+                ),
+                AgentCreationTurnResult(
+                    understanding = 70,
+                    requestDocument = true
                 )
             )
         )
         val coordinator = AgentCreationCoordinator(gateway, clock())
         coordinator.start()
 
-        coordinator.sendUserText("我是初二学生")
+        coordinator.sendUserText("我要期末冲刺")
+        assertFalse(coordinator.state.requestDocumentActive)
 
+        // 第 2 轮：goal+role 就绪、无文档、满 2 轮 → 放行请求资料
+        coordinator.sendUserText("我是初二学生")
         assertTrue(coordinator.state.requestDocumentActive)
+    }
+
+    @Test
+    fun stopAskingForcesConvergenceAndStripsFollowUp() = runBlocking {
+        val gateway = ScriptedGateway(
+            listOf(
+                AgentCreationTurnResult(
+                    understanding = 50,
+                    followUpQuestion = "还聊吗？"
+                )
+            )
+        )
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        coordinator.start()
+
+        coordinator.sendUserText("别问了，直接生成吧")
+
+        // 收敛：策略快照带 converge，追问被剥离，改发收敛话术
+        assertEquals(true, gateway.lastStrategy?.converge)
+        val last = coordinator.state.feed.last() as AgentCreationFeedEntry.Assistant
+        assertTrue(last.text.contains("不问了"))
+        assertFalse(
+            coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+                .any { it.text.contains("还聊吗") }
+        )
+    }
+
+    @Test
+    fun titleFallbackProposalFillsFromGoal() = runBlocking {
+        val gateway = ScriptedGateway(
+            listOf(
+                AgentCreationTurnResult(
+                    understanding = 50,
+                    followUpQuestion = "基础怎么样？",
+                    draft = AgentCreationDraftPatch(goal = "把浮力讲明白，期末要考")
+                )
+            )
+        )
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        coordinator.start()
+
+        coordinator.sendUserText("我想把浮力讲明白，期末要考")
+
+        // goal 已填 title 仍空 → 客户端合成提案（首句裁 14 字 + 后缀）
+        assertEquals("把浮力讲明白 · 讲学练", coordinator.state.draft.title)
     }
 
     @Test

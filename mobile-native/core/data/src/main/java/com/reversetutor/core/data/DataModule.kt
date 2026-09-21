@@ -125,7 +125,7 @@ object DataModule {
         )
     }
 
-    private fun productionGenerationRuntime(context: Context): LlmGenerationRuntime {
+    fun productionGenerationRuntime(context: Context): LlmGenerationRuntime {
         val secretStore = secretStore(context.applicationContext)
         return CompositeLlmGenerationRuntime.production(
             transport = UrlConnectionProviderHttpTransport(),

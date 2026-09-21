@@ -92,7 +92,8 @@ interface AgentCreationGateway {
         history: List<AgentCreationHistoryTurn>,
         userText: String,
         currentDraft: NewSessionConfiguration,
-        docAnalysis: AgentCreationDocAnalysis?
+        docAnalysis: AgentCreationDocAnalysis?,
+        strategy: AgentCreationTurnStrategy = AgentCreationTurnStrategy()
     ): AgentCreationTurnResult
 
     /** P1 文档分析。R-A 返回脚本化结果；R-C 接真实解析文本。 */

@@ -81,12 +81,13 @@ fun AgentCreationRoute(
     onBack: () -> Unit = {},
     openPickerOnStart: Boolean = false,
     onOpenPickerConsumed: () -> Unit = {},
+    gateway: AgentCreationGateway? = null,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val gateway = remember { FakeAgentCreationGateway() }
-    val coordinator = remember(gateway) { AgentCreationCoordinator(gateway) }
+    val activeGateway = remember(gateway) { gateway ?: FakeAgentCreationGateway() }
+    val coordinator = remember(activeGateway) { AgentCreationCoordinator(activeGateway) }
     val lifecycle = remember(createPort, persistence) {
         NewSessionLifecycleCoordinator(persistence = persistence, createPort = createPort)
     }

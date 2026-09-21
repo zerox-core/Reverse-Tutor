@@ -20,7 +20,8 @@ class FakeAgentCreationGateway(
         history: List<AgentCreationHistoryTurn>,
         userText: String,
         currentDraft: NewSessionConfiguration,
-        docAnalysis: AgentCreationDocAnalysis?
+        docAnalysis: AgentCreationDocAnalysis?,
+        strategy: AgentCreationTurnStrategy
     ): AgentCreationTurnResult {
         delay(latencyMillis)
         userTurns++
@@ -90,34 +91,7 @@ class FakeAgentCreationGateway(
 
     override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis {
         delay(latencyMillis * 2)
-        val cleanName = fileName.substringBeforeLast('.').replace('_', ' ')
-        return AgentCreationDocAnalysis(
-            materialTitle = cleanName.ifBlank { "未命名资料" },
-            materialType = if (fileName.contains(Regex("试卷|exam|test"))) "试卷" else "教材",
-            outline = listOf(
-                "第 1 章 · 概念与直觉引入",
-                "第 2 章 · 核心定义与公式",
-                "第 3 章 · 典型例题精讲",
-                "第 4 章 · 易错点对比",
-                "第 5 章 · 综合应用"
-            ),
-            knowledgePoints = listOf(
-                "概念定义与适用条件",
-                "公式的推导来源",
-                "典型题型识别",
-                "易错陷阱辨析",
-                "综合应用与迁移"
-            ),
-            difficulty = 0.55f,
-            prerequisites = listOf("基础代数运算", "上一章基本概念"),
-            suggestedPath = listOf(
-                "入门：概念直觉 + 定义：能用自己的话复述",
-                "筑基：公式推导 + 基础题：讲 3 道给 AI 学生听",
-                "强化：易错题辨析：每次讲完接住一个追问",
-                "检验：综合卷压轴题：完整讲一遍并答疑"
-            ),
-            summary = "结构完整的${if (fileName.contains(Regex("试卷|exam|test"))) "试卷" else "教材"}，概念—公式—例题链条清晰，适合讲学练式推进。"
-        )
+        return scriptedAgentCreationAnalysis(fileName)
     }
 
     private fun guessTopic(text: String): String {
@@ -135,4 +109,41 @@ class FakeAgentCreationGateway(
             "钢琴" to "钢琴", "乐理" to "乐理"
         )
     }
+}
+
+
+/**
+ * 脚本化 P1 文档分析结果（R-C 接真实解析前的占位实现）。
+ * Fake 网关与生产网关共用——生产网关的 analyzeDocument 在 R-C 之前同样走这里。
+ */
+internal fun scriptedAgentCreationAnalysis(fileName: String): AgentCreationDocAnalysis {
+    val cleanName = fileName.substringBeforeLast('.').replace('_', ' ')
+    val isExam = fileName.contains(Regex("试卷|exam|test"))
+    return AgentCreationDocAnalysis(
+        materialTitle = cleanName.ifBlank { "未命名资料" },
+        materialType = if (isExam) "试卷" else "教材",
+        outline = listOf(
+            "第 1 章 · 概念与直觉引入",
+            "第 2 章 · 核心定义与公式",
+            "第 3 章 · 典型例题精讲",
+            "第 4 章 · 易错点对比",
+            "第 5 章 · 综合应用"
+        ),
+        knowledgePoints = listOf(
+            "概念定义与适用条件",
+            "公式的推导来源",
+            "典型题型识别",
+            "易错陷阱辨析",
+            "综合应用与迁移"
+        ),
+        difficulty = 0.55f,
+        prerequisites = listOf("基础代数运算", "上一章基本概念"),
+        suggestedPath = listOf(
+            "入门：概念直觉 + 定义：能用自己的话复述",
+            "筑基：公式推导 + 基础题：讲 3 道给 AI 学生听",
+            "强化：易错题辨析：每次讲完接住一个追问",
+            "检验：综合卷压轴题：完整讲一遍并答疑"
+        ),
+        summary = "结构完整的${if (isExam) "试卷" else "教材"}，概念—公式—例题链条清晰，适合讲学练式推进。"
+    )
 }
