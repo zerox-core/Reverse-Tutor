@@ -104,6 +104,11 @@ data class BlackHolePhysics(
     val childOrbitPeriodSeconds: Float = 60f,
     /** R83 层级轨道：子节点绕母节点的基础轨道半径（世界单位）。 */
     val childOrbitRadius: Float = 95f,
+    /** R89 卫星环分档：同族卫星按 i % tiers 分到不同半径环，环距（世界单位）。
+     *  14px 档距时相邻环卫星视觉糊成一团（节点直径 20~40px），用户反馈拥挤后拉开到 30。 */
+    val childOrbitTierStep: Float = 30f,
+    /** R89 卫星环分档：环数（半径 = childOrbitRadius + tierStep × 环号）。 */
+    val childOrbitTiers: Int = 4,
     /** R83 连线绕行：折线沿净空带外沿绕行的边距（世界单位），保证关系线绝不横穿黑洞区域。 */
     val edgeZoneMargin: Float = 18f
 )
@@ -361,8 +366,11 @@ class BlackHoleGraphEngine(
             val parent = byId[pid] ?: return@forEach
             val base = (pid.fold(0) { acc, c -> (acc * 31 + c.code) and 0x7fffffff } % 628) / 100f
             kids.forEachIndexed { i, kid ->
-                kid.orbitAngle = base + i * (2f * PI.toFloat() / kids.size)
-                kid.orbitRTarget = physics.childOrbitRadius + 14f * (i % 3)
+                // R89：环分档 + 环相位错开——每环比上一环旋转 1/tiers 槽位，避免相邻环卫星径向对齐叠在一起
+                val slot = 2f * PI.toFloat() / kids.size
+                val ring = i % physics.childOrbitTiers
+                kid.orbitAngle = base + i * slot + ring * slot / physics.childOrbitTiers
+                kid.orbitRTarget = physics.childOrbitRadius + physics.childOrbitTierStep * ring
                 kid.orbitR = kid.orbitRTarget
                 var x = parent.simX + cos(kid.orbitAngle) * kid.orbitR
                 var y = parent.simY + sin(kid.orbitAngle) * kid.orbitR
@@ -1052,7 +1060,8 @@ class BlackHoleGraphEngine(
         var relY = node.simY + dy - parent.dispY
         var r = hypot(relX, relY)
         val minR = parent.displayRadius(physics) + node.displayRadius(physics) + physics.collisionPadding
-        val maxR = physics.childOrbitRadius + 60f
+        // R89：上限跟随环分档（最外环 + 40 余量），避免位移被钳回拥挤区
+        val maxR = physics.childOrbitRadius + physics.childOrbitTierStep * (physics.childOrbitTiers - 1) + 40f
         when {
             r < 0.001f -> { relX = minR; relY = 0f }
             r < minR -> { relX *= minR / r; relY *= minR / r }

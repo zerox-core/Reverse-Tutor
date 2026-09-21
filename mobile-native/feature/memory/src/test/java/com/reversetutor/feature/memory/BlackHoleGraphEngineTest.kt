@@ -258,6 +258,38 @@ class BlackHoleGraphEngineTest {
         assertTrue("orbitR out of band: ${c2.orbitR}", c2.orbitR > 0f && c2.orbitR < 200f)
     }
 
+    @Test
+    fun satellite_ring_tiers_spread_initial_placement() {
+        // R89：同族卫星按 i%4 分到 4 个半径环（95/125/155/185，环距 30）——不砍卫星上限、
+        // 靠拉大环距解决拥挤；每环比上一环旋转 1/4 槽位，相邻环卫星不径向对齐
+        val engine = engineWith(9, edges = (2..9).map { "n1" to "n$it" })
+        val kids = engine.nodes.filter { it.parentId == "n1" }
+        assertEquals(8, kids.size)
+        val byRing = kids.groupBy { it.orbitRTarget }
+        assertEquals("ring count", 4, byRing.size)
+        assertEquals(
+            listOf(95f, 125f, 155f, 185f),
+            byRing.keys.sorted()
+        )
+        assertEquals("per-ring count", 2, byRing[95f]!!.size)
+        val slot = 2f * PI.toFloat() / 8f
+        // 同环两颗（i=0、i=4）相位差 = 4×slot
+        val r0 = byRing[95f]!!
+        val dSame = kotlin.math.abs(wrapAngle(r0[0].orbitAngle - r0[1].orbitAngle))
+        assertTrue("same-ring phase: d=$dSame", kotlin.math.abs(dSame - 4f * slot) < 0.01f)
+        // 相邻环 i=0→i=1 相位差 = slot + slot/4（环相位错开生效）
+        assertEquals(95f, kids[0].orbitRTarget, 0.01f)
+        assertEquals(125f, kids[1].orbitRTarget, 0.01f)
+        val dAdj = wrapAngle(kids[1].orbitAngle - kids[0].orbitAngle)
+        assertTrue("adjacent-ring offset: d=$dAdj", kotlin.math.abs(dAdj - 5f * slot / 4f) < 0.01f)
+    }
+
+    private fun wrapAngle(a: Float): Float {
+        var x = a % (2f * PI.toFloat())
+        if (x < 0f) x += 2f * PI.toFloat()
+        return x
+    }
+
     // ---------- 黑洞交互 ----------
 
     @Test
