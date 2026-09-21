@@ -968,7 +968,9 @@ private fun BlackHoleGraphReadyContent(
                     (labelColor.green * 255).toInt(),
                     (labelColor.blue * 255).toInt()
                 )
-                textSize = 11.sp.toPx()
+                // R90 用户反馈「字体太大了导致浏览有问题」：11sp→9sp 单独缩小标签字号
+                // （整体放大节点×2 的方案被否——卫星会被 ×2 后的净空带吞掉、环距不够必抖；字体单独缩小零风险）
+                textSize = 9.sp.toPx()
                 textAlign = android.graphics.Paint.Align.CENTER
                 isAntiAlias = true
             }
