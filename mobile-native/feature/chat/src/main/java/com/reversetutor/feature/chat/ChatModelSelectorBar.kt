@@ -1,18 +1,17 @@
 package com.reversetutor.feature.chat
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -35,8 +34,10 @@ import com.reversetutor.core.model.LlmProfile
 private val ChatInk = Color(0xFF171C27)
 private val ChatMuted = Color(0xFF6D778C)
 
+// 2026-09-21 模型选择入口：联网搜索同款胶囊，放在输入框上方操作行，
+// 点开是按型号家族分组的弹窗（用户拍板：不要顶栏长条，太丑）。
 @Composable
-internal fun ChatModelSelectorBar(
+internal fun ChatModelSelectorChip(
     profiles: List<LlmProfile>,
     onActivate: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -44,45 +45,30 @@ internal fun ChatModelSelectorBar(
     if (profiles.isEmpty()) return
     val active = profiles.firstOrNull { it.enabled } ?: profiles.first()
     var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(modifier = modifier.padding(start = 8.dp, top = 10.dp)) {
         Surface(
-            onClick = { expanded = true },
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-                .fillMaxWidth(),
-            color = Color(0xFFF3F6FA),
-            contentColor = ChatInk,
-            shape = RoundedCornerShape(8.dp),
-            border = BorderStroke(1.dp, Color(0xFFDDE3ED))
+            color = Color(0xFFF6F8FD),
+            contentColor = ChatMuted,
+            shape = RoundedCornerShape(999.dp),
+            border = BorderStroke(1.dp, Color(0xFFC7D8EA)),
+            modifier = Modifier.clickable { expanded = true }
         ) {
             Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(start = 14.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "模型",
-                    color = ChatMuted,
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "${active.name} · ${active.model}",
-                    color = ChatInk,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = active.name,
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+                    overflow = TextOverflow.Ellipsis
                 )
                 Icon(
                     Icons.Rounded.ExpandMore,
                     contentDescription = "选择模型",
-                    tint = Color(0xFF395575),
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }

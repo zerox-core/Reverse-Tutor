@@ -301,10 +301,6 @@ internal fun ReverseTeachingChatScreen(
                 }
             }
         )
-        ChatModelSelectorBar(
-            profiles = llmProfiles,
-            onActivate = onActivateLlmProfile
-        )
         LazyColumn(
             state = listState,
             modifier = Modifier
@@ -458,16 +454,22 @@ internal fun ReverseTeachingChatScreen(
             if (showAttachmentActions) {
                 ChatAttachmentMediaStrip()
             }
-            WebSearchToggle(
-                enabled = webSearchEnabled,
-                onToggle = { wantEnabled ->
-                    if (wantEnabled) {
-                        showWebSearchConfirm = true
-                    } else {
-                        onWebSearchChange(false)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                WebSearchToggle(
+                    enabled = webSearchEnabled,
+                    onToggle = { wantEnabled ->
+                        if (wantEnabled) {
+                            showWebSearchConfirm = true
+                        } else {
+                            onWebSearchChange(false)
+                        }
                     }
-                }
-            )
+                )
+                ChatModelSelectorChip(
+                    profiles = llmProfiles,
+                    onActivate = onActivateLlmProfile
+                )
+            }
             ReverseTeachingComposer(
                 text = state.composer.text,
                 canSend = state.composer.canSend,
@@ -1770,13 +1772,21 @@ private fun GenerationRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (avatarVisible) LearnerAvatar(learnerName, learnerAvatarReference)
-        Text(
-            text = "$learnerName · $label",
+        Row(
             modifier = Modifier.weight(1f),
-            color = Color(0xFF5D6C86),
-            fontSize = 12.sp,
-            lineHeight = 18.sp
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "$learnerName · $label",
+                color = Color(0xFF5D6C86),
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+            val waitingDots = !label.startsWith("未配置模型") &&
+                !(label.startsWith("生成失败") && onRetry != null)
+            if (waitingDots) BreathingDots()
+        }
         when {
             label.startsWith("未配置模型") -> TextButton(onClick = onOpenSettings) {
                 Text("去设置", color = Color(0xFF4264C7), fontSize = 11.sp)
@@ -1784,7 +1794,6 @@ private fun GenerationRow(
             label.startsWith("生成失败") && onRetry != null -> TextButton(onClick = onRetry) {
                 Text("重试", color = Color(0xFF4264C7), fontSize = 11.sp)
             }
-            else -> BreathingDots()
         }
     }
 }
