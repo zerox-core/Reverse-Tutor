@@ -81,11 +81,18 @@ class ProductionLlmGenerationRuntime(
                 retryable = false
             )
 
+        // Slice 5: capture the provider usage chunk riding the SSE stream
+        // (requested via stream_options.include_usage for OpenAI-compatible
+        // providers; DeepSeek-style cache hit fields are parsed too).
+        var capturedUsage: LlmTokenUsage? = null
         return when (val result = runCatching {
             if (request.streaming) {
                 transport.executeStreaming(
                     providerRequest,
                     onLine = { line ->
+                        line.sseData().forEach { json ->
+                            parseLlmTokenUsage(json)?.let { capturedUsage = it }
+                        }
                         line.sseData().mapNotNull(::parseText).forEach { text ->
                             request.onStreamChunk?.invoke(text)
                         }
@@ -96,7 +103,7 @@ class ProductionLlmGenerationRuntime(
                 transport.execute(providerRequest)
             }
         }.getOrNull()) {
-            is ProviderHttpResult.Response -> parseResponse(result, request.streaming)
+            is ProviderHttpResult.Response -> parseResponse(result, request.streaming, capturedUsage)
             ProviderHttpResult.Timeout -> LlmGenerationResult.Timeout
             ProviderHttpResult.Failure, null -> LlmGenerationResult.Failure(
                 message = "Provider request failed.",
@@ -121,7 +128,12 @@ class ProductionLlmGenerationRuntime(
             // 在 160ms 内放完），App 端观感就是“一整坨上屏”。请求关闭思考，
             // 让正文从头逐段流出；不认识该字段的供应商会忽略它。
             if (protocol == LlmProviderProtocol.OpenAiCompatible && request.streaming) {
-                base.copy(body = base.body + ("enable_thinking" to false))
+                base.copy(body = base.body + mapOf(
+                    "enable_thinking" to false,
+                    // Slice 5: ask for the trailing usage chunk on the stream;
+                    // providers that do not know the field ignore it.
+                    "stream_options" to mapOf("include_usage" to true)
+                ))
             } else {
                 base
             }
@@ -159,7 +171,8 @@ class ProductionLlmGenerationRuntime(
 
     private fun parseResponse(
         response: ProviderHttpResult.Response,
-        streaming: Boolean
+        streaming: Boolean,
+        capturedUsage: LlmTokenUsage? = null
     ): LlmGenerationResult {
         if (response.statusCode !in 200..299) {
             return response.statusCode.toSafeFailure()
@@ -175,10 +188,11 @@ class ProductionLlmGenerationRuntime(
                 retryable = true
             )
         }
+        val usage = capturedUsage ?: parseLlmTokenUsage(response.body)
         return if (streaming) {
-            LlmGenerationResult.Streamed(chunks)
+            LlmGenerationResult.Streamed(chunks, usage)
         } else {
-            LlmGenerationResult.Success(chunks.joinToString(separator = ""))
+            LlmGenerationResult.Success(chunks.joinToString(separator = ""), usage)
         }
     }
 
@@ -498,4 +512,28 @@ internal object ProviderJson {
             while (source.getOrNull(index)?.isWhitespace() == true) index += 1
         }
     }
+}
+
+
+/**
+ * Expression-loop slice 5: best-effort token usage extraction from a provider
+ * SSE chunk or JSON body. Understands OpenAI style
+ * (usage.prompt_tokens_details.cached_tokens), DeepSeek style
+ * (usage.prompt_cache_hit_tokens) and Anthropic style (input_tokens /
+ * output_tokens / cache_read_input_tokens). Returns null when the payload
+ * carries no usage block.
+ */
+internal fun parseLlmTokenUsage(json: String): LlmTokenUsage? {
+    val root = ProviderJson.parse(json) as? Map<*, *> ?: return null
+    val usage = root["usage"] as? Map<*, *> ?: return null
+    val prompt = (usage["prompt_tokens"] as? Number)?.toLong()
+        ?: (usage["input_tokens"] as? Number)?.toLong()
+        ?: return null
+    val completion = (usage["completion_tokens"] as? Number)?.toLong()
+        ?: (usage["output_tokens"] as? Number)?.toLong()
+        ?: 0L
+    val cached = (usage["prompt_cache_hit_tokens"] as? Number)?.toLong()
+        ?: (usage["prompt_tokens_details"] as? Map<*, *>)?.get("cached_tokens")?.let { it as? Number }?.toLong()
+        ?: (usage["cache_read_input_tokens"] as? Number)?.toLong()
+    return LlmTokenUsage(promptTokens = prompt, completionTokens = completion, cachedPromptTokens = cached)
 }

@@ -159,6 +159,11 @@ data class TurnTrajectoryEntity(
     val retried: Int = 0,
     val usedFallback: Int = 0,
     val selfAssessment: String? = null,
+    val firstTokenLatencyMillis: Long? = null,
+    val totalLatencyMillis: Long? = null,
+    val promptTokens: Long? = null,
+    val completionTokens: Long? = null,
+    val cachedPromptTokens: Long? = null,
     val modelId: String = "",
     val createdAtEpochMillis: Long
 )

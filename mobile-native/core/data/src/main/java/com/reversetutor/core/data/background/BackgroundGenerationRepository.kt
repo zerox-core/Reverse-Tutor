@@ -284,6 +284,11 @@ class BackgroundGenerationRepository(
                         retried = if (trajectory.retried) 1 else 0,
                         usedFallback = if (trajectory.usedFallback) 1 else 0,
                         selfAssessment = trajectory.selfAssessment,
+                        firstTokenLatencyMillis = trajectory.firstTokenLatencyMillis,
+                        totalLatencyMillis = trajectory.totalLatencyMillis,
+                        promptTokens = trajectory.promptTokens,
+                        completionTokens = trajectory.completionTokens,
+                        cachedPromptTokens = trajectory.cachedPromptTokens,
                         modelId = trajectory.modelId,
                         createdAtEpochMillis = trajectory.createdAtEpochMillis
                     )

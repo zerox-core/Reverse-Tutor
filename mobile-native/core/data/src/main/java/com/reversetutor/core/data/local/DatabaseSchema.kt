@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 17
+    const val version = 18
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -145,6 +145,17 @@ object DatabaseSchema {
         }
     }
 
+    /** Expression-loop slice 5: latency / token-usage probes on trajectories. */
+    val migration17To18: Migration = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN firstTokenLatencyMillis INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN totalLatencyMillis INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN promptTokens INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN completionTokens INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN cachedPromptTokens INTEGER")
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -161,7 +172,8 @@ object DatabaseSchema {
         migration13To14,
         migration14To15,
         migration15To16,
-        migration16To17
+        migration16To17,
+        migration17To18
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {

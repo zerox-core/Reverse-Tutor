@@ -538,14 +538,27 @@ private const val DefaultImagePrompt = "Describe the attached image."
 private const val MaxContextEvidence = 6
 private const val MaxTurnNoteChars = 400
 
+/**
+ * Expression-loop slice 5: provider-reported token usage for the latency /
+ * cost baseline (SPEC section 4.6). Populated best-effort; null when the
+ * provider does not report usage.
+ */
+data class LlmTokenUsage(
+    val promptTokens: Long = 0,
+    val completionTokens: Long = 0,
+    val cachedPromptTokens: Long? = null
+)
+
 sealed interface LlmGenerationResult {
     val visibleText: String
+    val usage: LlmTokenUsage?
+        get() = null
 
-    data class Success(val text: String) : LlmGenerationResult {
+    data class Success(val text: String, override val usage: LlmTokenUsage? = null) : LlmGenerationResult {
         override val visibleText: String = text.trim()
     }
 
-    data class Streamed(val chunks: List<String>) : LlmGenerationResult {
+    data class Streamed(val chunks: List<String>, override val usage: LlmTokenUsage? = null) : LlmGenerationResult {
         override val visibleText: String = chunks.joinToString(separator = "").trim()
     }
 

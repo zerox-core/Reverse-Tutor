@@ -26,6 +26,16 @@ data class ReplyTrajectory(
     val usedFallback: Boolean = false,
     /** Slice 4: compact serialized self-assessment from the envelope outcome (SPEC section 4.4). */
     val selfAssessment: String? = null,
+    /** Slice 5 latency probe: first visible-body delta since generation start. */
+    val firstTokenLatencyMillis: Long? = null,
+    /** Slice 5 latency probe: total generation wall time. */
+    val totalLatencyMillis: Long? = null,
+    /** Slice 5 cost baseline: provider-reported prompt tokens. */
+    val promptTokens: Long? = null,
+    /** Slice 5 cost baseline: provider-reported completion tokens. */
+    val completionTokens: Long? = null,
+    /** Slice 5 cache baseline: cached prompt tokens (prompt_cache_hit_tokens / cached_tokens). */
+    val cachedPromptTokens: Long? = null,
     val modelId: String,
     val createdAtEpochMillis: Long
 )

@@ -97,6 +97,9 @@ class ChatGenerationRepository(
         val redLines = mutableListOf<ReplyValidator.RedLine>()
         var abortedOutputText: String? = null
         var retried = false
+        // Slice 5 latency probes: wall clock at generation start; TTFT is
+        // read off the final attempt's watchdog after completion.
+        val generationStartedAtMillis = System.currentTimeMillis()
         var attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk)
         val attemptRequest = plannedRequest.copy(
             onStreamChunk = attemptWatchdog.onStreamChunk,
@@ -180,6 +183,12 @@ class ChatGenerationRepository(
                             retried = retried,
                             usedFallback = usedFallback,
                             selfAssessment = parsedReply?.outcome?.let(MonologueEnvelope::selfAssessmentPayload),
+                            firstTokenLatencyMillis = attemptWatchdog.firstChunkAtMillis
+                                ?.let { it - generationStartedAtMillis },
+                            totalLatencyMillis = System.currentTimeMillis() - generationStartedAtMillis,
+                            promptTokens = result.usage?.promptTokens,
+                            completionTokens = result.usage?.completionTokens,
+                            cachedPromptTokens = result.usage?.cachedPromptTokens,
                             modelId = plannedRequest.model,
                             createdAtEpochMillis = nowEpochMillis
                         )
@@ -509,8 +518,13 @@ private class StreamWatchdog(
     var redLine: ReplyValidator.RedLine? = null
         private set
 
+    /** Slice 5: wall clock of the first visible-body delta (TTFT probe). */
+    var firstChunkAtMillis: Long? = null
+        private set
+
     val onStreamChunk: (String) -> Unit = { chunk ->
         if (redLine == null) {
+            if (chunk.isNotEmpty() && firstChunkAtMillis == null) firstChunkAtMillis = System.currentTimeMillis()
             streamed.append(chunk)
             // Slice 4: the leading monologue segment is held back; only the
             // spoken body ever reaches the preview and the red-line check
