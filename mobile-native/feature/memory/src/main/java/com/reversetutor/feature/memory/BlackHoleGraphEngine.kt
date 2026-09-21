@@ -90,8 +90,8 @@ data class BlackHolePhysics(
     val inertiaDamping: Float = 0.84f,
     val dragMomentum: Float = 1.1f,
     val inertiaStopSpeed: Float = 6f,
-    /** 拖拽期间连线弹簧放大倍数：让关联节点被带着走（真机反馈「关联的拖动性不够」）。 */
-    val dragLinkBoost: Float = 6f,
+    /** 拖拽期间连线弹簧放大倍数：让关联节点被带着走。R92 用户拍板「减少关系线的吸附效果」6→2.5——拖动手感保留轻微跟随、不再大片粘连。 */
+    val dragLinkBoost: Float = 2.5f,
     /** 弹簧轴向阻尼（相对速度投影系数）：让连线牵引收敛圆润、不振颤（真机反馈「假引力」）。 */
     val springDamping: Float = 0.06f,
     /** 吞噬遗忘门：触核节点遗忘 >= 此值即吞（R87 正常吸收的终点），健康误闯者弹开。 */
@@ -153,9 +153,9 @@ class BlackHoleNode(
     /** R83 层级轨道：子节点轨道半径的回弹目标。 */
     var orbitRTarget: Float = 0f
 
-    /** 节点基础半径：9+2.4√degree → 10.5+2.8√degree（R68 用户反馈节点太小太淡，整体放大 ~17%）。 */
+    /** 节点基础半径：9+2.4√degree → 10.5+2.8√degree（R68 +17%）→ 14+3.9√degree（R92 用户拍板「还是需要把节点半径增大」，约 +35%，与 R92 标签缩至 8sp 配套；卫星环 95 起仍留 ≥40 世界单位间隙，不挤压 R89 版式）。 */
     val baseRadius: Float
-        get() = 10.5f + 2.8f * sqrt(degree.toFloat().coerceAtLeast(0f))
+        get() = 14f + 3.9f * sqrt(degree.toFloat().coerceAtLeast(0f))
 
     fun displayRadius(physics: BlackHolePhysics): Float {
         val scale = 1f - (1f - physics.minNodeScale) * forget.coerceIn(0f, 1f)
@@ -218,6 +218,9 @@ class BlackHoleGraphEngine(
 
     /** R91：布局是否已收敛（供界面层自动取景锁定——首帧 extent 是未收敛瞬态，取景需跟到收敛）。 */
     val isSettled: Boolean get() = settled
+
+    /** R92：当前被拖拽节点 id（供界面层把「拖动中」也视为聚焦态、高亮其关联连线）。 */
+    val draggingNodeId: String? get() = draggingId
 
     var timeScale: Float = 1f
         set(value) {

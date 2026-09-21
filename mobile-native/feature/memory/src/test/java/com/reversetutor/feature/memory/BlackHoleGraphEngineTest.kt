@@ -489,6 +489,18 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
+    fun r92_draggingNodeId_exposed_for_drag_edge_highlight() {
+        // R92 用户拍板「拖动时明显看到关联线」：界面层聚焦态 = 选中节点 ?: 拖拽节点——访问器须与拖拽生命周期同步
+        val engine = engineWith(6)
+        assertNull(engine.draggingNodeId)
+        val target = engine.nodes.first()
+        engine.startDrag(target.id)
+        assertEquals(target.id, engine.draggingNodeId)
+        engine.endDrag()
+        assertNull(engine.draggingNodeId)
+    }
+
+    @Test
     fun entrance_eases_from_center_then_completes() {
         val engine = engineWith(4)
         assertEquals(0f, engine.entrance, 0.0001f)

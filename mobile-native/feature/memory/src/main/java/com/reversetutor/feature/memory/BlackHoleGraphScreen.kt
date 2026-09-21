@@ -837,7 +837,8 @@ private fun BlackHoleGraphReadyContent(
                 )
             }
             // 选中态：邻接保持高亮，其余压暗（聚焦模式）
-            val selectedId = state.selectedNodeId
+            // R92 用户拍板「拖动中也要明显看到关联线」：聚焦态 = 选中节点 ?: 正在拖拽的节点——拖动同样触发聚焦高亮
+            val selectedId = state.selectedNodeId ?: engine.draggingNodeId
             val neighborIds = if (selectedId == null) {
                 emptySet()
             } else {
@@ -850,18 +851,21 @@ private fun BlackHoleGraphReadyContent(
                 set
             }
 
-            // 连线：全局档 opacity 0.25，缩放超过标签阈值渐进增强；屏上粗细下限 1.2px（V24/V25）
+            // 连线：R92 用户拍板「降低亮度、只有点击/拖动才明显看到」——全局档 opacity 0.25→0.10（默认几乎隐入背景），
+            // 聚焦节点的关联边 ×4 亮度 + 1.6× 粗细（拖动/点选时明显浮现）；缩放渐进增强与 1.2px 粗细下限保留（V24/V25）
             val edgeGate = when {
                 camera.scale < 0.7f -> 1f
                 else -> (1f + (camera.scale - 0.7f) / 0.8f * 0.8f).coerceAtMost(1.8f)
             }
             val edgeBaseWidthPx = max(1.2f, 1.dp.toPx())
             engine.renderEdges().forEach { edge ->
-                val dim = if (selectedId != null &&
-                    edge.fromId != selectedId && edge.toId != selectedId
-                ) 0.22f else 1f
-                val edgeStroke = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f)
-                val edgeAlpha = (0.25f * edgeGate * edge.opacityFactor * dim).coerceIn(0f, 1f)
+                val incident = selectedId != null &&
+                    (edge.fromId == selectedId || edge.toId == selectedId)
+                val dim = if (selectedId != null && !incident) 0.22f else 1f
+                val edgeStroke = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f) *
+                    (if (incident) 1.6f else 1f)
+                val edgeAlpha = (0.10f * edgeGate * edge.opacityFactor * dim *
+                    (if (incident) 4f else 1f)).coerceIn(0f, 1f)
                 // R85 用户拍板：关系线优先保持直线，绝不为「成圆」而弯曲——撤销 R83 绕行折线；
                 // 圆感靠公转运动与边数量自然形成，不强制。黑核本体画在连线之上，核面仍无线条穿过。
                 // R87 用户拍板：直线几何不动，遗忘区内渐隐遮断——分段绘制、按段中点到洞心
@@ -1008,9 +1012,9 @@ private fun BlackHoleGraphReadyContent(
                     (labelColor.green * 255).toInt(),
                     (labelColor.blue * 255).toInt()
                 )
-                // R90 用户反馈「字体太大了导致浏览有问题」：11sp→9sp 单独缩小标签字号
-                // （整体放大节点×2 的方案被否——卫星会被 ×2 后的净空带吞掉、环距不够必抖；字体单独缩小零风险）
-                textSize = 9.sp.toPx()
+                // R90：11sp→9sp（整体放大节点×2 的方案被否——卫星会被 ×2 后的净空带吞掉、环距不够必抖；字体单独缩小零风险）
+                // R92 用户拍板「字体再进行缩小」：9sp→8sp（与节点半径 +35% 配套，药丸底衬随 measureText 自动缩小）
+                textSize = 8.sp.toPx()
                 textAlign = android.graphics.Paint.Align.CENTER
                 isAntiAlias = true
             }
