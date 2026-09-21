@@ -299,6 +299,8 @@ fun FormalHomeScreen(
     onShowNewSessionSheet: () -> Unit,
     onDismissNewSessionSheet: () -> Unit,
     onStartLearningSetup: () -> Unit,
+    onCustomCreate: () -> Unit = {},
+    onImportDocument: () -> Unit = {},
     onOpenWeekly: () -> Unit,
     showSpatialIndicator: Boolean = true,
     modifier: Modifier = Modifier
@@ -338,7 +340,9 @@ fun FormalHomeScreen(
             if (state.isNewSessionSheetVisible) {
                 FormalNewSessionSheet(
                     onDismiss = onDismissNewSessionSheet,
-                    onStartLearningSetup = onStartLearningSetup
+                    onStartLearningSetup = onStartLearningSetup,
+                    onCustomCreate = onCustomCreate,
+                    onImportDocument = onImportDocument
                 )
             }
             actionSession?.let { session ->
@@ -1168,7 +1172,9 @@ private fun WeeklyPageIndicator(onClick: () -> Unit) {
 @Composable
 private fun FormalNewSessionSheet(
     onDismiss: () -> Unit,
-    onStartLearningSetup: () -> Unit
+    onStartLearningSetup: () -> Unit,
+    onCustomCreate: () -> Unit,
+    onImportDocument: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
@@ -1181,7 +1187,7 @@ private fun FormalNewSessionSheet(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(357.dp)
+                .height(492.dp)
                 .shadow(
                     elevation = 10.dp,
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -1210,7 +1216,9 @@ private fun FormalNewSessionSheet(
         ) {
             NewSessionSheetContent(
                 onDismiss = onDismiss,
-                onStartLearningSetup = onStartLearningSetup
+                onStartLearningSetup = onStartLearningSetup,
+                onCustomCreate = onCustomCreate,
+                onImportDocument = onImportDocument
             )
         }
     }
@@ -1219,22 +1227,27 @@ private fun FormalNewSessionSheet(
 @Composable
 private fun NewSessionSheetContent(
     onDismiss: () -> Unit,
-    onStartLearningSetup: () -> Unit
+    onStartLearningSetup: () -> Unit,
+    onCustomCreate: () -> Unit,
+    onImportDocument: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
     val modes = formalNewSessionModes()
-    Box(modifier = Modifier.fillMaxSize()) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp)
+    ) {
         Box(
             modifier = Modifier
-                .offset(x = 20.dp, y = 6.dp)
-                .width(36.dp)
-                .height(5.dp)
+                .padding(top = 6.dp)
+                .size(width = 36.dp, height = 5.dp)
+                .align(Alignment.CenterHorizontally)
                 .background(Color(0x577A8599), RoundedCornerShape(3.dp))
         )
         Row(
             modifier = Modifier
-                .offset(x = 20.dp, y = 25.dp)
-                .widthIn(max = 350.dp)
+                .padding(top = 19.dp)
                 .fillMaxWidth()
                 .height(48.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1252,77 +1265,141 @@ private fun NewSessionSheetContent(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = "×",
+                        text = "\u00d7",
                         style = type.style(18f, 22f, color = Color(0xFF454F63))
                     )
                 }
             }
         }
         Text(
-            text = "先选择一种模式，下一步再配置专属世界树。",
+            text = "选一种创建方式，模式默认为学习。",
             style = type.style(11f, 16f, color = FormalColors.Muted),
-            modifier = Modifier.offset(x = 20.dp, y = 87.dp)
+            modifier = Modifier.padding(top = 4.dp)
         )
         Text(
-            text = "选择产品方向",
+            text = "会话模式",
             style = type.style(12f, 17f, FontWeight.Bold, FormalColors.Ink),
-            modifier = Modifier.offset(x = 20.dp, y = 114.dp)
+            modifier = Modifier.padding(top = 18.dp)
         )
         Row(
             modifier = Modifier
-                .offset(x = 20.dp, y = 142.dp)
-                .widthIn(max = 350.dp)
+                .padding(top = 10.dp)
                 .fillMaxWidth()
                 .height(82.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             NewSessionModeCard(
                 spec = modes[0],
-                onClick = onStartLearningSetup,
+                onClick = onCustomCreate,
                 modifier = Modifier.weight(1f)
             )
             NewSessionModeCard(
                 spec = modes[1],
-                onClick = onStartLearningSetup,
+                onClick = onCustomCreate,
                 modifier = Modifier.weight(1f)
             )
             NewSessionModeCard(
                 spec = modes[2],
-                onClick = onStartLearningSetup,
+                onClick = onCustomCreate,
                 modifier = Modifier.weight(1f)
             )
         }
         Text(
-            text = "世界树包含学习路径、性格、目标与资料，将在下一步统一配置。",
-            style = type.style(10f, 15f, color = FormalColors.Muted),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .offset(x = 20.dp, y = 238.dp)
-                .widthIn(max = 350.dp)
+            text = "创建方式",
+            style = type.style(12f, 17f, FontWeight.Bold, FormalColors.Ink),
+            modifier = Modifier.padding(top = 18.dp)
         )
-        Surface(
-            onClick = onStartLearningSetup,
+        Column(
             modifier = Modifier
-                .offset(x = 20.dp, y = 267.dp)
-                .widthIn(max = 350.dp)
-                .fillMaxWidth()
-                .height(50.dp)
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(FormalShapes.CardRadius),
-                    ambientColor = Color(0x382E5CDB),
-                    spotColor = Color(0x382E5CDB)
-                ),
-            color = FormalColors.Primary,
-            shape = RoundedCornerShape(FormalShapes.CardRadius)
+                .padding(top = 10.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            NewSessionOptionRow(
+                title = "自定义",
+                description = "和 AI 直接聊，越聊越懂你",
+                badge = "推荐",
+                onClick = onCustomCreate,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("home_new_session_custom")
+            )
+            NewSessionOptionRow(
+                title = "模板",
+                description = "从预设模板里挑一个开始",
+                onClick = onStartLearningSetup,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("home_new_session_template")
+            )
+            NewSessionOptionRow(
+                title = "导入",
+                description = "上传教材或试卷，边分析边创建",
+                onClick = onImportDocument,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("home_new_session_import")
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewSessionOptionRow(
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    badge: String? = null
+) {
+    val type = LocalFormalTypeScale.current
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(60.dp),
+        color = FormalColors.SurfaceElevated,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, FormalColors.BorderStrong)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = type.style(13f, 18f, FontWeight.Medium, FormalColors.Ink)
+                    )
+                    if (badge != null) {
+                        Surface(
+                            shape = RoundedCornerShape(FormalShapes.PillRadius),
+                            color = FormalColors.PrimarySoft
+                        ) {
+                            Text(
+                                text = badge,
+                                style = type.style(9f, 12f, FontWeight.Medium, FormalColors.Primary),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
                 Text(
-                    text = "开始设置  →",
-                    style = type.style(13f, 18f, FontWeight.Bold, Color.White)
+                    text = description,
+                    style = type.style(10f, 14f, color = FormalColors.Muted),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+            Text(
+                text = "\u2192",
+                style = type.style(13f, 18f, FontWeight.Bold, color = Color(0xFF8A94A5))
+            )
         }
     }
 }

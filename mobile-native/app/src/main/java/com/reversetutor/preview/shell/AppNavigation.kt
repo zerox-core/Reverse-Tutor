@@ -22,6 +22,7 @@ enum class AppDestination(
     SessionSettingsPersonalization("session-settings-personalization", "会话设置", "个性化"),
     Challenge("challenge", "挑战活动", "线上活动 · 学习任务"),
     NewSession("new-session", "新建会话", "模板、导入和自定义"),
+    AgentCreation("agent-creation", "新建会话", "Agent 对话式创建"),
     GlobalSearch("global-search", "全局搜索", "本地索引"),
     PublicArticle("public-article", "公益读本", "在线公益内容"),
     Settings("settings", "设置", "模型、迁移、外观和诊断"),
@@ -100,6 +101,7 @@ data class AppNavigationState(
             )
             AppDestination.Challenge,
             AppDestination.NewSession,
+            AppDestination.AgentCreation,
             AppDestination.GlobalSearch,
             AppDestination.PublicArticle -> listOf(AppDestination.Sessions, destination)
             AppDestination.ChatReferences,

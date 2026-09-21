@@ -88,6 +88,7 @@ import com.reversetutor.feature.chat.LearningOverviewUiState
 import com.reversetutor.feature.chat.NewSessionPrefillRequest
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
+import com.reversetutor.feature.chat.AgentCreationRoute
 import com.reversetutor.feature.chat.SessionsRoute
 import com.reversetutor.feature.chat.WindowBranchAction
 import com.reversetutor.feature.chat.WindowBranchPanel
@@ -204,6 +205,7 @@ fun AppShell(
     var challengeCurrentReturnContext by remember { mutableStateOf(ChallengeReturnContext()) }
     var challengePrefillReturnContext by remember { mutableStateOf<ChallengeReturnContext?>(null) }
     var challengeRestoreContext by remember { mutableStateOf<ChallengeReturnContext?>(null) }
+    var agentCreationImportRequested by remember { mutableStateOf(false) }
     var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
     var pageLocalActionDismissers by remember {
         mutableStateOf(emptyMap<WorkspacePage, () -> Unit>())
@@ -516,6 +518,17 @@ fun AppShell(
                             challengePrefillReturnContext = null
                             challengeRestoreContext = null
                             navigationState = navigationState.navigate(AppDestination.NewSession)
+                        },
+                        onOpenAgentCreation = {
+                            navigationState = navigationState.navigate(AppDestination.AgentCreation)
+                        },
+                        onOpenAgentCreationImport = {
+                            agentCreationImportRequested = true
+                            navigationState = navigationState.navigate(AppDestination.AgentCreation)
+                        },
+                        agentCreationImportRequested = agentCreationImportRequested,
+                        onAgentCreationImportConsumed = {
+                            agentCreationImportRequested = false
                         },
                         onOpenPublicArticle = { slug ->
                             activeArticleSlug = slug
@@ -894,6 +907,10 @@ private fun DestinationContent(
     onChallengeJoined: () -> Unit,
     onChallengeRetry: () -> Unit,
     onOpenNewSession: () -> Unit,
+    onOpenAgentCreation: () -> Unit,
+    onOpenAgentCreationImport: () -> Unit,
+    agentCreationImportRequested: Boolean,
+    onAgentCreationImportConsumed: () -> Unit,
     onOpenPublicArticle: (String) -> Unit,
     onOpenSearchTarget: (SearchTarget) -> Unit,
     onSessionCreated: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
@@ -1348,6 +1365,8 @@ private fun DestinationContent(
                 challengeTotal = challengeTotal,
                 onOpenSession = onOpenSession,
                 onNewSession = onOpenNewSession,
+                onOpenAgentCreation = onOpenAgentCreation,
+                onOpenAgentCreationImport = onOpenAgentCreationImport,
                 onOpenChallenge = onOpenChallenge,
                 onOpenPublicContent = { content ->
                     if (content.canOpen) onOpenPublicArticle(content.slug)
@@ -1368,6 +1387,17 @@ private fun DestinationContent(
                 onCreated = onSessionCreated,
                 onBack = onCloseNewSession,
                 initialPrefill = challengeSessionPrefill
+            )
+            return@ReverseTutorScreenSurface
+        }
+        if (destination == AppDestination.AgentCreation) {
+            AgentCreationRoute(
+                createPort = hybridAppGraph.frontend.newSessionCreatePort,
+                persistence = hybridAppGraph.frontend.newSessionPersistence,
+                onCreated = onSessionCreated,
+                onBack = onCloseNewSession,
+                openPickerOnStart = agentCreationImportRequested,
+                onOpenPickerConsumed = onAgentCreationImportConsumed
             )
             return@ReverseTutorScreenSurface
         }

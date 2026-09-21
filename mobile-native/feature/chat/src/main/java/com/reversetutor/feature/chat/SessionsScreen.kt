@@ -75,6 +75,8 @@ fun SessionsRoute(
     onOpenSession: (SessionListItem) -> Unit,
     onNewSession: () -> Unit = {},
     onOpenChallenge: () -> Unit = {},
+    onOpenAgentCreation: () -> Unit = {},
+    onOpenAgentCreationImport: () -> Unit = {},
     onOpenPublicContent: (FormalPublicContentUi) -> Unit = {},
     onOpenWeekly: () -> Unit = {},
     showSpatialIndicator: Boolean = true,
@@ -180,6 +182,14 @@ fun SessionsRoute(
             onStartLearningSetup = {
                 showNewSessionSheet = false
                 onNewSession()
+            },
+            onCustomCreate = {
+                showNewSessionSheet = false
+                onOpenAgentCreation()
+            },
+            onImportDocument = {
+                showNewSessionSheet = false
+                onOpenAgentCreationImport()
             },
             onOpenWeekly = onOpenWeekly,
             showSpatialIndicator = showSpatialIndicator
