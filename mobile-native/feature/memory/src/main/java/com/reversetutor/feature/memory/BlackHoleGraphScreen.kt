@@ -431,6 +431,14 @@ private fun BlackHoleGraphReadyContent(
                 graphNodes = layoutNodes.map { Triple(it.id, it.label, it.kind) },
                 edges = snapshot.edges.map { it.fromNodeId to it.toNodeId }
             )
+            // R96 演示种子（用户要看遗忘闪烁实况）：把「参数方程」直接置为遗忘中途
+            // （遗忘 0.5 > 闪烁门 0.35，入场即呼吸闪烁），1× 倍率约 2 分钟走满淡出消失；
+            // 点按/拖拽闪烁节点 = 抢救回归（保护期无限，救回后不再遗忘）。
+            // 空安全查找：真实 App 数据没有该 id 时自动跳过，不影响生产页面。
+            nodes.firstOrNull { it.id == "c9" }?.let { demo ->
+                demo.cooling = false
+                demo.forget = 0.5f
+            }
         }
     }
     val camera = remember(engine) { BlackHoleCamera() }
