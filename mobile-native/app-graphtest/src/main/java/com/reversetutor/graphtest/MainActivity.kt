@@ -23,10 +23,10 @@ import com.reversetutor.feature.memory.KnowledgeGraphUiState
 import com.reversetutor.feature.memory.GraphRenderStatus
 
 /**
- * 黑洞图谱真机交互验证专用壳。
+ * 知识图谱真机交互验证专用壳（R94 去黑洞版）。
  *
  * 数据为内置演示集（与真实 App 数据完全隔离），目的在于验证：
- * 物理手感（拖拽/惯性/碰撞/弹开）、遗忘吸收节奏、黑洞轨道、
+ * 物理手感（拖拽/惯性/碰撞/弹开）、遗忘闪烁消失与点按抢救、
  * 相机平移缩放、节点选中与时间倍率。
  */
 class MainActivity : ComponentActivity() {
@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
                 BlackHoleGraphScreen(
                     state = graphState.copy(selectedNodeId = selectedNodeId),
                     onSelectedNodeChange = { selectedNodeId = it },
-                    title = "黑洞图谱测试",
+                    title = "知识图谱测试",
                     subtitle = "演示数据 · 真机交互验证版",
                     onBack = { finish() }
                 )
@@ -112,7 +112,7 @@ private object DemoGraph {
     fun state(): KnowledgeGraphUiState = KnowledgeGraphUiState(
         scope = GraphScope.Global,
         status = GraphRenderStatus.Ready,
-        title = "黑洞图谱测试",
+        title = "知识图谱测试",
         summary = "演示数据",
         nodes = specs.mapIndexed { index, spec ->
             GraphLayoutNode(
