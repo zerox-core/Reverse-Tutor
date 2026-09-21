@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.hypot
 import kotlin.math.atan2
+import kotlin.math.PI
 
 /**
  * 黑洞图谱引擎单元测试（V12~V30 定稿规格的落地验收 + 真机反馈整改）。
@@ -206,6 +207,55 @@ class BlackHoleGraphEngineTest {
         val sa = hypot(a.vx, a.vy)
         val sb = hypot(b.vx, b.vy)
         assertTrue("correction kicked node: |va|=$sa |vb|=$sb", sa < 0.5f && sb < 0.5f)
+    }
+
+    @Test
+    fun kinematic_children_separate_via_orbit_reprojection() {
+        // R88b：运动学子节点（绕母节点公转）位置每帧由 advanceChildren 按轨道重算，
+        // 直接改 simX 会被覆写——两族卫星交叉穿过彼此时只能靠轨道重投影分开
+        // （位移转 orbitAngle/orbitR），这是残留重叠的根因（Free 节点已由位置级修正保护）
+        val engine = engineWith(6)
+        val p1 = engine.nodes[0]
+        val p2 = engine.nodes[1]
+        val c1 = engine.nodes[2]
+        val c2 = engine.nodes[3]
+        val c3 = engine.nodes[4]
+        val c4 = engine.nodes[5]
+        // 两个家族：母节点同在一条水平线、相距 190（95+95 的轨道半径会让 c1/c2 世界坐标重合）
+        val baseX = engine.holeX + engine.exclusionRadius + 500f
+        for (p in listOf(p1, p2)) {
+            p.mode = BlackHoleNodeMode.Free
+            p.simY = engine.holeY; p.dispY = engine.holeY
+            p.vx = 0f; p.vy = 0f
+        }
+        p1.simX = baseX; p1.dispX = baseX
+        p2.simX = baseX + 190f; p2.dispX = p2.simX
+        listOf(c1 to p1, c2 to p2, c3 to p1, c4 to p2).forEach { (c, p) ->
+            c.mode = BlackHoleNodeMode.Free
+            c.parentId = p.id
+            c.vx = 0f; c.vy = 0f
+        }
+        // c1 在 p1 正右方 95、c2 在 p2 正左方 95 -> 完全重合；c3/c4 错开放置
+        c1.orbitAngle = 0f; c1.orbitR = 95f; c1.orbitRTarget = 95f
+        c2.orbitAngle = PI.toFloat(); c2.orbitR = 95f; c2.orbitRTarget = 95f
+        c3.orbitAngle = 2.4f; c3.orbitR = 120f; c3.orbitRTarget = 120f
+        c4.orbitAngle = 4.0f; c4.orbitR = 120f; c4.orbitRTarget = 120f
+        val bodies = c1.displayRadius(engine.physics) + c2.displayRadius(engine.physics)
+        engine.tick(1f / 60f)
+        val d1 = hypot(c1.simX - c2.simX, c1.simY - c2.simY)
+        assertTrue("kinematic children still overlapped: d=$d1 bodies=$bodies", d1 >= bodies - 1f)
+        // 轨道重投影持久生效：逐帧采样渲染位置，2 秒内任何时刻都不允许两颗卫星身体重叠
+        // （轨道半径回弹会把它们拉近 -> 每帧位置级修正再把重叠拆掉，渲染层永远不叠）
+        repeat(120) {
+            engine.tick(1f / 60f)
+            val d = hypot(c1.simX - c2.simX, c1.simY - c2.simY)
+            assertTrue("satellites overlap at frame $it: d=$d bodies=$bodies", d >= bodies - 0.5f)
+        }
+        // 家族结构未被破坏：子节点仍挂各自母节点、轨道半径有界
+        assertEquals(p1.id, c1.parentId)
+        assertEquals(p2.id, c2.parentId)
+        assertTrue("orbitR out of band: ${c1.orbitR}", c1.orbitR > 0f && c1.orbitR < 200f)
+        assertTrue("orbitR out of band: ${c2.orbitR}", c2.orbitR > 0f && c2.orbitR < 200f)
     }
 
     // ---------- 黑洞交互 ----------

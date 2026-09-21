@@ -832,6 +832,9 @@ class BlackHoleGraphEngine(
         val fx = HashMap<String, Float>(freeNodes.size * 2)
         val fy = HashMap<String, Float>(freeNodes.size * 2)
         freeNodes.forEach { fx[it.id] = 0f; fy[it.id] = 0f }
+        // R88b：位置级修正给运动学子节点做轨道重投影时查母节点用（存活母节点必在 freeNodes 内）
+        val byId = HashMap<String, BlackHoleNode>(freeNodes.size * 2)
+        freeNodes.forEach { byId[it.id] = it }
 
         // 1) 两两斥力 + 碰撞（全体节点对；非 Free 节点以展示位置施力但不受力——V29/V30）
         for (i in freeNodes.indices) {
@@ -861,31 +864,33 @@ class BlackHoleGraphEngine(
                 applyForce(a, fx, fy, -ux * f, -uy * f, fromCollision = d < minD)
                 applyForce(b, fx, fy, ux * f, uy * f, fromCollision = d < minD)
                 // R88 位置级碰撞修正：重叠节点沿轴线直接分开（只改位置、不注入速度），
-                // 并卸掉互相接近的相对速度分量（非弹性、只减能不加能）。
+                // 并卸掉互相接近的速度分量（非弹性、只减能不加能）。
                 // 力式碰撞在密集公转区会持续踢动形成能量棘轮（R88 两次调参均撕裂图谱），
-                // 位置修正在结构上不可能积累能量，且立刻保证不重叠
+                // 位置修正在结构上不可能积累能量，且立刻保证不重叠。
+                // R88b：运动学子节点（绕母节点公转）位置每帧由 advanceChildren 按轨道重算、
+                // 直接改 simX 会被覆写——必须经轨道重投影（displace kind=1）把位移转成
+                // orbitAngle/orbitR 调整；否则两族卫星交叉穿过彼此时没有任何机制分开它们
                 if (d < minD) {
                     val overlap = minD - d
-                    val aMovable = a.mode == BlackHoleNodeMode.Free && !isKinematic(a)
-                    val bMovable = b.mode == BlackHoleNodeMode.Free && !isKinematic(b)
-                    if (aMovable && bMovable) {
+                    // 位移形态：0=不可动（非 Free）1=运动学子节点（轨道重投影）2=Free 直接位移
+                    val aKind = if (a.mode != BlackHoleNodeMode.Free) 0 else if (isKinematic(a)) 1 else 2
+                    val bKind = if (b.mode != BlackHoleNodeMode.Free) 0 else if (isKinematic(b)) 1 else 2
+                    if (aKind > 0 && bKind > 0) {
                         val half = overlap / 2f
-                        a.simX -= ux * half; a.simY -= uy * half
-                        b.simX += ux * half; b.simY += uy * half
-                        // relV = (vb-va)·u，<0 为互相接近——清零该分量（双方各担一半）
-                        val relV = (b.vx - a.vx) * ux + (b.vy - a.vy) * uy
-                        if (relV < 0f) {
-                            val h = relV / 2f
-                            a.vx += ux * h; a.vy += uy * h
-                            b.vx -= ux * h; b.vy -= uy * h
-                        }
-                    } else if (aMovable) {
-                        a.simX -= ux * overlap; a.simY -= uy * overlap
-                        val vIn = a.vx * ux + a.vy * uy // a 朝向 b 的分量
+                        displace(a, aKind, -ux * half, -uy * half, byId)
+                        displace(b, bKind, ux * half, uy * half, byId)
+                    } else if (aKind > 0) {
+                        displace(a, aKind, -ux * overlap, -uy * overlap, byId)
+                    } else if (bKind > 0) {
+                        displace(b, bKind, ux * overlap, uy * overlap, byId)
+                    }
+                    // 卸掉可动 Free 节点朝向对方的速度分量（非弹性、只减能）
+                    if (aKind == 2) {
+                        val vIn = a.vx * ux + a.vy * uy
                         if (vIn > 0f) { a.vx -= ux * vIn; a.vy -= uy * vIn }
-                    } else if (bMovable) {
-                        b.simX += ux * overlap; b.simY += uy * overlap
-                        val vIn = b.vx * ux + b.vy * uy // b 朝向 a 是 -u 方向
+                    }
+                    if (bKind == 2) {
+                        val vIn = b.vx * ux + b.vy * uy
                         if (vIn < 0f) { b.vx -= ux * vIn; b.vy -= uy * vIn }
                     }
                 }
@@ -1021,6 +1026,45 @@ class BlackHoleGraphEngine(
         if (iter > physics.alphaIterations && draggingId == null) {
             settled = true
         }
+    }
+
+    /**
+     * R88/R88b 位置级位移（碰撞修正专用，只改位置不注入速度）：
+     * - kind=2（Free 非运动学）：直接改 simX/simY，积分段稍后同步 disp；
+     * - kind=1（运动学子节点）：位置每帧由 advanceChildren 按轨道重算，直接改 simX 会被
+     *   覆写——把世界坐标位移转成 orbitAngle/orbitR（轨道重投影）：半径夹在
+     *   [母半径+子半径+padding, childOrbitRadius+60]，相位角修改持久生效（公转从新相位继续）。
+     */
+    private fun displace(
+        node: BlackHoleNode,
+        kind: Int,
+        dx: Float,
+        dy: Float,
+        byId: Map<String, BlackHoleNode>
+    ) {
+        if (kind == 2) {
+            node.simX += dx
+            node.simY += dy
+            return
+        }
+        val parent = node.parentId?.let { byId[it] } ?: return
+        var relX = node.simX + dx - parent.dispX
+        var relY = node.simY + dy - parent.dispY
+        var r = hypot(relX, relY)
+        val minR = parent.displayRadius(physics) + node.displayRadius(physics) + physics.collisionPadding
+        val maxR = physics.childOrbitRadius + 60f
+        when {
+            r < 0.001f -> { relX = minR; relY = 0f }
+            r < minR -> { relX *= minR / r; relY *= minR / r }
+            r > maxR -> { relX *= maxR / r; relY *= maxR / r }
+        }
+        r = hypot(relX, relY)
+        node.orbitR = r
+        node.orbitAngle = atan2(relY, relX)
+        node.simX = parent.dispX + relX
+        node.simY = parent.dispY + relY
+        node.dispX = node.simX
+        node.dispY = node.simY
     }
 
     private fun applyForce(
