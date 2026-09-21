@@ -1257,7 +1257,7 @@ private fun DestinationContent(
         connectionResult = null
     )
     LaunchedEffect(destination) {
-        if (destination == AppDestination.Settings) {
+        if (destination == AppDestination.Settings || destination == AppDestination.Chat) {
             llmProfiles = llmProfileRepository.listProfiles()
         }
     }
@@ -1391,6 +1391,13 @@ private fun DestinationContent(
         }
         if (destination == AppDestination.Chat && activeSessionId != null && activeSessionTitle != null) {
             ChatRoute(
+                llmProfiles = llmProfiles,
+                onActivateLlmProfile = { profileId ->
+                    scope.launch {
+                        llmProfileRepository.activateProfile(profileId, System.currentTimeMillis())
+                        llmProfiles = llmProfileRepository.listProfiles()
+                    }
+                },
                 messageRepository = messageRepository,
                 visibleTimelinePort = hybridAppGraph.visibleTimelinePort,
                 chatGenerationRepository = chatGenerationRepository,

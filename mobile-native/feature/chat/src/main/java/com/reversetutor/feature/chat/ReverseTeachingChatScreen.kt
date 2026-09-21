@@ -131,6 +131,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -184,6 +185,8 @@ internal fun ReverseTeachingChatScreen(
     onOpenWindowBranches: () -> Unit = {},
     onOpenGlobalGraph: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
+    llmProfiles: List<LlmProfile> = emptyList(),
+    onActivateLlmProfile: (String) -> Unit = {},
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onBack: () -> Unit,
@@ -297,6 +300,10 @@ internal fun ReverseTeachingChatScreen(
                     ChatOverflowAction.Export -> onExport()
                 }
             }
+        )
+        ChatModelSelectorBar(
+            profiles = llmProfiles,
+            onActivate = onActivateLlmProfile
         )
         LazyColumn(
             state = listState,

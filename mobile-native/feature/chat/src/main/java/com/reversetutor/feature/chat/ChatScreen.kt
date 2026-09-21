@@ -75,6 +75,7 @@ import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.model.BackgroundJobStatus
+import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.SourceParserStatus
 import com.reversetutor.core.model.SourceType
@@ -136,6 +137,8 @@ fun ChatRoute(
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
+    llmProfiles: List<LlmProfile> = emptyList(),
+    onActivateLlmProfile: (String) -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
@@ -675,6 +678,8 @@ fun ChatRoute(
         onOpenSources = onOpenSources,
         onExport = onExport,
         onOpenModelSettings = onOpenModelSettings,
+        llmProfiles = llmProfiles,
+        onActivateLlmProfile = onActivateLlmProfile,
         availableSourceAttachments = availableSourceAttachments,
         cameraPermissionState = cameraPermissionState,
         onPickImages = onPickImage,
@@ -790,6 +795,8 @@ fun ChatScreen(
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
+    llmProfiles: List<LlmProfile> = emptyList(),
+    onActivateLlmProfile: (String) -> Unit = {},
     availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
     cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     onPickImages: () -> Unit = onCreateImageDraft,
@@ -843,6 +850,8 @@ fun ChatScreen(
         onOpenWindowBranches = onOpenWindowBranches,
         onOpenGlobalGraph = onOpenGlobalGraph,
         onOpenModelSettings = onOpenModelSettings,
+        llmProfiles = llmProfiles,
+        onActivateLlmProfile = onActivateLlmProfile,
         onOpenSources = onOpenSources,
         onExport = onExport,
         onOpenSearch = onOpenSearch,
