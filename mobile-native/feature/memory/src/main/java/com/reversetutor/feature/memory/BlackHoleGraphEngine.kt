@@ -216,6 +216,9 @@ class BlackHoleGraphEngine(
     var simulationSteps: Long = 0L
         private set
 
+    /** R91：布局是否已收敛（供界面层自动取景锁定——首帧 extent 是未收敛瞬态，取景需跟到收敛）。 */
+    val isSettled: Boolean get() = settled
+
     var timeScale: Float = 1f
         set(value) {
             field = value.coerceIn(0.05f, 10f)

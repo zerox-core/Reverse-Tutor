@@ -477,6 +477,18 @@ class BlackHoleGraphEngineTest {
     }
 
     @Test
+    fun r91_isSettled_flips_once_enough_substeps_run_and_resets_on_wake() {
+        // R91 自动取景：界面层靠 isSettled 锁定跟随取景——收敛前 false、之后 true、wake 后回落
+        val engine = engineWith(6)
+        assertFalse(engine.isSettled)
+        tickSeconds(engine, 6f)
+        assertTrue(engine.isSettled)
+        engine.startDrag(engine.nodes.first().id) // wake() 路径
+        assertFalse(engine.isSettled)
+        engine.endDrag()
+    }
+
+    @Test
     fun entrance_eases_from_center_then_completes() {
         val engine = engineWith(4)
         assertEquals(0f, engine.entrance, 0.0001f)

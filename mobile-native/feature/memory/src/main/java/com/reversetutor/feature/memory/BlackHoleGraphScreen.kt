@@ -379,6 +379,9 @@ private class BlackHoleCamera {
     var vy = 0f
     var initialized = false
 
+    /** R91 自动取景：布局收敛前每帧向目标缓动（星团收缩/漂移时画面跟着调），收敛即锁定；用户手势一旦操作立即接管。 */
+    var autoFit = true
+
     fun tick() {
         centerX += vx
         centerY += vy
@@ -390,6 +393,13 @@ private class BlackHoleCamera {
         }
     }
 
+    /**
+     * 舒适入画系数（R91：0.44→0.36，真机反馈「太密集、要松弛感」——星团占短边 72% 而非 88%，留足呼吸边距）。
+     * 0.44 是 R89 定稿值，本系数变更已同步开发文档修订记录。
+     */
+    private fun fitScale(extent: Float, viewportW: Float, viewportH: Float): Float =
+        (min(viewportW, viewportH) * 0.36f / extent).coerceIn(0.45f, 3.2f)
+
     /** 初始化：质心居中 + 包围半径舒适入画（fit-zoom）。 */
     fun initializeFit(engine: BlackHoleGraphEngine, viewportW: Float, viewportH: Float) {
         if (viewportW <= 0f || viewportH <= 0f) return
@@ -397,11 +407,32 @@ private class BlackHoleCamera {
         val extent = engine.clusterExtent()
         centerX = centroid.first
         centerY = centroid.second
-        val fit = min(viewportW, viewportH) * 0.44f / extent
-        scale = fit.coerceIn(0.45f, 3.2f)
+        scale = fitScale(extent, viewportW, viewportH)
         vx = 0f
         vy = 0f
         initialized = true
+        autoFit = true
+    }
+
+    /**
+     * R91 自动跟随取景：修复真机「整体过大、太密」根因——首帧的 clusterExtent() 是未收敛瞬态
+     * （真机首帧比模拟器晚，星团已被弹簧收缩到更小，fit-zoom 被算大 ~2 倍，实测手机 2.93× vs
+     * 模拟器 1.36×，且初始化后永不修正）。收敛前每帧向「质心 + 收敛 extent」目标缓动，
+     * 收敛落定一次（snap=true）即停；用户平移/缩放/拖动即 autoFit=false 交还手势。
+     */
+    fun trackFit(engine: BlackHoleGraphEngine, viewportW: Float, viewportH: Float, snap: Boolean) {
+        if (viewportW <= 0f || viewportH <= 0f) return
+        val centroid = engine.centroidOfCluster()
+        val target = fitScale(engine.clusterExtent(), viewportW, viewportH)
+        if (snap) {
+            centerX = centroid.first
+            centerY = centroid.second
+            scale = target
+        } else {
+            centerX += (centroid.first - centerX) * 0.12f
+            centerY += (centroid.second - centerY) * 0.12f
+            scale += (target - scale) * 0.08f
+        }
     }
 
     fun zoomBy(factor: Float, focusWorldX: Float, focusWorldY: Float) {
@@ -567,6 +598,7 @@ private fun BlackHoleGraphReadyContent(
                                 dragging = false
                             } else if (change.positionChanged()) {
                                 totalMove += change.positionChange().getDistance()
+                                if (totalMove > viewConfiguration.touchSlop) camera.autoFit = false
                                 val world = screenToWorld(change.position)
                                 engine.dragTo(world.x, world.y)
                                 change.consume()
@@ -629,6 +661,10 @@ private fun BlackHoleGraphReadyContent(
                                         camera.zoomBy(span / prevSpan, focusWorld.x, focusWorld.y)
                                     }
                                     totalMove += delta.getDistance()
+                                    // R91：用户实际平移/缩放即接管相机，停掉自动取景
+                                    if (totalMove > viewConfiguration.touchSlop || pressed.size >= 2) {
+                                        camera.autoFit = false
+                                    }
                                     prevCentroid = centroid
                                     prevSpan = span
                                 }
@@ -653,6 +689,10 @@ private fun BlackHoleGraphReadyContent(
 
             if (!camera.initialized && size.width > 0f) {
                 camera.initializeFit(engine, size.width, size.height)
+            } else if (camera.autoFit) {
+                // R91：收敛前自动跟随取景（首帧 extent 未收敛会把 scale 算大且永不修正），收敛即落定锁定
+                camera.trackFit(engine, size.width, size.height, engine.isSettled)
+                if (engine.isSettled) camera.autoFit = false
             }
 
             fun worldToScreen(wx: Float, wy: Float): Offset = Offset(
@@ -978,8 +1018,13 @@ private fun BlackHoleGraphReadyContent(
             // 标签候选：循环内只收集，循环后做防重叠剔除再统一绘制
             // （用户反馈「字体全都重复在一起」——选中节点最优先，其余按节点大小，矩形相交则跳过；
             //  R88 再加缩放分级预算 + 半透底衬：默认视角只留最重要的少数标签，放大才显示更多）
-            class LabelCandidate(val text: String, val x: Float, val y: Float, val selected: Boolean, val neighbor: Boolean, val r: Float)
+            // R91：候选携带节点圆心（nodeY）而非固定下方锚点——绘制时按与节点圆的避让关系选上/下侧
+            class LabelCandidate(val text: String, val x: Float, val nodeY: Float, val selected: Boolean, val neighbor: Boolean, val r: Float)
             val labelCandidates = mutableListOf<LabelCandidate>()
+            // R91 错位修复：标签药丸与「节点圆」的避让检测需要全部节点圆的屏幕位置（此前只查标签间重叠，
+            // 纵向堆叠时下方药丸直接盖住下一个节点的上半圆，看起来像标签接错了节点）
+            class ScreenCircle(val x: Float, val y: Float, val r: Float)
+            val nodeCircles = mutableListOf<ScreenCircle>()
             engine.renderNodes().forEach { node ->
                 val center = worldToScreen(node.x, node.y)
                 val r = node.radius * camera.scale
@@ -992,6 +1037,7 @@ private fun BlackHoleGraphReadyContent(
                 } else 1f
                 val alpha = (node.opacity * dim * breathAlpha).coerceIn(0f, 1f)
                 if (r <= 0.5f) return@forEach
+                nodeCircles.add(ScreenCircle(center.x, center.y, r))
                 val base = palette.nodeColor(node.kind)
                 // 选中/抢救提示环用同色相压暗描边（用户 2026-09-19 拍板：不要黑色线框），与米白底和同色光晕都有区分度
                 val ringColor = Color(base.red * 0.72f, base.green * 0.72f, base.blue * 0.72f)
@@ -1048,7 +1094,7 @@ private fun BlackHoleGraphReadyContent(
                         LabelCandidate(
                             node.label.take(12),
                             center.x,
-                            center.y + r + 13.dp.toPx(),
+                            center.y,
                             state.selectedNodeId == node.id,
                             node.id != state.selectedNodeId && node.id in neighborIds,
                             r
@@ -1074,12 +1120,31 @@ private fun BlackHoleGraphReadyContent(
                 .forEach { c ->
                     if (labelsDrawn >= labelBudget) return@forEach
                     val w = labelPaint.measureText(c.text)
-                    val rect = android.graphics.RectF(
-                        c.x - w / 2f - 5.dp.toPx(),
-                        c.y - 12.dp.toPx(),
-                        c.x + w / 2f + 5.dp.toPx(),
-                        c.y + 3.dp.toPx()
+                    val padX = 5.dp.toPx()
+                    val gapY = 13.dp.toPx()
+                    // R91 错位修复：默认画在节点下方；若下方药丸与其它节点圆相撞则翻到上方，
+                    // 两侧都撞则保留下方（交给下方既有的标签间矩形剔除兜底）。
+                    // 此前固定画在下方，节点纵向贴近时药丸盖住下一个节点的上半圆——正是真机反馈的「错位」。
+                    fun rectAt(anchorY: Float) = android.graphics.RectF(
+                        c.x - w / 2f - padX,
+                        anchorY - 12.dp.toPx(),
+                        c.x + w / 2f + padX,
+                        anchorY + 3.dp.toPx()
                     )
+                    fun blocked(rect: android.graphics.RectF): Boolean {
+                        nodeCircles.forEach { sc ->
+                            if (sc.x == c.x && sc.y == c.nodeY) return@forEach // 自己的圆
+                            val nx = sc.x.coerceIn(rect.left, rect.right)
+                            val ny = sc.y.coerceIn(rect.top, rect.bottom)
+                            if (kotlin.math.hypot(sc.x - nx, sc.y - ny) < sc.r + 2.dp.toPx()) return true
+                        }
+                        return false
+                    }
+                    var rect = rectAt(c.nodeY + c.r + gapY)
+                    if (blocked(rect)) {
+                        val above = rectAt(c.nodeY - c.r - gapY)
+                        if (!blocked(above)) rect = above
+                    }
                     if (drawnLabelRects.none { android.graphics.RectF.intersects(it, rect) }) {
                         drawnLabelRects.add(rect)
                         drawRoundRect(
@@ -1089,7 +1154,7 @@ private fun BlackHoleGraphReadyContent(
                             cornerRadius = CornerRadius(6.dp.toPx()),
                             alpha = 0.78f
                         )
-                        drawContext.canvas.nativeCanvas.drawText(c.text, c.x, c.y, labelPaint)
+                        drawContext.canvas.nativeCanvas.drawText(c.text, c.x, rect.bottom - 3.dp.toPx(), labelPaint)
                         labelsDrawn++
                     }
                 }
