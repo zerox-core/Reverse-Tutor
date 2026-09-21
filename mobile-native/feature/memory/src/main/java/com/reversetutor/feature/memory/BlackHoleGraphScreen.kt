@@ -115,7 +115,7 @@ object BlackHoleGraphThemes {
         chipIdleBg = Color(0x66FFFFFF),
         chipIdleText = Color(0xFF46506B),
         nodeGlow = Color.White,
-        nodeGlowAlpha = 0.55f,
+        nodeGlowAlpha = 0.72f, // R95：浅色下同色晕看不见——强度 0.55→0.72 + 末层全释放绘制
         nodeBorder = Color.White,
         isDark = false,
         nodeColors = mapOf(
@@ -153,7 +153,7 @@ object BlackHoleGraphThemes {
         chipIdleBg = Color(0x33141B33),
         chipIdleText = Color(0xFF9AA7C7),
         nodeGlow = Color(0xFF3A466E),
-        nodeGlowAlpha = 0.55f, // R81：深色同步浅色发光强度（用户拍板）
+        nodeGlowAlpha = 0.62f, // R95：末层全释放绘制后任何元素不再遮挡光晕，强度微调 0.55→0.62
         nodeBorder = Color(0xFF1A2242),
         isDark = true,
         nodeColors = mapOf(
@@ -189,17 +189,18 @@ private fun buildDust(engine: BlackHoleGraphEngine, colors: List<Color>): List<D
     val extent = engine.clusterExtent().coerceAtLeast(400f)
     // R94：黑洞删除——散布锚点由「净空带」改为等效常量（原 168），仍以布局中心为原点
     val field = 170f + extent * 2.2f
-    val count = 200
+    // R95 用户拍板「彩点密度增加、再大一点、再多一点」：200→320 颗，半径整体 ×~1.5
+    val count = 320
     val dotColors = colors.ifEmpty { listOf(Color(0xFF93A2C4)) }
     return List(count) {
         val angle = rng.nextFloat() * 2f * Math.PI.toFloat()
         val dist = 85f + rng.nextFloat() * field
-        // 大小分档：88% 小点 + 12% 大颗粒点缀，画面更有层次
-        val big = rng.nextFloat() < 0.12f
+        // 大小分档：85% 小点 + 15% 大颗粒点缀，画面更有层次
+        val big = rng.nextFloat() < 0.15f
         DustDot(
             x = engine.holeX + kotlin.math.cos(angle) * dist,
             y = engine.holeY + kotlin.math.sin(angle) * dist,
-            radius = if (big) 2.6f + rng.nextFloat() * 1.2f else 1.0f + rng.nextFloat() * 1.6f,
+            radius = if (big) 3.6f + rng.nextFloat() * 1.8f else 1.6f + rng.nextFloat() * 2.0f,
             alpha = if (big) 0.30f + rng.nextFloat() * 0.16f else 0.34f + rng.nextFloat() * 0.28f,
             driftPhase = rng.nextFloat() * 2f * Math.PI.toFloat(),
             driftAmp = 3f + rng.nextFloat() * 7f,
@@ -733,7 +734,7 @@ private fun BlackHoleGraphReadyContent(
                 )
             }
 
-            // 节点：柔光晕 -> 填充 -> 细边 -> 标签
+            // 节点：填充 -> 细边 -> 内环设计层 -> 标签（光晕 R95 改末层统一释放）
             val labelColor = palette.label
             val labelPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.argb(
@@ -759,6 +760,10 @@ private fun BlackHoleGraphReadyContent(
             // 纵向堆叠时下方药丸直接盖住下一个节点的上半圆，看起来像标签接错了节点）
             class ScreenCircle(val x: Float, val y: Float, val r: Float)
             val nodeCircles = mutableListOf<ScreenCircle>()
+            // R95 光晕全释放：循环内只收集光晕参数，标签画完后统一最末层绘制，
+            // 任何元素（标签药丸/连线/尘埃）都不再截断光晕（用户反馈深色下光晕被字体遮挡、浅色下看不见）
+            class GlowSpec(val x: Float, val y: Float, val r: Float, val color: Color, val alpha: Float)
+            val glowSpecs = mutableListOf<GlowSpec>()
             engine.renderNodes().forEach { node ->
                 val center = worldToScreen(node.x, node.y)
                 val r = node.radius * camera.scale
@@ -775,20 +780,8 @@ private fun BlackHoleGraphReadyContent(
                 val base = palette.nodeColor(node.kind)
                 // 选中/抢救提示环用同色相压暗描边（用户 2026-09-19 拍板：不要黑色线框），与米白底和同色光晕都有区分度
                 val ringColor = Color(base.red * 0.72f, base.green * 0.72f, base.blue * 0.72f)
-                // 柔光晕（半径外扩 ~2.1x，渐隐）：节点同色晕（R81 深色同步浅色做法——深色统一蓝紫晕与浅色同色晕观感割裂）
-                val glowColor = base
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            glowColor.copy(alpha = palette.nodeGlowAlpha * alpha),
-                            Color.Transparent
-                        ),
-                        center = center,
-                        radius = r * 2.1f
-                    ),
-                    radius = r * 2.1f,
-                    center = center
-                )
+                // 柔光晕：R95 改为收集制——此处不再即画，标签绘制完成后统一末层释放（见下方 glowSpecs 循环）
+                glowSpecs.add(GlowSpec(center.x, center.y, r, base, alpha))
                 drawCircle(color = base, radius = r, center = center, alpha = alpha)
                 // 细边
                 drawCircle(
@@ -797,6 +790,14 @@ private fun BlackHoleGraphReadyContent(
                     center = center,
                     alpha = alpha,
                     style = Stroke(width = borderPx)
+                )
+                // R95 节点设计层（用户反馈「光秃秃的有点丑」）：内环细描边，
+                // 白色半透与彩色填充成「徽章」层次，简单一层不抢戏
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.45f * alpha),
+                    radius = r * 0.68f,
+                    center = center,
+                    style = Stroke(width = 1.2.dp.toPx())
                 )
                 if (state.selectedNodeId == node.id) {
                     drawCircle(
@@ -886,6 +887,26 @@ private fun BlackHoleGraphReadyContent(
                         labelsDrawn++
                     }
                 }
+
+            // R95 光晕全释放：最末层统一绘制——半径外扩 2.4x、三段渐隐，
+            // 覆盖在标签/连线上方，光晕连续不再被任何元素截断（靠近节点的标签仅被极淡染色，文字可读性不受影响）
+            glowSpecs.forEach { g ->
+                val glowR = g.r * 2.4f
+                val gc = Offset(g.x, g.y)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            g.color.copy(alpha = palette.nodeGlowAlpha * g.alpha),
+                            g.color.copy(alpha = palette.nodeGlowAlpha * 0.45f * g.alpha),
+                            Color.Transparent
+                        ),
+                        center = gc,
+                        radius = glowR
+                    ),
+                    radius = glowR,
+                    center = gc
+                )
+            }
         }
 
         // 右上：主题切换 + 时间倍率 chips + 已遗忘计数（每帧随重组刷新）
