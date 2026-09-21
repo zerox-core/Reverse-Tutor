@@ -274,7 +274,8 @@ fun ChatRoute(
                 generation = backgroundGenerationUiState(
                     activeJob.status,
                     activeJob.errorMessage,
-                    repository.getGenerationPreview(activeJob.id, activeJob.token)
+                    repository.getGenerationPreview(activeJob.id, activeJob.token),
+                    repository.getGenerationMonologue(activeJob.id, activeJob.token)
                 )
             }
         }
@@ -352,7 +353,8 @@ fun ChatRoute(
             generation = backgroundGenerationUiState(
                 job.status,
                 job.errorMessage,
-                repository.getGenerationPreview(jobId, job.token)
+                repository.getGenerationPreview(jobId, job.token),
+                repository.getGenerationMonologue(jobId, job.token)
             )
         }
     }

@@ -59,6 +59,7 @@ internal interface DebugLlmProfileStore {
     suspend fun profileIds(): Set<String>
     suspend fun save(seed: DebugLlmProfileSeed, config: DebugLlmBootstrapConfig, nowEpochMillis: Long)
     suspend fun activate(profileId: String, nowEpochMillis: Long)
+    suspend fun delete(profileId: String)
 }
 
 internal class RepositoryDebugLlmProfileStore(
@@ -88,6 +89,10 @@ internal class RepositoryDebugLlmProfileStore(
     override suspend fun activate(profileId: String, nowEpochMillis: Long) {
         repository.activateProfile(profileId, nowEpochMillis)
     }
+
+    override suspend fun delete(profileId: String) {
+        repository.deleteProfile(profileId)
+    }
 }
 
 internal class DebugLlmProfileBootstrapper(
@@ -97,10 +102,17 @@ internal class DebugLlmProfileBootstrapper(
     suspend fun ensureProfiles(config: DebugLlmBootstrapConfig) {
         if (!config.isComplete) return
 
+        val seeds = config.profiles()
         val createdDefault = DebugLlmBootstrapConfig.DefaultProfileId !in store.profileIds()
-        config.profiles().forEach { seed ->
+        seeds.forEach { seed ->
             store.save(seed, config, nowEpochMillis())
         }
+        // 2026-09-21：清掉不在本次配置里的旧 debug 占位（例如换模型后残留的
+        // fallback-N 死配置），只动 debug-llm-* 前缀，用户手动建的不碰。
+        val seedIds = seeds.mapTo(linkedSetOf()) { it.id }
+        store.profileIds()
+            .filter { it.startsWith("debug-llm-") && it !in seedIds }
+            .forEach { store.delete(it) }
         if (createdDefault) {
             store.activate(DebugLlmBootstrapConfig.DefaultProfileId, nowEpochMillis())
         }

@@ -142,6 +142,29 @@ class MonologueEnvelopeTest {
         )
     }
 
+    // ---- monologueSoFar（2026-09-21 思考链流式透出） ----
+
+    @Test
+    fun monologueSoFarTracksStreamingMonologueAndFreezesAfterBodyStarts() {
+        val splitter = MonologueStreamSplitter()
+        assertNull(splitter.monologueSoFar())
+        splitter.onChunk("<thinking>我卡在")
+        assertEquals("我卡在", splitter.monologueSoFar())
+        splitter.onChunk("货币乘数这")
+        assertEquals("我卡在货币乘数这", splitter.monologueSoFar())
+        splitter.onChunk("</thinking>老师，")
+        assertEquals("我卡在货币乘数这", splitter.monologueSoFar())
+        splitter.onChunk("那负数呢？")
+        assertEquals("我卡在货币乘数这", splitter.monologueSoFar())
+    }
+
+    @Test
+    fun monologueSoFarStaysNullForLegacyText() {
+        val splitter = MonologueStreamSplitter()
+        splitter.onChunk("老师好")
+        assertNull(splitter.monologueSoFar())
+    }
+
     @Test
     fun selfAssessmentPayloadCapsLength() {
         val payload = MonologueEnvelope.selfAssessmentPayload(

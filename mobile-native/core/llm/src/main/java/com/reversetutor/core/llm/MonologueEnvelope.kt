@@ -96,6 +96,12 @@ class MonologueStreamSplitter {
     fun splitSoFar(): MonologueEnvelope.SplitResult =
         MonologueEnvelope.splitComplete(buffer.toString())
 
+    /**
+     * 2026-09-21 思考链流式透出：当前已流入的独白快照（未出现起始标记时为
+     * null），供流式抽屉实时展示；正文仍只经 onChunk 透出，红线校验语义不变。
+     */
+    fun monologueSoFar(): String? = splitSoFar().monologue
+
     private fun visibleBodyPrefix(): String? {
         val raw = buffer.toString()
         val trimmed = raw.trimStart()

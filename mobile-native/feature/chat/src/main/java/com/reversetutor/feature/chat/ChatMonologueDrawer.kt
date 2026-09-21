@@ -14,10 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Psychology
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,12 +26,20 @@ import androidx.compose.ui.unit.sp
  *
  * Collapsed by default, rendered under the spoken bubble. The [Surface] click
  * is consumed locally so tapping the drawer never toggles bubble selection.
+ *
+ * 2026-09-21 思考链体验优化：展开状态改为受控（调用方会话级共享）——用户
+ * 展开一次，后续消息与流式中的抽屉都保持展开，生成结束落抽屉不再闪断；
+ * [streaming] = true 时副标题提示「正在思考…」。
  */
 @Composable
-internal fun MonologueDrawer(monologue: String) {
-    var expanded by remember { mutableStateOf(false) }
+internal fun MonologueDrawer(
+    monologue: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    streaming: Boolean = false
+) {
     Surface(
-        onClick = { expanded = !expanded },
+        onClick = { onExpandedChange(!expanded) },
         modifier = Modifier.fillMaxWidth(),
         color = Color(0xFFF4F6FA),
         shape = RoundedCornerShape(7.dp),
@@ -60,7 +64,11 @@ internal fun MonologueDrawer(monologue: String) {
                     fontSize = 11.sp
                 )
                 Text(
-                    if (expanded) "收起" else "我此刻在想什么",
+                    when {
+                        expanded -> "收起"
+                        streaming -> "正在思考…"
+                        else -> "我此刻在想什么"
+                    },
                     color = Color(0xFF6D778C),
                     fontSize = 10.sp
                 )

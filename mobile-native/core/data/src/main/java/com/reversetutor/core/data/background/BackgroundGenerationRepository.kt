@@ -330,6 +330,9 @@ class BackgroundGenerationRepository(
                     partialStore.clear(job.id, job.token.value)
                 }
                 partialStore.append(job.id, job.token.value, chunk)
+            },
+            onMonologueUpdate = { monologue ->
+                partialStore.setMonologue(job.id, job.token.value, monologue)
             }
         )
 
@@ -474,6 +477,10 @@ class BackgroundGenerationRepository(
 
     suspend fun getGenerationPreview(jobId: String, token: LlmGenerationToken): String? =
         partialStore.get(jobId, token.value)
+
+    /** 2026-09-21 思考链流式透出：Running 期间读独白快照（流式思考链抽屉内容）。 */
+    suspend fun getGenerationMonologue(jobId: String, token: LlmGenerationToken): String? =
+        partialStore.getMonologue(jobId, token.value)
 
     private companion object {
         const val GenerationKind = "Generation"

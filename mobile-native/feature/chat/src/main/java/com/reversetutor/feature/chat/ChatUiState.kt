@@ -180,7 +180,7 @@ sealed interface ChatGenerationUiState {
         override val statusLabel: String = "正在生成回复..."
     }
 
-    data class Streaming(val text: String) : ChatGenerationUiState {
+    data class Streaming(val text: String, val monologue: String? = null) : ChatGenerationUiState {
         override val statusLabel: String = "正在生成回复..."
     }
 
@@ -200,7 +200,9 @@ fun backgroundGenerationUiState(
     status: BackgroundJobStatus,
     errorMessage: String?,
     /** 2026-09-20 拍板接通：Running 期间从 GenerationPartialStore 读到的流式增量文本。 */
-    preview: String? = null
+    preview: String? = null,
+    /** 2026-09-21 思考链流式透出：Running 期间读到的独白快照（流式思考链抽屉内容）。 */
+    monologue: String? = null
 ): ChatGenerationUiState = when (status) {
     BackgroundJobStatus.Failed -> when (errorMessage) {
         NoModelConfiguredReason -> ChatGenerationUiState.NoModel
@@ -212,9 +214,16 @@ fun backgroundGenerationUiState(
     BackgroundJobStatus.Discarded,
     BackgroundJobStatus.Completed -> ChatGenerationUiState.Idle
     BackgroundJobStatus.Queued -> ChatGenerationUiState.Pending
-    BackgroundJobStatus.Running -> preview?.takeIf { it.isNotBlank() }
-        ?.let { ChatGenerationUiState.Streaming(it) }
-        ?: ChatGenerationUiState.Pending
+    BackgroundJobStatus.Running -> {
+        val cleanPreview = preview?.takeIf { it.isNotBlank() }
+        val cleanMonologue = monologue?.takeIf { it.isNotBlank() }
+        when {
+            cleanPreview != null -> ChatGenerationUiState.Streaming(cleanPreview, cleanMonologue)
+            // 独白先于正文到达：正文还空着也进 Streaming，让思考链抽屉先上屏。
+            cleanMonologue != null -> ChatGenerationUiState.Streaming("", cleanMonologue)
+            else -> ChatGenerationUiState.Pending
+        }
+    }
 }
 
 internal const val NoModelConfiguredReason = "No model configured"

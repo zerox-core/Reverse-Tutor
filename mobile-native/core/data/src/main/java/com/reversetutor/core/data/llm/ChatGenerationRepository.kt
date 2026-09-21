@@ -56,7 +56,9 @@ class ChatGenerationRepository(
         nowEpochMillis: Long,
         isTokenCurrent: (LlmGenerationToken) -> Boolean,
         canPersistResult: suspend () -> Boolean = { true },
-        onChunk: (String) -> Unit = {}
+        onChunk: (String) -> Unit = {},
+        /** 2026-09-21 思考链流式透出：独白快照变化回调（全量覆盖语义）。 */
+        onMonologueUpdate: (String?) -> Unit = {}
     ): ChatGenerationOutcome {
         if (!isTokenCurrent(input.token)) {
             return ChatGenerationOutcome.Stale
@@ -100,7 +102,7 @@ class ChatGenerationRepository(
         // Slice 5 latency probes: wall clock at generation start; TTFT is
         // read off the final attempt's watchdog after completion.
         val generationStartedAtMillis = System.currentTimeMillis()
-        var attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk)
+        var attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk, onMonologueUpdate)
         val attemptRequest = plannedRequest.copy(
             onStreamChunk = attemptWatchdog.onStreamChunk,
             streamAbortRequested = attemptWatchdog.abortRequested
@@ -113,7 +115,7 @@ class ChatGenerationRepository(
             abortedOutputText = attemptWatchdog.streamedText().ifBlank { result.visibleTextOrNull() }
             retried = true
             onGenerationRestart(input.token)
-            attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk)
+            attemptWatchdog = StreamWatchdog(input.token, isTokenCurrent, onChunk, onMonologueUpdate)
             val retryRequest = attemptRequest.copy(
                 onStreamChunk = attemptWatchdog.onStreamChunk,
                 streamAbortRequested = attemptWatchdog.abortRequested,
@@ -509,11 +511,13 @@ private fun LlmGenerationBlockReason.toOutcome(): ChatGenerationOutcome =
 private class StreamWatchdog(
     private val token: LlmGenerationToken,
     private val isTokenCurrent: (LlmGenerationToken) -> Boolean,
-    private val onChunk: (String) -> Unit
+    private val onChunk: (String) -> Unit,
+    private val onMonologueUpdate: (String?) -> Unit = {}
 ) {
     private val streamed = StringBuilder()
     private val visibleBody = StringBuilder()
     private val splitter = MonologueStreamSplitter()
+    private var lastEmittedMonologue: String? = null
 
     var redLine: ReplyValidator.RedLine? = null
         private set
@@ -526,6 +530,13 @@ private class StreamWatchdog(
         if (redLine == null) {
             if (chunk.isNotEmpty() && firstChunkAtMillis == null) firstChunkAtMillis = System.currentTimeMillis()
             streamed.append(chunk)
+            // 2026-09-21 思考链流式透出：独白快照有变化就推给预览层（全量覆盖
+            // 语义），正文仍只经下方 visibleDelta 上屏，红线校验语义不变。
+            val monologueSnapshot = splitter.monologueSoFar()
+            if (monologueSnapshot != lastEmittedMonologue && isTokenCurrent(token)) {
+                lastEmittedMonologue = monologueSnapshot
+                onMonologueUpdate(monologueSnapshot)
+            }
             // Slice 4: the leading monologue segment is held back; only the
             // spoken body ever reaches the preview and the red-line check
             // (SPEC section 10 decision 9: red lines govern the spoken text).

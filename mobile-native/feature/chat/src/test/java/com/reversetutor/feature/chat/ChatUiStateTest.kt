@@ -265,6 +265,37 @@ class ChatUiStateTest {
     }
 
     @Test
+    fun runningJobWithMonologueOnlyStreamsDrawerBeforeBody() {
+        // 2026-09-21 思考链流式透出：独白先于正文到达也进 Streaming，抽屉先上屏。
+        assertEquals(
+            ChatGenerationUiState.Streaming("", "我卡在货币乘数这"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                monologue = "我卡在货币乘数这"
+            )
+        )
+    }
+
+    @Test
+    fun runningJobWithBodyAndMonologueCarriesBoth() {
+        assertEquals(
+            ChatGenerationUiState.Streaming("我们一起看看这道题", "我卡在货币乘数这"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                preview = "我们一起看看这道题",
+                monologue = "我卡在货币乘数这"
+            )
+        )
+        // 空白独白等价于没有独白。
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Running, errorMessage = null, monologue = "  ")
+        )
+    }
+
+    @Test
     fun noModelFailureMapsToNoModelGenerationState() {
         assertEquals(
             ChatGenerationUiState.NoModel,

@@ -208,6 +208,9 @@ internal fun ReverseTeachingChatScreen(
     modifier: Modifier = Modifier
 ) {
     var selectedMessageId by remember(state.sessionTitle) { mutableStateOf<String?>(null) }
+    // 2026-09-21 思考链展开状态会话内共享：用户展开一次，后续消息（含流式中
+    // 的抽屉）都保持展开；收起同理。切会话回落默认折叠。
+    var monologueExpanded by remember(state.sessionTitle) { mutableStateOf(false) }
     var actionMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
     var locateSourceMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
     var viewerAttachment by remember(state.sessionTitle) { mutableStateOf<ChatAttachmentUi?>(null) }
@@ -354,7 +357,9 @@ internal fun ReverseTeachingChatScreen(
                             onOpenSource = onOpenSessionSource,
                             onReselectInvalidSource = onReselectInvalidSource,
                             onOpenExternalLink = onOpenExternalLink,
-                            onCopyRichSource = onCopyRichSource
+                            onCopyRichSource = onCopyRichSource,
+                            monologueExpanded = monologueExpanded,
+                            onMonologueExpandedChange = { monologueExpanded = it }
                         )
                     }
                 }
@@ -372,7 +377,9 @@ internal fun ReverseTeachingChatScreen(
         // item；列表只组合可视区 item，指示器一旦滚出视口就不渲染，表现为间歇性
         // 消失。挪出列表后始终可见；流式气泡限高内滚、随文本增长自动贴尾。
         state.generationStatusLabel?.let { label ->
-            val partial = (state.generation as? ChatGenerationUiState.Streaming)?.text
+            val streaming = state.generation as? ChatGenerationUiState.Streaming
+            val partial = streaming?.text
+            val streamingMonologue = streaming?.monologue
             val generationRowScroll = rememberScrollState()
             LaunchedEffect(partial?.length) {
                 if (generationRowScroll.maxValue > 0) {
@@ -387,6 +394,17 @@ internal fun ReverseTeachingChatScreen(
                     .heightIn(max = 280.dp)
                     .verticalScroll(generationRowScroll)
             ) {
+                // 2026-09-21 思考链流式透出：抽屉置顶、流式正文在下；展开状态与
+                // 已完成消息共享，生成结束落抽屉时不再闪断。
+                if (!streamingMonologue.isNullOrBlank()) {
+                    MonologueDrawer(
+                        monologue = streamingMonologue,
+                        expanded = monologueExpanded,
+                        onExpandedChange = { monologueExpanded = it },
+                        streaming = true
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
                 if (partial.isNullOrBlank()) {
                     GenerationRow(
                         learnerName = state.learnerName,
@@ -832,7 +850,9 @@ private fun ReverseTeachingMessage(
     onOpenSource: (String?) -> Unit,
     onReselectInvalidSource: (String, String) -> Unit,
     onOpenExternalLink: (String) -> Unit,
-    onCopyRichSource: (String) -> ChatClipboardResult
+    onCopyRichSource: (String) -> ChatClipboardResult,
+    monologueExpanded: Boolean = false,
+    onMonologueExpandedChange: (Boolean) -> Unit = {}
 ) {
     when (item.role) {
         MessageRole.System -> SystemTimelineMessage(item.text)
@@ -853,7 +873,9 @@ private fun ReverseTeachingMessage(
             onOpenSource,
             onReselectInvalidSource,
             onOpenExternalLink,
-            onCopyRichSource
+            onCopyRichSource,
+            monologueExpanded,
+            onMonologueExpandedChange
         )
     }
 }
@@ -948,7 +970,9 @@ private fun LearnerTimelineMessage(
     onOpenSource: (String?) -> Unit,
     onReselectInvalidSource: (String, String) -> Unit,
     onOpenExternalLink: (String) -> Unit,
-    onCopyRichSource: (String) -> ChatClipboardResult
+    onCopyRichSource: (String) -> ChatClipboardResult,
+    monologueExpanded: Boolean = false,
+    onMonologueExpandedChange: (Boolean) -> Unit = {}
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -1002,7 +1026,11 @@ private fun LearnerTimelineMessage(
                 // thinking-chain drawer under the spoken bubble; it consumes
                 // its own taps and never triggers bubble selection.
                 item.monologue?.let { monologue ->
-                    MonologueDrawer(monologue = monologue)
+                    MonologueDrawer(
+                        monologue = monologue,
+                        expanded = monologueExpanded,
+                        onExpandedChange = onMonologueExpandedChange
+                    )
                 }
             }
             if (selected) MessageMetadataRow(item)
