@@ -842,6 +842,7 @@ private fun AppDestination.ownsInContentTopBar(): Boolean =
         this == AppDestination.Chat ||
         this == AppDestination.ChatReferences ||
         this == AppDestination.NewSession ||
+        this == AppDestination.AgentCreation ||
         this == AppDestination.Settings ||
         this == AppDestination.LlmConfiguration ||
         this == AppDestination.GlobalSearch ||

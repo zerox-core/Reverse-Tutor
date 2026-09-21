@@ -314,6 +314,11 @@ private fun CreationTopRow(
                 )
             }
         }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = "新建会话",
+            style = type.style(15f, 20f, FontWeight.Bold, FormalColors.Ink)
+        )
         Spacer(Modifier.weight(1f))
         Surface(
             onClick = onCreate,
