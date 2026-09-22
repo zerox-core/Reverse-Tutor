@@ -66,6 +66,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -177,6 +178,8 @@ internal fun ReverseTeachingChatScreen(
     sessionContract: SessionConversationContract? = null,
     onAssistantInteraction: (SessionAssistantInteraction) -> Unit = {},
     onComposerTextChange: (String) -> Unit,
+    voiceInputState: VoiceInputState = VoiceInputState(),
+    onVoiceInputClick: () -> Unit = {},
     onSendMessage: () -> Unit,
     onCancelQuote: () -> Unit,
     onCreateImageDraft: () -> Unit,
@@ -525,6 +528,8 @@ internal fun ReverseTeachingChatScreen(
                 canSend = state.composer.canSend,
                 isSending = state.composer.isSending,
                 onTextChange = onComposerTextChange,
+        voiceInputState = voiceInputState,
+        onVoiceInputClick = onVoiceInputClick,
                 onAdd = {
                     if (showAttachmentActions) {
                         showAttachmentActions = false
@@ -2429,6 +2434,8 @@ private fun ReverseTeachingComposer(
     canSend: Boolean,
     isSending: Boolean,
     onTextChange: (String) -> Unit,
+    voiceInputState: VoiceInputState = VoiceInputState(),
+    onVoiceInputClick: () -> Unit = {},
     onAdd: () -> Unit,
     onSend: () -> Unit,
     onFocusChanged: (Boolean) -> Unit
@@ -2487,6 +2494,21 @@ private fun ReverseTeachingComposer(
                         lineHeight = 20.sp
                     )
                 }
+            }
+        }
+        Surface(
+            onClick = onVoiceInputClick,
+            modifier = Modifier.size(ChatComposerLayout.SendSize),
+            color = if (voiceInputState.active) Color(0xFF4287E8) else Color.Transparent,
+            contentColor = if (voiceInputState.active) Color.White else Color(0xFF577394),
+            shape = CircleShape
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Filled.Mic,
+                    contentDescription = if (voiceInputState.active) "停止语音输入" else "语音输入",
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
         Surface(

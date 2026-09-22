@@ -1,5 +1,9 @@
 package com.reversetutor.feature.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,12 +62,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.reversetutor.core.data.background.BackgroundGenerationInput
 import com.reversetutor.core.data.background.BackgroundGenerationRepository
 import com.reversetutor.core.data.llm.ChatGenerationInput
@@ -207,6 +213,75 @@ fun ChatRoute(
         composer = next
         if (persist) {
             draftStore.save(sessionId, next.toPersistentDraft(clientRequestId))
+        }
+    }
+
+    // 语音输入（1a：系统 SpeechRecognizer 语音转文字进输入框）。
+    // 状态在 feature 内自管理，不穿透 app 层接线。
+    val context = LocalContext.current
+    var voiceInputState by remember(sessionId) { mutableStateOf(VoiceInputState()) }
+    var voiceBaseText by remember(sessionId) { mutableStateOf<String?>(null) }
+    val voiceController = remember(sessionId) {
+        VoiceInputController { next -> voiceInputState = next }
+    }
+    val voiceEngine = remember(sessionId) { SpeechRecognizerVoiceInputEngine(context) }
+
+    fun startVoiceSession() {
+        voiceBaseText = composer.text
+        voiceController.onStartRequested()
+        voiceEngine.start(voiceController)
+    }
+
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startVoiceSession()
+        } else {
+            updateComposer(composer.copy(notice = "需要麦克风权限才能语音输入，可在系统设置中开启。"))
+        }
+    }
+
+    val onVoiceInputClick: () -> Unit = {
+        when {
+            voiceInputState.active -> {
+                voiceController.onStopRequested()
+                voiceEngine.stop()
+            }
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> startVoiceSession()
+            else -> voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // 语音转写实时上屏：基准文本（开始录音时输入框内容）+ 本次转写。
+    LaunchedEffect(voiceInputState) {
+        val base = voiceBaseText ?: return@LaunchedEffect
+        val targetText = base + voiceInputState.transcript
+        if (composer.text != targetText) {
+            updateComposer(composer.copy(text = targetText, sendFailure = null))
+        }
+        when (voiceInputState.phase) {
+            VoiceInputPhase.Idle -> {
+                voiceBaseText = null
+                voiceController.reset()
+            }
+            VoiceInputPhase.Failed -> {
+                val message = voiceInputState.errorMessage ?: "语音识别失败，请重试。"
+                updateComposer(composer.copy(notice = message))
+                voiceBaseText = null
+                voiceController.reset()
+            }
+            else -> Unit
+        }
+    }
+
+    DisposableEffect(sessionId) {
+        onDispose {
+            voiceEngine.cancel()
+            voiceEngine.release()
         }
     }
 
@@ -490,6 +565,8 @@ fun ChatRoute(
             }
         },
         onComposerTextChange = { updateComposer(composer.copy(text = it, sendFailure = null, notice = null)) },
+        voiceInputState = voiceInputState,
+        onVoiceInputClick = onVoiceInputClick,
         onSendMessage = {
             if (composer.canSend) {
                 val sentComposer = composer.copy(isSending = true, sendFailure = null, notice = null)
@@ -847,6 +924,8 @@ fun ChatScreen(
     sessionContract: SessionConversationContract? = null,
     onAssistantInteraction: (SessionAssistantInteraction) -> Unit = {},
     onComposerTextChange: (String) -> Unit,
+    voiceInputState: VoiceInputState = VoiceInputState(),
+    onVoiceInputClick: () -> Unit = {},
     onSendMessage: () -> Unit,
     onCancelQuote: () -> Unit,
     onCreateImageDraft: () -> Unit,
@@ -906,6 +985,8 @@ fun ChatScreen(
         sessionContract = sessionContract,
         onAssistantInteraction = onAssistantInteraction,
         onComposerTextChange = onComposerTextChange,
+        voiceInputState = voiceInputState,
+        onVoiceInputClick = onVoiceInputClick,
         onSendMessage = onSendMessage,
         onCancelQuote = onCancelQuote,
         onCreateImageDraft = onCreateImageDraft,
