@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -69,21 +70,10 @@ private const val CameraPanFactor = 0.72f
  */
 class BlackHoleGraphPalette(
     val background: Color,
-    val holeCore: Color,
-    /** 光子环：贴事件视界边缘的亮白窄环（用户 2026-09-19 拍板：线条/光晕一律纯白）。 */
-    val photonRing: Color,
-    /** 吸积盘内缘色（最亮的白）。 */
-    val diskHot: Color,
-    /** 吸积盘中段色（白，靠透明度分层）。 */
-    val diskMid: Color,
-    /** 吸积盘外缘色（白，向外渐隐）。 */
-    val diskOuter: Color,
-    val holeExclusionHint: Color,
     val edge: Color,
     val label: Color,
     val dust: Color,
     val dustAlphaBoost: Float,
-    val bounceMark: Color,
     val topBarText: Color,
     val topBarSub: Color,
     val panel: Color,
@@ -110,17 +100,10 @@ object BlackHoleGraphThemes {
     /** V1 iOS 浅色风：暖米白纸感底 + 彩色点缀（真机反馈「不要单调白」）；节点饱和度加深版。 */
     val Light = BlackHoleGraphPalette(
         background = Color(0xFFF7F1E4),
-        holeCore = Color(0xFF0B0E14),
-        photonRing = Color(0xFFFFFFFF),
-        diskHot = Color(0xFFFFFFFF),
-        diskMid = Color(0xFFFFFFFF),
-        diskOuter = Color(0xFFFFFFFF),
-        holeExclusionHint = Color(0x14273A5E),
         edge = Color(0xFF8E9AB8),
         label = Color(0xFF46506B),
         dust = Color(0xFF93A2C4),
         dustAlphaBoost = 1f,
-        bounceMark = Color(0xFFD84C4C),
         topBarText = Color(0xFF1C2433),
         topBarSub = Color(0xFF6D778C),
         panel = Color(0xFFFFFFFF),
@@ -132,7 +115,7 @@ object BlackHoleGraphThemes {
         chipIdleBg = Color(0x66FFFFFF),
         chipIdleText = Color(0xFF46506B),
         nodeGlow = Color.White,
-        nodeGlowAlpha = 0.55f,
+        nodeGlowAlpha = 0.72f, // R95：浅色下同色晕看不见——强度 0.55→0.72 + 末层全释放绘制
         nodeBorder = Color.White,
         isDark = false,
         nodeColors = mapOf(
@@ -152,20 +135,13 @@ object BlackHoleGraphThemes {
         )
     )
 
-    /** 深色回归版：夜空底 + 银河星景（视差星点/银河带/星云）+ 高饱和节点 + 吸积盘黑洞。 */
+    /** 深色回归版：夜空底 + 银河星景（视差星点/银河带/星云）+ 高饱和节点（R94：黑洞已删除）。 */
     val Dark = BlackHoleGraphPalette(
         background = Color(0xFF0B1026),
-        holeCore = Color(0xFF05060D),
-        photonRing = Color(0xFFFFFFFF),
-        diskHot = Color(0xFFFFFFFF),
-        diskMid = Color(0xFFEDF1F8),
-        diskOuter = Color(0xFFC9D2E4),
-        holeExclusionHint = Color(0x336FA8F0),
         edge = Color(0xFF8FA3C8),
         label = Color(0xFFE8ECF4),
         dust = Color(0xFFAFC3E8),
         dustAlphaBoost = 1.5f,
-        bounceMark = Color(0xFFD84C4C),
         topBarText = Color(0xFFE8ECF4),
         topBarSub = Color(0xFF8FA3C8),
         panel = Color(0xE6141B33),
@@ -177,7 +153,7 @@ object BlackHoleGraphThemes {
         chipIdleBg = Color(0x33141B33),
         chipIdleText = Color(0xFF9AA7C7),
         nodeGlow = Color(0xFF3A466E),
-        nodeGlowAlpha = 0.55f, // R81：深色同步浅色发光强度（用户拍板）
+        nodeGlowAlpha = 0.62f, // R95：末层全释放绘制后任何元素不再遮挡光晕，强度微调 0.55→0.62
         nodeBorder = Color(0xFF1A2242),
         isDark = true,
         nodeColors = mapOf(
@@ -198,73 +174,6 @@ object BlackHoleGraphThemes {
 }
 
 /** 彩色点缀点（浅色主题，世界空间，确定性种子，正弦漂移 + 闪烁）。整画布背景散布，取大地暖调四色（与节点图谱色拉开——用户拍板「彩点颜色不要和图谱相似、画面要丰富」）。 */
-/** 吸积盘湍流条纹：开普勒差速自转（内快外慢，omega ~ r^-1.5）。 */
-private data class DiskStreak(
-    /** 半径（核心半径的倍数，1.2~2.9——铺满遗忘渐进区）。 */
-    val rNorm: Float,
-    val angle0: Float,
-    val omega: Float,
-    val sweep: Float,
-    val alpha: Float,
-    /** 线宽（核心半径的倍数，分辨率无关）。 */
-    val width: Float
-)
-
-private fun buildDiskStreaks(): List<DiskStreak> {
-    val rng = Random(20260919L xor 0xD15C)
-    return List(72) {
-        val rNorm = 1.2f + 1.7f * rng.nextFloat()
-        val kepler = 1.1f / kotlin.math.sqrt(rNorm * rNorm * rNorm)
-        DiskStreak(
-            rNorm = rNorm,
-            angle0 = rng.nextFloat() * 6.2832f,
-            omega = kepler * (0.8f + 0.4f * rng.nextFloat()),
-            sweep = 18f + 66f * rng.nextFloat(),
-            alpha = 0.10f + 0.30f * rng.nextFloat(),
-            width = 0.030f + 0.060f * rng.nextFloat()
-        )
-    }
-}
-
-/** 螺旋内流光（仅浅色主题，纯白）：近侧吸积流从黑洞阴影前方螺旋坠入——
- *  白光在黑盘剪影上显形（用户 2026-09-20 拍板：纯白、往中心走、用黑洞的形状凸显白光）。 */
-private data class SpiralInflow(
-    /** 起始方位角（弧度）。 */
-    val angle0: Float,
-    /** 公转速度（圈/秒，缓慢）。 */
-    val orbit: Float,
-    /** 脉冲相位（0~1，各流错峰）。 */
-    val phase: Float,
-    /** 脉冲速度（圈/秒）。 */
-    val speed: Float,
-    /** 螺距（弧度/全程，越大越卷）。 */
-    val pitch: Float,
-    val alpha: Float,
-    val widthDp: Float
-)
-
-private fun buildSpiralInflows(): List<SpiralInflow> {
-    val rng = Random(20260920L xor 0x51FA)
-    return List(10) { i ->
-        SpiralInflow(
-            angle0 = i * 6.2832f / 10f + (rng.nextFloat() - 0.5f) * 0.35f,
-            orbit = 0.05f + 0.04f * rng.nextFloat(),
-            phase = rng.nextFloat(),
-            speed = 0.10f + 0.10f * rng.nextFloat(),
-            pitch = 2.4f + 1.2f * rng.nextFloat(),
-            alpha = 0.45f + 0.30f * rng.nextFloat(),
-            widthDp = 1.4f + 1.4f * rng.nextFloat()
-        )
-    }
-}
-
-private fun lerpColor(a: Color, b: Color, t: Float): Color = Color(
-    red = a.red + (b.red - a.red) * t,
-    green = a.green + (b.green - a.green) * t,
-    blue = a.blue + (b.blue - a.blue) * t,
-    alpha = a.alpha + (b.alpha - a.alpha) * t
-)
-
 private data class DustDot(
     val x: Float,
     val y: Float,
@@ -278,18 +187,20 @@ private data class DustDot(
 private fun buildDust(engine: BlackHoleGraphEngine, colors: List<Color>): List<DustDot> {
     val rng = Random(20260918)
     val extent = engine.clusterExtent().coerceAtLeast(400f)
-    val field = engine.exclusionRadius + extent * 2.2f
-    val count = 200
+    // R94：黑洞删除——散布锚点由「净空带」改为等效常量（原 168），仍以布局中心为原点
+    val field = 170f + extent * 2.2f
+    // R95 用户拍板「彩点密度增加、再大一点、再多一点」：200→320 颗，半径整体 ×~1.5
+    val count = 320
     val dotColors = colors.ifEmpty { listOf(Color(0xFF93A2C4)) }
     return List(count) {
         val angle = rng.nextFloat() * 2f * Math.PI.toFloat()
-        val dist = engine.exclusionRadius * 0.5f + rng.nextFloat() * field
-        // 大小分档：88% 小点 + 12% 大颗粒点缀，画面更有层次
-        val big = rng.nextFloat() < 0.12f
+        val dist = 85f + rng.nextFloat() * field
+        // 大小分档：85% 小点 + 15% 大颗粒点缀，画面更有层次
+        val big = rng.nextFloat() < 0.15f
         DustDot(
             x = engine.holeX + kotlin.math.cos(angle) * dist,
             y = engine.holeY + kotlin.math.sin(angle) * dist,
-            radius = if (big) 2.6f + rng.nextFloat() * 1.2f else 1.0f + rng.nextFloat() * 1.6f,
+            radius = if (big) 3.6f + rng.nextFloat() * 1.8f else 1.6f + rng.nextFloat() * 2.0f,
             alpha = if (big) 0.30f + rng.nextFloat() * 0.16f else 0.34f + rng.nextFloat() * 0.28f,
             driftPhase = rng.nextFloat() * 2f * Math.PI.toFloat(),
             driftAmp = 3f + rng.nextFloat() * 7f,
@@ -313,7 +224,8 @@ private data class StarDot(
 private fun buildStarfield(engine: BlackHoleGraphEngine): List<StarDot> {
     val rng = Random(20260919)
     val extent = engine.clusterExtent().coerceAtLeast(400f)
-    val field = engine.exclusionRadius + extent * 2.2f
+    // R94：黑洞删除——散布锚点由「净空带」改为等效常量（原 168），仍以布局中心为原点
+    val field = 170f + extent * 2.2f
     val stars = ArrayList<StarDot>(200)
     // 三层：远（多而小暗、视差最慢）/ 中 / 近（少而大亮、随前景）
     val layers = listOf(
@@ -324,7 +236,7 @@ private fun buildStarfield(engine: BlackHoleGraphEngine): List<StarDot> {
     layers.forEach { (count, parallax, baseR) ->
         repeat(count) {
             val angle = rng.nextFloat() * 2f * Math.PI.toFloat()
-            val dist = engine.exclusionRadius * 0.6f + rng.nextFloat() * field
+            val dist = 100f + rng.nextFloat() * field
             stars += StarDot(
                 x = engine.holeX + kotlin.math.cos(angle) * dist,
                 y = engine.holeY + kotlin.math.sin(angle) * dist,
@@ -369,6 +281,15 @@ private fun buildNebulae(engine: BlackHoleGraphEngine): List<NebulaGlow> {
     )
 }
 
+/** R100 浅色星云辉光：fx/fy/fradius 均为屏幕宽/高比例（屏幕空间定位，跟随窗口），phase 为漂移相位。 */
+private data class LightNebula(
+    val fx: Float,
+    val fy: Float,
+    val fradius: Float,
+    val color: Color,
+    val phase: Float
+)
+
 /** 相机：世界坐标中心 + 缩放；平移降敏（x0.72）、松手滑移惯性衰减 0.93（Obsidian 式微惯性）、缩放范围 0.45~3.2。 */
 private class BlackHoleCamera {
     var centerX = 0f
@@ -377,6 +298,9 @@ private class BlackHoleCamera {
     var vx = 0f
     var vy = 0f
     var initialized = false
+
+    /** R91 自动取景：布局收敛前每帧向目标缓动（星团收缩/漂移时画面跟着调），收敛即锁定；用户手势一旦操作立即接管。 */
+    var autoFit = true
 
     fun tick() {
         centerX += vx
@@ -389,6 +313,13 @@ private class BlackHoleCamera {
         }
     }
 
+    /**
+     * 舒适入画系数（R91：0.44→0.36，真机反馈「太密集、要松弛感」——星团占短边 72% 而非 88%，留足呼吸边距）。
+     * 0.44 是 R89 定稿值，本系数变更已同步开发文档修订记录。
+     */
+    private fun fitScale(extent: Float, viewportW: Float, viewportH: Float): Float =
+        (min(viewportW, viewportH) * 0.36f / extent).coerceIn(0.45f, 3.2f)
+
     /** 初始化：质心居中 + 包围半径舒适入画（fit-zoom）。 */
     fun initializeFit(engine: BlackHoleGraphEngine, viewportW: Float, viewportH: Float) {
         if (viewportW <= 0f || viewportH <= 0f) return
@@ -396,11 +327,32 @@ private class BlackHoleCamera {
         val extent = engine.clusterExtent()
         centerX = centroid.first
         centerY = centroid.second
-        val fit = min(viewportW, viewportH) * 0.44f / extent
-        scale = fit.coerceIn(0.45f, 3.2f)
+        scale = fitScale(extent, viewportW, viewportH)
         vx = 0f
         vy = 0f
         initialized = true
+        autoFit = true
+    }
+
+    /**
+     * R91 自动跟随取景：修复真机「整体过大、太密」根因——首帧的 clusterExtent() 是未收敛瞬态
+     * （真机首帧比模拟器晚，星团已被弹簧收缩到更小，fit-zoom 被算大 ~2 倍，实测手机 2.93× vs
+     * 模拟器 1.36×，且初始化后永不修正）。收敛前每帧向「质心 + 收敛 extent」目标缓动，
+     * 收敛落定一次（snap=true）即停；用户平移/缩放/拖动即 autoFit=false 交还手势。
+     */
+    fun trackFit(engine: BlackHoleGraphEngine, viewportW: Float, viewportH: Float, snap: Boolean) {
+        if (viewportW <= 0f || viewportH <= 0f) return
+        val centroid = engine.centroidOfCluster()
+        val target = fitScale(engine.clusterExtent(), viewportW, viewportH)
+        if (snap) {
+            centerX = centroid.first
+            centerY = centroid.second
+            scale = target
+        } else {
+            centerX += (centroid.first - centerX) * 0.12f
+            centerY += (centroid.second - centerY) * 0.12f
+            scale += (target - scale) * 0.08f
+        }
     }
 
     fun zoomBy(factor: Float, focusWorldX: Float, focusWorldY: Float) {
@@ -488,14 +440,29 @@ private fun BlackHoleGraphReadyContent(
                 graphNodes = layoutNodes.map { Triple(it.id, it.label, it.kind) },
                 edges = snapshot.edges.map { it.fromNodeId to it.toNodeId }
             )
+            // R96 演示种子（用户要看遗忘闪烁实况）：把「参数方程」直接置为遗忘中途
+            // （遗忘 0.5 > 闪烁门 0.35，入场即呼吸闪烁），1× 倍率约 2 分钟走满淡出消失；
+            // 点按/拖拽闪烁节点 = 抢救回归（保护期无限，救回后不再遗忘）。
+            // 空安全查找：真实 App 数据没有该 id 时自动跳过，不影响生产页面。
+            nodes.firstOrNull { it.id == "c9" }?.let { demo ->
+                demo.cooling = false
+                demo.forget = 0.5f
+            }
         }
     }
     val camera = remember(engine) { BlackHoleCamera() }
     val dust = remember(engine, palette) { buildDust(engine, palette.dustColors) }
-    val diskStreaks = remember { buildDiskStreaks() }
-    val spiralInflows = remember { buildSpiralInflows() }
     val starfield = remember(engine) { buildStarfield(engine) }
     val nebulae = remember(engine) { buildNebulae(engine) }
+    // R100 浅色版银河（用户决策卡拍板：深色银河结构翻成暖白调）：
+    // 三团暖色星云辉光，屏幕宽/高比例定位（跟随窗口、永不消失）+ 缓慢漂移
+    val lightNebulae = remember {
+        listOf(
+            LightNebula(0.24f, 0.30f, 0.62f, Color(0x11F0A860), 0.0f),
+            LightNebula(0.80f, 0.68f, 0.55f, Color(0x0FE8907A), 2.1f),
+            LightNebula(0.58f, 0.12f, 0.45f, Color(0x0CB8C078), 4.2f)
+        )
+    }
     var frame by remember { mutableLongStateOf(0L) }
     var timeScaleIndex by remember { mutableIntStateOf(0) }
     val timeScales = remember { listOf(1f, 0.3f, 3f) }
@@ -566,6 +533,7 @@ private fun BlackHoleGraphReadyContent(
                                 dragging = false
                             } else if (change.positionChanged()) {
                                 totalMove += change.positionChange().getDistance()
+                                if (totalMove > viewConfiguration.touchSlop) camera.autoFit = false
                                 val world = screenToWorld(change.position)
                                 engine.dragTo(world.x, world.y)
                                 change.consume()
@@ -628,6 +596,10 @@ private fun BlackHoleGraphReadyContent(
                                         camera.zoomBy(span / prevSpan, focusWorld.x, focusWorld.y)
                                     }
                                     totalMove += delta.getDistance()
+                                    // R91：用户实际平移/缩放即接管相机，停掉自动取景
+                                    if (totalMove > viewConfiguration.touchSlop || pressed.size >= 2) {
+                                        camera.autoFit = false
+                                    }
                                     prevCentroid = centroid
                                     prevSpan = span
                                 }
@@ -652,6 +624,10 @@ private fun BlackHoleGraphReadyContent(
 
             if (!camera.initialized && size.width > 0f) {
                 camera.initializeFit(engine, size.width, size.height)
+            } else if (camera.autoFit) {
+                // R91：收敛前自动跟随取景（首帧 extent 未收敛会把 scale 算大且永不修正），收敛即落定锁定
+                camera.trackFit(engine, size.width, size.height, engine.isSettled)
+                if (engine.isSettled) camera.autoFit = false
             }
 
             fun worldToScreen(wx: Float, wy: Float): Offset = Offset(
@@ -661,13 +637,14 @@ private fun BlackHoleGraphReadyContent(
 
             val seconds = frame / 1_000_000_000f
 
+            // 视差映射：p=1 与前景一致；p<1 相机平移时移动更慢（远景），初始与前景对齐（深浅背景共用）
+            fun bgToScreen(wx: Float, wy: Float, p: Float): Offset = Offset(
+                size.width / 2f + ((wx - engine.holeX) - (camera.centerX - engine.holeX) * p) * camera.scale,
+                size.height / 2f + ((wy - engine.holeY) - (camera.centerY - engine.holeY) * p) * camera.scale
+            )
+
             if (palette.isDark) {
                 // 银河背景（深色）：银河带 -> 星云辉光 -> 三层视差星点，营造「身处银河看星球」
-                // 视差映射：p=1 与前景一致；p<1 相机平移时移动更慢（远景），初始与前景对齐
-                fun bgToScreen(wx: Float, wy: Float, p: Float): Offset = Offset(
-                    size.width / 2f + ((wx - engine.holeX) - (camera.centerX - engine.holeX) * p) * camera.scale,
-                    size.height / 2f + ((wy - engine.holeY) - (camera.centerY - engine.holeY) * p) * camera.scale
-                )
 
                 // 银河带：斜向柔光带（随相机 0.2 倍慢漂）
                 withTransform({
@@ -723,7 +700,53 @@ private fun BlackHoleGraphReadyContent(
                     )
                 }
             } else {
-                // 彩色点缀点：漂移 + 闪烁（浅色主题，取节点粉彩色）
+                // R100 浅色版银河（用户决策卡拍板）：深色银河结构翻成暖白调——
+                // 斜向晨光带 -> 暖色星云辉光 -> 彩点（= 浅色星点）-> 边角轻压；
+                // 带与星云均屏幕空间定位，跟随窗口铺满，平移到哪都在，且带缓慢自漂动态。
+
+                // 晨光银河带：与深色银河带同构（-22°、相机 0.2 倍慢漂）+ 自身缓慢起伏呼吸
+                withTransform({
+                    rotate(degrees = -22f, pivot = Offset(size.width / 2f, size.height / 2f))
+                }) {
+                    val bandH = size.height * 0.62f
+                    val bandDrift = -(camera.centerY - engine.holeY) * 0.2f * camera.scale +
+                        sin(seconds * 0.05f) * size.height * 0.03f
+                    val bandTop = size.height * 0.5f - bandH / 2f - size.height * 0.08f + bandDrift
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.34f to Color(0x12FFDFA8),
+                            0.5f to Color(0x1CFFEDC4),
+                            0.66f to Color(0x12FFDFA8),
+                            1f to Color.Transparent,
+                            startY = bandTop,
+                            endY = bandTop + bandH
+                        ),
+                        topLeft = Offset(-size.width * 0.5f, bandTop),
+                        size = Size(size.width * 2f, bandH)
+                    )
+                }
+
+                // 暖色星云辉光：屏幕比例定位（跟随窗口）+ 缓慢漂移 + 相机 0.3 倍轻推制造纵深
+                lightNebulae.forEach { neb ->
+                    val drift = sin(seconds * 0.03f + neb.phase) * size.width * 0.02f
+                    val c = Offset(
+                        size.width * neb.fx + drift - (camera.centerX - engine.holeX) * 0.3f * camera.scale,
+                        size.height * neb.fy + drift * 0.6f - (camera.centerY - engine.holeY) * 0.3f * camera.scale
+                    )
+                    val r = size.height * neb.fradius
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(neb.color, Color.Transparent),
+                            center = c,
+                            radius = r
+                        ),
+                        radius = r,
+                        center = c
+                    )
+                }
+
+                // 彩色点缀点：漂移 + 闪烁（浅色主题，取大地暖调四色）
                 dust.forEach { dot ->
                     val dx = sin(seconds * 0.4f + dot.driftPhase) * dot.driftAmp
                     val dy = kotlin.math.cos(seconds * 0.3f + dot.driftPhase * 1.3f) * dot.driftAmp
@@ -739,64 +762,26 @@ private fun BlackHoleGraphReadyContent(
                         )
                     }
                 }
-            }
 
-            // 吸积盘黑洞（参考开源社区主流设计：ebruneton black_hole_shader / Shadertoy lstSRS / threejs-blackhole）：
-            // 事件视界黑核 + 光子环 + 吸积盘（温度梯度 + 湍流条纹 + 开普勒差速 + 多普勒亮边），无额外光环。
-            // 盘面正好铺满遗忘渐进区（1.15x 核心 → 3x 净空带），盘外缘即渐进区边界。
-            // 盘画在连线下层；黑核本体移到连线之后再画——任何跨洞连线都会被黑核盖住，绝不「接进」黑洞。
-            val holeCenter = worldToScreen(engine.holeX, engine.holeY)
-            val coreR = engine.holeCoreRadius * camera.scale
-            val diskR = engine.exclusionRadius * camera.scale // R82：光盘=遗忘区本体（半径比 3→6 由引擎承担，绘制随引擎值）
-            // 盘底色：径向亮度梯度（内缘最亮 → 外缘渐隐；用户拍板纯白盘）
-            val diskStops = if (palette.isDark) arrayOf(
-                0f to Color.Transparent,
-                (coreR * 1.05f / diskR) to Color.Transparent,
-                (coreR * 1.25f / diskR) to palette.diskHot.copy(alpha = palette.diskHot.alpha * 0.75f),
-                (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = palette.diskMid.alpha * 0.5f),
-                (coreR * 2.7f / diskR) to palette.diskOuter.copy(alpha = palette.diskOuter.alpha * 0.22f),
-                1f to Color.Transparent
-            ) else arrayOf(
-                // 浅色：外缘渐隐改陡——白盘收得果断，像白瓷盘的肩部而不是一团雾（真机反馈「外盘边缘再明确一点」）
-                0f to Color.Transparent,
-                (coreR * 1.05f / diskR) to Color.Transparent,
-                (coreR * 1.25f / diskR) to palette.diskHot,
-                (coreR * 1.9f / diskR) to palette.diskMid.copy(alpha = 0.85f),
-                (coreR * 2.55f / diskR) to palette.diskOuter.copy(alpha = 0.55f),
-                (coreR * 2.9f / diskR) to palette.diskOuter.copy(alpha = 0.2f),
-                1f to Color.Transparent
-            )
-            drawCircle(
-                brush = Brush.radialGradient(*diskStops, center = holeCenter, radius = diskR),
-                radius = diskR,
-                center = holeCenter
-            )
-            // 湍流条纹：开普勒差速（内快外慢）+ 多普勒亮边（一侧更亮，亮边方向极缓慢摆动）
-            val beamAngle = 3.5779f + 0.25f * sin(seconds * 0.11f)
-            diskStreaks.forEach { streak ->
-                val r = streak.rNorm * coreR // R82：条纹回退核心内圈点缀（外扩由遗忘区盘本体承担）
-                val theta = streak.angle0 + seconds * streak.omega
-                val rel = kotlin.math.cos(theta - beamAngle)
-                val beaming = 0.62f + 0.55f * rel * rel
-                val tt = (streak.rNorm - 1.2f) / 1.7f
-                val streakColor = if (tt < 0.5f) {
-                    lerpColor(palette.diskHot, palette.diskMid, tt * 2f)
-                } else {
-                    lerpColor(palette.diskMid, palette.diskOuter, (tt - 0.5f) * 2f)
-                }
-                drawArc(
-                    color = streakColor,
-                    startAngle = theta * 57.29578f,
-                    sweepAngle = streak.sweep,
-                    useCenter = false,
-                    topLeft = Offset(holeCenter.x - r, holeCenter.y - r),
-                    size = Size(r * 2f, r * 2f),
-                    alpha = (streak.alpha * beaming * if (palette.isDark) 1f else 2.2f).coerceIn(0f, 1f),
-                    style = Stroke(width = streak.width * coreR)
+                // 边角轻压（屏幕空间径向渐隐）：视线收拢到中央，像旧纸微微泛暗的边
+                drawRect(
+                    brush = Brush.radialGradient(
+                        0f to Color.Transparent,
+                        0.62f to Color.Transparent,
+                        1f to Color(0x14000000),
+                        center = Offset(size.width / 2f, size.height / 2f),
+                        radius = kotlin.math.hypot(size.width, size.height) / 2f
+                    ),
+                    topLeft = Offset.Zero,
+                    size = size
                 )
             }
+
+            // R94：黑洞已删除——吸积盘/湍流条纹/黑核/光子环/螺旋内流/透镜弧光整体退役，
+            // 画布只保留背景（银河星景/彩点）+ 连线 + 节点。
             // 选中态：邻接保持高亮，其余压暗（聚焦模式）
-            val selectedId = state.selectedNodeId
+            // R92 用户拍板「拖动中也要明显看到关联线」：聚焦态 = 选中节点 ?: 正在拖拽的节点——拖动同样触发聚焦高亮
+            val selectedId = state.selectedNodeId ?: engine.draggingNodeId
             val neighborIds = if (selectedId == null) {
                 emptySet()
             } else {
@@ -809,156 +794,33 @@ private fun BlackHoleGraphReadyContent(
                 set
             }
 
-            // 连线：全局档 opacity 0.25，缩放超过标签阈值渐进增强；屏上粗细下限 1.2px（V24/V25）
+            // 连线：R92 用户拍板「降低亮度、只有点击/拖动才明显看到」——全局档 opacity 0.25→0.10（默认几乎隐入背景），
+            // 聚焦节点的关联边 ×4 亮度 + 1.6× 粗细（拖动/点选时明显浮现）；缩放渐进增强与 1.2px 粗细下限保留（V24/V25）
             val edgeGate = when {
                 camera.scale < 0.7f -> 1f
                 else -> (1f + (camera.scale - 0.7f) / 0.8f * 0.8f).coerceAtMost(1.8f)
             }
             val edgeBaseWidthPx = max(1.2f, 1.dp.toPx())
             engine.renderEdges().forEach { edge ->
-                val dim = if (selectedId != null &&
-                    edge.fromId != selectedId && edge.toId != selectedId
-                ) 0.22f else 1f
-                val edgeStroke = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f)
-                val edgeAlpha = (0.25f * edgeGate * edge.opacityFactor * dim).coerceIn(0f, 1f)
-                // R85 用户拍板：关系线优先保持直线，绝不为「成圆」而弯曲——撤销 R83 绕行折线；
-                // 圆感靠公转运动与边数量自然形成，不强制。黑核本体画在连线之上，核面仍无线条穿过。
-                // R87 用户拍板：直线几何不动，遗忘区内渐隐遮断——分段绘制、按段中点到洞心
-                // 距离在 [exclusionRadius, +fadeMargin] 内做 alpha 渐隐，视觉上不穿越遗忘区。
-                val fadeMargin = 0.3f * engine.holeCoreRadius
-                val segments = 24
-                var prevX = edge.fromX
-                var prevY = edge.fromY
-                for (seg in 1..segments) {
-                    val t = seg.toFloat() / segments
-                    val cx = edge.fromX + (edge.toX - edge.fromX) * t
-                    val cy = edge.fromY + (edge.toY - edge.fromY) * t
-                    val midX = (prevX + cx) * 0.5f
-                    val midY = (prevY + cy) * 0.5f
-                    val dMid = kotlin.math.hypot(midX - engine.holeX, midY - engine.holeY)
-                    val vis = ((dMid - engine.exclusionRadius) / fadeMargin).coerceIn(0f, 1f)
-                    if (vis > 0.01f) {
-                        drawLine(
-                            color = palette.edge,
-                            start = worldToScreen(prevX, prevY),
-                            end = worldToScreen(cx, cy),
-                            strokeWidth = edgeStroke,
-                            alpha = (edgeAlpha * vis).coerceIn(0f, 1f)
-                        )
-                    }
-                    prevX = cx
-                    prevY = cy
-                }
-            }
-
-            // 黑核本体：压在连线之上（真机反馈「线连进黑洞」）——跨洞连线到核边界为止，核面绝无线条穿过
-            drawCircle(
-                color = palette.holeCore,
-                radius = coreR,
-                center = holeCenter
-            )
-
-            // 光子环：贴视界边缘的窄亮环（三层描边假高斯）+ 极轻闪烁，让黑核「有边界」而非一坨黑
-            val ringShimmer = 0.85f + 0.15f * sin(seconds * 1.7f)
-            val photonR = coreR * 1.08f
-            drawCircle(color = palette.photonRing, radius = photonR, center = holeCenter,
-                alpha = 0.16f * ringShimmer, style = Stroke(width = 5.5f.dp.toPx()))
-            drawCircle(color = palette.photonRing, radius = photonR, center = holeCenter,
-                alpha = 0.38f * ringShimmer, style = Stroke(width = 2.8f.dp.toPx()))
-            drawCircle(color = palette.photonRing, radius = photonR, center = holeCenter,
-                alpha = 0.92f * ringShimmer, style = Stroke(width = 1.4f.dp.toPx()))
-
-            // 螺旋内流光（仅浅色，纯白，用户 2026-09-20 拍板）：近侧吸积流从黑洞阴影前方螺旋坠入——
-            // 白光只在黑盘剪影上显形（白盘上不可见），越卷越紧、光珠沿流坠入消失；
-            // 黑盘上下两道透镜弧光是球面弯光的剪影——黑洞的形状本身就是白光的画框
-            if (!palette.isDark) {
-                val streamWhite = Color(0xFFFFFFFF)
-                val rOut = coreR * 1.75f
-                val rTip = coreR * 0.45f
-                spiralInflows.forEach { s ->
-                    val baseAngle = s.angle0 + seconds * s.orbit * 6.2832f
-                    val path = Path()
-                    var startX = 0f
-                    var startY = 0f
-                    var i = 0
-                    while (i <= 48) {
-                        val t = i / 48f
-                        val r = rOut + (rTip - rOut) * t
-                        val theta = baseAngle + s.pitch * t
-                        val x = holeCenter.x + kotlin.math.cos(theta) * r
-                        val y = holeCenter.y + kotlin.math.sin(theta) * r
-                        if (i == 0) {
-                            path.moveTo(x, y)
-                            startX = x
-                            startY = y
-                        } else {
-                            path.lineTo(x, y)
-                        }
-                        i++
-                    }
-                    drawPath(
-                        path = path,
-                        brush = Brush.linearGradient(
-                            0f to streamWhite.copy(alpha = 0f),
-                            0.5f to streamWhite.copy(alpha = s.alpha),
-                            0.85f to streamWhite.copy(alpha = s.alpha),
-                            1f to streamWhite.copy(alpha = 0f),
-                            start = Offset(startX, startY),
-                            end = holeCenter
-                        ),
-                        style = Stroke(width = s.widthDp.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                    // 光珠：沿螺旋向中心行进的亮珠，掠过黑盘正面、没入中心消失（白光在走）
-                    val travel = (seconds * s.speed + s.phase) % 1f
-                    val beadR = rOut + (rTip - rOut) * travel
-                    val beadTheta = baseAngle + s.pitch * travel
-                    val beadGlow = kotlin.math.sin(travel * 3.1416f)
-                    drawCircle(
-                        color = streamWhite,
-                        radius = (s.widthDp * 1.35f).dp.toPx(),
-                        center = Offset(
-                            holeCenter.x + kotlin.math.cos(beadTheta) * beadR,
-                            holeCenter.y + kotlin.math.sin(beadTheta) * beadR
-                        ),
-                        alpha = (s.alpha * 1.25f * beadGlow).coerceIn(0f, 1f)
-                    )
-                }
-                // 透镜弧光：黑洞球面把远端光弯到上下两侧的两道亮弧（贴在黑盘上沿/下沿）
-                val lensR = coreR * 0.82f
-                val lensBreath = 0.40f + 0.15f * sin(seconds * 0.9f)
-                drawArc(
-                    color = streamWhite,
-                    startAngle = 215f,
-                    sweepAngle = 110f,
-                    useCenter = false,
-                    topLeft = Offset(holeCenter.x - lensR, holeCenter.y - lensR),
-                    size = Size(lensR * 2f, lensR * 2f),
-                    alpha = lensBreath,
-                    style = Stroke(width = 2.2f.dp.toPx(), cap = StrokeCap.Round)
-                )
-                drawArc(
-                    color = streamWhite,
-                    startAngle = 35f,
-                    sweepAngle = 110f,
-                    useCenter = false,
-                    topLeft = Offset(holeCenter.x - lensR, holeCenter.y - lensR),
-                    size = Size(lensR * 2f, lensR * 2f),
-                    alpha = lensBreath * 0.85f,
-                    style = Stroke(width = 2.2f.dp.toPx(), cap = StrokeCap.Round)
+                val incident = selectedId != null &&
+                    (edge.fromId == selectedId || edge.toId == selectedId)
+                val dim = if (selectedId != null && !incident) 0.22f else 1f
+                val edgeStroke = edgeBaseWidthPx * (1f + (edgeGate - 1f) * 0.5f) *
+                    (if (incident) 1.6f else 1f)
+                val edgeAlpha = (0.10f * edgeGate * edge.opacityFactor * dim *
+                    (if (incident) 4f else 1f)).coerceIn(0f, 1f)
+                // R85 用户拍板：关系线优先保持直线，绝不为「成圆」而弯曲；
+                // R94：黑洞删除——遗忘区分段渐隐遮断随之退役，恢复整段直线绘制。
+                drawLine(
+                    color = palette.edge,
+                    start = worldToScreen(edge.fromX, edge.fromY),
+                    end = worldToScreen(edge.toX, edge.toY),
+                    strokeWidth = edgeStroke,
+                    alpha = edgeAlpha
                 )
             }
 
-            // 拖到黑洞上方：净空带警示圈 + 节点 X 标记（松手弹开、不吞噬）
-            if (engine.dragOverHole) {
-                drawCircle(
-                    color = palette.holeExclusionHint,
-                    radius = engine.exclusionRadius * camera.scale,
-                    center = holeCenter,
-                    style = Stroke(width = 1.2.dp.toPx())
-                )
-            }
-
-            // 节点：柔光晕 -> 填充 -> 细边 -> 标签
+            // 节点：填充 -> 细边 -> 内环设计层 -> 标签（光晕 R95 改末层统一释放）
             val labelColor = palette.label
             val labelPaint = android.graphics.Paint().apply {
                 color = android.graphics.Color.argb(
@@ -967,44 +829,46 @@ private fun BlackHoleGraphReadyContent(
                     (labelColor.green * 255).toInt(),
                     (labelColor.blue * 255).toInt()
                 )
-                textSize = 11.sp.toPx()
+                // R90：11sp→9sp（整体放大节点×2 的方案被否——卫星会被 ×2 后的净空带吞掉、环距不够必抖；字体单独缩小零风险）
+                // R92 用户拍板「字体再进行缩小」：9sp→8sp（与节点半径 +35% 配套，药丸底衬随 measureText 自动缩小）
+                textSize = 8.sp.toPx()
                 textAlign = android.graphics.Paint.Align.CENTER
                 isAntiAlias = true
             }
             val borderPx = max(1.5f, 1.8.dp.toPx())
             // 标签候选：循环内只收集，循环后做防重叠剔除再统一绘制
-            // （用户反馈「字体全都重复在一起」——选中节点最优先，其余按节点大小，矩形相交则跳过）
-            class LabelCandidate(val text: String, val x: Float, val y: Float, val selected: Boolean, val r: Float)
+            // （用户反馈「字体全都重复在一起」——选中节点最优先，其余按节点大小，矩形相交则跳过；
+            //  R88 再加缩放分级预算 + 半透底衬：默认视角只留最重要的少数标签，放大才显示更多）
+            // R91：候选携带节点圆心（nodeY）而非固定下方锚点——绘制时按与节点圆的避让关系选上/下侧
+            class LabelCandidate(val text: String, val x: Float, val nodeY: Float, val selected: Boolean, val neighbor: Boolean, val r: Float)
             val labelCandidates = mutableListOf<LabelCandidate>()
+            // R91 错位修复：标签药丸与「节点圆」的避让检测需要全部节点圆的屏幕位置（此前只查标签间重叠，
+            // 纵向堆叠时下方药丸直接盖住下一个节点的上半圆，看起来像标签接错了节点）
+            class ScreenCircle(val x: Float, val y: Float, val r: Float)
+            val nodeCircles = mutableListOf<ScreenCircle>()
+            // R95 光晕全释放：循环内只收集光晕参数，标签画完后统一最末层绘制，
+            // 任何元素（标签药丸/连线/尘埃）都不再截断光晕（用户反馈深色下光晕被字体遮挡、浅色下看不见）
+            class GlowSpec(val x: Float, val y: Float, val r: Float, val color: Color, val alpha: Float)
+            val glowSpecs = mutableListOf<GlowSpec>()
             engine.renderNodes().forEach { node ->
                 val center = worldToScreen(node.x, node.y)
                 val r = node.radius * camera.scale
                 val dim = if (selectedId != null && node.id !in neighborIds) 0.22f else 1f
-                // 衰减节点进入遗忘区后做闪烁呼吸 = 「即将遗忘」的警告（R66 设计，R87 判定改为遗忘>0）
-                val dToHole = kotlin.math.hypot(node.x - engine.holeX, node.y - engine.holeY)
-                val breathing = node.forget > 0f && dToHole <= engine.exclusionRadius
+                // 衰减节点遗忘过门后做闪烁呼吸 = 「即将遗忘」的警告（R66 设计；
+                // R94 无黑洞版：不再按遗忘区位置判定，遗忘 >= blinkForgetStart 即闪烁）
+                val breathing = node.forget >= engine.physics.blinkForgetStart
+                // R97 用户反馈「呼吸太局促」：频率 5.5→2.0（周期 ~1.1s→~3.1s），下限 0.45→0.5 更平缓
                 val breathAlpha = if (breathing) {
-                    0.45f + 0.55f * (0.5f + 0.5f * kotlin.math.sin(seconds * 5.5f))
+                    0.5f + 0.5f * (0.5f + 0.5f * kotlin.math.sin(seconds * 2.0f))
                 } else 1f
                 val alpha = (node.opacity * dim * breathAlpha).coerceIn(0f, 1f)
                 if (r <= 0.5f) return@forEach
+                nodeCircles.add(ScreenCircle(center.x, center.y, r))
                 val base = palette.nodeColor(node.kind)
                 // 选中/抢救提示环用同色相压暗描边（用户 2026-09-19 拍板：不要黑色线框），与米白底和同色光晕都有区分度
                 val ringColor = Color(base.red * 0.72f, base.green * 0.72f, base.blue * 0.72f)
-                // 柔光晕（半径外扩 ~2.1x，渐隐）：节点同色晕（R81 深色同步浅色做法——深色统一蓝紫晕与浅色同色晕观感割裂）
-                val glowColor = base
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            glowColor.copy(alpha = palette.nodeGlowAlpha * alpha),
-                            Color.Transparent
-                        ),
-                        center = center,
-                        radius = r * 2.1f
-                    ),
-                    radius = r * 2.1f,
-                    center = center
-                )
+                // 柔光晕：R95 改为收集制——此处不再即画，标签绘制完成后统一末层释放（见下方 glowSpecs 循环）
+                glowSpecs.add(GlowSpec(center.x, center.y, r, base, alpha))
                 drawCircle(color = base, radius = r, center = center, alpha = alpha)
                 // 细边
                 drawCircle(
@@ -1013,6 +877,14 @@ private fun BlackHoleGraphReadyContent(
                     center = center,
                     alpha = alpha,
                     style = Stroke(width = borderPx)
+                )
+                // R95 节点设计层（用户反馈「光秃秃的有点丑」）：内环细描边，
+                // 白色半透与彩色填充成「徽章」层次，简单一层不抢戏
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.45f * alpha),
+                    radius = r * 0.68f,
+                    center = center,
+                    style = Stroke(width = 1.2.dp.toPx())
                 )
                 if (state.selectedNodeId == node.id) {
                     drawCircle(
@@ -1032,42 +904,96 @@ private fun BlackHoleGraphReadyContent(
                         style = Stroke(width = 1.5.dp.toPx())
                     )
                 }
-                if (node.mode == BlackHoleNodeMode.Dragging && engine.dragOverHole) {
-                    val markR = r + 8.dp.toPx()
-                    val w = 2.dp.toPx()
-                    drawLine(palette.bounceMark, Offset(center.x - markR, center.y - markR), Offset(center.x + markR, center.y + markR), strokeWidth = w)
-                    drawLine(palette.bounceMark, Offset(center.x - markR, center.y + markR), Offset(center.x + markR, center.y - markR), strokeWidth = w)
-                }
                 // 标签：遗忘未过半且缩放达到标签阈值且入场完成（引擎已 gating entrance）——先收集，统一剔除后绘制
                 if (node.showLabel && camera.scale >= 0.8f && alpha > 0.05f) {
                     labelCandidates.add(
                         LabelCandidate(
                             node.label.take(12),
                             center.x,
-                            center.y + r + 13.dp.toPx(),
+                            center.y,
                             state.selectedNodeId == node.id,
+                            node.id != state.selectedNodeId && node.id in neighborIds,
                             r
                         )
                     )
                 }
             }
-            // 标签防重叠剔除：选中节点最优先，其余按节点半径从大到小；与已画矩形相交则跳过
+            // 标签绘制：R88 缩放分级预算（默认视角只留 6 个最重要的，1.4× 以上才全量），
+            // 选中 > 选中节点的邻居 > 节点半径；矩形相交跳过；半透底衬保证文字不被连线/尘埃/光晕干扰
+            val labelBudget = when {
+                camera.scale < 1.0f -> 6
+                camera.scale < 1.4f -> 12
+                else -> Int.MAX_VALUE
+            }
             val drawnLabelRects = mutableListOf<android.graphics.RectF>()
+            var labelsDrawn = 0
             labelCandidates
-                .sortedWith(compareByDescending<LabelCandidate> { it.selected }.thenByDescending { it.r })
+                .sortedWith(
+                    compareByDescending<LabelCandidate> { it.selected }
+                        .thenByDescending { it.neighbor }
+                        .thenByDescending { it.r }
+                )
                 .forEach { c ->
+                    if (labelsDrawn >= labelBudget) return@forEach
                     val w = labelPaint.measureText(c.text)
-                    val rect = android.graphics.RectF(
-                        c.x - w / 2f - 4.dp.toPx(),
-                        c.y - 12.dp.toPx(),
-                        c.x + w / 2f + 4.dp.toPx(),
-                        c.y + 4.dp.toPx()
+                    val padX = 5.dp.toPx()
+                    val gapY = 13.dp.toPx()
+                    // R91 错位修复：默认画在节点下方；若下方药丸与其它节点圆相撞则翻到上方，
+                    // 两侧都撞则保留下方（交给下方既有的标签间矩形剔除兜底）。
+                    // 此前固定画在下方，节点纵向贴近时药丸盖住下一个节点的上半圆——正是真机反馈的「错位」。
+                    fun rectAt(anchorY: Float) = android.graphics.RectF(
+                        c.x - w / 2f - padX,
+                        anchorY - 12.dp.toPx(),
+                        c.x + w / 2f + padX,
+                        anchorY + 3.dp.toPx()
                     )
+                    fun blocked(rect: android.graphics.RectF): Boolean {
+                        nodeCircles.forEach { sc ->
+                            if (sc.x == c.x && sc.y == c.nodeY) return@forEach // 自己的圆
+                            val nx = sc.x.coerceIn(rect.left, rect.right)
+                            val ny = sc.y.coerceIn(rect.top, rect.bottom)
+                            if (kotlin.math.hypot(sc.x - nx, sc.y - ny) < sc.r + 2.dp.toPx()) return true
+                        }
+                        return false
+                    }
+                    var rect = rectAt(c.nodeY + c.r + gapY)
+                    if (blocked(rect)) {
+                        val above = rectAt(c.nodeY - c.r - gapY)
+                        if (!blocked(above)) rect = above
+                    }
                     if (drawnLabelRects.none { android.graphics.RectF.intersects(it, rect) }) {
                         drawnLabelRects.add(rect)
-                        drawContext.canvas.nativeCanvas.drawText(c.text, c.x, c.y, labelPaint)
+                        drawRoundRect(
+                            color = palette.panel,
+                            topLeft = Offset(rect.left, rect.top),
+                            size = Size(rect.width(), rect.height()),
+                            cornerRadius = CornerRadius(6.dp.toPx()),
+                            alpha = 0.78f
+                        )
+                        drawContext.canvas.nativeCanvas.drawText(c.text, c.x, rect.bottom - 3.dp.toPx(), labelPaint)
+                        labelsDrawn++
                     }
                 }
+
+            // R95 光晕全释放：最末层统一绘制——半径外扩 2.4x、三段渐隐，
+            // 覆盖在标签/连线上方，光晕连续不再被任何元素截断（靠近节点的标签仅被极淡染色，文字可读性不受影响）
+            glowSpecs.forEach { g ->
+                val glowR = g.r * 2.4f
+                val gc = Offset(g.x, g.y)
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            g.color.copy(alpha = palette.nodeGlowAlpha * g.alpha),
+                            g.color.copy(alpha = palette.nodeGlowAlpha * 0.45f * g.alpha),
+                            Color.Transparent
+                        ),
+                        center = gc,
+                        radius = glowR
+                    ),
+                    radius = glowR,
+                    center = gc
+                )
+            }
         }
 
         // 右上：主题切换 + 时间倍率 chips + 已遗忘计数（每帧随重组刷新）
@@ -1332,13 +1258,6 @@ private fun BlackHoleMinimap(
                     alpha = node.opacity
                 )
             }
-            // 黑洞
-            val hc = worldToMm(engine.holeX, engine.holeY, w, h)
-            drawCircle(
-                color = palette.holeCore,
-                radius = 4.dp.toPx(),
-                center = hc
-            )
             // 视口框（主视角所见范围）
             if (viewportWidth > 0f && camera.scale > 0f) {
                 val halfW = viewportWidth / 2f / camera.scale
