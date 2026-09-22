@@ -464,11 +464,12 @@ private fun BlackHoleGraphReadyContent(
     val starfield = remember(engine) { buildStarfield(engine) }
     val nebulae = remember(engine) { buildNebulae(engine) }
     // R98 动态流线三层规格（远 -> 近：慢/淡/细 -> 快/显/粗 = 前后渐进）
+    // R99 用户反馈「线条太细、有点浅」：宽度 ×~2（1/1.3/1.6 -> 2.2/3.0/3.8px）、不透明度 0.05~0.09 -> 0.10~0.16
     val flowLayers = remember {
         listOf(
-            FlowLayer(spacingX = 110f, speed = 14f, len = 60f, widthPx = 1f, alpha = 0.05f, parallax = 0.3f, seed = 101),
-            FlowLayer(spacingX = 78f, speed = 26f, len = 92f, widthPx = 1.3f, alpha = 0.07f, parallax = 0.55f, seed = 202),
-            FlowLayer(spacingX = 52f, speed = 42f, len = 130f, widthPx = 1.6f, alpha = 0.09f, parallax = 0.85f, seed = 303)
+            FlowLayer(spacingX = 110f, speed = 14f, len = 60f, widthPx = 2.2f, alpha = 0.10f, parallax = 0.3f, seed = 101),
+            FlowLayer(spacingX = 78f, speed = 26f, len = 92f, widthPx = 3.0f, alpha = 0.13f, parallax = 0.55f, seed = 202),
+            FlowLayer(spacingX = 52f, speed = 42f, len = 130f, widthPx = 3.8f, alpha = 0.16f, parallax = 0.85f, seed = 303)
         )
     }
     var frame by remember { mutableLongStateOf(0L) }
