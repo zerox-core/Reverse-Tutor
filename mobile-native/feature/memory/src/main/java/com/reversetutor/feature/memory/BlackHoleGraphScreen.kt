@@ -281,23 +281,14 @@ private fun buildNebulae(engine: BlackHoleGraphEngine): List<NebulaGlow> {
     )
 }
 
-/** R98 动态流线规格：抽象线条感、微微下流（无具体雨滴），三层 = 前后渐进（远慢淡细 / 近快显粗）。 */
-private data class FlowLayer(
-    val spacingX: Float,
-    val speed: Float,
-    val len: Float,
-    val widthPx: Float,
-    val alpha: Float,
-    val parallax: Float,
-    val seed: Int
+/** R100 浅色星云辉光：fx/fy/fradius 均为屏幕宽/高比例（屏幕空间定位，跟随窗口），phase 为漂移相位。 */
+private data class LightNebula(
+    val fx: Float,
+    val fy: Float,
+    val fradius: Float,
+    val color: Color,
+    val phase: Float
 )
-
-/** R98 流线确定性哈希：同一下标永远同一随机值（0..1），流线位置逐帧稳定不抖。 */
-private fun flowHash01(index: Int, seed: Int): Float {
-    var h = index * 374761393 + seed * 668265263
-    h = (h xor (h ushr 13)) * 1274126177
-    return ((h xor (h ushr 16)) and 0x7fffffff) / 2147483647f
-}
 
 /** 相机：世界坐标中心 + 缩放；平移降敏（x0.72）、松手滑移惯性衰减 0.93（Obsidian 式微惯性）、缩放范围 0.45~3.2。 */
 private class BlackHoleCamera {
@@ -463,13 +454,13 @@ private fun BlackHoleGraphReadyContent(
     val dust = remember(engine, palette) { buildDust(engine, palette.dustColors) }
     val starfield = remember(engine) { buildStarfield(engine) }
     val nebulae = remember(engine) { buildNebulae(engine) }
-    // R98 动态流线三层规格（远 -> 近：慢/淡/细 -> 快/显/粗 = 前后渐进）
-    // R99 用户反馈「线条太细、有点浅」：宽度 ×~2（1/1.3/1.6 -> 2.2/3.0/3.8px）、不透明度 0.05~0.09 -> 0.10~0.16
-    val flowLayers = remember {
+    // R100 浅色版银河（用户决策卡拍板：深色银河结构翻成暖白调）：
+    // 三团暖色星云辉光，屏幕宽/高比例定位（跟随窗口、永不消失）+ 缓慢漂移
+    val lightNebulae = remember {
         listOf(
-            FlowLayer(spacingX = 110f, speed = 14f, len = 60f, widthPx = 2.2f, alpha = 0.10f, parallax = 0.3f, seed = 101),
-            FlowLayer(spacingX = 78f, speed = 26f, len = 92f, widthPx = 3.0f, alpha = 0.13f, parallax = 0.55f, seed = 202),
-            FlowLayer(spacingX = 52f, speed = 42f, len = 130f, widthPx = 3.8f, alpha = 0.16f, parallax = 0.85f, seed = 303)
+            LightNebula(0.24f, 0.30f, 0.62f, Color(0x11F0A860), 0.0f),
+            LightNebula(0.80f, 0.68f, 0.55f, Color(0x0FE8907A), 2.1f),
+            LightNebula(0.58f, 0.12f, 0.45f, Color(0x0CB8C078), 4.2f)
         )
     }
     var frame by remember { mutableLongStateOf(0L) }
@@ -709,33 +700,50 @@ private fun BlackHoleGraphReadyContent(
                     )
                 }
             } else {
-                // R98 动态流线（用户拍板换掉绢纸晨光：抽象线条感、微微下流、前后渐进、跟随窗口铺满）：
-                // 屏幕空间无限平铺——相机平移 / 缩放到哪流线都在，不再有「划走就空」的区域；
-                // 三层视差 = 前后渐进（远慢淡细 / 近快显粗），确定性哈希保证流线逐帧稳定不抖。
-                val flowColor = Color(0xFF8C7A5C)
-                flowLayers.forEach { layer ->
-                    val spacing = layer.spacingX
-                    val driftX = -(camera.centerX - engine.holeX) * layer.parallax * camera.scale
-                    val driftY = -(camera.centerY - engine.holeY) * layer.parallax * camera.scale
-                    val startK = kotlin.math.floor((-spacing - driftX) / spacing).toInt()
-                    val endK = kotlin.math.ceil((size.width + spacing - driftX) / spacing).toInt()
-                    val travel = size.height + layer.len * 2f
-                    var k = startK
-                    while (k <= endK) {
-                        val x = k * spacing + driftX + flowHash01(k, layer.seed) * spacing * 0.5f
-                        val phase = flowHash01(k, layer.seed + 7)
-                        val lenScale = 0.7f + flowHash01(k, layer.seed + 13) * 0.6f
-                        val y = ((seconds * layer.speed + phase * travel + driftY) % travel + travel) % travel - layer.len
-                        drawLine(
-                            color = flowColor,
-                            start = Offset(x, y),
-                            end = Offset(x, y + layer.len * lenScale),
-                            strokeWidth = layer.widthPx,
-                            cap = StrokeCap.Round,
-                            alpha = layer.alpha
-                        )
-                        k++
-                    }
+                // R100 浅色版银河（用户决策卡拍板）：深色银河结构翻成暖白调——
+                // 斜向晨光带 -> 暖色星云辉光 -> 彩点（= 浅色星点）-> 边角轻压；
+                // 带与星云均屏幕空间定位，跟随窗口铺满，平移到哪都在，且带缓慢自漂动态。
+
+                // 晨光银河带：与深色银河带同构（-22°、相机 0.2 倍慢漂）+ 自身缓慢起伏呼吸
+                withTransform({
+                    rotate(degrees = -22f, pivot = Offset(size.width / 2f, size.height / 2f))
+                }) {
+                    val bandH = size.height * 0.62f
+                    val bandDrift = -(camera.centerY - engine.holeY) * 0.2f * camera.scale +
+                        sin(seconds * 0.05f) * size.height * 0.03f
+                    val bandTop = size.height * 0.5f - bandH / 2f - size.height * 0.08f + bandDrift
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.34f to Color(0x12FFDFA8),
+                            0.5f to Color(0x1CFFEDC4),
+                            0.66f to Color(0x12FFDFA8),
+                            1f to Color.Transparent,
+                            startY = bandTop,
+                            endY = bandTop + bandH
+                        ),
+                        topLeft = Offset(-size.width * 0.5f, bandTop),
+                        size = Size(size.width * 2f, bandH)
+                    )
+                }
+
+                // 暖色星云辉光：屏幕比例定位（跟随窗口）+ 缓慢漂移 + 相机 0.3 倍轻推制造纵深
+                lightNebulae.forEach { neb ->
+                    val drift = sin(seconds * 0.03f + neb.phase) * size.width * 0.02f
+                    val c = Offset(
+                        size.width * neb.fx + drift - (camera.centerX - engine.holeX) * 0.3f * camera.scale,
+                        size.height * neb.fy + drift * 0.6f - (camera.centerY - engine.holeY) * 0.3f * camera.scale
+                    )
+                    val r = size.height * neb.fradius
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(neb.color, Color.Transparent),
+                            center = c,
+                            radius = r
+                        ),
+                        radius = r,
+                        center = c
+                    )
                 }
 
                 // 彩色点缀点：漂移 + 闪烁（浅色主题，取大地暖调四色）
