@@ -1503,9 +1503,12 @@ private fun RichMessageContent(
                 is ChatRichBlock.Code -> RichSourceBlock(
                     label = block.language?.let { "代码 · $it" } ?: "代码",
                     source = block.source,
+                    displayText = remember(block.language, block.source) {
+                        highlightedCodeAnnotatedString(block.language, block.source)
+                    },
                     onCopySource = onCopySource
                 )
-                is ChatRichBlock.Formula -> RichSourceBlock("公式", block.source, onCopySource)
+                is ChatRichBlock.Formula -> RichSourceBlock("公式", block.source, onCopySource = onCopySource)
                 is ChatRichBlock.Table -> RichTable(block)
                 is ChatRichBlock.PlainText -> Text(block.source, color = ChatInk, fontSize = 16.sp, lineHeight = 24.sp)
             }
@@ -1598,6 +1601,7 @@ internal fun buildRichInlineAnnotatedString(inlines: List<ChatRichInline>): Anno
 private fun RichSourceBlock(
     label: String,
     source: String,
+    displayText: AnnotatedString? = null,
     onCopySource: (String) -> ChatClipboardResult
 ) {
     Surface(
@@ -1617,11 +1621,12 @@ private fun RichSourceBlock(
                 }
             }
             Text(
-                source,
+                text = displayText ?: AnnotatedString(source),
                 modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 8.dp),
                 color = Color(0xFFF1F4F8),
                 fontSize = 14.sp,
                 lineHeight = 21.sp,
+                fontFamily = FontFamily.Monospace,
                 softWrap = false
             )
         }

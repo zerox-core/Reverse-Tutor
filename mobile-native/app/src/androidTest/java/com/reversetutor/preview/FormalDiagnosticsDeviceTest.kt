@@ -106,8 +106,8 @@ class FormalDiagnosticsDeviceTest {
 
     private companion object {
         val NoOpNotifier = object : BackgroundGenerationNotifier {
-            override fun notifyCompleted(jobId: String) = Unit
-            override fun notifyFailed(jobId: String) = Unit
+            override fun notifyCompleted(jobId: String, sessionId: String?) = Unit
+            override fun notifyFailed(jobId: String, sessionId: String?) = Unit
         }
     }
 }
