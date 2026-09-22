@@ -239,6 +239,63 @@ class ChatUiStateTest {
     }
 
     @Test
+    fun runningJobWithPreviewMapsToStreamingGenerationState() {
+        assertEquals(
+            ChatGenerationUiState.Streaming("我们一起看看这道题"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                preview = "我们一起看看这道题"
+            )
+        )
+        // 空白预览 = 还没有增量文本，退回等待态
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Running, errorMessage = null, preview = "  ")
+        )
+        // Queued 与终态不透出预览：完整回复只由持久化消息发布一次
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Queued, errorMessage = null, preview = "部分文本")
+        )
+        assertEquals(
+            ChatGenerationUiState.Idle,
+            backgroundGenerationUiState(BackgroundJobStatus.Completed, errorMessage = null, preview = "部分文本")
+        )
+    }
+
+    @Test
+    fun runningJobWithMonologueOnlyStreamsDrawerBeforeBody() {
+        // 2026-09-21 思考链流式透出：独白先于正文到达也进 Streaming，抽屉先上屏。
+        assertEquals(
+            ChatGenerationUiState.Streaming("", "我卡在货币乘数这"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                monologue = "我卡在货币乘数这"
+            )
+        )
+    }
+
+    @Test
+    fun runningJobWithBodyAndMonologueCarriesBoth() {
+        assertEquals(
+            ChatGenerationUiState.Streaming("我们一起看看这道题", "我卡在货币乘数这"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                preview = "我们一起看看这道题",
+                monologue = "我卡在货币乘数这"
+            )
+        )
+        // 空白独白等价于没有独白。
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Running, errorMessage = null, monologue = "  ")
+        )
+    }
+
+    @Test
     fun noModelFailureMapsToNoModelGenerationState() {
         assertEquals(
             ChatGenerationUiState.NoModel,

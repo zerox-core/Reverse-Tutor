@@ -49,6 +49,30 @@ class DebugLlmProfileBootstrapperTest {
     }
 
     @Test
+    fun reconcilePrunesStaleDebugFallbacksButKeepsManualProfiles() = runTest {
+        val store = FakeDebugLlmProfileStore()
+        val bootstrapper = DebugLlmProfileBootstrapper(store, nowEpochMillis = { 100L })
+
+        bootstrapper.ensureProfiles(config())
+        // 模拟用户在界面里手动建的配置（非 debug-llm- 前缀，prune 不许碰）。
+        store.save(
+            DebugLlmProfileSeed(id = "manual-profile-1", name = "手动", model = "some-model", isDefault = false),
+            config(),
+            200L
+        )
+
+        bootstrapper.ensureProfiles(
+            config(defaultModel = "gemini-3.5-flash-lite", fallbackModels = "deepseek-v4.1-flash")
+        )
+
+        assertEquals(listOf("debug-llm-fallback-2"), store.deleted)
+        assertEquals(
+            setOf("debug-llm-default", "debug-llm-fallback-1", "manual-profile-1"),
+            store.profileIds()
+        )
+    }
+
+    @Test
     fun incompleteConfigurationDoesNotCreateProfiles() = runTest {
         val store = FakeDebugLlmProfileStore()
         val bootstrapper = DebugLlmProfileBootstrapper(store)
@@ -64,13 +88,14 @@ class DebugLlmProfileBootstrapperTest {
     private fun config(
         apiKey: String = "test-key",
         baseUrl: String = "https://example.test/v1",
-        defaultModel: String = "qwen3.7-flash"
+        defaultModel: String = "qwen3.7-flash",
+        fallbackModels: String = "qwen3.6-flash,deepseek-v4-flash"
     ): DebugLlmBootstrapConfig =
         DebugLlmBootstrapConfig.from(
             apiKey = apiKey,
             baseUrl = baseUrl,
             defaultModel = defaultModel,
-            fallbackModels = "qwen3.6-flash,deepseek-v4-flash"
+            fallbackModels = fallbackModels
         )
 }
 
@@ -78,6 +103,7 @@ private class FakeDebugLlmProfileStore : DebugLlmProfileStore {
     private val ids = linkedSetOf<String>()
     val saved = mutableListOf<DebugLlmProfileSeed>()
     val activated = mutableListOf<String>()
+    val deleted = mutableListOf<String>()
 
     override suspend fun profileIds(): Set<String> = ids.toSet()
 
@@ -92,5 +118,10 @@ private class FakeDebugLlmProfileStore : DebugLlmProfileStore {
 
     override suspend fun activate(profileId: String, nowEpochMillis: Long) {
         activated += profileId
+    }
+
+    override suspend fun delete(profileId: String) {
+        ids -= profileId
+        deleted += profileId
     }
 }

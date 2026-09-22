@@ -33,9 +33,13 @@ import com.reversetutor.core.data.sync.RoomSyncRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.wipe.LocalDataWipeRepository
 import com.reversetutor.core.data.window.WindowTopologyRepository
+import com.reversetutor.core.data.windowmemory.WindowMemoryRepository
+import com.reversetutor.core.data.windowmemory.WindowTokenMeterRepository
 import com.reversetutor.core.domain.ConversationRunCoordinator
+import com.reversetutor.core.domain.ReplyValidator
 import com.reversetutor.core.domain.SyncCoordinator
 import com.reversetutor.core.domain.WindowKind
+import com.reversetutor.core.domain.WindowMemoryIntakeCoordinator
 import com.reversetutor.core.remote.AndroidOnlineAuthStateStore
 import com.reversetutor.core.remote.HttpOnlineApi
 import com.reversetutor.core.remote.OnlineAuthSessionManager
@@ -79,6 +83,16 @@ import com.reversetutor.preview.wiring.session.WindowVisibleHistoryReader
 import com.reversetutor.preview.wiring.session.WindowVisibleTimelinePortAdapter
 import com.reversetutor.preview.wiring.session.WindowBranchCoordinator
 import com.reversetutor.preview.wiring.session.SessionRichReplyPortAdapter
+import com.reversetutor.preview.wiring.session.WindowIntakeDispatcher
+import com.reversetutor.preview.wiring.session.WindowIntakeMessagePortAdapter
+import com.reversetutor.preview.wiring.session.WindowMemoryContextPortAdapter
+import com.reversetutor.preview.wiring.session.WindowIntakeRunner
+import com.reversetutor.preview.wiring.session.WindowIntakeStoreAdapter
+import com.reversetutor.preview.wiring.session.windowIntakeFoldSummary
+import java.util.Calendar
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 data class HybridFrontendFactories(
     val workspaceViewModelFactory: WorkspaceViewModelFactory,
@@ -269,6 +283,41 @@ class HybridAppGraph private constructor(
                 listMessageRecords = messageRepository::listMessageRecords
             )
             val sessionSummaryStore = SharedPreferencesSessionSummaryStore(appContext)
+            // V2-004: window-memory intake pipeline (decision #9 - batch
+            // extraction on sliding-window eviction, off the chat loop).
+            val windowMemoryRepository = WindowMemoryRepository(database.windowMemoryDao())
+            val windowMemoryIntakeCoordinator = WindowMemoryIntakeCoordinator(
+                messagePort = WindowIntakeMessagePortAdapter(messageRepository::listMessages),
+                store = WindowIntakeStoreAdapter(windowMemoryRepository),
+                hourOfDayAt = { epochMillis ->
+                    Calendar.getInstance().apply { timeInMillis = epochMillis }.get(Calendar.HOUR_OF_DAY)
+                },
+                foldSummary = windowIntakeFoldSummary(chatGenerationRepository::generateSessionSummary),
+            )
+            // V2-006: token metering (window-kept per intake, injection per
+            // assembled context) so the default window budget can be tuned
+            // against real usage.
+            val windowTokenMeterRepository = WindowTokenMeterRepository(database.windowMemoryTokenMeterDao())
+            val windowIntakeDispatcher = WindowIntakeDispatcher(
+                runner = WindowIntakeRunner { sessionId, now ->
+                    val report = windowMemoryIntakeCoordinator.onTurnCompleted(sessionId, now)
+                    windowTokenMeterRepository.recordTokenMeter(
+                        sessionId = sessionId,
+                        kind = "window_kept",
+                        estimatedTokens = report.windowKeptTokens,
+                        detail = "kept=" + report.windowKeptCount + ",evicted=" + report.evictedCount,
+                        createdAtEpochMillis = now,
+                    )
+                },
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            )
+            val windowMemoryContextPort = WindowMemoryContextPortAdapter(
+                repository = windowMemoryRepository,
+                meterRepository = windowTokenMeterRepository,
+                hourOfDayAt = { epochMillis ->
+                    Calendar.getInstance().apply { timeInMillis = epochMillis }.get(Calendar.HOUR_OF_DAY)
+                },
+            )
             val sessionConversationAssembly = SessionConversationAssembly(
                 chatGenerationRepository = chatGenerationRepository,
                 messageRepository = messageRepository,
@@ -280,7 +329,9 @@ class HybridAppGraph private constructor(
                 learningRepository = learningRepository,
                 learningLedgerRepository = learningLedgerRepository,
                 messageContextPort = TopologyAwareMessageContextPort(visibleHistoryReader),
-                sessionSummaryStore = sessionSummaryStore
+                sessionSummaryStore = sessionSummaryStore,
+                windowIntakeDispatcher = windowIntakeDispatcher,
+                windowMemoryContextPort = windowMemoryContextPort
             )
             val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =
                 BackgroundTurnPreparationCoordinator(
@@ -293,7 +344,13 @@ class HybridAppGraph private constructor(
                     enqueueJob = { input, now ->
                         backgroundGenerationRepository.enqueueGenerationJob(input, now)
                     },
-                    loadRecentTurnSignals = recentTurnSignalsReader::read
+                    loadRecentTurnSignals = recentTurnSignalsReader::read,
+                    loadLastTurnStyleHint = { sessionId ->
+                        DataModule.database(appContext).turnTrajectoryDao()
+                            .findLatestBySession(sessionId)
+                            ?.let { ReplyValidator.styleHintForPayload(it.styleFlagsPayload) }
+                            .orEmpty()
+                    }
                 )
             val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(
                 sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },

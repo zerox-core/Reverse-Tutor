@@ -80,7 +80,7 @@ class GuidedLearningTurnPlanContextTest {
         assertTrue(content.contains("Action: diagnose"))
         assertTrue(content.contains("Secondary action: worked_example"))
         assertTrue(content.contains("用户是老师，你是学生 AI"))
-        assertTrue(content.contains("本轮只做一个教学动作"))
+        assertTrue(content.contains("像真人聊天一样说话"))
         assertTrue(content.contains("最多问老师一个问题"))
         assertTrue(content.contains("Student expression: State one precise point"))
         assertTrue(content.contains("Expected teacher move:"))

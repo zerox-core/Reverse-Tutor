@@ -22,7 +22,9 @@ data class Message(
     val text: String,
     val createdAtEpochMillis: Long,
     val parentMessageId: String? = null,
-    val sourceImportId: String? = null
+    val sourceImportId: String? = null,
+    /** Expression-loop slice 4: leading first-person monologue (thinking drawer); null on legacy rows. */
+    val monologue: String? = null
 )
 
 enum class MessageRole {

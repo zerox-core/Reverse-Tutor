@@ -48,6 +48,10 @@ android {
 
     buildTypes {
         getByName("debug") {
+            // V2 记忆测试专用身份：与正式版并排安装、数据完全隔离，不覆盖原版本。
+            applicationIdSuffix = ".memtest"
+            versionNameSuffix = "-memtest"
+            resValue("string", "app_name", "反转家教·记忆测试")
             buildConfigField("String", "DEBUG_LLM_API_KEY", "\"${debugLlmApiKey.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"${debugLlmBaseUrl.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")

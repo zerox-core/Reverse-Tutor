@@ -16,6 +16,7 @@ import com.reversetutor.core.domain.ConversationSessionCoordinator
 import com.reversetutor.core.domain.LearningOverviewCoordinator
 import com.reversetutor.core.domain.LearningOverviewScope
 import com.reversetutor.core.domain.SessionPolicyInput
+import com.reversetutor.core.domain.WindowMemoryContextPort
 import com.reversetutor.feature.chat.ConversationMessageContract
 import com.reversetutor.feature.chat.SessionConversationContract
 import com.reversetutor.feature.chat.SessionConversationFacade
@@ -55,6 +56,8 @@ class SessionConversationAssembly(
     private val learningLedgerRepository: LearningLedgerRepository? = null,
     private val messageContextPort: MessageContextPort = MessageContextPortAdapter(messageRepository),
     private val sessionSummaryStore: SessionSummaryStore? = null,
+    private val windowIntakeDispatcher: WindowIntakeDispatcher? = null,
+    private val windowMemoryContextPort: WindowMemoryContextPort? = null,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis
 ) {
 
@@ -111,7 +114,8 @@ class SessionConversationAssembly(
             chatGenerationRepository::embedQueryText
         ),
         masteryFactPort = learningLedgerRepository?.let { MasteryFactContextPortAdapter(it) },
-        digestPort = sessionSummaryStore
+        digestPort = sessionSummaryStore,
+        windowMemoryPort = windowMemoryContextPort
     )
 
     private val coordinator: ConversationSessionCoordinator = ConversationSessionCoordinator(
@@ -180,6 +184,9 @@ class SessionConversationAssembly(
             token = token,
             policyInput = policyInput
         )
+        // V2-004 / decision #9: window-memory intake runs after the turn,
+        // asynchronously, and can never block or fail the chat loop.
+        windowIntakeDispatcher?.dispatch(sessionId)
         val messages = messageRepository.listMessages(sessionId).map {
             ConversationMessageContract(it.id, it.role.name.lowercase(), it.text, it.createdAtEpochMillis)
         }

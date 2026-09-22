@@ -121,7 +121,8 @@ object DataModule {
             llmProfileRepository = llmProfileRepository(appContext),
             runtime = runtime ?: productionGenerationRuntime(appContext),
             modelConnectionRepository = modelConnectionRepository(appContext),
-            partialStore = generationPartialStore
+            partialStore = generationPartialStore,
+            turnTrajectoryDao = database.turnTrajectoryDao()
         )
     }
 

@@ -29,6 +29,7 @@ class SessionDeletionRepository(
 
             database.turnRunDao().deleteBySession(sessionId)
             database.turnRunDao().deleteSnapshotsBySession(sessionId)
+            database.turnTrajectoryDao().deleteBySession(sessionId)
             database.learningDao().deletePlanTasksBySession(sessionId)
             database.searchDocumentDao().deleteBySession(sessionId)
             deleteSessionOwnedRows(sessionId)

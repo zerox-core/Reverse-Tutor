@@ -1,11 +1,14 @@
 package com.reversetutor.core.llm
 
+import android.util.Log
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "RtProviderTransport"
 
 class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
     override suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult =
@@ -32,6 +35,9 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
                     } else {
                         connection.errorStream
                     })?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                    if (statusCode !in 200..299) {
+                        Log.e(TAG, "execute http $statusCode url=${request.url} body=${body.take(400)}")
+                    }
                     ProviderHttpResult.Response(
                         statusCode = statusCode,
                         body = body,
@@ -42,9 +48,11 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
                 } finally {
                     connection.disconnect()
                 }
-            } catch (_: SocketTimeoutException) {
+            } catch (e: SocketTimeoutException) {
+                Log.e(TAG, "timeout url=${request.url}", e)
                 ProviderHttpResult.Timeout
-            } catch (_: IOException) {
+            } catch (e: IOException) {
+                Log.e(TAG, "io failure url=${request.url}", e)
                 ProviderHttpResult.Failure
             }
         }
@@ -52,6 +60,12 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
     override suspend fun executeStreaming(
         request: ProviderHttpRequest,
         onLine: (String) -> Unit
+    ): ProviderHttpResult = executeStreaming(request, onLine) { false }
+
+    override suspend fun executeStreaming(
+        request: ProviderHttpRequest,
+        onLine: (String) -> Unit,
+        shouldAbort: () -> Boolean
     ): ProviderHttpResult = withContext(Dispatchers.IO) {
         try {
             val connection = (URL(request.url).openConnection() as HttpURLConnection).apply {
@@ -70,12 +84,20 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
                     ?.bufferedReader(Charsets.UTF_8)
                     ?.use { reader ->
                         buildString {
-                            reader.forEachLine { line ->
+                            // Slice 3: poll the abort signal between lines so a
+                            // red-lined stream is cut early; the aborted line
+                            // itself is never forwarded.
+                            while (!shouldAbort()) {
+                                val line = reader.readLine() ?: break
+                                if (shouldAbort()) break
                                 onLine(line)
                                 append(line).append('\n')
                             }
                         }
                     }.orEmpty()
+                if (statusCode !in 200..299) {
+                    Log.e(TAG, "stream http $statusCode url=${request.url} body=${body.take(400)}")
+                }
                 ProviderHttpResult.Response(
                     statusCode = statusCode,
                     body = body,
@@ -85,9 +107,11 @@ class UrlConnectionProviderHttpTransport : ProviderHttpTransport {
             } finally {
                 connection.disconnect()
             }
-        } catch (_: SocketTimeoutException) {
+        } catch (e: SocketTimeoutException) {
+            Log.e(TAG, "stream timeout url=${request.url}", e)
             ProviderHttpResult.Timeout
-        } catch (_: IOException) {
+        } catch (e: IOException) {
+            Log.e(TAG, "stream io failure url=${request.url}", e)
             ProviderHttpResult.Failure
         }
     }

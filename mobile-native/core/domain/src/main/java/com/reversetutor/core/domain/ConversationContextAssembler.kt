@@ -21,6 +21,7 @@ class ConversationContextAssembler(
     private val sourcePort: SourceContextPort,
     private val masteryFactPort: MasteryFactContextPort? = null,
     private val digestPort: SessionDigestContextPort? = null,
+    private val windowMemoryPort: WindowMemoryContextPort? = null,
     private val messageLimit: Int = 10,
     private val memoryLimit: Int = 5,
     private val errorLimit: Int = 5,
@@ -119,6 +120,17 @@ class ConversationContextAssembler(
             }
         } ?: ""
 
+        // V2-006: window-memory injection block - same degradation contract
+        // as the digest (absent port => blank, failure => blank + warning).
+        val windowMemory = windowMemoryPort?.let { port ->
+            safeReadValue("window_memory", warnings) {
+                SessionTurnContracts.sanitizeContractText(
+                    port.loadWindowMemoryContext(spaceId, sessionId, queryText),
+                    digestCap
+                )
+            }
+        } ?: ""
+
         return ConversationContextContract(
             spaceId = spaceId,
             sessionId = sessionId,
@@ -130,7 +142,8 @@ class ConversationContextAssembler(
             recentMessages = messages,
             warnings = warnings,
             masteryProjections = mastery,
-            earlyHistoryDigest = digest
+            earlyHistoryDigest = digest,
+            windowMemoryDigest = windowMemory
         )
     }
 

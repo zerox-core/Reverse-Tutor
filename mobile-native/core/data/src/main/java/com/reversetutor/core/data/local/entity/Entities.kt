@@ -61,7 +61,9 @@ data class MessageEntity(
     val text: String,
     val createdAtEpochMillis: Long,
     val parentMessageId: String? = null,
-    val sourceImportId: String? = null
+    val sourceImportId: String? = null,
+    /** Expression-loop slice 4: leading first-person monologue (thinking drawer). */
+    val monologue: String? = null
 )
 
 @Entity(tableName = "message_attachments", indices = [Index("spaceId"), Index("messageId")])
@@ -385,7 +387,8 @@ fun Message.toEntity(): MessageEntity = MessageEntity(
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
     parentMessageId = parentMessageId,
-    sourceImportId = sourceImportId
+    sourceImportId = sourceImportId,
+    monologue = monologue
 )
 
 fun MessageEntity.toDomain(): Message = Message(
@@ -396,7 +399,8 @@ fun MessageEntity.toDomain(): Message = Message(
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
     parentMessageId = parentMessageId,
-    sourceImportId = sourceImportId
+    sourceImportId = sourceImportId,
+    monologue = monologue
 )
 
 fun MessageAttachment.toEntity(): MessageAttachmentEntity = MessageAttachmentEntity(
@@ -767,6 +771,103 @@ data class WindowHeartbeatEntity(
         val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
             "windowId", "spaceId", "enabled", "minCooldownMillis",
             "cooldownUntilEpochMillis", "pendingJobId", "updatedAtEpochMillis"
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Window-local memory (V2-004, schema 13 -> 14). Session-scoped structured
+// memory only: observations, evolved active values, intake watermark, and
+// the rolling summary of evicted raw turns. No raw transcript rows.
+// ---------------------------------------------------------------------------
+
+@Entity(tableName = "window_memory_observations", indices = [Index("sessionId")])
+data class WindowMemoryObservationEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val category: String,
+    val slotKey: String,
+    val value: String,
+    val sourceClass: String,
+    val confidence: Double,
+    val salience: String,
+    val occurredAtEpochMillis: Long,
+    val provenanceHandle: String
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "sessionId", "category", "slotKey", "value", "sourceClass",
+            "confidence", "salience", "occurredAtEpochMillis", "provenanceHandle"
+        )
+    }
+}
+
+@Entity(
+    tableName = "window_memory_active_values",
+    primaryKeys = ["sessionId", "category", "slotKey"]
+)
+data class WindowMemoryActiveValueEntity(
+    val sessionId: String,
+    val category: String,
+    val slotKey: String,
+    val value: String,
+    val revision: Long,
+    val weight: Double,
+    val sourceClass: String,
+    val provenanceHandle: String,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "category", "slotKey", "value", "revision", "weight",
+            "sourceClass", "provenanceHandle", "updatedAtEpochMillis"
+        )
+    }
+}
+
+@Entity(tableName = "window_memory_intake_watermarks")
+data class WindowIntakeWatermarkEntity(
+    @PrimaryKey val sessionId: String,
+    val lastProcessedMessageId: String,
+    val lastProcessedEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "lastProcessedMessageId", "lastProcessedEpochMillis"
+        )
+    }
+}
+
+@Entity(tableName = "window_memory_rolling_summaries")
+data class WindowRollingSummaryEntity(
+    @PrimaryKey val sessionId: String,
+    val summary: String,
+    val coversUntilMessageId: String,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "summary", "coversUntilMessageId", "updatedAtEpochMillis"
+        )
+    }
+}
+
+// Window-memory token metering (V2-006, schema 14 -> 15). Budget-tuning
+// telemetry for the memory subsystem itself (kept-window size, injected
+// context size); distinct from token_usage_records, which meters individual
+// LLM calls per turn attempt.
+@Entity(tableName = "window_memory_token_meters", indices = [Index("sessionId")])
+data class WindowMemoryTokenMeterEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val kind: String,
+    val estimatedTokens: Int,
+    val detail: String,
+    val createdAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "sessionId", "kind", "estimatedTokens", "detail", "createdAtEpochMillis"
         )
     }
 }

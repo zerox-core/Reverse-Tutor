@@ -261,6 +261,41 @@ class ChatGenerationRepositoryTest {
     }
 
     @Test
+    fun streamedEnvelopeReplyEmitsMonologueSnapshotsButOnlyBodyChunks() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val previews = mutableListOf<String>()
+        val monologues = mutableListOf<String?>()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = FakeLlmGenerationRuntime(
+                defaultResult = LlmGenerationResult.Streamed(
+                    listOf("<thinking>我卡在", "货币乘数这</thinking>老师，", "那负数呢？")
+                )
+            )
+        )
+
+        val outcome = repository.generateReply(
+            input = input("token-monologue"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true },
+            onChunk = previews::add,
+            onMonologueUpdate = { monologues += it }
+        )
+
+        assertEquals(ChatGenerationOutcome.Generated("assistant-token-monologue"), outcome)
+        // 2026-09-21 思考链流式透出：正文预览只有 body，独白快照单调增长并冻在闭合值。
+        assertEquals(listOf("老师，", "那负数呢？"), previews)
+        assertEquals(listOf("我卡在", "我卡在货币乘数这"), monologues)
+        val saved = messageRepository.listMessages("session-1").single()
+        assertEquals("我卡在货币乘数这", saved.monologue)
+        assertEquals("老师，那负数呢？", saved.text)
+    }
+
+    @Test
     fun staleGenerationTokenDoesNotPersistAssistantMessage() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
         val repository = ChatGenerationRepository(

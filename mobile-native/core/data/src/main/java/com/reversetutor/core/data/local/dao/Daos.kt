@@ -32,6 +32,11 @@ import com.reversetutor.core.data.local.entity.ScopeSignalEntity
 import com.reversetutor.core.data.local.entity.CompanionMemoryVersionEntity
 import com.reversetutor.core.data.local.entity.MemoryObservationEntity
 import com.reversetutor.core.data.local.entity.WindowHeartbeatEntity
+import com.reversetutor.core.data.local.entity.WindowIntakeWatermarkEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryActiveValueEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryObservationEntity
+import com.reversetutor.core.data.local.entity.WindowMemoryTokenMeterEntity
+import com.reversetutor.core.data.local.entity.WindowRollingSummaryEntity
 import com.reversetutor.core.data.local.entity.AssistantReplyArtifactEntity
 import com.reversetutor.core.data.local.entity.SessionDocumentEntity
 import com.reversetutor.core.data.local.entity.SessionDocumentBlockEntity
@@ -511,4 +516,43 @@ interface SessionAgentDao {
         insertReceipt(receipt)
         return true
     }
+}
+
+@Dao
+interface WindowMemoryDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertObservation(observation: WindowMemoryObservationEntity)
+
+    @Query("SELECT * FROM window_memory_observations WHERE sessionId = :sessionId ORDER BY occurredAtEpochMillis ASC")
+    suspend fun listObservations(sessionId: String): List<WindowMemoryObservationEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertActiveValue(value: WindowMemoryActiveValueEntity)
+
+    @Query("SELECT * FROM window_memory_active_values WHERE sessionId = :sessionId AND category = :category AND slotKey = :slotKey")
+    suspend fun getActiveValue(sessionId: String, category: String, slotKey: String): WindowMemoryActiveValueEntity?
+
+    @Query("SELECT * FROM window_memory_active_values WHERE sessionId = :sessionId")
+    suspend fun listActiveValues(sessionId: String): List<WindowMemoryActiveValueEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertWatermark(watermark: WindowIntakeWatermarkEntity)
+
+    @Query("SELECT * FROM window_memory_intake_watermarks WHERE sessionId = :sessionId")
+    suspend fun getWatermark(sessionId: String): WindowIntakeWatermarkEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRollingSummary(summary: WindowRollingSummaryEntity)
+
+    @Query("SELECT * FROM window_memory_rolling_summaries WHERE sessionId = :sessionId")
+    suspend fun getRollingSummary(sessionId: String): WindowRollingSummaryEntity?
+}
+
+@Dao
+interface WindowMemoryTokenMeterDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMeter(meter: WindowMemoryTokenMeterEntity)
+
+    @Query("SELECT * FROM window_memory_token_meters WHERE sessionId = :sessionId ORDER BY createdAtEpochMillis ASC")
+    suspend fun listMeters(sessionId: String): List<WindowMemoryTokenMeterEntity>
 }

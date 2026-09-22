@@ -29,8 +29,27 @@ data class LlmGenerationRequest(
     val sessionPolicy: LlmSessionPolicyContext? = null,
     val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
     val guidedTurnPlan: LlmGuidedTurnPlan? = null,
+    /**
+     * Expression-loop slice 2: pre-rendered turn note block (density tier,
+     * pacing signals, suggested focus), already rendered by the domain
+     * assembler; the LLM layer only positions it at the tail of the prompt
+     * per the cache-friendly layout (SPEC §4.8). Null keeps the legacy shape.
+     */
+    val turnNoteBlock: String? = null,
     /** Process-local preview only; never persisted or sent to a provider. */
-    val onStreamChunk: ((String) -> Unit)? = null
+    val onStreamChunk: ((String) -> Unit)? = null,
+    /**
+     * Expression-loop slice 3: red-line watchdog abort signal. Streaming
+     * transports poll it between lines and cut the stream early when the
+     * validator hits; ignored by non-streaming calls.
+     */
+    val streamAbortRequested: () -> Boolean = { false },
+    /**
+     * Expression-loop slice 3: strong-constraint retry directive appended at
+     * the very tail of the prompt (after the user text) when a turn is
+     * retried after a red-line abort. Null on the first attempt.
+     */
+    val retryDirective: String? = null
 )
 
 /**
@@ -462,6 +481,7 @@ object LlmGenerationPlanner {
         sessionPolicy: LlmSessionPolicyContext? = null,
         assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
         guidedTurnPlan: LlmGuidedTurnPlan? = null,
+        turnNoteBlock: String? = null,
         onStreamChunk: ((String) -> Unit)? = null,
         allowPlanDrivenOpening: Boolean = false,
         webSearchEnabled: Boolean = false
@@ -506,6 +526,7 @@ object LlmGenerationPlanner {
                 sessionPolicy = normalizedSessionPolicy,
                 assistantTurnEnvelope = normalizedEnvelope,
                 guidedTurnPlan = guidedTurnPlan?.normalized(),
+                turnNoteBlock = turnNoteBlock?.trim()?.takeIf { it.isNotEmpty() }?.take(MaxTurnNoteChars),
                 onStreamChunk = onStreamChunk,
                 webSearchEnabled = webSearchEnabled
             )
@@ -515,15 +536,29 @@ object LlmGenerationPlanner {
 
 private const val DefaultImagePrompt = "Describe the attached image."
 private const val MaxContextEvidence = 6
+private const val MaxTurnNoteChars = 400
+
+/**
+ * Expression-loop slice 5: provider-reported token usage for the latency /
+ * cost baseline (SPEC section 4.6). Populated best-effort; null when the
+ * provider does not report usage.
+ */
+data class LlmTokenUsage(
+    val promptTokens: Long = 0,
+    val completionTokens: Long = 0,
+    val cachedPromptTokens: Long? = null
+)
 
 sealed interface LlmGenerationResult {
     val visibleText: String
+    val usage: LlmTokenUsage?
+        get() = null
 
-    data class Success(val text: String) : LlmGenerationResult {
+    data class Success(val text: String, override val usage: LlmTokenUsage? = null) : LlmGenerationResult {
         override val visibleText: String = text.trim()
     }
 
-    data class Streamed(val chunks: List<String>) : LlmGenerationResult {
+    data class Streamed(val chunks: List<String>, override val usage: LlmTokenUsage? = null) : LlmGenerationResult {
         override val visibleText: String = chunks.joinToString(separator = "").trim()
     }
 
@@ -626,15 +661,13 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
         LlmGenerationResult.Failure("Live Anthropic-compatible calls are disabled in preview")
 }
 
-private fun LlmGenerationRequest.contextualUserText(): String {
+internal fun LlmGenerationRequest.contextualUserText(): String {
+    // Cache-friendly layout (SPEC §4.8): stable persona/contract first, then
+    // the low-frequency evidence block, then the per-turn decision blocks; the
+    // turn note, quote and current message sit at the tail so the longest
+    // possible prefix stays byte-identical across turns.
     val contextLines = buildList {
         reverseTutorStudentPromptBlock()?.let { add(it) }
-        turnPlanPromptBlock()?.let { add(it) }
-        sessionPolicyPromptBlock()?.let { add(it) }
-        guidedLearningPlanPromptBlock()?.let { add(it) }
-        if (!quoteExcerpt.isNullOrBlank()) {
-            add("Quote: $quoteExcerpt")
-        }
         if (contextEvidence.isNotEmpty()) {
             add(
                 buildString {
@@ -655,10 +688,22 @@ private fun LlmGenerationRequest.contextualUserText(): String {
                 }
             )
         }
+        turnPlanPromptBlock()?.let { add(it) }
+        sessionPolicyPromptBlock()?.let { add(it) }
+        guidedLearningPlanPromptBlock()?.let { add(it) }
+        turnNotePromptBlock()?.let { add(it) }
+        if (!quoteExcerpt.isNullOrBlank()) {
+            add("Quote: $quoteExcerpt")
+        }
     }
-    if (contextLines.isEmpty()) return userText.orEmpty()
-    return (contextLines + listOfNotNull(userText?.takeIf { it.isNotBlank() }))
-        .joinToString(separator = "\n\n")
+    // Slice 3: a retry directive always sits at the very tail — after the
+    // user text — so the cached prefix stays byte-identical on a retry.
+    val tail = listOfNotNull(
+        userText?.takeIf { it.isNotBlank() },
+        retryDirective?.trim()?.takeIf { it.isNotEmpty() }
+    )
+    if (contextLines.isEmpty()) return tail.joinToString(separator = "\n\n")
+    return (contextLines + tail).joinToString(separator = "\n\n")
 }
 
 /**
@@ -675,10 +720,13 @@ internal fun LlmGenerationRequest.reverseTutorStudentPromptBlock(): String? =
             反转教学·学生表达契约：
             - 用户是老师，你是学生 AI：表面在向老师请教，实际是通过提问让老师把知识讲出来（教即是学）。
             - 全程学生口吻：自然口语、可以带一点情绪；角色、画像、目标与语气以证据里的「会话模板」为准。
+            - 像真人聊天一样说话：不背模板、不每轮用同一种开头；称呼老师要自然克制，绝不句句带「老师」；句子长短混搭，可以有犹豫、自我修正和插话。
+            - 不先总后分：不要先说一句概括再逐条展开，不用「→」列步骤，不刻意分段加粗关键词；想到哪说到哪。
             - 教学策略隐身：不宣布计划、不给老师打分、不切换成讲课腔，也不替老师给出完整权威解法。
-            - 举例子时说成你自己的尝试：带具体数字或函数、最多 5 步、每步一句话、用「→」衔接，并请老师确认或纠错。
-            - 本轮只做一个教学动作：最多三小段或四短行；关键词用 **加粗** 突出。
+            - 举例就说成你自己的尝试：带具体数字或场景，讲完自然地问一句这样理解对不对。
+            - 这一轮可以只是听：可以不推进任何东西，陪聊和废话都不是失误。
             - 最多问老师一个问题，问完就停，绝不自问自答。
+            - 每次回复的最开头，先用 <thinking> 和 </thinking> 包住一两句你此刻的第一人称内心独白（卡在哪、想怎么问），紧接着另起一段写给老师的正文；独白不是正文的一部分。
         """.trimIndent()
     }
 
@@ -725,6 +773,9 @@ internal fun LlmGenerationRequest.guidedLearningPlanPromptBlock(): String? =
             }
         }
     }
+
+private fun LlmGenerationRequest.turnNotePromptBlock(): String? =
+    turnNoteBlock?.trim()?.takeIf { it.isNotEmpty() }
 
 internal fun LlmGenerationRequest.sessionPolicyPromptBlock(): String? =
     sessionPolicy?.normalized()?.let { policy ->

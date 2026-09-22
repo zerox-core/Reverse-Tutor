@@ -75,6 +75,8 @@ import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.core.model.BackgroundJobStatus
+import com.reversetutor.core.model.LlmProfile
+import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.SourceParserStatus
 import com.reversetutor.core.model.SourceType
@@ -136,6 +138,8 @@ fun ChatRoute(
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
+    llmProfiles: List<LlmProfile> = emptyList(),
+    onActivateLlmProfile: (String) -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
@@ -153,6 +157,7 @@ fun ChatRoute(
     var generation by remember(sessionId) { mutableStateOf<ChatGenerationUiState>(ChatGenerationUiState.Idle) }
     var activeGenerationToken by remember(sessionId) { mutableStateOf<LlmGenerationToken?>(null) }
     var activeBackgroundJobId by remember(sessionId) { mutableStateOf<String?>(null) }
+    var failedGenerationRetry by remember(sessionId) { mutableStateOf<FailedGenerationRetry?>(null) }
     var sessionContract by remember(sessionId) { mutableStateOf<SessionConversationContract?>(null) }
     var refreshKey by remember(sessionId) { mutableIntStateOf(0) }
     var noticeText by remember { mutableStateOf<String?>(null) }
@@ -267,10 +272,44 @@ fun ChatRoute(
         // page keeps observing the same Worker-owned turn instead of showing
         // the already-persisted user message as an orphan.
         if (activeBackgroundJobId == null) {
-            backgroundGenerationRepository?.findActiveJobForSession(sessionId)?.let { activeJob ->
+            val repository = backgroundGenerationRepository
+            val activeJob = repository?.findActiveJobForSession(sessionId)
+            if (activeJob != null) {
                 activeGenerationToken = activeJob.token
                 activeBackgroundJobId = activeJob.id
-                generation = backgroundGenerationUiState(activeJob.status, activeJob.errorMessage)
+                generation = backgroundGenerationUiState(
+                    activeJob.status,
+                    activeJob.errorMessage,
+                    repository.getGenerationPreview(activeJob.id, activeJob.token),
+                    repository.getGenerationMonologue(activeJob.id, activeJob.token)
+                )
+            } else {
+                // 终态失败回放（2026-09-21）：生成在离开会话期间失败时，用户消息已
+                // 持久化但页面没有任何状态残留——重进会话补出「生成失败+重试」。
+                // 仅当该用户消息之后仍无 assistant 回复（真孤儿）时才显示；
+                // 已有回复的正常历史不打断。
+                val latestJob = repository?.findLatestJobForSession(sessionId)
+                val orphanMessageId = latestJob?.userMessageId
+                if (latestJob != null &&
+                    latestJob.status == BackgroundJobStatus.Failed &&
+                    orphanMessageId != null
+                ) {
+                    val messageRecords = messageRepository.listMessageRecords(sessionId)
+                    val orphanIndex = messageRecords.indexOfFirst { it.message.id == orphanMessageId }
+                    val hasAssistantReply = orphanIndex >= 0 && messageRecords
+                        .drop(orphanIndex + 1)
+                        .any { it.message.role == MessageRole.Assistant }
+                    if (orphanIndex >= 0 && !hasAssistantReply) {
+                        generation = backgroundGenerationUiState(latestJob.status, latestJob.errorMessage)
+                        failedGenerationRetry = FailedGenerationRetry(
+                            spaceId = latestJob.spaceId,
+                            userMessageId = orphanMessageId,
+                            userText = latestJob.userText.orEmpty(),
+                            quoteExcerpt = latestJob.quoteExcerpt,
+                            imageAttachments = latestJob.imageAttachments
+                        )
+                    }
+                }
             }
         }
     }
@@ -329,21 +368,42 @@ fun ChatRoute(
         val jobId = activeBackgroundJobId ?: return@LaunchedEffect
         val repository = backgroundGenerationRepository ?: return@LaunchedEffect
         while (activeBackgroundJobId == jobId) {
-            delay(250L)
+            delay(150L)
             val job = repository.getJob(jobId) ?: return@LaunchedEffect
-            // Background generation intentionally shows no streaming preview:
-            // the pending indicator covers the whole run and the terminal
-            // branch below publishes the full reply once (design confirmed 2026-09-10).
             if (job.status in TerminalGenerationStatuses) {
                 if (activeGenerationToken == job.token) {
                     activeGenerationToken = null
                 }
                 generation = job.status.toUiState(job.errorMessage)
+                // 失败终态同样留重试入口：job 自带原用户消息引用，重试只
+                // 重新排队生成，不重复发送用户消息。
+                failedGenerationRetry = if (job.status == BackgroundJobStatus.Failed) {
+                    job.userMessageId?.let { failedMessageId ->
+                        FailedGenerationRetry(
+                            spaceId = job.spaceId,
+                            userMessageId = failedMessageId,
+                            userText = job.userText.orEmpty(),
+                            quoteExcerpt = job.quoteExcerpt,
+                            imageAttachments = job.imageAttachments
+                        )
+                    }
+                } else {
+                    null
+                }
                 sessionContract = sessionContract?.withTerminalGeneration(job.status, job.errorMessage)
                 activeBackgroundJobId = null
                 reload()
                 return@LaunchedEffect
             }
+            // 2026-09-20 用户拍板：接通流式预览（翻转 2026-09-10 的无预览设计）。
+            // Running 期间把 partialStore 的增量文本透出为 Streaming 状态逐字上屏；
+            // 终态仍走上面分支——完整回复只由持久化消息发布一次，预览随终态清空。
+            generation = backgroundGenerationUiState(
+                job.status,
+                job.errorMessage,
+                repository.getGenerationPreview(jobId, job.token),
+                repository.getGenerationMonologue(jobId, job.token)
+            )
         }
     }
 
@@ -375,6 +435,42 @@ fun ChatRoute(
             pendingDeletion = pendingDeletion,
             pendingDeletionRetryRequired = pendingDeletionRetryRequired
         )
+    }
+
+    // 孤儿消息重试（2026-09-21）：对持久化任务里那条没有等到回复的用户
+    // 消息重新排队一次后台生成，不重复发送用户消息本体。
+    val retryFailedGeneration: () -> Unit = {
+        val target = failedGenerationRetry
+        if (target != null) {
+            scope.launch {
+                val tokenValue = "${target.userMessageId}-${System.currentTimeMillis()}"
+                val request = BackgroundTurnPreparationRequest(
+                    spaceId = target.spaceId,
+                    sessionId = sessionId,
+                    userMessageId = target.userMessageId,
+                    userText = target.userText,
+                    token = tokenValue,
+                    quoteExcerpt = target.quoteExcerpt,
+                    imageAttachments = target.imageAttachments,
+                    sessionSnapshot = sessionSnapshot
+                )
+                when (val prepared = backgroundTurnPreparationPort.prepareAndEnqueue(request)) {
+                    is BackgroundTurnPreparationResult.Queued -> {
+                        activeGenerationToken = LlmGenerationToken(tokenValue)
+                        generation = ChatGenerationUiState.Pending
+                        activeBackgroundJobId = prepared.jobId
+                        sessionContract = prepared.contract
+                        failedGenerationRetry = null
+                        onBackgroundGenerationQueued(prepared.jobId)
+                    }
+                    BackgroundTurnPreparationResult.BlankInput,
+                    BackgroundTurnPreparationResult.SessionUnavailable,
+                    BackgroundTurnPreparationResult.Unavailable,
+                    BackgroundTurnPreparationResult.Failed ->
+                        generation = ChatGenerationUiState.Failure("后台准备失败")
+                }
+            }
+        }
     }
 
     ChatScreen(
@@ -447,6 +543,7 @@ fun ChatRoute(
                             generation = ChatGenerationUiState.Pending
                             activeBackgroundJobId = prepared.jobId
                             sessionContract = prepared.contract
+                            failedGenerationRetry = null
                             onBackgroundGenerationQueued(prepared.jobId)
                         }
                         BackgroundTurnPreparationResult.BlankInput,
@@ -663,6 +760,8 @@ fun ChatRoute(
         onOpenSources = onOpenSources,
         onExport = onExport,
         onOpenModelSettings = onOpenModelSettings,
+        llmProfiles = llmProfiles,
+        onActivateLlmProfile = onActivateLlmProfile,
         availableSourceAttachments = availableSourceAttachments,
         cameraPermissionState = cameraPermissionState,
         onPickImages = onPickImage,
@@ -698,6 +797,7 @@ fun ChatRoute(
             )
         },
         onOpenSessionSettings = onOpenSessionSettings,
+        onRetryGeneration = if (failedGenerationRetry != null) retryFailedGeneration else null,
         initialScrollPosition = initialScrollPosition,
         onScrollPositionChanged = onScrollPositionChanged,
         onBack = onBack,
@@ -778,6 +878,8 @@ fun ChatScreen(
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
+    llmProfiles: List<LlmProfile> = emptyList(),
+    onActivateLlmProfile: (String) -> Unit = {},
     availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
     cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     onPickImages: () -> Unit = onCreateImageDraft,
@@ -792,6 +894,7 @@ fun ChatScreen(
     onMoveAttachment: (Int, Int) -> Unit = { _, _ -> },
     onRetrySend: () -> Unit = onSendMessage,
     onOpenSessionSettings: () -> Unit = {},
+    onRetryGeneration: (() -> Unit)? = null,
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     onBack: () -> Unit = {},
@@ -831,6 +934,8 @@ fun ChatScreen(
         onOpenWindowBranches = onOpenWindowBranches,
         onOpenGlobalGraph = onOpenGlobalGraph,
         onOpenModelSettings = onOpenModelSettings,
+        llmProfiles = llmProfiles,
+        onActivateLlmProfile = onActivateLlmProfile,
         onOpenSources = onOpenSources,
         onExport = onExport,
         onOpenSearch = onOpenSearch,
@@ -848,6 +953,7 @@ fun ChatScreen(
         onMoveAttachment = onMoveAttachment,
         onRetrySend = onRetrySend,
         onOpenSessionSettings = onOpenSessionSettings,
+        onRetryGeneration = onRetryGeneration,
         initialScrollPosition = initialScrollPosition,
         onScrollPositionChanged = onScrollPositionChanged,
         onBack = onBack,
@@ -1470,3 +1576,15 @@ private val TerminalGenerationStatuses = setOf(
 
 private fun BackgroundJobStatus.toUiState(errorMessage: String?): ChatGenerationUiState =
     backgroundGenerationUiState(this, errorMessage)
+
+/**
+ * 重试一次失败的后台生成所需的持久化数据。全部字段来自 Room 里的
+ * BackgroundJobEntity，重试时不重新发送用户消息、也不重新组装附件。
+ */
+private data class FailedGenerationRetry(
+    val spaceId: String,
+    val userMessageId: String,
+    val userText: String,
+    val quoteExcerpt: String?,
+    val imageAttachments: List<MessageAttachment>
+)

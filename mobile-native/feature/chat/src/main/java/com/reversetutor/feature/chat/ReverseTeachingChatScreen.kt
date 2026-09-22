@@ -12,6 +12,13 @@ import android.provider.MediaStore
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.BorderStroke
@@ -50,6 +57,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -143,6 +151,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -196,6 +205,8 @@ internal fun ReverseTeachingChatScreen(
     onOpenWindowBranches: () -> Unit = {},
     onOpenGlobalGraph: () -> Unit = {},
     onOpenModelSettings: () -> Unit = {},
+    llmProfiles: List<LlmProfile> = emptyList(),
+    onActivateLlmProfile: (String) -> Unit = {},
     onOpenSources: () -> Unit = {},
     onExport: () -> Unit = {},
     onBack: () -> Unit,
@@ -215,11 +226,15 @@ internal fun ReverseTeachingChatScreen(
     onMoveAttachment: (Int, Int) -> Unit = { _, _ -> },
     onRetrySend: () -> Unit = {},
     onOpenSessionSettings: () -> Unit = {},
+    onRetryGeneration: (() -> Unit)? = null,
     initialScrollPosition: ChatScrollPosition = ChatScrollPosition(),
     onScrollPositionChanged: (ChatScrollPosition) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedMessageId by remember(state.sessionTitle) { mutableStateOf<String?>(null) }
+    // 2026-09-21 思考链展开状态会话内共享：用户展开一次，后续消息（含流式中
+    // 的抽屉）都保持展开；收起同理。切会话回落默认折叠。
+    var monologueExpanded by remember(state.sessionTitle) { mutableStateOf(false) }
     var actionMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
     var locateSourceMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
     var viewerAttachment by remember(state.sessionTitle) { mutableStateOf<ChatAttachmentUi?>(null) }
@@ -232,9 +247,18 @@ internal fun ReverseTeachingChatScreen(
     )
 
     LaunchedEffect(listState) {
-        snapshotFlow { ChatScrollPosition(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+        // 2026-09-21 修复：消息异步加载期间列表为空，(0,0) 发射会覆盖掉
+        // ChatScrollMemory 记住的位置（恢复自我破坏）——空列表时不向外发射。
+        snapshotFlow {
+            listState.layoutInfo.totalItemsCount to ChatScrollPosition(
+                listState.firstVisibleItemIndex,
+                listState.firstVisibleItemScrollOffset
+            )
+        }
             .distinctUntilChanged()
-            .collect(onScrollPositionChanged)
+            .collect { (count, position) ->
+                if (count > 0) onScrollPositionChanged(position)
+            }
     }
 
     LaunchedEffect(evidenceTargetMessageId, state.messages) {
@@ -251,6 +275,53 @@ internal fun ReverseTeachingChatScreen(
         val selected = selectedMessageId ?: return@LaunchedEffect
         kotlinx.coroutines.delay(3_000L)
         if (selectedMessageId == selected) selectedMessageId = null
+    }
+
+    // 自动滚动：用户发送消息后强制滚动到最新内容；新内容（回复到达 / 流式文本增长）
+    // 仅在视口本来就贴近底部时跟随，不打断向上翻阅历史。
+    var followNextAppend by remember(state.sessionTitle) { mutableStateOf(false) }
+    val streamingLength = (state.generation as? ChatGenerationUiState.Streaming)?.text?.length ?: 0
+    val timelineItemCount = run {
+        val messageItems = if (state.messages.isEmpty()) 1 else buildChatTimelineEntries(state.messages).size
+        messageItems + (if (sessionContract != null) 1 else 0)
+    }
+    var previousTimelineItemCount by remember(state.sessionTitle) { mutableStateOf(timelineItemCount) }
+    var scrollRestoreGuard by remember(state.sessionTitle) { mutableStateOf(true) }
+    // 2026-09-21 修复：没有记住的位置时（默认 (0,0)），进会话应落在底部
+    // 最新一条，而不是停在列表顶部；消息可能异步到达，等内容出现后再落底。
+    var pendingInitialBottom by remember(state.sessionTitle) {
+        mutableStateOf(initialScrollPosition.index == 0 && initialScrollPosition.offset == 0)
+    }
+    LaunchedEffect(timelineItemCount, streamingLength, state.generationStatusLabel != null) {
+        val countChanged = timelineItemCount != previousTimelineItemCount
+        previousTimelineItemCount = timelineItemCount
+        if (scrollRestoreGuard) {
+            // 首次组合跳过，保留 initialScrollPosition 的位置恢复语义
+            scrollRestoreGuard = false
+            if (pendingInitialBottom && timelineItemCount > 1) {
+                pendingInitialBottom = false
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+            }
+            return@LaunchedEffect
+        }
+        if (pendingInitialBottom) {
+            if (timelineItemCount > 1) {
+                pendingInitialBottom = false
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+            }
+            return@LaunchedEffect
+        }
+        if (timelineItemCount <= 0) return@LaunchedEffect
+        val layoutInfo = listState.layoutInfo
+        val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        val nearEnd = layoutInfo.totalItemsCount == 0 || lastVisibleIndex >= layoutInfo.totalItemsCount - 2
+        if (!followNextAppend && !nearEnd) return@LaunchedEffect
+        followNextAppend = false
+        if (countChanged) {
+            listState.animateScrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+        } else {
+            listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+        }
     }
 
     Box(
@@ -339,29 +410,9 @@ internal fun ReverseTeachingChatScreen(
                             onOpenSource = onOpenSessionSource,
                             onReselectInvalidSource = onReselectInvalidSource,
                             onOpenExternalLink = onOpenExternalLink,
-                            onCopyRichSource = onCopyRichSource
-                        )
-                    }
-                }
-            }
-            state.generationStatusLabel?.let { label ->
-                item {
-                    val partial = (state.generation as? ChatGenerationUiState.Streaming)?.text
-                    if (partial.isNullOrBlank()) {
-                        GenerationRow(
-                            learnerName = state.learnerName,
-                            learnerAvatarReference = state.learnerAvatarReference,
-                            avatarVisible = state.avatarVisible,
-                            label = label,
-                            onOpenSettings = onOpenModelSettings,
-                            onRetry = null
-                        )
-                    } else {
-                        StreamingGenerationRow(
-                            learnerName = state.learnerName,
-                            learnerAvatarReference = state.learnerAvatarReference,
-                            avatarVisible = state.avatarVisible,
-                            text = partial
+                            onCopyRichSource = onCopyRichSource,
+                            monologueExpanded = monologueExpanded,
+                            onMonologueExpandedChange = { monologueExpanded = it }
                         )
                     }
                 }
@@ -371,6 +422,57 @@ internal fun ReverseTeachingChatScreen(
                     SessionAssistantReplyHint(
                         contract = contract,
                         onInteraction = onAssistantInteraction
+                    )
+                }
+            }
+        }
+        // 生成状态行固定在输入框上方（2026-09-20 拍板）：此前是 LazyColumn 尾部
+        // item；列表只组合可视区 item，指示器一旦滚出视口就不渲染，表现为间歇性
+        // 消失。挪出列表后始终可见；流式气泡限高内滚、随文本增长自动贴尾。
+        state.generationStatusLabel?.let { label ->
+            val streaming = state.generation as? ChatGenerationUiState.Streaming
+            val partial = streaming?.text
+            val streamingMonologue = streaming?.monologue
+            val generationRowScroll = rememberScrollState()
+            LaunchedEffect(partial?.length) {
+                if (generationRowScroll.maxValue > 0) {
+                    generationRowScroll.scrollTo(generationRowScroll.maxValue)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xEAF3F5FA))
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .heightIn(max = 280.dp)
+                    .verticalScroll(generationRowScroll)
+            ) {
+                // 2026-09-21 思考链流式透出：抽屉置顶、流式正文在下；展开状态与
+                // 已完成消息共享，生成结束落抽屉时不再闪断。
+                if (!streamingMonologue.isNullOrBlank()) {
+                    MonologueDrawer(
+                        monologue = streamingMonologue,
+                        expanded = monologueExpanded,
+                        onExpandedChange = { monologueExpanded = it },
+                        streaming = true
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                if (partial.isNullOrBlank()) {
+                    GenerationRow(
+                        learnerName = state.learnerName,
+                        learnerAvatarReference = state.learnerAvatarReference,
+                        avatarVisible = state.avatarVisible,
+                        label = label,
+                        onOpenSettings = onOpenModelSettings,
+                        onRetry = onRetryGeneration
+                    )
+                } else {
+                    StreamingGenerationRow(
+                        learnerName = state.learnerName,
+                        learnerAvatarReference = state.learnerAvatarReference,
+                        avatarVisible = state.avatarVisible,
+                        text = partial
                     )
                 }
             }
@@ -402,16 +504,22 @@ internal fun ReverseTeachingChatScreen(
             if (showAttachmentActions) {
                 ChatAttachmentMediaStrip()
             }
-            WebSearchToggle(
-                enabled = webSearchEnabled,
-                onToggle = { wantEnabled ->
-                    if (wantEnabled) {
-                        showWebSearchConfirm = true
-                    } else {
-                        onWebSearchChange(false)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                WebSearchToggle(
+                    enabled = webSearchEnabled,
+                    onToggle = { wantEnabled ->
+                        if (wantEnabled) {
+                            showWebSearchConfirm = true
+                        } else {
+                            onWebSearchChange(false)
+                        }
                     }
-                }
-            )
+                )
+                ChatModelSelectorChip(
+                    profiles = llmProfiles,
+                    onActivate = onActivateLlmProfile
+                )
+            }
             ReverseTeachingComposer(
                 text = state.composer.text,
                 canSend = state.composer.canSend,
@@ -425,7 +533,10 @@ internal fun ReverseTeachingChatScreen(
                         showAttachmentActions = true
                     }
                 },
-                onSend = onSendMessage,
+                onSend = {
+                    followNextAppend = true
+                    onSendMessage()
+                },
                 onFocusChanged = { focused ->
                     if (focused) showAttachmentActions = false
                     onComposerFocusChanged(focused)
@@ -927,7 +1038,9 @@ private fun ReverseTeachingMessage(
     onOpenSource: (String?) -> Unit,
     onReselectInvalidSource: (String, String) -> Unit,
     onOpenExternalLink: (String) -> Unit,
-    onCopyRichSource: (String) -> ChatClipboardResult
+    onCopyRichSource: (String) -> ChatClipboardResult,
+    monologueExpanded: Boolean = false,
+    onMonologueExpandedChange: (Boolean) -> Unit = {}
 ) {
     when (item.role) {
         MessageRole.System -> SystemTimelineMessage(item.text)
@@ -948,7 +1061,9 @@ private fun ReverseTeachingMessage(
             onOpenSource,
             onReselectInvalidSource,
             onOpenExternalLink,
-            onCopyRichSource
+            onCopyRichSource,
+            monologueExpanded,
+            onMonologueExpandedChange
         )
     }
 }
@@ -1043,7 +1158,9 @@ private fun LearnerTimelineMessage(
     onOpenSource: (String?) -> Unit,
     onReselectInvalidSource: (String, String) -> Unit,
     onOpenExternalLink: (String) -> Unit,
-    onCopyRichSource: (String) -> ChatClipboardResult
+    onCopyRichSource: (String) -> ChatClipboardResult,
+    monologueExpanded: Boolean = false,
+    onMonologueExpandedChange: (Boolean) -> Unit = {}
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -1093,6 +1210,16 @@ private fun LearnerTimelineMessage(
                 }
                 if (item.inheritedReadOnly) InheritedMessageLabel()
                 if (item.remembered) RememberedMessageLabel()
+                // Expression-loop slice 4 (SPEC section 4.7 route C): collapsed
+                // thinking-chain drawer under the spoken bubble; it consumes
+                // its own taps and never triggers bubble selection.
+                item.monologue?.let { monologue ->
+                    MonologueDrawer(
+                        monologue = monologue,
+                        expanded = monologueExpanded,
+                        onExpandedChange = onMonologueExpandedChange
+                    )
+                }
             }
             if (selected) MessageMetadataRow(item)
         }
@@ -1783,6 +1910,32 @@ private fun EvidenceTimelineMessage(text: String) {
     }
 }
 
+// 表达层提速（2026-09-20 拍板）：预填充首字前的等待指示从静态「•••」改为
+// 错相位呼吸点，长等待窗口读起来是「在活动」而不是「卡住了」。
+@Composable
+private fun BreathingDots() {
+    // 当前 Compose 版本的 animateFloat 没有 initialStartOffset 错相位参数，
+    // 改用单个 0→1 相位动画 + 三角波数学错相位：效果等价，不依赖新 API。
+    val breath = rememberInfiniteTransition(label = "generation-wait")
+    val phase by breath.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1240, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "generation-wait-phase"
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        repeat(3) { index ->
+            val shifted = (phase + index / 3f) % 1f
+            val triangle = if (shifted < 0.5f) shifted * 2f else (1f - shifted) * 2f
+            val alpha = 0.2f + 0.8f * triangle
+            Text("•", color = Color(0xFF6077B3).copy(alpha = alpha), fontSize = 12.sp)
+        }
+    }
+}
+
 @Composable
 private fun GenerationRow(
     learnerName: String,
@@ -1798,13 +1951,21 @@ private fun GenerationRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (avatarVisible) LearnerAvatar(learnerName, learnerAvatarReference)
-        Text(
-            text = "$learnerName · $label",
+        Row(
             modifier = Modifier.weight(1f),
-            color = Color(0xFF5D6C86),
-            fontSize = 12.sp,
-            lineHeight = 18.sp
-        )
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "$learnerName · $label",
+                color = Color(0xFF5D6C86),
+                fontSize = 12.sp,
+                lineHeight = 18.sp
+            )
+            val waitingDots = !label.startsWith("未配置模型") &&
+                !(label.startsWith("生成失败") && onRetry != null)
+            if (waitingDots) BreathingDots()
+        }
         when {
             label.startsWith("未配置模型") -> TextButton(onClick = onOpenSettings) {
                 Text("去设置", color = Color(0xFF4264C7), fontSize = 11.sp)
@@ -1812,7 +1973,6 @@ private fun GenerationRow(
             label.startsWith("生成失败") && onRetry != null -> TextButton(onClick = onRetry) {
                 Text("重试", color = Color(0xFF4264C7), fontSize = 11.sp)
             }
-            else -> Text("•••", color = Color(0xFF6077B3), fontSize = 12.sp)
         }
     }
 }
@@ -1838,7 +1998,19 @@ private fun StreamingGenerationRow(
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                 Text(text, fontSize = 14.sp, lineHeight = 21.sp)
-                Text("正在输入…", color = ChatMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
+                // 表达层提速（2026-09-20 拍板）：等待期让状态文字呼吸，
+                // 长等待窗口读起来是「在活动」而不是「卡住了」。
+                val typingBreath = rememberInfiniteTransition(label = "streaming-breath")
+                val typingAlpha by typingBreath.animateFloat(
+                    initialValue = 0.35f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 900, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "streaming-typing-alpha"
+                )
+                Text("正在输入…", color = ChatMuted.copy(alpha = typingAlpha), fontSize = 11.sp, modifier = Modifier.padding(top = 5.dp))
             }
         }
     }

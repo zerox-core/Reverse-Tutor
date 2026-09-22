@@ -237,8 +237,8 @@ class LlmGenerationLifecycleTest {
 
 
     // NEWMP-V1-006 Task 1: single-turn rhythm contract — the student prompt
-    // block must keep locking one teaching move per turn, bounded paragraphs,
-    // and exactly one question so the interaction space stays with the teacher.
+    // block now locks natural chat principles (no arrow steps / bounded
+    // paragraphs / bold keywords); exactly one question stays with the teacher.
     @Test
     fun reverseTutorStudentPromptBlockLocksSingleTurnRhythmAndInteractionSpace() {
         val request = LlmGenerationRequest(
@@ -265,8 +265,10 @@ class LlmGenerationLifecycleTest {
 
         val block = request.reverseTutorStudentPromptBlock()
         assertTrue(block != null)
-        assertTrue(block!!.contains("本轮只做一个教学动作"))
-        assertTrue(block.contains("最多三小段或四短行"))
+        assertTrue(block!!.contains("像真人聊天一样说话"))
+        assertTrue(block.contains("绝不句句带「老师」"))
+        assertTrue(!block.contains("最多三小段或四短行"))
+        assertTrue(block.contains("不先总后分"))
         assertTrue(block.contains("最多问老师一个问题"))
     }
 
@@ -301,6 +303,64 @@ class LlmGenerationLifecycleTest {
         )
 
         assertEquals(true, (plan as LlmGenerationPlan.Ready).request.webSearchEnabled)
+    }
+
+    // Expression-loop slice 2: prompt blocks follow the cache-friendly layout —
+    // stable contract first, evidence mid, per-turn blocks and turn note at the
+    // tail, quote and user text last.
+    @Test
+    fun promptBlocksFollowCacheFriendlyOrderWithTurnNoteAtTail() {
+        val runtime = OpenAiCompatibleGenerationRuntime()
+        val payload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                quoteExcerpt = "x^2 - 4",
+                contextEvidence = listOf(contextEvidence()),
+                sessionPolicy = LlmSessionPolicyContext(
+                    actionType = "probe",
+                    studentRole = "probing_student",
+                    knowledgePoint = "factoring",
+                    difficulty = 0.7f,
+                    processSummary = "ask for a justification",
+                    evaluationCorrectness = 0.4f,
+                    userEmotion = "engaged",
+                    correctionTiming = "summary_only"
+                ),
+                turnNoteBlock = "本轮便签（内部节奏提示，别念出来、别解释）：\n- 信息密度：中（回复 ≤160 字、最多 1 个新概念、最多 1 个问题）"
+            )
+        )
+        val messages = payload.body["messages"] as List<*>
+        val userMessage = messages.single() as Map<*, *>
+        val content = userMessage["content"] as String
+
+        val contractIdx = content.indexOf("反转教学·学生表达契约")
+        val evidenceIdx = content.indexOf("Context evidence:")
+        val policyIdx = content.indexOf("Teaching policy:")
+        val noteIdx = content.indexOf("本轮便签")
+        val quoteIdx = content.indexOf("Quote: x^2 - 4")
+        val userIdx = content.lastIndexOf("Help")
+
+        assertTrue(contractIdx >= 0)
+        assertTrue(contractIdx < evidenceIdx)
+        assertTrue(evidenceIdx < policyIdx)
+        assertTrue(policyIdx < noteIdx)
+        assertTrue(noteIdx < quoteIdx)
+        assertTrue(quoteIdx < userIdx)
+        assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun plannerTrimsAndCarriesTurnNoteBlock() {
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Help",
+            profile = profile(LlmProviderKind.OpenAiCompatible, secretRef = null),
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-note"),
+            turnNoteBlock = "  本轮便签：测试  "
+        )
+
+        assertEquals("本轮便签：测试", (plan as LlmGenerationPlan.Ready).request.turnNoteBlock)
     }
 
     private fun request(provider: LlmProviderKind): LlmGenerationRequest =

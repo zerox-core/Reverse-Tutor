@@ -5,6 +5,9 @@ import com.reversetutor.core.data.background.BackgroundGenerationJob
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTurnPolicy
+import com.reversetutor.core.domain.TurnNoteAssembler
+import com.reversetutor.core.domain.TurnNoteInput
+import com.reversetutor.core.domain.UserIntent
 import com.reversetutor.core.llm.LlmGenerationToken
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.BackgroundTurnPreparationRequest
@@ -32,6 +35,7 @@ internal class BackgroundTurnPreparationCoordinator(
     private val assembleContext: suspend (String, String, String) -> ConversationContextContract,
     private val enqueueJob: suspend (BackgroundGenerationInput, Long) -> BackgroundGenerationJob,
     private val loadRecentTurnSignals: suspend (String, String) -> RecentTurnSignals = { _, _ -> RecentTurnSignals() },
+    private val loadLastTurnStyleHint: suspend (String) -> String = { "" },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val loadMessages: (String) -> List<ConversationMessageContract> = { emptyList() },
     private val facade: SessionConversationFacade = SessionConversationFacade()
@@ -73,6 +77,49 @@ internal class BackgroundTurnPreparationCoordinator(
                 request.sessionSnapshot.toSessionPolicyInput(request.userText)
             )
 
+            // Expression-loop slice 3: the previous turn's validator style
+            // flags replay as a one-line correction hint (never blocks a turn).
+            val lastTurnStyleHint = try {
+                loadLastTurnStyleHint(request.sessionId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                ""
+            }
+
+            // Expression-loop slice 2: assemble the deterministic turn note.
+            val turnNote = TurnNoteAssembler.assemble(
+                TurnNoteInput(
+                    userText = request.userText,
+                    recentUserTexts = context.recentMessages
+                        .asSequence()
+                        .filter { it.role == "user" }
+                        .map { it.text }
+                        .toList()
+                        .let { texts ->
+                            // The just-sent message may already be persisted;
+                            // pacing signals only look at earlier turns.
+                            if (texts.firstOrNull() == request.userText.trim()) texts.drop(1) else texts
+                        },
+                    turnPlan = turnPlan,
+                    knowledgePoint = policy.action.knowledgePoint,
+                    masteryScore = context.masteryProjections
+                        .firstOrNull { it.knowledgePoint == turnPlan.conceptKey }
+                        ?.score,
+                    lastStuckPoint = context.historicalErrors.firstOrNull()?.description.orEmpty(),
+                    userEmotion = policy.evaluation.userEmotion,
+                    styleHint = lastTurnStyleHint
+                )
+            ).normalized()
+
+            // Expression-loop speed pass (2026-09-20 拍板): casual small talk
+            // and goal changes don't need the learning evidence pack — the
+            // template persona plus the two freshest messages keep these
+            // prompts near ~1.5k chars so provider prefill stops dominating
+            // casual-turn latency.
+            val lightweightEvidenceTurn = guidedInput.userIntentHint == UserIntent.OffTopic ||
+                guidedInput.userIntentHint == UserIntent.GoalChange
+
             val job = enqueueJob(
                 BackgroundGenerationInput(
                     spaceId = request.spaceId,
@@ -83,9 +130,14 @@ internal class BackgroundTurnPreparationCoordinator(
                     quoteExcerpt = request.quoteExcerpt,
                     imageAttachments = request.imageAttachments,
                     contextEvidence = listOfNotNull(request.sessionSnapshot.toLlmTemplateEvidence()) +
-                        context.toLlmContextEvidence(),
+                        if (lightweightEvidenceTurn) {
+                            context.toLlmLightweightContextEvidence()
+                        } else {
+                            context.toLlmContextEvidence()
+                        },
                     sessionPolicy = policy.toLlmSessionPolicyContext(),
-                    turnPlan = turnPlan
+                    turnPlan = turnPlan,
+                    turnNoteBlock = turnNote.render()
                 ),
                 nowEpochMillis()
             )

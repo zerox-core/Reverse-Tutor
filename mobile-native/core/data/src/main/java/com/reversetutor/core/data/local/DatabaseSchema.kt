@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 13
+    const val version = 18
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -114,6 +114,48 @@ object DatabaseSchema {
         }
     }
 
+    /** V2-004: window-local memory layers (observations / active values / watermark / rolling summary). */
+    val migration13To14: Migration = object : Migration(13, 14) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            windowMemoryTableSql.forEach(db::execSQL)
+            windowMemoryIndexSql.forEach(db::execSQL)
+        }
+    }
+
+    /** V2-006: window-memory token metering for budget tuning. */
+    val migration14To15: Migration = object : Migration(14, 15) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            windowMemoryTokenMeterTableSql.forEach(db::execSQL)
+            windowMemoryTokenMeterIndexSql.forEach(db::execSQL)
+        }
+    }
+
+    /** Expression-loop slice 3: per-turn generation trajectories. */
+    val migration15To16: Migration = object : Migration(15, 16) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            turnTrajectoryTableSql.forEach(db::execSQL)
+            turnTrajectoryIndexSql.forEach(db::execSQL)
+        }
+    }
+
+    /** Expression-loop slice 4: message-borne monologue for the thinking drawer. */
+    val migration16To17: Migration = object : Migration(16, 17) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE messages ADD COLUMN monologue TEXT")
+        }
+    }
+
+    /** Expression-loop slice 5: latency / token-usage probes on trajectories. */
+    val migration17To18: Migration = object : Migration(17, 18) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN firstTokenLatencyMillis INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN totalLatencyMillis INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN promptTokens INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN completionTokens INTEGER")
+            db.execSQL("ALTER TABLE turn_run_trajectories ADD COLUMN cachedPromptTokens INTEGER")
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -126,7 +168,12 @@ object DatabaseSchema {
         migration9To10,
         migration10To11,
         migration11To12,
-        migration12To13
+        migration12To13,
+        migration13To14,
+        migration14To15,
+        migration15To16,
+        migration16To17,
+        migration17To18
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {
@@ -730,6 +777,104 @@ object DatabaseSchema {
         "CREATE INDEX IF NOT EXISTS index_session_table_rows_tableId ON session_table_rows(tableId)",
         "CREATE INDEX IF NOT EXISTS index_tool_call_receipts_sessionId ON tool_call_receipts(sessionId)",
         "CREATE INDEX IF NOT EXISTS index_tool_call_receipts_toolName ON tool_call_receipts(toolName)"
+    )
+
+    private val windowMemoryTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_observations (
+            id TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            category TEXT NOT NULL,
+            slotKey TEXT NOT NULL,
+            value TEXT NOT NULL,
+            sourceClass TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            salience TEXT NOT NULL,
+            occurredAtEpochMillis INTEGER NOT NULL,
+            provenanceHandle TEXT NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_active_values (
+            sessionId TEXT NOT NULL,
+            category TEXT NOT NULL,
+            slotKey TEXT NOT NULL,
+            value TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            weight REAL NOT NULL,
+            sourceClass TEXT NOT NULL,
+            provenanceHandle TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId, category, slotKey)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_intake_watermarks (
+            sessionId TEXT NOT NULL,
+            lastProcessedMessageId TEXT NOT NULL,
+            lastProcessedEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_rolling_summaries (
+            sessionId TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            coversUntilMessageId TEXT NOT NULL,
+            updatedAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(sessionId)
+        )
+        """.trimIndent()
+    )
+
+    private val windowMemoryIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_window_memory_observations_sessionId ON window_memory_observations(sessionId)"
+    )
+
+    private val windowMemoryTokenMeterTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS window_memory_token_meters (
+            id TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            estimatedTokens INTEGER NOT NULL,
+            detail TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val windowMemoryTokenMeterIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_window_memory_token_meters_sessionId ON window_memory_token_meters(sessionId)"
+    )
+
+    private val turnTrajectoryTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS turn_run_trajectories (
+            id TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            userMessageId TEXT,
+            generationToken TEXT NOT NULL,
+            turnNoteBlock TEXT,
+            outputText TEXT NOT NULL,
+            abortedOutputText TEXT,
+            redLinesPayload TEXT NOT NULL,
+            styleFlagsPayload TEXT NOT NULL,
+            retried INTEGER NOT NULL,
+            usedFallback INTEGER NOT NULL,
+            selfAssessment TEXT,
+            modelId TEXT NOT NULL,
+            createdAtEpochMillis INTEGER NOT NULL,
+            PRIMARY KEY(id)
+        )
+        """.trimIndent()
+    )
+
+    private val turnTrajectoryIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_turn_run_trajectories_sessionId ON turn_run_trajectories(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_turn_run_trajectories_sessionId_createdAtEpochMillis ON turn_run_trajectories(sessionId, createdAtEpochMillis)"
     )
 }
 
