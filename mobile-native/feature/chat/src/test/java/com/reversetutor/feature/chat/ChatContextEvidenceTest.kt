@@ -209,12 +209,12 @@ private class FakeSourceDao : SourceDao {
         return ids.size
     }
 
-    override suspend fun updateChunkEmbedding(chunkId: String, embedding: ByteArray) {
-        chunks[chunkId]?.let { chunks[chunkId] = it.copy(embedding = embedding) }
+    override suspend fun updateChunkEmbedding(chunkId: String, embedding: ByteArray, embeddingModel: String?) {
+        chunks[chunkId]?.let { chunks[chunkId] = it.copy(embedding = embedding, embeddingModel = embeddingModel) }
     }
 
     override suspend fun listChunkEmbeddingRows(spaceId: String): List<SourceChunkEmbeddingRow> =
         chunks.values
             .filter { it.spaceId == spaceId && it.embedding != null }
-            .map { SourceChunkEmbeddingRow(it.id, it.embedding!!) }
+            .map { SourceChunkEmbeddingRow(it.id, it.embedding!!, it.embeddingModel) }
 }

@@ -24,30 +24,37 @@ class OpenAiCompatibleEmbeddingRuntime(
         secretRef: String?,
         baseUrl: String?,
         model: String,
-        texts: List<String>
+        texts: List<String>,
+        allowAnonymous: Boolean = false
     ): EmbeddingCallResult {
         if (texts.isEmpty()) return EmbeddingCallResult.Success(emptyList())
         val trimmedRef = secretRef?.trim().orEmpty()
-        if (trimmedRef.isEmpty()) return EmbeddingCallResult.Failed
+        if (trimmedRef.isEmpty() && !allowAnonymous) return EmbeddingCallResult.Failed
         val endpointBase = baseUrl?.trim()?.trimEnd('/').orEmpty()
         if (endpointBase.isEmpty()) return EmbeddingCallResult.Failed
         val endpoint = "$endpointBase/embeddings"
         if (!endpoint.isSafeHttpEndpoint()) return EmbeddingCallResult.Failed
 
-        val secret = runCatching { secretResolver.resolve(trimmedRef) }
-            .getOrNull()
-            ?.takeIf { it.isNotBlank() }
-            ?: return EmbeddingCallResult.Failed
+        // 1e: allowAnonymous lets the built-in fallback channel call the
+        // server relay without any credential (key never ships in the APK).
+        val secret = if (trimmedRef.isEmpty()) {
+            null
+        } else {
+            runCatching { secretResolver.resolve(trimmedRef) }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?: return EmbeddingCallResult.Failed
+        }
 
         val vectors = mutableListOf<FloatArray>()
         texts.chunked(BatchSize).forEach { batch ->
             val request = ProviderHttpRequest(
                 url = endpoint,
-                headers = mapOf(
-                    "Content-Type" to "application/json",
-                    "Accept" to "application/json",
-                    "Authorization" to "Bearer $secret"
-                ),
+                headers = buildMap {
+                    put("Content-Type", "application/json")
+                    put("Accept", "application/json")
+                    if (secret != null) put("Authorization", "Bearer $secret")
+                },
                 jsonBody = ProviderJson.stringify(
                     mapOf(
                         "model" to model,

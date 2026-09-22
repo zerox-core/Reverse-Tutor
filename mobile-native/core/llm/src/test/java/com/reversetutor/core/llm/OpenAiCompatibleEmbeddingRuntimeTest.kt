@@ -157,4 +157,24 @@ class OpenAiCompatibleEmbeddingRuntimeTest {
 
         assertTrue(result is EmbeddingCallResult.Failed)
     }
+
+    @Test
+    fun allowAnonymousSendsRequestWithoutAuthorizationHeader() = runBlocking {
+        val transport = RecordingTransport(
+            ProviderHttpResult.Response(200, body(listOf(listOf(1f)), listOf(0)))
+        )
+        val runtime = OpenAiCompatibleEmbeddingRuntime(transport, resolver)
+
+        val result = runtime.embed(
+            secretRef = null,
+            baseUrl = "https://hub.zeroxcore.tech/v1",
+            model = "BAAI/bge-m3",
+            texts = listOf("a"),
+            allowAnonymous = true
+        )
+
+        assertTrue(result is EmbeddingCallResult.Success)
+        assertEquals(1, transport.requests.size)
+        assertTrue(transport.requests[0].headers["Authorization"] == null)
+    }
 }

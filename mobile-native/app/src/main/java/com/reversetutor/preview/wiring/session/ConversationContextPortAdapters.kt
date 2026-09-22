@@ -5,6 +5,9 @@ import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.memory.MemoryRepository
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.sources.SourceRepository
+import com.reversetutor.core.data.sources.StoredChunkEmbedding
+import com.reversetutor.core.llm.EmbeddingChannelKind
+import com.reversetutor.core.llm.EmbeddingVectorSet
 import com.reversetutor.core.data.sources.SourceWithChunks
 import com.reversetutor.core.domain.ContextMessage
 import com.reversetutor.core.domain.ErrorContextPort
@@ -146,7 +149,7 @@ class SourceContextPortAdapter(
      * Absent, or returning null (no runtime, unsupported channel, failed call),
      * degrades to keyword ranking, preserving the old behavior.
      */
-    private val embedQuery: (suspend (String) -> FloatArray?)? = null
+    private val embedQuery: (suspend (String) -> EmbeddingVectorSet?)? = null
 ) : SourceContextPort {
     override suspend fun listSourceEvidence(
         spaceId: String,
@@ -191,11 +194,14 @@ class SourceContextPortAdapter(
         if (entries.isEmpty()) return null
         val embeddings = sourceRepository.listChunkEmbeddings(spaceId)
         if (embeddings.isEmpty()) return null
-        val queryVector = embed(trimmed) ?: return null
+        val querySet = embed(trimmed) ?: return null
+        val queryVector = querySet.vectors.firstOrNull() ?: return null
         val ranked = entries.mapNotNull { entry ->
             entry.chunks
                 .mapNotNull { chunk ->
-                    val vector = embeddings[chunk.id] ?: return@mapNotNull null
+                    val stored = embeddings[chunk.id] ?: return@mapNotNull null
+                    if (!stored.isCompatibleWith(querySet)) return@mapNotNull null
+                    val vector = stored.vector
                     if (vector.size != queryVector.size) return@mapNotNull null
                     val score = cosineSimilarity(queryVector, vector)
                     if (score < MinVectorScore) null else RankedSourceEntry(entry.source, chunk, score)
@@ -237,6 +243,18 @@ class SourceContextPortAdapter(
             compareByDescending<RankedSourceEntry> { it.score }.thenBy { it.source.id }
         )
     }
+
+    /**
+     * 1e: cross-model cosine scores are garbage even at equal dimensions, so a
+     * stored vector only scores when its model matches the query's. Legacy
+     * rows (null modelKey, pre-v19) stay compatible with user-configured
+     * channels only — the built-in fallback must not mix with unknown vectors.
+     */
+    private fun StoredChunkEmbedding.isCompatibleWith(query: EmbeddingVectorSet): Boolean =
+        when {
+            modelKey != null -> modelKey == query.modelKey
+            else -> query.channelKind == EmbeddingChannelKind.UserConfigured
+        }
 
     private fun keywordScore(text: String, terms: List<String>): Float {
         var hits = 0

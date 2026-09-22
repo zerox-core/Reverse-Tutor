@@ -7,6 +7,8 @@ import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.sources.SourceEmbeddingCodec
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.domain.ConversationContextContract
+import com.reversetutor.core.llm.EmbeddingChannelKind
+import com.reversetutor.core.llm.EmbeddingVectorSet
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -51,17 +53,17 @@ class SourceContextPortAdapterTest {
             return removed
         }
 
-        override suspend fun updateChunkEmbedding(chunkId: String, embedding: ByteArray) {
+        override suspend fun updateChunkEmbedding(chunkId: String, embedding: ByteArray, embeddingModel: String?) {
             chunks.values.forEach { list ->
                 val index = list.indexOfFirst { it.id == chunkId }
-                if (index >= 0) list[index] = list[index].copy(embedding = embedding)
+                if (index >= 0) list[index] = list[index].copy(embedding = embedding, embeddingModel = embeddingModel)
             }
         }
 
         override suspend fun listChunkEmbeddingRows(spaceId: String): List<SourceChunkEmbeddingRow> =
             chunks.values.flatten()
                 .filter { it.spaceId == spaceId }
-                .mapNotNull { chunk -> chunk.embedding?.let { SourceChunkEmbeddingRow(chunk.id, it) } }
+                .mapNotNull { chunk -> chunk.embedding?.let { SourceChunkEmbeddingRow(chunk.id, it, chunk.embeddingModel) } }
     }
 
     private fun sourceEntity(id: String, spaceId: String, createdAt: Long, title: String = "单调性讲义") =
@@ -175,7 +177,9 @@ class SourceContextPortAdapterTest {
         val repo = SourceRepository(dao)
         val adapter = SourceContextPortAdapter(
             sourceRepository = repo,
-            embedQuery = { floatArrayOf(1f, 0f) }
+            embedQuery = {
+                EmbeddingVectorSet("test-model", EmbeddingChannelKind.UserConfigured, listOf(floatArrayOf(1f, 0f)))
+            }
         )
         dao.insertSource(sourceEntity("src-old", "space-a", createdAt = 100L))
         dao.insertChunk(
@@ -232,5 +236,70 @@ class SourceContextPortAdapterTest {
         val evidence = adapter.listSourceEvidence("space-a", "sess-1", 5, queryText = "   ")
         assertEquals(listOf("src-2", "src-1"), evidence.map { it.id })
         assertTrue(evidence.all { it.relevanceScore == 0f })
+    }
+
+    // 1e · 8. 模型身份匹配 → 向量正常命中
+    @Test
+    fun matchingEmbeddingModelUsesVectorRanking() = runBlocking {
+        val dao = FakeSourceDao()
+        val repo = SourceRepository(dao)
+        val adapter = SourceContextPortAdapter(
+            sourceRepository = repo,
+            embedQuery = {
+                EmbeddingVectorSet("model-a", EmbeddingChannelKind.UserConfigured, listOf(floatArrayOf(1f, 0f)))
+            }
+        )
+        dao.insertSource(sourceEntity("src-match", "space-a", createdAt = 100L))
+        dao.insertChunk(
+            chunkAt("src-match", "space-a", 0, "模型匹配的资料片段", embedding = SourceEmbeddingCodec.encode(floatArrayOf(1f, 0f)))
+                .copy(embeddingModel = "model-a")
+        )
+
+        val evidence = adapter.listSourceEvidence("space-a", "sess-1", 5, queryText = "任何查询")
+        assertEquals(listOf("src-match"), evidence.map { it.id })
+        assertTrue(evidence.first().relevanceScore >= 0.30f)
+    }
+
+    // 1e · 9. 模型身份不匹配 → 向量被过滤（跨模型余弦是垃圾值），回退关键词
+    @Test
+    fun mismatchedEmbeddingModelFallsBackToKeywordRanking() = runBlocking {
+        val dao = FakeSourceDao()
+        val repo = SourceRepository(dao)
+        val adapter = SourceContextPortAdapter(
+            sourceRepository = repo,
+            embedQuery = {
+                EmbeddingVectorSet("model-a", EmbeddingChannelKind.UserConfigured, listOf(floatArrayOf(1f, 0f)))
+            }
+        )
+        dao.insertSource(sourceEntity("src-mis", "space-a", createdAt = 100L))
+        dao.insertChunk(
+            // 向量与查询完全相同（cosine=1.0），但出自另一个模型，必须被过滤。
+            chunkAt("src-mis", "space-a", 0, "完全无关内容", embedding = SourceEmbeddingCodec.encode(floatArrayOf(1f, 0f)))
+                .copy(embeddingModel = "model-b")
+        )
+
+        val evidence = adapter.listSourceEvidence("space-a", "sess-1", 5, queryText = "不命中的查询词")
+        assertTrue(evidence.isEmpty())
+    }
+
+    // 1e · 10. 内置渠道不得混用旧数据（null modelKey）→ 回退关键词
+    @Test
+    fun builtInChannelDoesNotMixWithLegacyEmbeddings() = runBlocking {
+        val dao = FakeSourceDao()
+        val repo = SourceRepository(dao)
+        val adapter = SourceContextPortAdapter(
+            sourceRepository = repo,
+            embedQuery = {
+                EmbeddingVectorSet("BAAI/bge-m3", EmbeddingChannelKind.BuiltIn, listOf(floatArrayOf(1f, 0f)))
+            }
+        )
+        dao.insertSource(sourceEntity("src-legacy", "space-a", createdAt = 100L))
+        dao.insertChunk(
+            // 旧数据：embeddingModel = null，向量与查询相同，也不得被内置渠道使用。
+            chunkAt("src-legacy", "space-a", 0, "旧资料内容", embedding = SourceEmbeddingCodec.encode(floatArrayOf(1f, 0f)))
+        )
+
+        val evidence = adapter.listSourceEvidence("space-a", "sess-1", 5, queryText = "不命中的查询词")
+        assertTrue(evidence.isEmpty())
     }
 }

@@ -6,7 +6,10 @@ import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.domain.ReplyValidator
 import com.reversetutor.core.domain.TurnNoteAssembler
 import com.reversetutor.core.domain.TurnPlan
+import com.reversetutor.core.llm.BuiltInEmbeddingChannel
 import com.reversetutor.core.llm.EmbeddingCallResult
+import com.reversetutor.core.llm.EmbeddingChannelKind
+import com.reversetutor.core.llm.EmbeddingVectorSet
 import com.reversetutor.core.llm.EmbeddingModelDiscovery
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmGuidedTurnPlan
@@ -307,28 +310,67 @@ class ChatGenerationRepository(
      * no runtime is wired, the active channel cannot serve OpenAI-compatible
      * embeddings, or the call fails — callers then fall back to keywords.
      */
-    suspend fun embedSourceTexts(texts: List<String>): List<FloatArray>? = embedTexts(texts)
+    suspend fun embedSourceTexts(texts: List<String>): EmbeddingVectorSet? = embedTexts(texts)
 
     /** NEWMP-V1-024: embeds the current user query for semantic retrieval. */
-    suspend fun embedQueryText(text: String): FloatArray? = embedTexts(listOf(text))?.firstOrNull()
+    suspend fun embedQueryText(text: String): EmbeddingVectorSet? = embedTexts(listOf(text))
 
-    private suspend fun embedTexts(texts: List<String>): List<FloatArray>? {
-        if (texts.isEmpty()) return emptyList()
+    /**
+     * 1e fallback chain: user-configured channel -> built-in bge-m3 relay
+     * (anonymous; key never ships in the APK) -> null, in which case callers
+     * degrade to keyword retrieval. The returned [EmbeddingVectorSet.modelKey]
+     * is persisted with the vectors so retrieval can filter by model identity.
+     */
+    private suspend fun embedTexts(texts: List<String>): EmbeddingVectorSet? {
+        if (texts.isEmpty()) return null
         val runtime = embeddingRuntime ?: return null
+        embedViaUserChannel(runtime, texts)?.let { return it }
+        return embedViaBuiltInChannel(runtime, texts)
+    }
+
+    private suspend fun embedViaUserChannel(
+        runtime: OpenAiCompatibleEmbeddingRuntime,
+        texts: List<String>
+    ): EmbeddingVectorSet? {
         val profile = activeLegacyProfile() ?: return null
         if (!profileSupportsEmbeddings(profile)) return null
+        val model = embeddingModelDiscovery?.discover(profile.secretRef, profile.baseUrl)
+            ?: embeddingModelName
         return when (
             val result = runtime.embed(
                 secretRef = profile.secretRef,
                 baseUrl = profile.baseUrl,
-                model = embeddingModelDiscovery?.discover(profile.secretRef, profile.baseUrl)
-                    ?: embeddingModelName,
+                model = model,
                 texts = texts
             )
         ) {
-            is EmbeddingCallResult.Success -> result.vectors
+            is EmbeddingCallResult.Success -> EmbeddingVectorSet(
+                modelKey = model,
+                channelKind = EmbeddingChannelKind.UserConfigured,
+                vectors = result.vectors
+            )
             EmbeddingCallResult.Failed -> null
         }
+    }
+
+    private suspend fun embedViaBuiltInChannel(
+        runtime: OpenAiCompatibleEmbeddingRuntime,
+        texts: List<String>
+    ): EmbeddingVectorSet? = when (
+        val result = runtime.embed(
+            secretRef = null,
+            baseUrl = BuiltInEmbeddingChannel.BaseUrl,
+            model = BuiltInEmbeddingChannel.Model,
+            texts = texts,
+            allowAnonymous = true
+        )
+    ) {
+        is EmbeddingCallResult.Success -> EmbeddingVectorSet(
+            modelKey = BuiltInEmbeddingChannel.Model,
+            channelKind = EmbeddingChannelKind.BuiltIn,
+            vectors = result.vectors
+        )
+        EmbeddingCallResult.Failed -> null
     }
 
     private fun profileSupportsEmbeddings(profile: LlmProfile): Boolean =

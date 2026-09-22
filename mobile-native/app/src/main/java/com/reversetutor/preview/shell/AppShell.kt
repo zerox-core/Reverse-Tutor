@@ -933,9 +933,13 @@ private fun DestinationContent(
         scope.launch {
             val texts = imported.chunks.map { it.text }
             if (texts.isEmpty()) return@launch
-            val vectors = chatGenerationRepository.embedSourceTexts(texts)
-            if (vectors == null || vectors.size != imported.chunks.size) return@launch
-            sourceRepository.updateChunkEmbeddings(imported.chunks.map { it.id }, vectors)
+            val embedded = chatGenerationRepository.embedSourceTexts(texts)
+            if (embedded == null || embedded.vectors.size != imported.chunks.size) return@launch
+            sourceRepository.updateChunkEmbeddings(
+                imported.chunks.map { it.id },
+                embedded.vectors,
+                embedded.modelKey
+            )
         }
     }
     val sessionSettingsStore = remember(context) { SharedPreferencesSessionSettingsStore(context) }

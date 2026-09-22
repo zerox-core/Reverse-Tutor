@@ -22,17 +22,20 @@ class SourceRepository(
         }
 
     /** NEWMP-V1-024: persists semantic embedding vectors for freshly indexed chunks. */
-    suspend fun updateChunkEmbeddings(chunkIds: List<String>, vectors: List<FloatArray>) {
+    suspend fun updateChunkEmbeddings(chunkIds: List<String>, vectors: List<FloatArray>, modelKey: String) {
         if (chunkIds.size != vectors.size) return
         chunkIds.zip(vectors).forEach { (chunkId, vector) ->
-            sourceDao.updateChunkEmbedding(chunkId, SourceEmbeddingCodec.encode(vector))
+            sourceDao.updateChunkEmbedding(chunkId, SourceEmbeddingCodec.encode(vector), modelKey)
         }
     }
 
-    /** NEWMP-V1-024: loads all stored chunk embeddings for a space (chunk id -> vector). */
-    suspend fun listChunkEmbeddings(spaceId: String = defaultSpaceId): Map<String, FloatArray> =
+    /** 1e: loads all stored chunk embeddings for a space (chunk id -> vector + model identity). */
+    suspend fun listChunkEmbeddings(spaceId: String = defaultSpaceId): Map<String, StoredChunkEmbedding> =
         sourceDao.listChunkEmbeddingRows(spaceId)
-            .mapNotNull { row -> SourceEmbeddingCodec.decode(row.embedding)?.let { row.id to it } }
+            .mapNotNull { row ->
+                SourceEmbeddingCodec.decode(row.embedding)
+                    ?.let { row.id to StoredChunkEmbedding(it, row.embeddingModel) }
+            }
             .toMap()
 
     suspend fun importSource(

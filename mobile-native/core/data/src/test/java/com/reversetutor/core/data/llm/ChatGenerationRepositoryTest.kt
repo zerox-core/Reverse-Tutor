@@ -11,7 +11,14 @@ import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.message.MessageRepository
 import com.reversetutor.core.data.model.ExecutionModelConfiguration
 import com.reversetutor.core.data.model.ExecutionModelResolver
+import com.reversetutor.core.llm.BuiltInEmbeddingChannel
+import com.reversetutor.core.llm.EmbeddingChannelKind
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
+import com.reversetutor.core.llm.LlmSecretResolver
+import com.reversetutor.core.llm.OpenAiCompatibleEmbeddingRuntime
+import com.reversetutor.core.llm.ProviderHttpRequest
+import com.reversetutor.core.llm.ProviderHttpResult
+import com.reversetutor.core.llm.ProviderHttpTransport
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationResult
@@ -816,5 +823,80 @@ private class RecordingGenerationRuntime : LlmGenerationRuntime {
     override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
         requests += request
         return LlmGenerationResult.Success("Bound model reply")
+    }
+}
+
+
+/** 1e: embedding fallback chain — user channel -> built-in bge-m3 relay (anonymous) -> null. */
+class ChatGenerationEmbeddingFallbackTest {
+
+    private class RecordingEmbeddingTransport(vararg responses: ProviderHttpResult) : ProviderHttpTransport {
+        val requests = mutableListOf<ProviderHttpRequest>()
+        private val queue = responses.toMutableList()
+        override suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult {
+            requests += request
+            return queue.removeFirstOrNull() ?: ProviderHttpResult.Failure
+        }
+    }
+
+    private fun embeddingBody(vararg values: Float): String {
+        val vec = values.joinToString(",", prefix = "[", postfix = "]")
+        return "{\"data\":[{\"index\":0,\"embedding\":$vec}]}"
+    }
+
+    private fun repository(transport: ProviderHttpTransport): ChatGenerationRepository =
+        ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = RecordingGenerationRuntime(),
+            embeddingRuntime = OpenAiCompatibleEmbeddingRuntime(
+                transport = transport,
+                secretResolver = LlmSecretResolver { "secret-1" }
+            )
+        )
+
+    @Test
+    fun userChannelSuccessSkipsBuiltInChannel() = runBlocking {
+        val transport = RecordingEmbeddingTransport(
+            ProviderHttpResult.Response(200, embeddingBody(0.1f, 0.2f))
+        )
+
+        val result = repository(transport).embedSourceTexts(listOf("函数的单调性"))
+
+        assertEquals(EmbeddingChannelKind.UserConfigured, result?.channelKind)
+        assertEquals(1, transport.requests.size)
+        assertEquals("https://api.example.test/v1/embeddings", transport.requests[0].url)
+        assertEquals("Bearer secret-1", transport.requests[0].headers["Authorization"])
+    }
+
+    @Test
+    fun userChannelFailureFallsBackToBuiltInChannelAnonymously() = runBlocking {
+        val transport = RecordingEmbeddingTransport(
+            ProviderHttpResult.Response(401, "{}"),
+            ProviderHttpResult.Response(200, embeddingBody(0.3f, 0.4f))
+        )
+
+        val result = repository(transport).embedSourceTexts(listOf("导数"))
+
+        assertEquals(EmbeddingChannelKind.BuiltIn, result?.channelKind)
+        assertEquals(BuiltInEmbeddingChannel.Model, result?.modelKey)
+        assertEquals(2, transport.requests.size)
+        val builtInRequest = transport.requests[1]
+        assertEquals("https://hub.zeroxcore.tech/v1/embeddings", builtInRequest.url)
+        assertFalse(builtInRequest.headers.containsKey("Authorization"))
+    }
+
+    @Test
+    fun bothChannelsFailingReturnsNull() = runBlocking {
+        val transport = RecordingEmbeddingTransport(
+            ProviderHttpResult.Response(500, "{}"),
+            ProviderHttpResult.Response(500, "{}")
+        )
+
+        assertNull(repository(transport).embedSourceTexts(listOf("x")))
+        assertEquals(2, transport.requests.size)
     }
 }

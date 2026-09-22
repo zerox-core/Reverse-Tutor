@@ -206,7 +206,9 @@ data class SourceChunkEntity(
     val text: String,
     val tokenEstimate: Int? = null,
     /** NEWMP-V1-024: optional local embedding vector for semantic retrieval. */
-    val embedding: ByteArray? = null
+    val embedding: ByteArray? = null,
+    /** 1e: which model produced [embedding]; null = legacy rows (pre-v19). */
+    val embeddingModel: String? = null
 )
 
 @Entity(tableName = "background_jobs", indices = [Index("spaceId"), Index("sessionId"), Index("status")])
