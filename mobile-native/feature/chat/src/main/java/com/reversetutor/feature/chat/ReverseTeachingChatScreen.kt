@@ -1508,7 +1508,21 @@ private fun RichMessageContent(
                     },
                     onCopySource = onCopySource
                 )
-                is ChatRichBlock.Formula -> RichSourceBlock("公式", block.source, onCopySource = onCopySource)
+                is ChatRichBlock.Formula -> {
+                    val formulaNodes = remember(block.source) {
+                        (LatexMiniParser.parse(block.source) as? LatexParseResult.Success)?.nodes
+                    }
+                    if (formulaNodes != null) {
+                        RichFormulaBlock(
+                            source = block.source,
+                            nodes = formulaNodes,
+                            onCopySource = onCopySource
+                        )
+                    } else {
+                        // 解析失败（含流式半完整块）回退原始源码展示，不炸屏
+                        RichSourceBlock("公式", block.source, onCopySource = onCopySource)
+                    }
+                }
                 is ChatRichBlock.Table -> RichTable(block)
                 is ChatRichBlock.PlainText -> Text(block.source, color = ChatInk, fontSize = 16.sp, lineHeight = 24.sp)
             }
@@ -1583,9 +1597,17 @@ internal fun buildRichInlineAnnotatedString(inlines: List<ChatRichInline>): Anno
                     fontSize = 14.sp
                 )
             ) { append(inline.source) }
-            is ChatRichInline.Formula -> withStyle(
-                SpanStyle(color = Color(0xFF334D7A), fontWeight = FontWeight.Medium)
-            ) { append(inline.source) }
+            is ChatRichInline.Formula -> {
+                val renderedFormula = latexInlineAnnotatedString(inline.source)
+                if (renderedFormula != null) {
+                    append(renderedFormula)
+                } else {
+                    // 解析失败（含流式半完整块）回退原始源码样式
+                    withStyle(
+                        SpanStyle(color = Color(0xFF334D7A), fontWeight = FontWeight.Medium)
+                    ) { append(inline.source) }
+                }
+            }
             is ChatRichInline.Link -> {
                 pushStringAnnotation(ChatRichInlineLinkTag, inline.url)
                 withStyle(
