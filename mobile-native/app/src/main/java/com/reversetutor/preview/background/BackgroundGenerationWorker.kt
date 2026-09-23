@@ -23,9 +23,12 @@ import com.reversetutor.core.data.agent.SessionTableRepository
 import com.reversetutor.core.data.agent.SessionToolExecutionRepository
 import com.reversetutor.core.data.agent.ToolCallReceiptRepository
 import com.reversetutor.core.data.background.BackgroundGenerationOutcome
+import com.reversetutor.core.data.windowmemory.WindowMemoryRepository
+import com.reversetutor.core.data.windowmemory.WindowTokenMeterRepository
 import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.domain.LearningFactReceipt
+import com.reversetutor.core.domain.WindowMemoryIntakeCoordinator
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.preview.BuildConfig
@@ -35,6 +38,15 @@ import com.reversetutor.preview.wiring.HybridLlmRuntimeMode
 import com.reversetutor.preview.wiring.runtimeMode
 import com.reversetutor.preview.wiring.session.PostTurnProjector
 import com.reversetutor.preview.wiring.session.TurnProjectionSink
+import com.reversetutor.preview.wiring.session.WindowIntakeDispatcher
+import com.reversetutor.preview.wiring.session.WindowIntakeMessagePortAdapter
+import com.reversetutor.preview.wiring.session.WindowIntakeRunner
+import com.reversetutor.preview.wiring.session.WindowIntakeStoreAdapter
+import com.reversetutor.preview.wiring.session.windowIntakeFoldSummary
+import java.util.Calendar
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 class BackgroundGenerationWorker(
     appContext: Context,
@@ -71,6 +83,13 @@ class BackgroundGenerationWorker(
                         outcome = outcome,
                         nowEpochMillis = System.currentTimeMillis()
                     )
+                }
+                // V2-004 / decision #9: window-memory intake runs after every
+                // completed turn, asynchronously, off the chat loop. Production
+                // turns execute through this worker (background generation),
+                // so the intake dispatch must fire here as well.
+                runCatching {
+                    windowIntakeDispatcherForTurn(applicationContext).dispatch(job.sessionId)
                 }
             }
         }
@@ -138,6 +157,43 @@ class BackgroundGenerationWorker(
                 )
         }
     }
+}
+
+/**
+ * V2-004 wiring: window-memory intake dispatcher built from DataModule
+ * singletons for the production turn path (background generation). Mirrors
+ * the HybridAppGraph construction; the dispatcher swallows intake failures
+ * itself so a broken extractor can never fail a completed turn (decision #9).
+ */
+private fun windowIntakeDispatcherForTurn(context: Context): WindowIntakeDispatcher {
+    val appContext = context.applicationContext
+    val database = DataModule.database(appContext)
+    val coordinator = WindowMemoryIntakeCoordinator(
+        messagePort = WindowIntakeMessagePortAdapter(
+            DataModule.messageRepository(appContext)::listMessages
+        ),
+        store = WindowIntakeStoreAdapter(WindowMemoryRepository(database.windowMemoryDao())),
+        hourOfDayAt = { epochMillis ->
+            Calendar.getInstance().apply { timeInMillis = epochMillis }.get(Calendar.HOUR_OF_DAY)
+        },
+        foldSummary = windowIntakeFoldSummary(
+            DataModule.chatGenerationRepository(appContext)::generateSessionSummary
+        ),
+    )
+    val tokenMeterRepository = WindowTokenMeterRepository(database.windowMemoryTokenMeterDao())
+    return WindowIntakeDispatcher(
+        runner = WindowIntakeRunner { sessionId, now ->
+            val report = coordinator.onTurnCompleted(sessionId, now)
+            tokenMeterRepository.recordTokenMeter(
+                sessionId = sessionId,
+                kind = "window_kept",
+                estimatedTokens = report.windowKeptTokens,
+                detail = "kept=" + report.windowKeptCount + ",evicted=" + report.evictedCount,
+                createdAtEpochMillis = now,
+            )
+        },
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    )
 }
 
 private fun completionProcessor(context: Context): BackgroundTurnCompletionProcessor {

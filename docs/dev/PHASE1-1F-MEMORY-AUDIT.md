@@ -56,4 +56,8 @@
 
 ## 结论
 
-1f 记忆层 L1/L2/L3 验收通过：四层窗口记忆 + 掌握度台账的实现与两份决策文档逐条对齐，1578 用例全绿。本子阶段无代码改动，以本核查文档收官并提交推送。大阶段一整体验证（全量构建 + 全量单测 + 模拟器 E2E）仍在 1g 完成后由分支窗口统一执行，窗口记忆的模拟器 E2E 一并纳入该验证。
+1f 记忆层 L1/L2/L3 验收通过：四层窗口记忆 + 掌握度台账的实现与两份决策文档逐条对齐，1578 用例全绿。大阶段一整体验证（全量构建 + 全量单测 + 模拟器 E2E）仍在 1g 完成后由分支窗口统一执行，窗口记忆的模拟器 E2E 一并纳入该验证。
+
+## 附录：2026-09-23 E2E 修正（审计漏判）
+
+本审计曾结论「记忆链路无新代码、接线完整」——该结论在生产链路上被 E2E 证伪：intake 分派接在 SessionConversationAssembly.runTurn()，而生产轮次从不调用 runTurn（真实路径 = BackgroundGenerationWorker → BackgroundGenerationRepository.runGenerationJob()），接线「存在但不可达」，故生产轮次零摄入。审计只核了「接线存在」，漏核「接线可达性」。修复：Worker Completed 分支派发 intake（DataModule 装配，自吞异常不拖垮轮次，决策 #9）。修复后 E2E 全绿（kept=41/evicted=31、折叠摘要 227 tokens、下轮注入 237 tokens、window_kept 计量表全程记录），证据见 docs/verification/1f-memory-intake-e2e.md。方法论教训（长期）：静态接线审计必须核对调用方可达性——「装配存在」≠「生产可达」。
