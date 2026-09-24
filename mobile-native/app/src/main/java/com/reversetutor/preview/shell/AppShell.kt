@@ -103,6 +103,7 @@ import com.reversetutor.core.domain.LearningOverviewScope
 import com.reversetutor.feature.sources.SourcesRoute
 import com.reversetutor.feature.settings.FirstLaunchImportPromptUiState
 import com.reversetutor.feature.settings.FormalLlmConfigurationScreen
+import com.reversetutor.feature.settings.fetchOpenAiModelIds
 import com.reversetutor.feature.settings.LlmProfileSettingsUiState
 import com.reversetutor.feature.settings.FormalSettingsScreen
 import com.reversetutor.preview.background.GenerationDiagnosticPolicy

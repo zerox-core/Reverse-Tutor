@@ -61,6 +61,7 @@ data class LlmProfileSettingsUiState(
                     LlmProfileItem(
                         id = profile.id,
                         name = profile.name,
+                        model = profile.model,
                         providerModelLabel = "${profile.provider.name} · ${profile.model}",
                         baseUrlLabel = profile.baseUrl ?: "未设置 Base URL",
                         keyStatusLabel = if (profile.secretRef == null) "未保存 API Key" else "已保存 API Key",
@@ -81,6 +82,9 @@ data class LlmProfileSettingsUiState(
 data class LlmProfileItem(
     val id: String,
     val name: String,
+    // 2026-09-24：一键获取模型列表需要按 model 精确比对勾选状态，
+    // 原来只藏在 providerModelLabel 的展示串里，拆出独立字段（带默认值，既有构造不破）。
+    val model: String = "",
     val providerModelLabel: String,
     val baseUrlLabel: String,
     val keyStatusLabel: String,

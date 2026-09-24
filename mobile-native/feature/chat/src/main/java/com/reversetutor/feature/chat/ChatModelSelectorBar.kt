@@ -76,7 +76,7 @@ internal fun ChatModelSelectorChip(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
-            profiles.groupBy { chatModelFamily(it.model) }.forEach { (family, items) ->
+            profiles.groupBy { chatModelGroupLabel(it) }.forEach { (family, items) ->
                 Text(
                     text = family,
                     color = ChatMuted,
@@ -121,6 +121,29 @@ internal fun ChatModelSelectorChip(
             }
         }
     }
+}
+
+/**
+ * 2026-09-24 拍板：模型切换窗按「上游」分组，不再按模型家族。
+ * 优先级：渠道限定名（丽珠::model）的 :: 前缀 = 上游/渠道显示名；
+ * 裸模型名则按 baseUrl 的 host 区分（不同上游同名模型自然分开）；
+ * 两者都没有才退回模型家族。
+ */
+internal fun chatModelGroupLabel(profile: LlmProfile): String {
+    val model = profile.model
+    if (model.contains("::")) {
+        val channel = model.substringBefore("::")
+        if (channel.isNotBlank()) return channel
+    }
+    profile.baseUrl?.let { base ->
+        val host = base
+            .trim()
+            .removePrefix("https://")
+            .removePrefix("http://")
+            .substringBefore('/')
+        if (host.isNotBlank()) return host
+    }
+    return chatModelFamily(model)
 }
 
 internal fun chatModelFamily(model: String): String {
