@@ -8,7 +8,7 @@ plugins {
 val debugLocalProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.isFile) {
-        file.inputStream().use(::load)
+        file.reader(Charsets.UTF_8).use(::load)
     }
 }
 
