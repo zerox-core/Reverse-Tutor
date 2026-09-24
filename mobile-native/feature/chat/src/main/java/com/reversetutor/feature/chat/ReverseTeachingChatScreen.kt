@@ -1387,12 +1387,12 @@ private fun MessageImageAttachment(
     }
     val ratio = (imageState as? ChatImageLoadState.Ready)?.bitmap?.let { bitmap ->
         bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1).toFloat()
-    }?.coerceIn(0.72f, 1.8f) ?: 1.35f
+    } ?: 1.35f
 
     Surface(
         onClick = { if (imageState is ChatImageLoadState.Ready) onOpen(attachment) },
         modifier = if (imageState is ChatImageLoadState.Ready) {
-            Modifier.fillMaxWidth().heightIn(max = 220.dp).aspectRatio(ratio)
+            Modifier.fillMaxWidth().aspectRatio(ratio)
         } else {
             Modifier.fillMaxWidth().height(64.dp)
         },
@@ -1415,7 +1415,7 @@ private fun MessageImageAttachment(
             is ChatImageLoadState.Ready -> Image(
                 bitmap = current.bitmap,
                 contentDescription = attachment.name,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize()
             )
         }
