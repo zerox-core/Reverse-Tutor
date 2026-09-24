@@ -402,9 +402,10 @@ internal fun ReverseTeachingChatScreen(
                         return@items
                     }
                     val item = (entry as ChatTimelineEntry.Message).item
+                    // 2026-09-24 排版改版：气泡化后行距收紧，避免消息松散漂浮
                     val timelineSpacing = when (item.role) {
-                        MessageRole.Assistant -> Modifier.padding(bottom = 28.dp)
-                        MessageRole.User -> Modifier.heightIn(min = 63.dp)
+                        MessageRole.Assistant -> Modifier.padding(bottom = 8.dp)
+                        MessageRole.User -> Modifier
                         MessageRole.System,
                         MessageRole.Tool -> Modifier
                     }
@@ -1116,34 +1117,35 @@ private fun UserTimelineMessage(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    // 2026-09-24 排版改版（QQ 参考）：用户消息右对齐实底蓝气泡、白字、
+    // 尾角在右下的小圆角，替代原「裸文本 + 绿色竖条」的排版。
     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-        Row(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically
+                .widthIn(max = 286.dp)
+                .graphicsLayer {
+                    scaleX = if (pressed) 0.99f else 1f
+                    scaleY = if (pressed) 0.99f else 1f
+                }
+                .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onTap,
+                    onLongClick = onLongPress
+                ),
+            color = Color(0xFF4287E8),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp)
         ) {
             Column(
-                modifier = Modifier
-                    .widthIn(max = 286.dp)
-                    .graphicsLayer {
-                        scaleX = if (pressed) 0.99f else 1f
-                        scaleY = if (pressed) 0.99f else 1f
-                    }
-                    .combinedClickable(
-                        interactionSource = interactionSource,
-                        indication = null,
-                        onClick = onTap,
-                        onLongClick = onLongPress
-                    ),
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 item.quoteLabel?.let { quote ->
                     Text(
                         text = quote,
-                        color = ChatMuted,
+                        color = Color(0xCCFFFFFF),
                         fontSize = 10.sp,
                         lineHeight = 15.sp,
                         textAlign = TextAlign.End
@@ -1155,7 +1157,8 @@ private fun UserTimelineMessage(
                     onOpenExternalLink = onOpenExternalLink,
                     onMessageTap = onTap,
                     onMessageLongPress = onLongPress,
-                    onCopySource = onCopyRichSource
+                    onCopySource = onCopyRichSource,
+                    textColor = Color.White
                 )
                 item.attachments.forEach {
                     MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
@@ -1163,13 +1166,6 @@ private fun UserTimelineMessage(
                 if (item.inheritedReadOnly) InheritedMessageLabel()
                 if (item.remembered) RememberedMessageLabel()
             }
-            Spacer(Modifier.width(10.dp))
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .fillMaxHeight()
-                    .background(Color(0xFF1A8C61), RoundedCornerShape(2.dp))
-            )
         }
         if (selected) MessageMetadataRow(item)
     }
@@ -1211,9 +1207,11 @@ private fun LearnerTimelineMessage(
                 fontWeight = FontWeight.Medium
             )
             Spacer(Modifier.height(4.dp))
-            Column(
+            // 2026-09-24 排版改版（QQ 参考）：学习者消息进白色圆角气泡，
+            // 宽度随内容自适应、不再撑满整行；尾角在左下。思考链抽屉留气泡外。
+            Surface(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .widthIn(max = 320.dp)
                     .graphicsLayer {
                         scaleX = if (pressed) 0.99f else 1f
                         scaleY = if (pressed) 0.99f else 1f
@@ -1224,34 +1222,42 @@ private fun LearnerTimelineMessage(
                         onClick = onTap,
                         onLongClick = onLongPress
                     ),
-                verticalArrangement = Arrangement.spacedBy(7.dp)
+                color = Color.White,
+                contentColor = ChatInk,
+                shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp),
+                border = BorderStroke(1.dp, Color(0xFFE3E9F2))
             ) {
-                item.quoteLabel?.let { quote ->
-                    Text(quote, color = ChatMuted, fontSize = 10.sp, lineHeight = 15.sp)
-                }
-                RichMessageContent(
-                    source = item.text,
-                    userAligned = false,
-                    onOpenExternalLink = onOpenExternalLink,
-                    onMessageTap = onTap,
-                    onMessageLongPress = onLongPress,
-                    onCopySource = onCopyRichSource
-                )
-                item.attachments.forEach {
-                    MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
-                }
-                if (item.inheritedReadOnly) InheritedMessageLabel()
-                if (item.remembered) RememberedMessageLabel()
-                // Expression-loop slice 4 (SPEC section 4.7 route C): collapsed
-                // thinking-chain drawer under the spoken bubble; it consumes
-                // its own taps and never triggers bubble selection.
-                item.monologue?.let { monologue ->
-                    MonologueDrawer(
-                        monologue = monologue,
-                        expanded = monologueExpanded,
-                        onExpandedChange = onMonologueExpandedChange
+                Column(
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    item.quoteLabel?.let { quote ->
+                        Text(quote, color = ChatMuted, fontSize = 10.sp, lineHeight = 15.sp)
+                    }
+                    RichMessageContent(
+                        source = item.text,
+                        userAligned = false,
+                        onOpenExternalLink = onOpenExternalLink,
+                        onMessageTap = onTap,
+                        onMessageLongPress = onLongPress,
+                        onCopySource = onCopyRichSource
                     )
+                    item.attachments.forEach {
+                        MessageAttachment(it, sources, onOpenImage, onOpenSource, onReselectInvalidSource)
+                    }
+                    if (item.inheritedReadOnly) InheritedMessageLabel()
+                    if (item.remembered) RememberedMessageLabel()
                 }
+            }
+            // Expression-loop slice 4 (SPEC section 4.7 route C): collapsed
+            // thinking-chain drawer under the spoken bubble; it consumes
+            // its own taps and never triggers bubble selection.
+            item.monologue?.let { monologue ->
+                MonologueDrawer(
+                    monologue = monologue,
+                    expanded = monologueExpanded,
+                    onExpandedChange = onMonologueExpandedChange
+                )
             }
             if (selected) MessageMetadataRow(item)
         }
@@ -1482,11 +1488,14 @@ private fun RichMessageContent(
     onOpenExternalLink: (String) -> Unit,
     onMessageTap: () -> Unit,
     onMessageLongPress: () -> Unit,
-    onCopySource: (String) -> ChatClipboardResult
+    onCopySource: (String) -> ChatClipboardResult,
+    // 2026-09-24 排版改版：正文颜色可注入（用户蓝气泡传白字），
+    // 列宽从撑满改为内容自适应上限，配合气泡排版。
+    textColor: Color = ChatInk
 ) {
     val blocks = remember(source) { ChatRichContentParser.parse(source) }
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.widthIn(max = 320.dp),
         horizontalAlignment = if (userAligned) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
@@ -1494,7 +1503,7 @@ private fun RichMessageContent(
             when (block) {
                 is ChatRichBlock.Heading -> Text(
                     block.text,
-                    color = ChatInk,
+                    color = textColor,
                     fontSize = when (block.level) { 1 -> 20.sp; 2 -> 18.sp; else -> 16.sp },
                     lineHeight = 28.sp,
                     fontWeight = FontWeight.Bold
@@ -1503,7 +1512,8 @@ private fun RichMessageContent(
                     inlines = block.inlines,
                     onOpenExternalLink = onOpenExternalLink,
                     onMessageTap = onMessageTap,
-                    onMessageLongPress = onMessageLongPress
+                    onMessageLongPress = onMessageLongPress,
+                    textColor = textColor
                 )
                 is ChatRichBlock.ListItem -> Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text(if (block.ordered) "${block.index ?: 1}." else "•", color = ChatMuted, fontSize = 16.sp)
@@ -1512,7 +1522,8 @@ private fun RichMessageContent(
                             inlines = ChatRichContentParser.parseInlines(block.text),
                             onOpenExternalLink = onOpenExternalLink,
                             onMessageTap = onMessageTap,
-                            onMessageLongPress = onMessageLongPress
+                            onMessageLongPress = onMessageLongPress,
+                            textColor = textColor
                         )
                     }
                 }
@@ -1551,7 +1562,7 @@ private fun RichMessageContent(
                     }
                 }
                 is ChatRichBlock.Table -> RichTable(block)
-                is ChatRichBlock.PlainText -> Text(block.source, color = ChatInk, fontSize = 16.sp, lineHeight = 24.sp)
+                is ChatRichBlock.PlainText -> Text(block.source, color = textColor, fontSize = 16.sp, lineHeight = 24.sp)
             }
         }
     }
