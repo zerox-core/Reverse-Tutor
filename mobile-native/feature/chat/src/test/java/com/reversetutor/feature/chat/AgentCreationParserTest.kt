@@ -30,6 +30,15 @@ class AgentCreationParserTest {
     }
 
     @Test
+    fun parsesPersonaIntoDraftPatch() {
+        val raw = """{"understanding":50,"followUpQuestion":"他什么性格？","draft":{"persona":"慢热但较真"}}"""
+
+        val result = AgentCreationParser.parseTurnResult(raw)
+
+        assertEquals("慢热但较真", result?.draft?.persona)
+    }
+
+    @Test
     fun parsesFencedJsonWithSurroundingProse() {
         val raw = "好的，我理解了。\n```json\n" +
             "{\"understanding\":70,\"assistantNote\":\"草案已更新。\",\"followUpQuestion\":\"先讲概念还是先做题？\"," +

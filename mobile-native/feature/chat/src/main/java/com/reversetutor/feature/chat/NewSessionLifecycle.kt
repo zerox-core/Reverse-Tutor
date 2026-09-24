@@ -46,7 +46,9 @@ data class NewSessionConfiguration(
     val learnerImageRef: String? = null,
     val storyImageRef: String? = null,
     val builtInPresetId: String? = null,
-    val quickTags: Map<String, TagFieldSelection> = emptyMap()
+    val quickTags: Map<String, TagFieldSelection> = emptyMap(),
+    /** 人物性格（R84）：创建链路「用户目标 → 人物性格 → 教学方式」的中间环。 */
+    val persona: String = ""
 ) {
     fun validationErrors(): List<String> = buildList {
         if (title.isBlank()) add("请填写会话名称。")
@@ -57,11 +59,11 @@ data class NewSessionConfiguration(
         get() {
             val completed = listOf(
                 title.isNotBlank(), learnerRole.isNotBlank(), learnerProfile.isNotBlank(),
-                goal.isNotBlank(), plan.isNotBlank(), dialogueStrategy.isNotBlank(),
+                persona.isNotBlank(), goal.isNotBlank(), plan.isNotBlank(), dialogueStrategy.isNotBlank(),
                 story.isNotBlank(), sourceSelections.isNotEmpty(), effectiveCustomColumns().isNotEmpty(),
                 openingMessage.isNotBlank()
             ).count { it }
-            return completed * 10
+            return completed * 100 / 11
         }
 
     fun sectionSummary(section: NewSessionSection): String = when (section) {
@@ -83,6 +85,7 @@ data class NewSessionConfiguration(
         goal = goal,
         profileText = buildString {
             append(learnerProfile.ifBlank { "未填写" })
+            append("\nPersona: ").append(persona.ifBlank { "未填写" })
             append("\nPlan: ").append(plan.ifBlank { "未填写" })
             append("\nDialogue: ").append(dialogueStrategy.ifBlank { "未填写" })
             append("\nStory: ").append(story.ifBlank { "未填写" })

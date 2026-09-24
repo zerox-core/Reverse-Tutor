@@ -30,10 +30,18 @@ class AgentCreationUnderstandingTest {
             dialogueStrategy = "多追问", plan = "分三阶段",
             story = "晚自习教室"
         )
-        // 20+20+15+10+15+10+5 = 95
-        assertEquals(95, AgentCreationUnderstanding.deterministicScore(full, false))
-        // 文档 +10 → 105 钳到 100
-        assertEquals(100, AgentCreationUnderstanding.deterministicScore(full, true))
+        // 20+20+15+5(profile)+15+10+5 = 90（persona 未填）
+        assertEquals(90, AgentCreationUnderstanding.deterministicScore(full, false))
+        // persona 15 + 文档 10 → 115 钳到 100
+        assertEquals(100, AgentCreationUnderstanding.deterministicScore(full.copy(persona = "较真"), true))
+    }
+
+    @Test
+    fun personaCarriesChainWeight() {
+        val empty = NewSessionConfiguration()
+        assertEquals(15, AgentCreationUnderstanding.deterministicScore(empty.copy(persona = "慢热较真"), false))
+        assertTrue(AgentCreationUnderstanding.hasPersona(empty.copy(persona = "x")))
+        assertFalse(AgentCreationUnderstanding.hasPersona(empty))
     }
 
     @Test
@@ -115,8 +123,12 @@ class AgentCreationUnderstandingTest {
         val withGoal = empty.copy(goal = "g")
         assertEquals("学习者角色", planner.strategyFor(withGoal, 20, false).targetFollowUpField)
 
-        // goal+role+title 都填 → teachingStyle
-        val ready = withGoal.copy(learnerRole = "r", title = "t")
+        // goal+role 填了 → persona（R84：目标 → 人物性格 → 教学方式的中间环）
+        val withRole = withGoal.copy(learnerRole = "r")
+        assertEquals("人物性格", planner.strategyFor(withRole, 40, false).targetFollowUpField)
+
+        // goal+role+persona+title 都填 → teachingStyle
+        val ready = withRole.copy(persona = "较真", title = "t")
         assertEquals("教学风格偏好", planner.strategyFor(ready, 55, false).targetFollowUpField)
     }
 

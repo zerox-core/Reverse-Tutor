@@ -98,6 +98,36 @@ class AgentCreationCoordinatorTest {
     }
 
     @Test
+    fun draftCardStaysSingleAndSinksToFeedTail() = runBlocking {
+        val gateway = ScriptedGateway(
+            listOf(
+                AgentCreationTurnResult(
+                    understanding = 30,
+                    followUpQuestion = "目标？",
+                    draft = AgentCreationDraftPatch(title = "旧标题", learnerRole = "初二学生")
+                ),
+                AgentCreationTurnResult(
+                    understanding = 50,
+                    followUpQuestion = "性格？",
+                    draft = AgentCreationDraftPatch(persona = "慢热较真")
+                )
+            )
+        )
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        coordinator.start()
+
+        coordinator.sendUserText("第一句")
+        coordinator.sendUserText("第二句")
+
+        // R84：草案卡单卡化——feed 里永远只有一张，且沉在对话流末尾
+        val cards = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.DraftCard>()
+        assertEquals(1, cards.size)
+        assertEquals("慢热较真", cards.single().configuration.persona)
+        assertEquals("旧标题", cards.single().configuration.title)
+        assertTrue(coordinator.state.feed.last() is AgentCreationFeedEntry.DraftCard)
+    }
+
+    @Test
     fun displayedUnderstandingCappedWhileRequiredFieldsMissing() = runBlocking {
         val gateway = ScriptedGateway(
             listOf(

@@ -215,11 +215,14 @@ class AgentCreationCoordinator(
             appendAssistant(followUp)
         }
         if (draftChanged) {
+            // R84：草案卡单卡化——撤掉旧卡、最新草案永远沉在对话流末尾，
+            // 让「当前输出状态」持久可见，而不是滚出一串过期的历史卡。
             state = state.copy(
-                feed = state.feed + AgentCreationFeedEntry.DraftCard(
-                    id = nextId(),
-                    configuration = newDraft
-                )
+                feed = state.feed.filterNot { it is AgentCreationFeedEntry.DraftCard } +
+                    AgentCreationFeedEntry.DraftCard(
+                        id = nextId(),
+                        configuration = newDraft
+                    )
             )
         }
     }

@@ -28,10 +28,11 @@ data class AgentCreationTurnStrategy(
  */
 class AgentCreationFollowUpPlanner {
 
-    /** 追问优先级队列（10.3）：goal > learnerRole > title > teachingStyle > constraints。 */
+    /** 追问优先级队列（10.3 + R84）：goal > learnerRole > persona > title > teachingStyle > constraints。 */
     enum class Field(val label: String, val fallbackQuestion: String) {
         Goal("学习目标", "你想达到什么目标？比如补上某个薄弱块、冲刺一次考试，或者单纯把概念讲透。"),
         LearnerRole("学习者角色", "你现在的基础怎么样？学到哪一块了？"),
+        Persona("人物性格", "这个 AI 学生是个什么性格的人？比如慢热但较真、急性子爱抢话、基础弱但特别好胜——性格定了，我才知道该怎么「学」。"),
         Title("会话名称", "给这个会话起个名字吧？不想起的话，我就用提案的名字了。"),
         TeachingStyle("教学风格偏好", "你希望我怎么学？比如多追问你几个为什么，还是先听你完整讲完再提问。"),
         Constraints("约束条件", "有没有什么禁区或约束？比如不想被打断、只准用教材里的方法，没有就说没有。")
@@ -85,6 +86,7 @@ class AgentCreationFollowUpPlanner {
     private fun isFilled(field: Field, draft: NewSessionConfiguration): Boolean = when (field) {
         Field.Goal -> draft.goal.isNotBlank()
         Field.LearnerRole -> draft.learnerRole.isNotBlank()
+        Field.Persona -> draft.persona.isNotBlank()
         Field.Title -> draft.title.isNotBlank()
         Field.TeachingStyle -> AgentCreationUnderstanding.hasTeachingStyle(draft)
         Field.Constraints -> AgentCreationUnderstanding.hasConstraints(draft)
@@ -97,6 +99,7 @@ class AgentCreationFollowUpPlanner {
         private val PRIORITY = listOf(
             Field.Goal,
             Field.LearnerRole,
+            Field.Persona,
             Field.Title,
             Field.TeachingStyle,
             Field.Constraints

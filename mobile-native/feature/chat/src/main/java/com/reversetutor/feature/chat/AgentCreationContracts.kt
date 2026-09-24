@@ -53,7 +53,8 @@ data class AgentCreationDraftPatch(
     val reviewFrequency: String? = null,
     val speakingTone: String? = null,
     val story: String? = null,
-    val openingMessage: String? = null
+    val openingMessage: String? = null,
+    val persona: String? = null
 ) {
     fun applyTo(base: NewSessionConfiguration): NewSessionConfiguration = base.copy(
         title = title ?: base.title,
@@ -73,7 +74,8 @@ data class AgentCreationDraftPatch(
         reviewFrequency = reviewFrequency ?: base.reviewFrequency,
         speakingTone = speakingTone ?: base.speakingTone,
         story = story ?: base.story,
-        openingMessage = openingMessage ?: base.openingMessage
+        openingMessage = openingMessage ?: base.openingMessage,
+        persona = persona ?: base.persona
     )
 }
 

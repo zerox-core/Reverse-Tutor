@@ -50,6 +50,7 @@ class NewSessionSnapshotCodecTest {
                 )
             ),
             openingMessage = "老师，请先讲定义。",
+            persona = "慢热但较真，爱追问",
             learnerImageRef = "content://learner/1",
             storyImageRef = "content://story/1",
             builtInPresetId = "formal-math-sprint"

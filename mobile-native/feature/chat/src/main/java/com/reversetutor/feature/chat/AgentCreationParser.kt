@@ -64,7 +64,8 @@ object AgentCreationParser {
         reviewFrequency = draft.text("reviewFrequency"),
         speakingTone = draft.text("speakingTone"),
         story = draft.text("story"),
-        openingMessage = draft.text("openingMessage")
+        openingMessage = draft.text("openingMessage"),
+        persona = draft.text("persona")
     )
 
     private fun JsonValue.Object.text(key: String): String? =

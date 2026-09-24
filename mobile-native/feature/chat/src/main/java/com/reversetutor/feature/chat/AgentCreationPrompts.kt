@@ -74,6 +74,7 @@ object AgentCreationPrompts {
         if (draft.title.isNotBlank()) line("title", draft.title)
         if (draft.learnerRole.isNotBlank()) line("learnerRole", draft.learnerRole)
         if (draft.learnerProfile.isNotBlank()) line("learnerProfile", draft.learnerProfile)
+        if (draft.persona.isNotBlank()) line("persona", draft.persona)
         if (draft.learnerDisplayName != "学习者") line("learnerDisplayName", draft.learnerDisplayName)
         if (draft.goal.isNotBlank()) line("goal", draft.goal)
         if (draft.plan.isNotBlank()) line("plan", draft.plan)
@@ -125,15 +126,16 @@ object AgentCreationPrompts {
     /** P2' 契约全文 + 评分锚点（10.2）+ 追问规则（10.3）。 */
     private const val CONTRACT = """[角色与输出契约]
 你是「反转家教」的会话创建顾问：通过简短对话收集信息，逐步完善一份学习会话草案。这个产品的形态是「用户当老师，把一个 AI 学生教会」，草案描述的就是这个 AI 学生该怎么学。
+收集顺序：先弄清学习目标，再和用户一起勾勒 AI 学生的人物性格（persona：他是个怎样的人、怎么提问、卡壳时什么反应），性格定了再谈教学方式。
 每轮只输出一个 JSON 对象，不要输出任何其他文字，不要 markdown 围栏：
 {"understanding":0到100的整数,"followUpQuestion":"追问或null","assistantNote":"对用户说的话或null","requestDocument":true或false,"draft":{...}}
-draft 只写本轮要更新的字段，未提及的字段会保持原值。可用字段：title, learnerRole, learnerProfile, learnerDisplayName, goal, plan, learningScope, modules, stageMilestones, dialogueStrategy, feedbackIntensity(1到5整数), probingIntensity(1到5), scaffoldingIntensity(1到5), correctionPersistence, reviewFrequency, speakingTone, story, openingMessage
+draft 只写本轮要更新的字段，未提及的字段会保持原值。可用字段：title, learnerRole, learnerProfile, persona, learnerDisplayName, goal, plan, learningScope, modules, stageMilestones, dialogueStrategy, feedbackIntensity(1到5整数), probingIntensity(1到5), scaffoldingIntensity(1到5), correctionPersistence, reviewFrequency, speakingTone, story, openingMessage
 
-[了解程度评分锚点]
+[了解程度评分锚点]（链路：用户目标 → AI 学生的人物性格 persona → 教学方式）
 0-20 只有模糊意向（"想学点东西"）
-20-40 有明确目标，角色不清
-40-60 目标+角色齐，风格未谈
-60-80 目标/角色/风格齐，可直接生成
+20-40 有明确目标，人物性格未成型
+40-60 目标+人物性格齐，教学方式未谈
+60-80 目标/性格/教学方式齐，可直接生成
 80-100 细节充分（含资料/约束/画像），可生成高质量开场
 
 [追问规则]

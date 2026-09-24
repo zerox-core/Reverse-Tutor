@@ -4,8 +4,13 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -244,15 +249,17 @@ fun AgentCreationRoute(
                             is AgentCreationFeedEntry.DraftCard -> DraftSummaryCard(entry.configuration)
                         }
                     }
-                    if (state.busy) {
-                        item(key = "busy-indicator") { ThinkingIndicator() }
-                    }
                 }
                 LaunchedEffect(state.feed.size, state.busy) {
                     if (state.feed.isNotEmpty()) {
                         feedState.animateScrollToItem(state.feed.size - 1)
                     }
                 }
+            }
+            // R84：生成中状态条固定在输入框上方、不随对话流滚走——
+            // 发出消息后用户始终看得到动态反馈，不会再觉得卡在页面上。
+            if (state.busy) {
+                WorkingStatusBar()
             }
             BottomComposer(
                 input = input,
@@ -534,17 +541,30 @@ private fun FileCard(
 
 @Composable
 private fun DraftSummaryCard(configuration: NewSessionConfiguration) {
+    // R84：档案卡视觉——色带头 + 白身 + 字段表，与聊天气泡/输入框拉开辨识度。
     val type = LocalFormalTypeScale.current
     Surface(
-        color = FormalColors.SurfaceSubtle,
+        color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, FormalColors.Border),
+        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.35f)),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("agent_creation_draft_card")
     ) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        FormalColors.PrimarySoft,
+                        RoundedCornerShape(
+                            topStart = FormalShapes.CardRadius,
+                            topEnd = FormalShapes.CardRadius
+                        )
+                    )
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+            ) {
                 Icon(
                     Icons.Filled.AutoAwesome,
                     contentDescription = null,
@@ -553,25 +573,33 @@ private fun DraftSummaryCard(configuration: NewSessionConfiguration) {
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = "会话草案",
+                    text = "会话草案 · 实时更新",
                     style = type.style(12f, 17f, FontWeight.SemiBold, FormalColors.Primary)
                 )
                 Spacer(Modifier.weight(1f))
-                Text(
-                    text = "完成度 ${configuration.completionPercent}%",
-                    style = type.style(10f, 14f, color = FormalColors.Muted)
-                )
+                Surface(
+                    color = FormalColors.Surface,
+                    shape = RoundedCornerShape(FormalShapes.PillRadius)
+                ) {
+                    Text(
+                        text = "完成度 ${configuration.completionPercent}%",
+                        style = type.style(9f, 13f, FontWeight.Medium, FormalColors.Primary),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                    )
+                }
             }
-            Spacer(Modifier.height(10.dp))
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
             DraftRow("会话名称", configuration.title.ifBlank { "待补充" })
             DraftRow("AI 学生", configuration.learnerDisplayName)
             DraftRow("学习者角色", configuration.learnerRole.ifBlank { "待补充" })
+            DraftRow("人物性格", configuration.persona.ifBlank { "待补充" })
             DraftRow("目标", configuration.goal.ifBlank { "待补充" })
             if (configuration.plan.isNotBlank()) DraftRow("计划", configuration.plan)
             if (configuration.stageMilestones != "未设置") DraftRow("阶段里程碑", configuration.stageMilestones)
             if (configuration.openingMessage.isNotBlank() &&
                 configuration.openingMessage != "准备好后，请开始讲给我听吧。"
             ) DraftRow("开场消息", configuration.openingMessage)
+            }
         }
     }
 }
@@ -596,18 +624,50 @@ private fun DraftRow(label: String, value: String) {
 }
 
 @Composable
-private fun ThinkingIndicator() {
+private fun WorkingStatusBar() {
     val type = LocalFormalTypeScale.current
-    Surface(
-        color = FormalColors.Surface,
-        shape = CircleShape,
-        border = BorderStroke(1.dp, FormalColors.Border)
+    val stages = listOf("正在理解你说的…", "正在更新会话草案…", "正在琢磨怎么接话…")
+    var stageIndex by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1600)
+            stageIndex = (stageIndex + 1) % stages.size
+        }
+    }
+    val dotsTransition = rememberInfiniteTransition(label = "working-dots")
+    val dotAlphas = List(3) { index ->
+        dotsTransition.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 600),
+                repeatMode = RepeatMode.Reverse,
+                initialStartOffset = StartOffset(index * 200)
+            ),
+            label = "working-dot-$index"
+        )
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(FormalColors.Surface)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("agent_creation_working"),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "正在思考…",
-            style = type.style(11f, 16f, color = FormalColors.Muted),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+            text = stages[stageIndex],
+            style = type.style(11f, 16f, color = FormalColors.Muted)
         )
+        Spacer(Modifier.width(8.dp))
+        dotAlphas.forEach { alpha ->
+            Box(
+                modifier = Modifier
+                    .size(5.dp)
+                    .background(FormalColors.Primary.copy(alpha = alpha.value), CircleShape)
+            )
+            Spacer(Modifier.width(4.dp))
+        }
     }
 }
 

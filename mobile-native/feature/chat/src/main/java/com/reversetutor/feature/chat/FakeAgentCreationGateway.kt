@@ -61,6 +61,7 @@ class FakeAgentCreationGateway(
                     requestDocument = true,
                     draft = AgentCreationDraftPatch(
                         learnerProfile = "有目标感但基础有缺口，常见误区在概念衔接处；提问直接，需要被追问出所以然。",
+                        persona = "慢热但较真：听不懂会抓住一个点反复问，懂了之后会用自己的话复述一遍确认。",
                         learnerDisplayName = "小林",
                         dialogueStrategy = "每轮先复述用户讲法，再挑一个衔接点追问依据；用户卡壳时给台阶式提示。",
                         feedbackIntensity = 4,

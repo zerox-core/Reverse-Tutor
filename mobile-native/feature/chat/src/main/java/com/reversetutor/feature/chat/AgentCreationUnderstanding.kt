@@ -30,10 +30,13 @@ object AgentCreationUnderstanding {
             draft.stageMilestones != UNSET ||
             draft.learningScope != UNSET
 
+    /** 人物性格是否已成型（R84 链路中间环：目标 → 人物性格 → 教学方式）。 */
+    fun hasPersona(draft: NewSessionConfiguration): Boolean = draft.persona.isNotBlank()
+
     /**
-     * u_det：字段覆盖加权和（满分 110，钳到 100）。
-     * goal 20 / learnerRole 20 / title 15 / learnerProfile 10 /
-     * teachingStyle 15 / constraints 10 / openingMessage-story 5 / 文档 +10。
+     * u_det：字段覆盖加权和（满分 115，钳到 100）。
+     * goal 20 / learnerRole 20 / title 15 / persona 15 / teachingStyle 15 /
+     * constraints 10 / learnerProfile 5 / openingMessage-story 5 / 文档 +10。
      */
     fun deterministicScore(
         draft: NewSessionConfiguration,
@@ -43,7 +46,8 @@ object AgentCreationUnderstanding {
         if (draft.goal.isNotBlank()) score += 20
         if (draft.learnerRole.isNotBlank()) score += 20
         if (draft.title.isNotBlank()) score += 15
-        if (draft.learnerProfile.isNotBlank()) score += 10
+        if (draft.persona.isNotBlank()) score += 15
+        if (draft.learnerProfile.isNotBlank()) score += 5
         if (hasTeachingStyle(draft)) score += 15
         if (hasConstraints(draft)) score += 10
         if (draft.story.isNotBlank() || draft.openingMessage != DEFAULT_OPENING) score += 5

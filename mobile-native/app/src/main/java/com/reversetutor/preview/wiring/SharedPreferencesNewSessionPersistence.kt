@@ -120,13 +120,14 @@ object NewSessionSnapshotCodec {
             configuration.speakingTone,
             pack(configuration.quickTags.entries.flatMap { (field, selection) ->
                 selection.values.flatMap { value -> listOf(field, value.tagId.orEmpty(), value.text) }
-            })
+            }),
+            configuration.persona
         )
     )
 
     fun decodeConfiguration(value: String): NewSessionConfiguration {
         val fields = unpack(value)
-        require(fields.size == 13 || fields.size == 14 || fields.size == 27 || fields.size == 28) {
+        require(fields.size == 13 || fields.size == 14 || fields.size == 27 || fields.size == 28 || fields.size == 29) {
             "Unexpected new-session configuration field count"
         }
         val legacy = fields.size == 13 || fields.size == 14
@@ -173,7 +174,8 @@ object NewSessionSnapshotCodec {
                     }
                 }
                 .groupBy({ it.first }, { it.second })
-                .mapValues { TagFieldSelection(it.value) }
+                .mapValues { TagFieldSelection(it.value) },
+            persona = fields.getOrNull(28) ?: ""
         )
     }
 
