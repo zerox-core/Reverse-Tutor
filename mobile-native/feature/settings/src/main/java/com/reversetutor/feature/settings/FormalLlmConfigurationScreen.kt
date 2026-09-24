@@ -30,9 +30,11 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +63,7 @@ import com.reversetutor.core.design.LocalFormalTypeScale
 import com.reversetutor.core.design.style
 import com.reversetutor.core.data.llm.LlmProfileInput
 import com.reversetutor.core.model.LlmProviderKind
+import kotlinx.coroutines.launch
 
 enum class FormalLlmProvider(val label: String, val shortLabel: String) {
     DeepSeek("DeepSeek", "鲸"),
@@ -308,6 +312,10 @@ fun FormalLlmConfigurationScreen(
     onActivateProfile: (String) -> Unit,
     onTestProfile: (String) -> Unit,
     onSaveProfile: (LlmProfileInput) -> Unit = {},
+    onDeleteProfile: (String) -> Unit = {},
+    onDiscoverModels: suspend (baseUrl: String, apiKey: String) -> Result<List<String>> = { _, _ ->
+        Result.failure(IllegalStateException("未配置模型发现"))
+    },
     modifier: Modifier = Modifier,
     initialProvider: FormalLlmProvider = FormalLlmProvider.DeepSeek,
     initialShowPresets: Boolean = false
@@ -342,6 +350,11 @@ fun FormalLlmConfigurationScreen(
                 FormalLlmProvider.DeepSeek -> item.providerModelLabel.contains("DeepSeek", ignoreCase = true)
                 FormalLlmProvider.Kimi -> item.providerModelLabel.contains("Kimi", ignoreCase = true) ||
                     item.providerModelLabel.contains("Moonshot", ignoreCase = true)
+                // 2026-09-24：Custom 的 provider 枚举名是 Custom、label 是自定义，
+                // hub 等自定义上游的 providerModelLabel 里不含这两个词，导致配置永远不可见。
+                FormalLlmProvider.Custom -> item.providerModelLabel.contains("自定义", ignoreCase = true) ||
+                    item.providerModelLabel.contains("Custom", ignoreCase = true) ||
+                    item.providerModelLabel.contains("OpenAI", ignoreCase = true)
                 else -> item.providerModelLabel.contains(provider.label, ignoreCase = true)
             }
         }
@@ -439,6 +452,10 @@ fun FormalLlmConfigurationScreen(
             provider = provider,
             draft = editorDraft,
             onDraftChange = { editorDraft = it },
+            existingProfiles = state.profileItems,
+            onDiscoverModels = onDiscoverModels,
+            onSaveProfile = onSaveProfile,
+            onDeleteProfile = onDeleteProfile,
             onDismiss = { showEditor = false },
             onSave = {
                 onSaveProfile(editorDraft.toInput())
@@ -454,10 +471,20 @@ private fun LlmProfileEditorSheet(
     provider: FormalLlmProvider,
     draft: FormalLlmProfileDraft,
     onDraftChange: (FormalLlmProfileDraft) -> Unit,
+    existingProfiles: List<LlmProfileItem>,
+    onDiscoverModels: suspend (baseUrl: String, apiKey: String) -> Result<List<String>>,
+    onSaveProfile: (LlmProfileInput) -> Unit,
+    onDeleteProfile: (String) -> Unit,
     onDismiss: () -> Unit,
     onSave: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
+    val scope = rememberCoroutineScope()
+    var discovering by remember { mutableStateOf(false) }
+    var discoveryError by remember { mutableStateOf<String?>(null) }
+    var pickerRows by remember { mutableStateOf<List<DiscoveredModelRow>>(emptyList()) }
+    var showModelPicker by remember { mutableStateOf(false) }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = FormalColors.SurfaceElevated,
@@ -491,6 +518,39 @@ private fun LlmProfileEditorSheet(
                 label = { Text("模型") },
                 singleLine = true
             )
+            // 2026-09-24 拍板：配好上游 baseUrl + key 后一键获取模型列表，
+            // 勾选保存即同步到会话页模型切换窗口；取消勾选即从本机删除。
+            OutlinedButton(
+                onClick = {
+                    scope.launch {
+                        discovering = true
+                        discoveryError = null
+                        val result = onDiscoverModels(draft.baseUrl, draft.apiKey)
+                        discovering = false
+                        result.fold(
+                            onSuccess = { upstreamIds ->
+                                val sameUpstream = existingProfiles.filter {
+                                    it.baseUrlLabel.trim().trimEnd('/')
+                                        .equals(draft.baseUrl.trim().trimEnd('/'), ignoreCase = true)
+                                }
+                                pickerRows = buildDiscoveredModelRows(upstreamIds, sameUpstream)
+                                showModelPicker = true
+                            },
+                            onFailure = { discoveryError = it.message ?: "获取模型列表失败" }
+                        )
+                    }
+                },
+                enabled = draft.baseUrl.isNotBlank() && draft.apiKey.isNotBlank() && !discovering,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (discovering) "正在获取模型列表…" else "从上游获取模型列表")
+            }
+            if (discoveryError != null) {
+                Text(
+                    discoveryError ?: "",
+                    style = type.style(9f, 14f, color = Color(0xFFB5542F))
+                )
+            }
             OutlinedTextField(
                 value = draft.baseUrl,
                 onValueChange = { onDraftChange(draft.copy(baseUrl = it)) },
@@ -506,6 +566,10 @@ private fun LlmProfileEditorSheet(
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true
             )
+            Text(
+                "也可以直接在模型栏手动填写加入：手动保存的配置不会被一键获取覆盖；上游新加模型后，在这里手动补加即可。",
+                style = type.style(9f, 14f, color = FormalColors.Muted)
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -514,6 +578,172 @@ private fun LlmProfileEditorSheet(
                 TextButton(onClick = onDismiss) { Text("取消") }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = onSave, enabled = draft.canSave) { Text("保存配置") }
+            }
+        }
+    }
+
+    if (showModelPicker) {
+        DiscoveredModelPickerSheet(
+            rows = pickerRows,
+            onDismiss = { showModelPicker = false },
+            onApply = { checkedIds ->
+                pickerRows.forEach { row ->
+                    val checked = row.modelId in checkedIds
+                    if (checked && row.existingProfileId == null) {
+                        // 勾选 = 保存为本上游的一个配置，自动出现在会话页模型切换窗口
+                        onSaveProfile(
+                            LlmProfileInput(
+                                name = row.modelId.substringAfter("::").ifBlank { row.modelId },
+                                provider = draft.providerKind,
+                                model = row.modelId,
+                                baseUrl = draft.baseUrl,
+                                apiKey = draft.apiKey
+                            )
+                        )
+                    }
+                    if (!checked && row.existingProfileId != null) {
+                        // 取消勾选 = 删除本机配置；重新扫描不会把它加回来
+                        onDeleteProfile(row.existingProfileId)
+                    }
+                }
+                showModelPicker = false
+            }
+        )
+    }
+}
+
+internal data class DiscoveredModelRow(
+    val modelId: String,
+    val existingProfileId: String?,
+    val inUpstreamList: Boolean
+)
+
+/**
+ * 把上游 /models 结果与本机已有配置合并成勾选行：
+ * 上游可见的排前面（inUpstreamList=true），本机保留但上游已不可见的排后面。
+ * 已存在同 model 的配置直接绑定其 profileId，勾选状态由它决定。
+ */
+internal fun buildDiscoveredModelRows(
+    upstreamIds: List<String>,
+    existingProfiles: List<LlmProfileItem>
+): List<DiscoveredModelRow> {
+    val existingByModel = LinkedHashMap<String, String>()
+    existingProfiles.forEach { item ->
+        if (item.model.isNotBlank() && item.model !in existingByModel) {
+            existingByModel[item.model] = item.id
+        }
+    }
+    val rows = mutableListOf<DiscoveredModelRow>()
+    val seen = HashSet<String>()
+    upstreamIds.forEach { modelId ->
+        if (modelId.isNotBlank() && seen.add(modelId)) {
+            rows += DiscoveredModelRow(
+                modelId = modelId,
+                existingProfileId = existingByModel.remove(modelId),
+                inUpstreamList = true
+            )
+        }
+    }
+    existingByModel.forEach { (modelId, profileId) ->
+        rows += DiscoveredModelRow(
+            modelId = modelId,
+            existingProfileId = profileId,
+            inUpstreamList = false
+        )
+    }
+    return rows
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun DiscoveredModelPickerSheet(
+    rows: List<DiscoveredModelRow>,
+    onDismiss: () -> Unit,
+    onApply: (Set<String>) -> Unit
+) {
+    val type = LocalFormalTypeScale.current
+    var checkedIds by remember(rows) {
+        mutableStateOf(rows.filter { it.existingProfileId != null }.map { it.modelId }.toSet())
+    }
+    var query by remember(rows) { mutableStateOf("") }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = FormalColors.SurfaceElevated,
+        contentColor = FormalColors.Ink,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = FormalColors.BorderStrong) },
+        modifier = Modifier.testTag("formal-llm-model-picker")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("勾选要启用的模型", style = type.style(16f, 22f, FontWeight.Bold, FormalColors.Ink))
+            Text(
+                "勾选=保存并同步到会话页切换窗口；取消勾选=删除本机该配置，重新扫描也不会自动加回。上游新加的模型在这里手动勾上即可。",
+                style = type.style(9f, 14f, color = FormalColors.Muted)
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("搜索模型（共 ${rows.size} 个）") },
+                singleLine = true
+            )
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().height(320.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                val normalized = query.trim()
+                val visible = if (normalized.isEmpty()) rows else rows.filter { it.modelId.contains(normalized, ignoreCase = true) }
+                items(visible.size, key = { visible[it].modelId }) { index ->
+                    val row = visible[index]
+                    val checked = row.modelId in checkedIds
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                checkedIds = if (checked) checkedIds - row.modelId else checkedIds + row.modelId
+                            }
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = { on ->
+                                checkedIds = if (on) checkedIds + row.modelId else checkedIds - row.modelId
+                            }
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                row.modelId.substringAfter("::").ifBlank { row.modelId },
+                                style = type.style(12f, 18f, FontWeight.Medium, FormalColors.Ink)
+                            )
+                            Text(
+                                if (row.inUpstreamList) row.modelId else "${row.modelId}（本机保留，上游已不可见）",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = type.style(8f, 12f, color = FormalColors.Muted)
+                            )
+                        }
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "已选 ${checkedIds.size} 个",
+                    modifier = Modifier.weight(1f),
+                    style = type.style(10f, 15f, color = FormalColors.Muted)
+                )
+                TextButton(onClick = onDismiss) { Text("取消") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onApply(checkedIds) }) { Text("应用勾选") }
             }
         }
     }

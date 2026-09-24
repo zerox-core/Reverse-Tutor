@@ -21,7 +21,9 @@ internal data class DebugLlmBootstrapConfig(
             .mapIndexed { index, model ->
                 DebugLlmProfileSeed(
                     id = if (index == 0) DefaultProfileId else "debug-llm-fallback-$index",
-                    name = if (index == 0) "本地测试默认模型" else "本地测试备用模型 $index",
+                    // 2026-09-24：种子名直接用模型短名（去掉 渠道:: 前缀），
+                    // 会话页切换窗口按上游名分组后不再出现占位式名称。
+                    name = model.substringAfter("::").ifBlank { model },
                     model = model,
                     isDefault = index == 0
                 )

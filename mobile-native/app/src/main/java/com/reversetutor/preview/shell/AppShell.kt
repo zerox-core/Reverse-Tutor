@@ -2018,6 +2018,14 @@ private fun DestinationContent(
                         llmProfiles = llmProfileRepository.listProfiles()
                     }
                 },
+                onDeleteProfile = { profileId ->
+                    scope.launch {
+                        llmProfileRepository.deleteProfile(profileId)
+                        llmProfiles = llmProfileRepository.listProfiles()
+                    }
+                },
+                // 一键获取模型列表：只读上游 GET /models，不产生对话消耗
+                onDiscoverModels = { baseUrl, apiKey -> fetchOpenAiModelIds(baseUrl, apiKey) },
                 onTestProfile = {}
             )
             return@ReverseTutorScreenSurface
