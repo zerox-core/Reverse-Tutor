@@ -12,6 +12,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.core.app.NotificationManagerCompat
@@ -1214,7 +1215,9 @@ private fun DestinationContent(
         pendingChatAttachmentNotice = next.notice
     }
     val chatImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
+        // 2026-09-24 拍板：「相册」走系统相册（Photo Picker），不再弹文件管理器；
+        // 文件管理器只留给「文件」入口（sourceFileLauncher）。
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 9)
     ) { uris ->
         scope.launch {
             val batchId = System.currentTimeMillis()
@@ -1460,7 +1463,23 @@ private fun DestinationContent(
                 cameraPermissionState = cameraPermissionState,
                 evidenceTargetMessageId = pendingChatEvidenceTarget,
                 onPickImage = {
-                    chatImageLauncher.launch(arrayOf("image/*"))
+                    chatImageLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+                // 相册缩略图勾选（2026-09-24 拍板）：勾选即作为草稿附件进入输入区，
+                // 发送按钮随 canSend 亮起，走正常发送流程。
+                onGalleryImagePicked = { uri ->
+                    scope.launch {
+                        acceptPlatformAttachment(
+                            withContext(Dispatchers.IO) {
+                                context.readChatAttachmentInput(
+                                    uri = uri,
+                                    id = "strip-${System.currentTimeMillis()}"
+                                )
+                            }
+                        )
+                    }
                 },
                 onPickLocalSource = {
                     chatSourcePickerActive = true

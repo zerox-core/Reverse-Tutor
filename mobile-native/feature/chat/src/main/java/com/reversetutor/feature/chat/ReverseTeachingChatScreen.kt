@@ -66,6 +66,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
@@ -99,6 +101,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
@@ -118,6 +121,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.ui.graphics.vector.addPathNodes
@@ -152,6 +156,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.Dispatchers
@@ -180,6 +185,8 @@ internal fun ReverseTeachingChatScreen(
     onComposerTextChange: (String) -> Unit,
     voiceInputState: VoiceInputState = VoiceInputState(),
     onVoiceInputClick: () -> Unit = {},
+    onVoicePressStart: () -> Unit = {},
+    onVoicePressStop: () -> Unit = {},
     onSendMessage: () -> Unit,
     onCancelQuote: () -> Unit,
     onCreateImageDraft: () -> Unit,
@@ -218,6 +225,7 @@ internal fun ReverseTeachingChatScreen(
     cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     onOpenSearch: () -> Unit = {},
     onPickImages: () -> Unit = onCreateImageDraft,
+    onGalleryImagePicked: (Uri) -> Unit = {},
     onPickLocalSource: () -> Unit = {},
     onSelectSource: (ChatDraftAttachment) -> Unit = {},
     onTakePhoto: () -> Unit = {},
@@ -242,6 +250,9 @@ internal fun ReverseTeachingChatScreen(
     var locateSourceMessage by remember(state.sessionTitle) { mutableStateOf<ChatTimelineItem?>(null) }
     var viewerAttachment by remember(state.sessionTitle) { mutableStateOf<ChatAttachmentUi?>(null) }
     var showAttachmentActions by remember(state.sessionTitle) { mutableStateOf(false) }
+    // 相册缩略图勾选状态（2026-09-24）：勾选即把图片作为草稿附件加入输入区，
+    // 发送按钮随 canSend 自动亮起；取消勾选按 uri 找回附件并移除。
+    var selectedGalleryUris by remember(state.sessionTitle) { mutableStateOf(setOf<String>()) }
     var showWebSearchConfirm by remember(state.sessionTitle) { mutableStateOf(false) }
     var showSourcePicker by remember(state.sessionTitle) { mutableStateOf(false) }
     val listState = rememberLazyListState(
@@ -505,7 +516,21 @@ internal fun ReverseTeachingChatScreen(
             // below it while the panel is open.
             val focusManager = LocalFocusManager.current
             if (showAttachmentActions) {
-                ChatAttachmentMediaStrip()
+                ChatAttachmentMediaStrip(
+                    selectedUris = selectedGalleryUris,
+                    onToggle = { uri ->
+                        val key = uri.toString()
+                        if (key in selectedGalleryUris) {
+                            selectedGalleryUris = selectedGalleryUris - key
+                            state.composer.orderedAttachments
+                                .firstOrNull { it.uri == key }
+                                ?.let { onRemoveAttachment(it.id) }
+                        } else {
+                            selectedGalleryUris = selectedGalleryUris + key
+                            onGalleryImagePicked(uri)
+                        }
+                    }
+                )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 WebSearchToggle(
@@ -530,6 +555,8 @@ internal fun ReverseTeachingChatScreen(
                 onTextChange = onComposerTextChange,
         voiceInputState = voiceInputState,
         onVoiceInputClick = onVoiceInputClick,
+        onVoicePressStart = onVoicePressStart,
+        onVoicePressStop = onVoicePressStop,
                 onAdd = {
                     if (showAttachmentActions) {
                         showAttachmentActions = false
@@ -2198,7 +2225,9 @@ internal fun chatAttachmentSheetActionSpecs(): List<ChatAttachmentSheetActionSpe
  */
 @Composable
 private fun ChatAttachmentMediaStrip(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selectedUris: Set<String> = emptySet(),
+    onToggle: (Uri) -> Unit = {}
 ) {
     val context = LocalContext.current
     var hasPermission by remember {
@@ -2240,7 +2269,11 @@ private fun ChatAttachmentMediaStrip(
             }
         } else {
             items(images, key = { it.toString() }) { uri ->
-                GalleryMediaThumbnail(uri)
+                GalleryMediaThumbnail(
+                    uri = uri,
+                    selected = uri.toString() in selectedUris,
+                    onClick = { onToggle(uri) }
+                )
             }
         }
     }
@@ -2273,7 +2306,11 @@ private fun queryRecentGalleryImages(context: Context, limit: Int): List<Uri> {
 }
 
 @Composable
-private fun GalleryMediaThumbnail(uri: Uri) {
+private fun GalleryMediaThumbnail(
+    uri: Uri,
+    selected: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     val context = LocalContext.current
     val bitmap by produceState<Bitmap?>(null, uri) {
         value = withContext(Dispatchers.IO) {
@@ -2290,7 +2327,15 @@ private fun GalleryMediaThumbnail(uri: Uri) {
         modifier = Modifier
             .size(72.dp)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF2F6FC), RoundedCornerShape(12.dp)),
+            .background(Color(0xFFF2F6FC), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .then(
+                if (selected) {
+                    Modifier.border(2.dp, Color(0xFF4287E8), RoundedCornerShape(12.dp))
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (bitmap != null) {
@@ -2307,6 +2352,29 @@ private fun GalleryMediaThumbnail(uri: Uri) {
                 tint = ChatMuted,
                 modifier = Modifier.size(22.dp)
             )
+        }
+        if (selected) {
+            Box(Modifier.fillMaxSize().background(Color(0x33000000)))
+        }
+        // 勾选角标：未选=半透明空心圆，已选=蓝底白勾（2026-09-24 拍板交互）
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(if (selected) Color(0xFF4287E8) else Color(0x66000000))
+                .border(1.5.dp, Color.White, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            if (selected) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
         }
     }
 }
@@ -2455,6 +2523,7 @@ private fun WebSearchToggle(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ReverseTeachingComposer(
     text: String,
@@ -2463,10 +2532,20 @@ private fun ReverseTeachingComposer(
     onTextChange: (String) -> Unit,
     voiceInputState: VoiceInputState = VoiceInputState(),
     onVoiceInputClick: () -> Unit = {},
+    onVoicePressStart: () -> Unit = {},
+    onVoicePressStop: () -> Unit = {},
     onAdd: () -> Unit,
     onSend: () -> Unit,
     onFocusChanged: (Boolean) -> Unit
 ) {
+    // 2026-09-24 拍板语音交互：点按麦克风 → 输入栏变「按住 说话」语音栏
+    // （长按录制、松手即停）；长按麦克风 → 语音对话小弹窗。
+    var voiceMode by remember { mutableStateOf(false) }
+    var showVoiceDialog by remember { mutableStateOf(false) }
+    // pointerInput 不能以录音状态为 key：状态翻转会在手势中途取消协程、丢掉松手
+    // 事件（2026-09-24 用户反馈「松手即停没做好」的根因），回调用 rememberUpdatedState。
+    val currentVoicePressStart by rememberUpdatedState(onVoicePressStart)
+    val currentVoicePressStop by rememberUpdatedState(onVoicePressStop)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2494,6 +2573,30 @@ private fun ReverseTeachingComposer(
             shape = RoundedCornerShape(24.dp),
             border = BorderStroke(1.dp, Color(0xFFC7D8EA))
         ) {
+            if (voiceMode) {
+                // 语音栏：整栏按住说话、松手即停。
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = ChatComposerLayout.Height, max = 136.dp)
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown()
+                                currentVoicePressStart()
+                                waitForUpOrCancellation()
+                                currentVoicePressStop()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (voiceInputState.active) "松手结束" else "按住 说话",
+                        color = if (voiceInputState.active) Color(0xFF4287E8) else ChatInk,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            } else {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2522,21 +2625,25 @@ private fun ReverseTeachingComposer(
                     )
                 }
             }
-        }
-        Surface(
-            onClick = onVoiceInputClick,
-            modifier = Modifier.size(ChatComposerLayout.SendSize),
-            color = if (voiceInputState.active) Color(0xFF4287E8) else Color.Transparent,
-            contentColor = if (voiceInputState.active) Color.White else Color(0xFF577394),
-            shape = CircleShape
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Filled.Mic,
-                    contentDescription = if (voiceInputState.active) "停止语音输入" else "语音输入",
-                    modifier = Modifier.size(24.dp)
-                )
             }
+        }
+        // 麦克风：点按切换语音栏/键盘，长按打开语音对话弹窗。
+        Box(
+            modifier = Modifier
+                .size(ChatComposerLayout.SendSize)
+                .clip(CircleShape)
+                .combinedClickable(
+                    onClick = { voiceMode = !voiceMode },
+                    onLongClick = { showVoiceDialog = true }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (voiceMode) Icons.Filled.Keyboard else Icons.Filled.Mic,
+                contentDescription = if (voiceMode) "切换回键盘输入" else "语音输入，长按打开语音对话",
+                tint = if (voiceInputState.active) Color(0xFF4287E8) else Color(0xFF577394),
+                modifier = Modifier.size(24.dp)
+            )
         }
         Surface(
             onClick = onSend,
@@ -2552,6 +2659,177 @@ private fun ReverseTeachingComposer(
                     contentDescription = if (isSending) "正在发送" else "发送",
                     modifier = Modifier.size(26.dp)
                 )
+            }
+        }
+    }
+    if (showVoiceDialog) {
+        VoiceConversationDialog(
+            voiceInputState = voiceInputState,
+            onPressStart = onVoicePressStart,
+            onPressStop = onVoicePressStop,
+            onDismiss = { showVoiceDialog = false }
+        )
+    }
+}
+
+/**
+ * 语音对话小弹窗（2026-09-24 拍板）：长按输入区麦克风打开。
+ * 按住底部按钮说话、松手即停；识别文本由语音接线层实时写回输入框。
+ */
+@Composable
+private fun VoiceConversationDialog(
+    voiceInputState: VoiceInputState,
+    onPressStart: () -> Unit,
+    onPressStop: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    // 同语音栏：回调走 rememberUpdatedState，手势协程用固定 key，避免松手丢失。
+    val currentPressStart by rememberUpdatedState(onPressStart)
+    val currentPressStop by rememberUpdatedState(onPressStop)
+    Dialog(onDismissRequest = onDismiss) {
+        var entered by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { entered = true }
+        val dialogScale by animateFloatAsState(
+            targetValue = if (entered) 1f else 0.82f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            ),
+            label = "voiceDialogScale"
+        )
+        val dialogAlpha by animateFloatAsState(
+            targetValue = if (entered) 1f else 0f,
+            animationSpec = tween(durationMillis = 220),
+            label = "voiceDialogAlpha"
+        )
+        val listening = voiceInputState.phase == VoiceInputPhase.Starting ||
+            voiceInputState.phase == VoiceInputPhase.Listening
+        Surface(
+            modifier = Modifier
+                .width(300.dp)
+                .graphicsLayer {
+                    scaleX = dialogScale
+                    scaleY = dialogScale
+                    alpha = dialogAlpha
+                },
+            shape = RoundedCornerShape(28.dp),
+            color = Color.White
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "语音对话",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = ChatInk,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "关闭语音对话",
+                        tint = ChatMuted,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clickable(onClick = onDismiss)
+                    )
+                }
+                Spacer(Modifier.height(18.dp))
+                val pulseTransition = rememberInfiniteTransition(label = "voicePulse")
+                val pulseScale by pulseTransition.animateFloat(
+                    initialValue = 1f,
+                    targetValue = 1.3f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 750, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "voicePulseScale"
+                )
+                Box(
+                    modifier = Modifier.size(104.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (listening) {
+                        Box(
+                            modifier = Modifier
+                                .size(96.dp)
+                                .graphicsLayer {
+                                    scaleX = pulseScale
+                                    scaleY = pulseScale
+                                }
+                                .clip(CircleShape)
+                                .background(Color(0x334287E8))
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(if (listening) Color(0xFF4287E8) else Color(0xFFF2F6FC)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Mic,
+                            contentDescription = null,
+                            tint = if (listening) Color.White else Color(0xFF577394),
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = when (voiceInputState.phase) {
+                        VoiceInputPhase.Starting -> "正在启动…"
+                        VoiceInputPhase.Listening -> "正在聆听，松手结束"
+                        VoiceInputPhase.Stopping -> "正在识别…"
+                        VoiceInputPhase.Failed -> voiceInputState.errorMessage ?: "识别失败，请重试"
+                        VoiceInputPhase.Idle -> "按住下方按钮说话"
+                    },
+                    fontSize = 14.sp,
+                    color = if (voiceInputState.phase == VoiceInputPhase.Failed) Color(0xFF9D3340) else ChatMuted,
+                    textAlign = TextAlign.Center
+                )
+                if (voiceInputState.transcript.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = voiceInputState.transcript,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = ChatInk,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(18.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .background(if (listening) Color(0xFF2F6FD6) else Color(0xFF4287E8))
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown()
+                                currentPressStart()
+                                waitForUpOrCancellation()
+                                currentPressStop()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (listening) "松手结束" else "按住 说话",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }

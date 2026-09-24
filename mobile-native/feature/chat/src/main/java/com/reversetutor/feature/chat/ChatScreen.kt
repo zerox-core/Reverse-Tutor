@@ -2,6 +2,7 @@ package com.reversetutor.feature.chat
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -118,6 +119,7 @@ fun ChatRoute(
     cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     evidenceTargetMessageId: String? = null,
     onPickImage: () -> Unit = {},
+    onGalleryImagePicked: (Uri) -> Unit = {},
     onPickLocalSource: () -> Unit = {},
     onTakePhoto: () -> Unit = {},
     onRequestCameraPermission: () -> Unit = {},
@@ -253,6 +255,25 @@ fun ChatRoute(
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED -> startVoiceSession()
             else -> voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // 按住说话 / 松手即停（2026-09-24 拍板）：语音栏与语音对话弹窗共用的按压回调。
+    val onVoicePressStart: () -> Unit = {
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            startVoiceSession()
+        } else {
+            voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    val onVoicePressStop: () -> Unit = {
+        if (voiceInputState.active) {
+            voiceController.onStopRequested()
+            voiceEngine.stop()
         }
     }
 
@@ -567,6 +588,8 @@ fun ChatRoute(
         onComposerTextChange = { updateComposer(composer.copy(text = it, sendFailure = null, notice = null)) },
         voiceInputState = voiceInputState,
         onVoiceInputClick = onVoiceInputClick,
+        onVoicePressStart = onVoicePressStart,
+        onVoicePressStop = onVoicePressStop,
         onSendMessage = {
             if (composer.canSend) {
                 val sentComposer = composer.copy(isSending = true, sendFailure = null, notice = null)
@@ -842,6 +865,7 @@ fun ChatRoute(
         availableSourceAttachments = availableSourceAttachments,
         cameraPermissionState = cameraPermissionState,
         onPickImages = onPickImage,
+        onGalleryImagePicked = onGalleryImagePicked,
         onPickLocalSource = onPickLocalSource,
         onSelectSource = ::addAttachment,
         onTakePhoto = onTakePhoto,
@@ -926,6 +950,8 @@ fun ChatScreen(
     onComposerTextChange: (String) -> Unit,
     voiceInputState: VoiceInputState = VoiceInputState(),
     onVoiceInputClick: () -> Unit = {},
+    onVoicePressStart: () -> Unit = {},
+    onVoicePressStop: () -> Unit = {},
     onSendMessage: () -> Unit,
     onCancelQuote: () -> Unit,
     onCreateImageDraft: () -> Unit,
@@ -962,6 +988,7 @@ fun ChatScreen(
     availableSourceAttachments: List<ChatDraftAttachment> = emptyList(),
     cameraPermissionState: ChatPermissionState = ChatPermissionState.Requestable,
     onPickImages: () -> Unit = onCreateImageDraft,
+    onGalleryImagePicked: (Uri) -> Unit = {},
     onPickLocalSource: () -> Unit = {},
     onSelectSource: (ChatDraftAttachment) -> Unit = {},
     onTakePhoto: () -> Unit = {},
@@ -987,6 +1014,8 @@ fun ChatScreen(
         onComposerTextChange = onComposerTextChange,
         voiceInputState = voiceInputState,
         onVoiceInputClick = onVoiceInputClick,
+        onVoicePressStart = onVoicePressStart,
+        onVoicePressStop = onVoicePressStop,
         onSendMessage = onSendMessage,
         onCancelQuote = onCancelQuote,
         onCreateImageDraft = onCreateImageDraft,
@@ -1023,6 +1052,7 @@ fun ChatScreen(
         availableSourceAttachments = availableSourceAttachments,
         cameraPermissionState = cameraPermissionState,
         onPickImages = onPickImages,
+        onGalleryImagePicked = onGalleryImagePicked,
         onPickLocalSource = onPickLocalSource,
         onSelectSource = onSelectSource,
         onTakePhoto = onTakePhoto,

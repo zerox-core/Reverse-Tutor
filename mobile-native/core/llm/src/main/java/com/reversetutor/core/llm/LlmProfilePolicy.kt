@@ -64,7 +64,15 @@ object LlmProfileCapabilityResolver {
                 model.contains("gpt-4.1") ||
                 model.contains("gpt-5") ||
                 model.contains("vision") ||
-                model.startsWith("qwen3.7-flash")
+                model.contains("vl") ||
+                model.contains("omni") ||
+                model.contains("glm-5v") ||
+                // 2026-09-24：hub 换代到 Qwen-3.8-Flash（带/不带连字符两种 id），
+                // qwen3.7-flash 曾按视觉可用白名单，家族后继型号沿用；上游为
+                // OpenAI 兼容透传，多模态按模型名带 vl/omni/vision 标记放行。
+                model.contains("qwen3.7-flash") ||
+                model.contains("qwen3.8-flash") ||
+                model.contains("qwen-3.8-flash")
             LlmProviderKind.AnthropicCompatible -> model.contains("claude-3") ||
                 model.contains("claude-4")
             LlmProviderKind.Gemini -> true
