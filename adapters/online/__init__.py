@@ -2,11 +2,13 @@
 
 from fastapi import APIRouter
 
+from .admin_routes import router as admin_router
 from .auth_routes import router as auth_router
 from .routes import router as online_router
 
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(online_router)
+router.include_router(admin_router)
 
 __all__ = ["router"]

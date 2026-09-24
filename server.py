@@ -37,6 +37,7 @@ import llm
 import vision
 from adapters import dispatch_webhook
 from adapters.online import router as online_router
+from adapters.online.admin_service import admin_activity_service
 from adapters.online.auth_routes import reset_auth_service, set_auth_service
 from adapters.online.dependencies import build_postgres_online_services
 from adapters.online.errors import OnlineApiError, error_response
@@ -59,11 +60,13 @@ def configure_online_auth_from_env() -> bool:
             activity_port=services.activity_port,
         )
         set_online_runtime_status(mode="postgresql", schema_head=online_schema_head())
+        admin_activity_service.set_activity_store(services.activity_store)
         return True
     if os.getenv("ONLINE_AUTH_ALLOW_IN_MEMORY", "") == "1":
         reset_auth_service()
         online_service.reset_content_activity_ports()
         reset_online_runtime_status()
+        admin_activity_service.reset_activity_store()
         return False
     raise RuntimeError(
         "ONLINE_DATABASE_URL is required unless ONLINE_AUTH_ALLOW_IN_MEMORY=1"
@@ -85,6 +88,7 @@ async def app_lifespan(_app: FastAPI):
         reset_auth_service()
         online_service.reset_content_activity_ports()
         reset_online_runtime_status()
+        admin_activity_service.reset_activity_store()
 
 
 # --- App ---------------------------------------------------------------------
