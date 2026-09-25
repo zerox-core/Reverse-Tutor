@@ -81,10 +81,22 @@
   - B 类确认 = 我的工作清单：挑战窗口内容链路、知识包内容层、零起点引导层、学生卡归并流程、大纲外显「书」形态。
 - **落点**：本纪要 R9 ③ 划线撤销 + R10 本条；commit（本轮提交）。
 
+### 2026-09-25 · R11 全授权动工：建设计划定稿 + I1 知识包内容层落地
+- **用户要点**：「不担心啊，你现在是一个新分支，所以说你正常的去开发你想要完成的一个最终版。如果说后续合并时候有冲突文档，我会进行一个人工判断的——你尽可能按着你想要去完成的去做就行了。」
+- **执行响应**：
+  - 动工前先把骨架代码读实（代码实证）：服务端 `catalog_seed.py`（英文示例无 tasks、无中文活动）、`activity_store.py`（tasks 单事务/乐观锁/幂等事件/状态机全支持）；端上 `ChallengeRoute.kt`（详情 BottomSheet 无每日任务列表、progress=12 与 FeedbackPill 为硬编码占位）、`ChallengeRuntimeCoordinator.kt`（仅 Load/Join，无进度上报）、`ChallengeSessionLaunch.kt`（Create/Reuse 决策已有，prefill 未注入当日任务）、`HttpOnlineApi.kt`（progress 端点已有无人调）。
+  - 产出 `docs/dev/challenge-01-build-plan.md`：5 个增量（I1 知识包内容 → I2 服务端内容接入 → I3 端上内容链路 F2/F4/prefill → I4 大纲外显与掌握度反馈 → I5 学生卡归并+收尾），每增量验收门禁与提交规矩。
+  - **I1 完成**：`activities/challenge-01-agent-app-dev/` 23 文件全部落地——README 知识包索引（M0-M7 知识地图 + 17 天编排 + 完成判据草案 + 实测核实点清单）、days/day-01..17.md（front-matter 对齐 activity_tasks 字段：day_number/title/stage_goal，正文即 task_markdown；D1-D2 实操、D3-D16 每模块「概念日+应用纠错日」、D17 综合验收）、labs.md（四对照实验指南 + 观察记录表 + 降级方案）、onboarding-d0.md（四意图摸底 + 降级链 L1-L3 + 六大劝退点预案）、misconceptions.yaml（E1-E10 十条，假规则均 ≤20 字）、student-card.yaml（PresetCard 草案，配方取值标「待定」挂 §10-4）。
+  - 门禁：内容 lint 全过（front-matter 字段齐全、day_number 与文件名一致、无「老师」开头话术、假规则字数达标）；未实测平台细节全部标【实测核实点】、未写死。
+- **落点**：commit（本轮提交）；I2（服务端 seed 接入）下轮开工。
+
 ## 待办 / 挂起项
 
 - [ ] §10 待与算法层对齐清单 6 项与用户确认（完成判据接 mastery 闸门 / 误解暴露时机接法 / D0 测评会话状态映射 / PresetCard 注册机制与配方取值 / 17 天编排与遗忘调度 / 递话机制接法）。
-- [ ] 三件套正式内容填充（modules/guides/days/student.yaml/dialogue-policy）：填充前先做实测清单（DeepSeek 注册额度 / zcode 获取与 DS API 配置 / Claude Code·Codex 国内可达性 / 镜像源）；全部示例话术按表达契约会重写（称呼克制、只保留请教意图）。
+- [ ] 实测清单执行（DeepSeek 注册额度 / zcode 获取与 DS API 配置 / Claude Code·Codex 国内可达性 / 镜像源）——知识包内容里的【实测核实点】全部依赖此项，实测后回填 onboarding-d0.md 与 labs.md。
+- [x] ~~三件套正式内容填充~~ **R11 已完成**（activities/challenge-01-agent-app-dev/ 23 文件，lint 全过）。
+- [ ] **I2 服务端内容接入**（R11 计划）：首期中文活动 seed（slug challenge-agent-app-dev-17d，17 条 tasks 从 days/ 生成）+ session_template 内容定义。
+- [ ] **I3 端上内容链路**：F2 每日任务列表 UI、挑战会话 prefill 注入当日任务、F4 完成会话→进度+1 触发点。
 - [ ] **挑战窗口开发（R10 拍板：挑战窗口完全没有，就是我的开发任务；挑战页预置、用户点开即用，不需用户自己创建）**：活动页 → 教学会话 → 掌握度反馈全链路跑通。
 - [ ] 学生卡归并机制（依赖 1d 创建面板的全局创建窗口，归并阶段才需要，不阻塞挑战窗口）。
 - [ ] 最终交接报告（任务收尾时产出）。
