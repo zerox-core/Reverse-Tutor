@@ -409,6 +409,87 @@ class NewSessionLifecycleTest {
         assertTrue(persistence.loadDrafts().isEmpty())
     }
 
+    @Test
+    fun enteringCustomWithSavedDraftsAsksContinueOrNewInsteadOfAutoBlank() {
+        val initial = listOf(
+            NewSessionDraftRecord(
+                id = "draft-old",
+                configuration = validConfiguration("上次的配置"),
+                updatedAtEpochMillis = 10L
+            )
+        )
+        val coordinator = coordinator(MemoryNewSessionPersistence(drafts = initial))
+
+        assertTrue(coordinator.selectTab(NewSessionHubTab.Custom))
+
+        assertTrue(coordinator.state.customEntryPrompt)
+        assertNull(coordinator.state.currentDraft)
+        assertEquals(NewSessionHubTab.Custom, coordinator.state.tab)
+    }
+
+    @Test
+    fun customEntryContinueRestoresLatestDraft() {
+        val initial = listOf(
+            NewSessionDraftRecord("draft-old", validConfiguration("旧配置"), updatedAtEpochMillis = 10L),
+            NewSessionDraftRecord("draft-new", validConfiguration("新配置"), updatedAtEpochMillis = 20L)
+        )
+        val coordinator = coordinator(MemoryNewSessionPersistence(drafts = initial))
+        coordinator.selectTab(NewSessionHubTab.Custom)
+
+        assertTrue(coordinator.continueLatestDraft())
+
+        assertFalse(coordinator.state.customEntryPrompt)
+        assertEquals("draft-new", coordinator.state.currentDraft?.id)
+        assertEquals("新配置", coordinator.state.currentDraft?.configuration?.title)
+    }
+
+    @Test
+    fun customEntryNewSessionStartsFreshBlankDraft() {
+        val initial = listOf(
+            NewSessionDraftRecord("draft-old", validConfiguration("旧配置"), updatedAtEpochMillis = 10L)
+        )
+        val coordinator = coordinator(
+            MemoryNewSessionPersistence(drafts = initial),
+            ids = ArrayDeque(listOf("fresh"))
+        )
+        coordinator.selectTab(NewSessionHubTab.Custom)
+
+        assertTrue(coordinator.startBlankDraftFromPrompt())
+
+        assertFalse(coordinator.state.customEntryPrompt)
+        val draft = checkNotNull(coordinator.state.currentDraft)
+        assertEquals("draft-fresh", draft.id)
+        assertTrue(draft.configuration.title.isBlank())
+    }
+
+    @Test
+    fun customEntryDismissReturnsToBuiltInWithoutDraft() {
+        val initial = listOf(
+            NewSessionDraftRecord("draft-old", validConfiguration("旧配置"), updatedAtEpochMillis = 10L)
+        )
+        val coordinator = coordinator(MemoryNewSessionPersistence(drafts = initial))
+        coordinator.selectTab(NewSessionHubTab.Custom)
+
+        coordinator.dismissCustomEntryPrompt()
+
+        assertFalse(coordinator.state.customEntryPrompt)
+        assertNull(coordinator.state.currentDraft)
+        assertEquals(NewSessionHubTab.BuiltIn, coordinator.state.tab)
+    }
+
+    @Test
+    fun enteringCustomWithoutDraftsStillAutoStartsBlank() {
+        val coordinator = coordinator(
+            MemoryNewSessionPersistence(),
+            ids = ArrayDeque(listOf("blank"))
+        )
+
+        assertTrue(coordinator.selectTab(NewSessionHubTab.Custom))
+
+        assertFalse(coordinator.state.customEntryPrompt)
+        assertEquals("draft-blank", coordinator.state.currentDraft?.id)
+    }
+
     private fun coordinator(
         persistence: MemoryNewSessionPersistence,
         ids: ArrayDeque<String> = ArrayDeque((1..100).map(Int::toString)),

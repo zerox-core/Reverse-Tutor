@@ -215,7 +215,9 @@ data class NewSessionLifecycleState(
     val canUndoRandom: Boolean = false,
     val creating: Boolean = false,
     val createError: String? = null,
-    val persistenceError: String? = null
+    val persistenceError: String? = null,
+    /** 进入自定义创建时，草稿箱里有上次的配置 → 先问「继续上次还是创建新会话」。 */
+    val customEntryPrompt: Boolean = false
 )
 
 sealed interface CreateSessionOutcome {
@@ -250,11 +252,44 @@ class NewSessionLifecycleCoordinator(
         if (state.tab == NewSessionHubTab.Custom && tab != NewSessionHubTab.Custom && !saveBoundary()) {
             return false
         }
-        if (tab == NewSessionHubTab.Custom && state.currentDraft == null && !startBlankDraft()) {
-            return false
+        if (tab == NewSessionHubTab.Custom && state.currentDraft == null) {
+            // 2026-09-25 用户拍板：进入自定义创建时，若草稿箱里有上次的配置，
+            // 先问「继续上次还是创建新会话」，不要静默开空白草稿把上次配置藏起来。
+            if (state.drafts.isNotEmpty()) {
+                state = state.copy(
+                    tab = NewSessionHubTab.Custom,
+                    selectedPresetId = null,
+                    selectedSection = null,
+                    customEntryPrompt = true
+                )
+                return true
+            }
+            if (!startBlankDraft()) return false
         }
-        state = state.copy(tab = tab, selectedPresetId = null, selectedSection = null)
+        state = state.copy(tab = tab, selectedPresetId = null, selectedSection = null, customEntryPrompt = false)
         return true
+    }
+
+    /** 入口询问「继续上次还是创建新会话」：继续 = 恢复最近更新的草稿进编辑器。 */
+    fun continueLatestDraft(): Boolean {
+        val latest = state.drafts.maxByOrNull { it.updatedAtEpochMillis }
+        state = state.copy(customEntryPrompt = false)
+        latest ?: return false
+        return restoreDraft(latest.id)
+    }
+
+    /** 入口询问：创建新会话 = 开一份全新的空白草稿。 */
+    fun startBlankDraftFromPrompt(): Boolean {
+        state = state.copy(customEntryPrompt = false)
+        return startBlankDraft()
+    }
+
+    /** 入口询问：取消 = 收起询问并退回内置预设页，不留半空状态。 */
+    fun dismissCustomEntryPrompt() {
+        state = state.copy(
+            customEntryPrompt = false,
+            tab = if (state.currentDraft == null) NewSessionHubTab.BuiltIn else state.tab
+        )
     }
 
     fun openPresetDetail(presetId: String) {

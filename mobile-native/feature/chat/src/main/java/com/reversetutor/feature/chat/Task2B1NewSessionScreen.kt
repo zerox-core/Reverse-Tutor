@@ -341,6 +341,47 @@ fun Task2B1NewSessionRoute(
             }
         )
     }
+    // 2026-09-25 用户拍板：进入自定义创建且草稿箱里有上次的配置时，
+    // 先问「继续上次还是创建新会话」，不要静默开空白草稿。
+    if (state.customEntryPrompt && state.currentDraft == null) {
+        val latest = state.drafts.maxByOrNull { it.updatedAtEpochMillis }
+        AlertDialog(
+            onDismissRequest = {
+                coordinator.dismissCustomEntryPrompt()
+                sync()
+            },
+            title = { Text("继续上次的配置？") },
+            text = {
+                Text(
+                    if (latest != null) {
+                        "上次编辑到「${latest.configuration.title.ifBlank { "未命名配置" }}」" +
+                            "（完成度 ${latest.configuration.completionPercent}%）。\n" +
+                            "继续上次会接着这份配置编辑；创建新会话则从零开始。"
+                    } else {
+                        "继续上次会接着上次的配置编辑；创建新会话则从零开始。"
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    coordinator.continueLatestDraft()
+                    sync()
+                }) { Text("继续上次") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        coordinator.dismissCustomEntryPrompt()
+                        sync()
+                    }) { Text("取消") }
+                    TextButton(onClick = {
+                        coordinator.startBlankDraftFromPrompt()
+                        sync()
+                    }) { Text("创建新会话") }
+                }
+            }
+        )
+    }
     renameDraft?.let { record ->
         AlertDialog(
             onDismissRequest = { renameDraft = null },
