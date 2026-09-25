@@ -49,6 +49,15 @@ object AgentCreationPrompts {
             ""
         }
         return when {
+            strategy.mustConfirmPath ->
+                "确认学习路径：assistantNote 用序号逐条列出草案 learningPath 的完整路径，" +
+                    "说明「确认后路径冻结，上课按这个顺序先基础后提升」；" +
+                    "followUpQuestion 必须请用户确认顺序、或提出增删/换序调整。" +
+                    "本轮不追问其他字段。" + titleNote
+            strategy.shouldRequestDocument ->
+                "主动要资料：followUpQuestion 询问用户是否有教材、讲义或试卷可以上传" +
+                    "（说明有资料就按资料目录排学习路径，没有就按目标分解），requestDocument 必须置 true。" +
+                    "本轮不追问其他字段。" + titleNote
             strategy.converge ->
                 "收敛：不再追问。缺失字段给合理的默认值提案写进 draft，" +
                     "assistantNote 总结草案并邀请用户点右上角「创建并进入聊天」。" + titleNote
@@ -144,7 +153,8 @@ learningPath 是有序学习路径：JSON 数组，3到8个知识点，按学习
 - 一次只问一个问题，问完就停，绝不一次问多个。
 - understanding<40 必须追问；40到70 至多一问；>=70 不追问，assistantNote 总结并邀请创建。
 - 同一字段已问 2 次未获有效回答（答非所问/说"随便"），不再追问该字段，改为给默认值提案写进 draft 请用户确认。
-- requestDocument=true 仅当 goal 与 learnerRole 已填、尚无已分析文档、轮数>=2 且话题涉及教材/试卷/资料；其他情况一律 false。
+- requestDocument=true 仅当 goal 与 learnerRole 已填、尚无已分析文档、轮数>=2 且话题涉及教材/试卷/资料；其他情况一律 false。例外：本轮指令明确要求「主动要资料」时必须置 true。
+- 学习路径经用户确认才算定稿：被要求确认路径时，用序号逐条列出完整路径，请用户确认顺序或提出增删/换序调整；确认前不得说路径已定稿。
 - followUpQuestion 与 assistantNote 可以同时给（先 note 后问，分两条气泡展示）。
 - 说话自然口语，像朋友聊天，不要表格腔，不要复述上面这些规则。"""
 }

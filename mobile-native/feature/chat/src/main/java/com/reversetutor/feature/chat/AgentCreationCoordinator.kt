@@ -178,6 +178,9 @@ class AgentCreationCoordinator(
         }
         // 本轮完成：按策略快照记录（追问计数以客户端指令为准，不信模型自觉）。
         planner.recordRound(strategy.targetFollowUpField)
+        // R87：主动问过的「要资料 / 确认路径」也记账，各只问一次。
+        if (strategy.shouldRequestDocument) planner.markDocumentAsked()
+        if (strategy.mustConfirmPath) planner.markPathConfirmAsked()
 
         var newDraft = turn.draft?.applyTo(state.draft) ?: state.draft
         // 10.4 title 提案的客户端兜底：goal 已明确而 title 仍空时直接合成提案，
@@ -209,7 +212,8 @@ class AgentCreationCoordinator(
         )
 
         // 10.3 requestDocument 客户端门槛：goal+role 就绪、无文档、满 2 轮才放行。
-        val allowRequestDocument = turn.requestDocument &&
+        // R87：策略快照判定本轮该主动要资料时，不等 LLM 自觉，客户端直接放行。
+        val allowRequestDocument = (turn.requestDocument || strategy.shouldRequestDocument) &&
             !hasDoc &&
             newDraft.goal.isNotBlank() &&
             newDraft.learnerRole.isNotBlank() &&
@@ -224,10 +228,19 @@ class AgentCreationCoordinator(
         // 追问把关（10.3）：收敛或高分一律不追问；低分（<40）必问，LLM 没问用兜底话术补上。
         val converging = strategy.converge || planner.shouldConverge()
         var followUp = turn.followUpQuestion
-        if (converging || fused >= 70) {
+        // R87：「确认路径 / 主动要资料」是客户端排定的关键动作，了解度高分也不许吞掉。
+        val proactiveAsk = strategy.mustConfirmPath || strategy.shouldRequestDocument
+        if (converging || (fused >= 70 && !proactiveAsk)) {
             followUp = null
         } else if (fused < 40 && followUp == null && strategy.targetFollowUpField != null) {
             followUp = planner.fieldByLabel(strategy.targetFollowUpField)?.fallbackQuestion
+        }
+        // R87 兜底：LLM 没问时客户端确定性补上（确认路径优先于要资料）。
+        if (!converging && followUp == null && strategy.mustConfirmPath) {
+            followUp = planner.pathConfirmQuestion(newDraft.learningPath)
+        }
+        if (!converging && followUp == null && strategy.shouldRequestDocument) {
+            followUp = AgentCreationFollowUpPlanner.DOC_REQUEST_FALLBACK
         }
 
         val note = turn.assistantNote ?: if (converging) {

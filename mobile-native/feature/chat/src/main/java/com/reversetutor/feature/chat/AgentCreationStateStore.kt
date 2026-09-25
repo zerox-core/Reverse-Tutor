@@ -4,7 +4,11 @@ package com.reversetutor.feature.chat
 data class AgentCreationPlannerState(
     val rounds: Int = 0,
     val askedCounts: Map<String, Int> = emptyMap(),
-    val converged: Boolean = false
+    val converged: Boolean = false,
+    /** R87：是否已主动向用户要过资料。 */
+    val documentAsked: Boolean = false,
+    /** R87：是否已请用户确认过学习路径。 */
+    val pathConfirmAsked: Boolean = false
 )
 
 /**

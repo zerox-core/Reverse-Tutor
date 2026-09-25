@@ -56,14 +56,16 @@ object AgentCreationSnapshotCodec {
             pack(snapshot.planner.askedCounts.entries.flatMap { listOf(it.key, it.value.toString()) }),
             pack(snapshot.history.map { pack(listOf(if (it.isUser) "1" else "0", it.text)) }),
             pack(snapshot.feed.map(::encodeFeedEntry)),
-            snapshot.docAnalysis?.let(::encodeDocAnalysis).orEmpty()
+            snapshot.docAnalysis?.let(::encodeDocAnalysis).orEmpty(),
+            if (snapshot.planner.documentAsked) "1" else "0",
+            if (snapshot.planner.pathConfirmAsked) "1" else "0"
         )
     )
 
     /** 损坏 / 版本不符一律返回 null：创建窗口从零开始，不抛异常。 */
     fun decode(value: String): AgentCreationSnapshot? = runCatching {
         val fields = unpack(value)
-        if (fields.size != FieldCount || fields[0] != Version) return null
+        if ((fields.size != FieldCount && fields.size != FieldCountV2) || fields[0] != Version) return null
         val askedCounts = unpack(fields[7]).chunked(2).mapNotNull { pair ->
             pair.takeIf { it.size == 2 }?.let { it[0] to (it[1].toIntOrNull() ?: return@let null) }
         }.toMap()
@@ -75,7 +77,9 @@ object AgentCreationSnapshotCodec {
             planner = AgentCreationPlannerState(
                 rounds = fields[5].toIntOrNull() ?: 0,
                 converged = fields[6] == "1",
-                askedCounts = askedCounts
+                askedCounts = askedCounts,
+                documentAsked = fields.getOrNull(11) == "1",
+                pathConfirmAsked = fields.getOrNull(12) == "1"
             ),
             history = unpack(fields[8]).mapNotNull(::decodeHistoryTurn),
             feed = unpack(fields[9]).mapNotNull(::decodeFeedEntry),
@@ -188,6 +192,7 @@ object AgentCreationSnapshotCodec {
 
     private const val Version = "v1"
     private const val FieldCount = 11
+    private const val FieldCountV2 = 13
     private const val TagAssistant = "A"
     private const val TagUser = "U"
     private const val TagFileCard = "F"

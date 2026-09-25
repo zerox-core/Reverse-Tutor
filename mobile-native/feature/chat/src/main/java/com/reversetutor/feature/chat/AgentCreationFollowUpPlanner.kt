@@ -18,7 +18,11 @@ data class AgentCreationTurnStrategy(
     /** 收敛模式：不追问，缺项给默认值提案，assistantNote 邀请创建。 */
     val converge: Boolean = false,
     /** 已有已分析文档：requestDocument 一律 false。 */
-    val documentAvailable: Boolean = false
+    val documentAvailable: Boolean = false,
+    /** R87：本轮必须主动向用户要资料（goal+role 就绪、无文档、未问过、满 2 轮）。 */
+    val shouldRequestDocument: Boolean = false,
+    /** R87：本轮必须把学习路径逐条列给用户确认（路径已生成且未确认过）。 */
+    val mustConfirmPath: Boolean = false
 )
 
 /**
@@ -46,20 +50,40 @@ class AgentCreationFollowUpPlanner {
 
     private var converged: Boolean = false
 
+    /** R87：是否已向用户要过资料（只主动问一次，不纠缠）。 */
+    private var documentAsked: Boolean = false
+
+    /** R87：是否已请用户确认过学习路径（只确认一次；用户提调整即视为参与定稿）。 */
+    private var pathConfirmAsked: Boolean = false
+
     /** 本轮前的策略快照：该问什么 / 是否收敛 / 是否必须给 title 提案。 */
     fun strategyFor(
         draft: NewSessionConfiguration,
         detScore: Int,
         documentAvailable: Boolean
-    ): AgentCreationTurnStrategy = AgentCreationTurnStrategy(
-        deterministicUnderstanding = detScore,
-        rounds = rounds,
-        askedCounts = askCounts.mapKeys { (field, _) -> field.label },
-        targetFollowUpField = if (shouldConverge()) null else nextField(draft)?.label,
-        mustProposeTitle = draft.goal.isNotBlank() && draft.title.isBlank(),
-        converge = shouldConverge(),
-        documentAvailable = documentAvailable
-    )
+    ): AgentCreationTurnStrategy {
+        // R87：主动问优先于通用追问队列——先要资料（资料可能重塑路径），再确认路径。
+        val wantDocument = !shouldConverge() && !documentAvailable && !documentAsked &&
+            draft.goal.isNotBlank() && draft.learnerRole.isNotBlank() &&
+            rounds >= MIN_ROUNDS_BEFORE_DOCUMENT_ASK
+        val wantPathConfirm = !shouldConverge() && !wantDocument &&
+            draft.learningPath.isNotEmpty() && !pathConfirmAsked
+        return AgentCreationTurnStrategy(
+            deterministicUnderstanding = detScore,
+            rounds = rounds,
+            askedCounts = askCounts.mapKeys { (field, _) -> field.label },
+            targetFollowUpField = if (shouldConverge() || wantDocument || wantPathConfirm) {
+                null
+            } else {
+                nextField(draft)?.label
+            },
+            mustProposeTitle = draft.goal.isNotBlank() && draft.title.isBlank(),
+            converge = shouldConverge(),
+            documentAvailable = documentAvailable,
+            shouldRequestDocument = wantDocument,
+            mustConfirmPath = wantPathConfirm
+        )
+    }
 
     /** 记录一轮完成；askedFieldLabel 为本轮实际追问的字段（null = 本轮没追问）。 */
     fun recordRound(askedFieldLabel: String?) {
@@ -70,6 +94,25 @@ class AgentCreationFollowUpPlanner {
 
     fun fieldByLabel(label: String?): Field? =
         Field.values().firstOrNull { it.label == label }
+
+    /** R87：本轮已按客户端指令向用户要资料（不论用户是否上传，只问一次）。 */
+    fun markDocumentAsked() {
+        documentAsked = true
+    }
+
+    /** R87：本轮已按客户端指令请用户确认学习路径（只确认一次）。 */
+    fun markPathConfirmAsked() {
+        pathConfirmAsked = true
+    }
+
+    /** R87：路径确认兜底话术——LLM 没问时客户端确定性补上。 */
+    fun pathConfirmQuestion(path: List<String>): String = buildString {
+        append("学习路径我排了一版：\n")
+        path.forEachIndexed { index, node ->
+            append(index + 1).append(". ").append(node).append('\n')
+        }
+        append("会按这个顺序从基础到提升来教，你看行吗？要调整（增删、换顺序）直接说。")
+    }
 
     /** 下一个该追问的字段：优先级队列中「未填且未问满 2 次」的第一项。 */
     fun nextField(draft: NewSessionConfiguration): Field? =
@@ -87,7 +130,9 @@ class AgentCreationFollowUpPlanner {
     fun exportState(): AgentCreationPlannerState = AgentCreationPlannerState(
         rounds = rounds,
         askedCounts = askCounts.mapKeys { (field, _) -> field.label },
-        converged = converged
+        converged = converged,
+        documentAsked = documentAsked,
+        pathConfirmAsked = pathConfirmAsked
     )
 
     /** R85：从快照恢复；未知字段 label 静默丢弃，向后兼容。 */
@@ -98,6 +143,8 @@ class AgentCreationFollowUpPlanner {
             fieldByLabel(label)?.let { askCounts[it] = count }
         }
         converged = snapshot.converged
+        documentAsked = snapshot.documentAsked
+        pathConfirmAsked = snapshot.pathConfirmAsked
     }
 
     private fun isFilled(field: Field, draft: NewSessionConfiguration): Boolean = when (field) {
@@ -112,6 +159,14 @@ class AgentCreationFollowUpPlanner {
     companion object {
         const val SOFT_ROUND_CAP = 8
         const val MAX_ASKS_PER_FIELD = 2
+
+        /** R87：主动要资料的最早轮数（与协调器 requestDocument 放行门槛一致）。 */
+        const val MIN_ROUNDS_BEFORE_DOCUMENT_ASK = 2
+
+        /** R87：主动要资料的兜底话术——LLM 没问时客户端确定性补上。 */
+        const val DOC_REQUEST_FALLBACK =
+            "对了——你手头有教材、讲义或者试卷吗？发给我，我就按资料目录排学习路径；没有也没关系，我按你的目标来分解。"
+
 
         private val PRIORITY = listOf(
             Field.Goal,
