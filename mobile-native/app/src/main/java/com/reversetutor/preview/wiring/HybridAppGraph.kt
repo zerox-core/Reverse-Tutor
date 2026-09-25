@@ -46,6 +46,7 @@ import com.reversetutor.core.remote.OnlineAuthSessionManager
 import com.reversetutor.core.remote.OnlineAuthTokenProvider
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
 import com.reversetutor.feature.chat.AgentCreationGateway
+import com.reversetutor.feature.chat.AgentCreationStateStore
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.FakeAgentCreationGateway
 import com.reversetutor.feature.chat.HeartbeatTurnDispatchPort
@@ -178,7 +179,9 @@ class HybridAppGraph private constructor(
     val challengeRuntimeCoordinator: ChallengeRuntimeCoordinator,
     val frontend: HybridFrontendFactories,
     /** R-B：Agent 创建对话网关（Fake 演示 / Production 真实 LLM）。 */
-    val agentCreationGateway: AgentCreationGateway
+    val agentCreationGateway: AgentCreationGateway,
+    /** R85：创建会话状态本地仓库（跨页面 / 跨进程恢复创建进度）。 */
+    val agentCreationStateStore: AgentCreationStateStore
 ) {
     companion object {
         fun create(
@@ -277,6 +280,7 @@ class HybridAppGraph private constructor(
                 AssistantReplyArtifactRepository(RoomAssistantReplyArtifactStore(database.sessionAgentDao()))
             )
             val newSessionPersistence = SharedPreferencesNewSessionPersistence(appContext)
+            val agentCreationStateStore: AgentCreationStateStore = SharedPreferencesAgentCreationStateStore(appContext)
             val visibleHistoryReader = WindowVisibleHistoryReader(
                 readWindow = windowTopologyRepository::getWindow,
                 readSnapshot = windowTopologyRepository::getSnapshot,
@@ -422,6 +426,7 @@ class HybridAppGraph private constructor(
                 online = onlineServices,
                 challengeRuntimeCoordinator = challengeRuntimeCoordinator,
                 agentCreationGateway = agentCreationGateway,
+                agentCreationStateStore = agentCreationStateStore,
                 frontend = createFrontendFactories(
                     context = appContext,
                     sessionRepository = sessionRepository,

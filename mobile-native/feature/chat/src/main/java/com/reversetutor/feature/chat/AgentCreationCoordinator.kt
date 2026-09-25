@@ -49,7 +49,8 @@ data class AgentCreationUiState(
 
 class AgentCreationCoordinator(
     private val gateway: AgentCreationGateway,
-    private val nowEpochMillis: () -> Long = System::currentTimeMillis
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val stateStore: AgentCreationStateStore? = null
 ) {
     var state: AgentCreationUiState = AgentCreationUiState()
         private set
@@ -57,6 +58,11 @@ class AgentCreationCoordinator(
     private val history = mutableListOf<AgentCreationHistoryTurn>()
     private val planner = AgentCreationFollowUpPlanner()
     private var entrySequence = 0
+
+    init {
+        // R85：有本地快照则恢复——切走页面 / 进程被杀后回到创建窗口接着聊。
+        stateStore?.load()?.let(::restore)
+    }
 
     fun start() {
         if (state.phase != AgentCreationPhase.Idle) return
@@ -67,10 +73,13 @@ class AgentCreationCoordinator(
                 text = "想学什么？直接说就行——比如「我想把初中物理浮力这块讲明白」，也可以随时把教材、试卷发给我。"
             )
         )
+        persist()
     }
 
     fun markCreated() {
         state = state.copy(phase = AgentCreationPhase.Created)
+        // R85：创建成功后清掉本地快照，下次进创建窗口从零开始。
+        stateStore?.clear()
     }
 
     /** 用户发一条文字消息：→ P2' 生成 → 更新了解程度/草案/追问。 */
@@ -84,6 +93,7 @@ class AgentCreationCoordinator(
         appendUser(trimmed)
         history += AgentCreationHistoryTurn(isUser = true, text = trimmed)
         converseTurn(trimmed)
+        persist()
     }
 
     /** 用户经消息框发文件：文件卡 → P1 分析 → 助手带结论续聊。 */
@@ -112,6 +122,7 @@ class AgentCreationCoordinator(
             updateFileCard(cardId) { it.copy(status = AgentCreationFeedEntry.FileCard.FileStatus.Failed) }
             state = state.copy(phase = AgentCreationPhase.Conversing)
             appendAssistant("这份文件暂时没读出来。可以点文件卡重试，也可以直接用文字描述，咱们接着聊。")
+            persist()
             return
         }
         updateFileCard(cardId) { it.copy(status = AgentCreationFeedEntry.FileCard.FileStatus.Analyzed) }
@@ -121,6 +132,7 @@ class AgentCreationCoordinator(
                 (analysis.summary.ifBlank { "大纲：" + analysis.outline.take(3).joinToString("、") }) +
                 "\n建议路径：${analysis.suggestedPath.firstOrNull() ?: "按大纲顺序过一遍"}。你想怎么学？"
         )
+        persist()
     }
 
     /** 失败的文件卡重试分析。 */
@@ -131,10 +143,12 @@ class AgentCreationCoordinator(
         updateFileCard(entryId) { it.copy(status = AgentCreationFeedEntry.FileCard.FileStatus.Analyzing) }
         val analysis = runCatching { gateway.analyzeDocument(card.fileName) }.getOrNull() ?: run {
             updateFileCard(entryId) { it.copy(status = AgentCreationFeedEntry.FileCard.FileStatus.Failed) }
+            persist()
             return
         }
         updateFileCard(entryId) { it.copy(status = AgentCreationFeedEntry.FileCard.FileStatus.Analyzed) }
         state = state.copy(docAnalysis = state.docAnalysis ?: analysis)
+        persist()
     }
 
     fun dismissError() {
@@ -259,4 +273,38 @@ class AgentCreationCoordinator(
     }
 
     private fun nextId(): String = "entry-${nowEpochMillis()}-${entrySequence++}"
+
+    /** R85：把当前状态写成快照；Idle 无内容时不写，避免覆盖有效快照。 */
+    private fun persist() {
+        val store = stateStore ?: return
+        if (state.phase == AgentCreationPhase.Idle) return
+        store.save(
+            AgentCreationSnapshot(
+                draft = state.draft.deepCopy(),
+                feed = state.feed,
+                rawUnderstanding = state.rawUnderstanding,
+                requestDocumentActive = state.requestDocumentActive,
+                history = history.toList(),
+                planner = planner.exportState(),
+                docAnalysis = state.docAnalysis,
+                entrySequence = entrySequence
+            )
+        )
+    }
+
+    /** R85：从快照恢复；busy / generationError 属瞬态一律复位，文件卡「分析中」由编解码层降级。 */
+    private fun restore(snapshot: AgentCreationSnapshot) {
+        history.clear()
+        history += snapshot.history
+        planner.restoreState(snapshot.planner)
+        entrySequence = snapshot.entrySequence
+        state = AgentCreationUiState(
+            phase = if (snapshot.feed.isEmpty()) AgentCreationPhase.Idle else AgentCreationPhase.Conversing,
+            feed = snapshot.feed,
+            draft = snapshot.draft,
+            rawUnderstanding = snapshot.rawUnderstanding,
+            requestDocumentActive = snapshot.requestDocumentActive,
+            docAnalysis = snapshot.docAnalysis
+        )
+    }
 }

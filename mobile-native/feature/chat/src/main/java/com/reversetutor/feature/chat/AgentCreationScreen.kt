@@ -87,12 +87,16 @@ fun AgentCreationRoute(
     openPickerOnStart: Boolean = false,
     onOpenPickerConsumed: () -> Unit = {},
     gateway: AgentCreationGateway? = null,
+    stateStore: AgentCreationStateStore? = null,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val activeGateway = remember(gateway) { gateway ?: FakeAgentCreationGateway() }
-    val coordinator = remember(activeGateway) { AgentCreationCoordinator(activeGateway) }
+    // R85：注入 stateStore 后创建进度跨页面 / 跨进程持久化，回来自动续聊。
+    val coordinator = remember(activeGateway, stateStore) {
+        AgentCreationCoordinator(activeGateway, stateStore = stateStore)
+    }
     val lifecycle = remember(createPort, persistence) {
         NewSessionLifecycleCoordinator(persistence = persistence, createPort = createPort)
     }

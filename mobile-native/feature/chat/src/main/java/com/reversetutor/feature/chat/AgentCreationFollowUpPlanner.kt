@@ -83,6 +83,23 @@ class AgentCreationFollowUpPlanner {
     /** 收敛条件：用户要求 / 到 8 轮软上限。 */
     fun shouldConverge(): Boolean = converged || rounds >= SOFT_ROUND_CAP
 
+    /** R85：导出可持久化状态（轮数 / 各字段已问次数 / 收敛标记）。 */
+    fun exportState(): AgentCreationPlannerState = AgentCreationPlannerState(
+        rounds = rounds,
+        askedCounts = askCounts.mapKeys { (field, _) -> field.label },
+        converged = converged
+    )
+
+    /** R85：从快照恢复；未知字段 label 静默丢弃，向后兼容。 */
+    fun restoreState(snapshot: AgentCreationPlannerState) {
+        rounds = snapshot.rounds
+        askCounts.clear()
+        snapshot.askedCounts.forEach { (label, count) ->
+            fieldByLabel(label)?.let { askCounts[it] = count }
+        }
+        converged = snapshot.converged
+    }
+
     private fun isFilled(field: Field, draft: NewSessionConfiguration): Boolean = when (field) {
         Field.Goal -> draft.goal.isNotBlank()
         Field.LearnerRole -> draft.learnerRole.isNotBlank()
