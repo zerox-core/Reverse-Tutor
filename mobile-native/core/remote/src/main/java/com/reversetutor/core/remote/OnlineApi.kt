@@ -49,7 +49,15 @@ data class OnlineActivity(
     val requiresOnlineConfirmation: Boolean = false,
     val allowsDeferredProgress: Boolean = false,
     val state: String = "offline",
-    val sessionTemplateId: String? = null
+    val sessionTemplateId: String? = null,
+    val tasks: List<OnlineActivityTask> = emptyList()
+)
+
+data class OnlineActivityTask(
+    val dayNumber: Long,
+    val title: String,
+    val taskMarkdown: String = "",
+    val stageGoal: String? = null
 )
 
 data class ActivityProgress(

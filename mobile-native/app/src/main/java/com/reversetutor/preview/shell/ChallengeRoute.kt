@@ -118,6 +118,7 @@ fun ChallengeRoute(
     total: Int = 21,
     runtimeState: ChallengeRuntimeState? = null,
     onRetry: () -> Unit = {},
+    onCompleteToday: () -> Unit = {},
     onExitBoundaryChanged: (Boolean) -> Unit = {},
     active: Boolean = true,
     initialShowDetails: Boolean = false,
@@ -237,6 +238,7 @@ fun ChallengeRoute(
                     onClose = { setDetailOpen(false) },
                     onJoin = onJoin,
                     onRetry = onRetry,
+                    onCompleteToday = onCompleteToday,
                     listState = detailListState,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -580,6 +582,7 @@ private fun ChallengeDetailSheet(
     onClose: () -> Unit,
     onJoin: () -> Unit,
     onRetry: () -> Unit,
+    onCompleteToday: () -> Unit = {},
     listState: LazyListState,
     modifier: Modifier = Modifier
 ) {
@@ -634,6 +637,26 @@ private fun ChallengeDetailSheet(
                     else -> Icons.Filled.Lightbulb
                 }
                 DetailRuleRow(rule.title, rule.body, icon)
+            }
+            if (state.tasks.isNotEmpty()) {
+                item {
+                    Text(
+                        "每日任务",
+                        style = FormalTypography.cardTitle(type, FormalColors.Ink),
+                        modifier = Modifier.padding(top = 10.dp)
+                    )
+                }
+                items(state.tasks.size) { index ->
+                    val task = state.tasks[index]
+                    DetailTaskRow(
+                        task = task,
+                        onCompleteToday = if (task.status == ChallengeTaskStatus.Current) {
+                            onCompleteToday
+                        } else {
+                            null
+                        }
+                    )
+                }
             }
             item { DetailRuleRow("资料来源", state.sourcesLabel, Icons.Filled.Memory) }
             item { DetailRuleRow("参与状态", state.participationLabel, Icons.Filled.Groups) }
@@ -754,6 +777,59 @@ private fun DetailRuleRow(
             }
             Spacer(Modifier.width(12.dp))
             FormalGlossyIcon(icon, null, size = 34.dp, glyphSize = 18.dp)
+        }
+    }
+}
+
+@Composable
+private fun DetailTaskRow(
+    task: ChallengeTaskUi,
+    onCompleteToday: (() -> Unit)?
+) {
+    val type = LocalFormalTypeScale.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = FormalColors.SurfaceElevated,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = if (ChallengeDetailLayout.UsesOutlinedContentCards) {
+            BorderStroke(1.dp, FormalColors.BorderStrong)
+        } else {
+            null
+        },
+        shadowElevation = ChallengeDetailLayout.RuleElevation
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Day ${task.dayNumber} · ${task.title}",
+                    style = FormalTypography.metadata(type, FormalColors.Ink)
+                        .copy(fontWeight = FontWeight.SemiBold)
+                )
+                task.stageGoal?.takeIf(String::isNotBlank)?.let { stageGoal ->
+                    Spacer(Modifier.height(2.dp))
+                    Text(stageGoal, style = type.style(11f, 17f, color = FormalColors.Muted))
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            when (task.status) {
+                ChallengeTaskStatus.Done -> Text(
+                    "已完成",
+                    style = FormalTypography.metadata(type, FormalColors.Muted)
+                )
+                ChallengeTaskStatus.Current -> Button(
+                    onClick = { onCompleteToday?.invoke() },
+                    enabled = onCompleteToday != null,
+                    modifier = Modifier.testTag("challenge-complete-today"),
+                    shape = RoundedCornerShape(FormalShapes.CardRadius),
+                    colors = ButtonDefaults.buttonColors(containerColor = FormalColors.Primary)
+                ) {
+                    Text("完成打卡", style = FormalTypography.control(type, Color.White))
+                }
+                ChallengeTaskStatus.Upcoming -> Text(
+                    "待解锁",
+                    style = FormalTypography.metadata(type, FormalColors.Muted)
+                )
+            }
         }
     }
 }

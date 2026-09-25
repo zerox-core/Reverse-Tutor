@@ -106,14 +106,26 @@
   - 测试 5 条（创建+17 任务顺序/可重复/不覆盖/冻结模块与 days/ 漂移/坏 front-matter 拒绝），目标测试 5/5 过；全量 533 passed + 2 failed（仅 test_project_homepage 两条版本漂移既有失败，与本线无关）+ 28 skipped。
 - **落点**：commit（本轮提交）；I3（端上内容链路：F2 任务列表 / prefill 注入当日任务 / F4 进度+1）下轮开工。
 
+### 2026-09-25 · R14 I3 端上内容链路完成：每日任务列表 + prefill 注入 + 进度打卡
+- **用户要点**：「对的继续」——按 R13 承诺推进 I3（挑战详情页每日任务列表、建会话注入当日任务与阶段目标、完成会话后进度 +1）。
+- **I3 完成（端上内容链路）**：
+  - 服务端任务字段全链路打通：新增 `ActivityTaskRecord`（content_activity_ports）；`SqlAlchemyActivityPort._activity_record` 回填 tasks（此前 tasks 在适配层被丢弃）；公开模型 `Activity.tasks`（CamelModel 序列化为 dayNumber/title/taskMarkdown/stageGoal）；内存端口 focus-week fixture 补 2 条任务；公开详情 API 返回 tasks。
+  - 客户端数据链：`OnlineActivityTask`（OnlineApi）→ HttpOnlineApi 显式解析 → 领域 `ActivityTask`（ActivitySummary.tasks）→ OnlineRepositoryAdapters 映射。
+  - F2 每日任务列表：`ChallengeDetailUiState` 派生 `ChallengeTaskUi`（状态机：已加入且 dayNumber<=progress → Done，=progress+1 → Current，其余 Upcoming）；ChallengeRoute 详情页新增「每日任务」区块 + `DetailTaskRow`（当前天显示「完成打卡」按钮，testTag=challenge-complete-today；已完成/待解锁为状态文案）；`ChallengeRuntimeCoordinator.loadLocked` 改用 `repository.detail` 取全量任务（失败回退列表摘要）。
+  - prefill 注入：`resolveChallengeSessionLaunch` 接 `currentTask`——goal=当日 stageGoal｜总目标、plan=当日 taskMarkdown、openingMessage 带「第 N 天 · 标题」；JoinFlowCoordinator 按 progress+1 选当日任务传入。
+  - F4 进度打卡：`ChallengeRuntimeCoordinator.reportProgress`（新枚举 `ReportProgress`）→ `updateProgress(newProgress=progress+1, idempotencyKey="progress:{activityId}:{accountId}:{newProgress}")`——同键去重覆盖双击/重试，不依赖时钟；失败保留 participation 可经 retry 重试；未加入=空操作。
+  - 测试：服务端 API 测试断言 tasks 序列化（含 stageGoal 空值）；客户端新增 7 条（HttpOnlineApi 解析 1 / Adapters 映射 1 / Coordinator 4：detail 优先、幂等键、失败可重试、未加入空操作 / SessionLaunch prefill 1 / UiState 状态派生 1）。
+- **门禁**：服务端定向 38/38 过；全量 538 passed + 2 failed（仅 test_project_homepage 两条版本漂移既有基线，与本线无关）+ 28 skipped；客户端 `gradlew :app :core:remote :core:data :core:domain testDebugUnitTest` BUILD SUCCESSFUL（3m05s，单测全绿）。
+- **落点**：commit（本轮提交）；「在线版」独立打包（R12 约定时机已到）下轮开工。
+
 ## 待办 / 挂起项
 
 - [ ] §10 待与算法层对齐清单 6 项与用户确认（完成判据接 mastery 闸门 / 误解暴露时机接法 / D0 测评会话状态映射 / PresetCard 注册机制与配方取值 / 17 天编排与遗忘调度 / 递话机制接法）。
 - [ ] 实测清单执行（DeepSeek 注册额度 / zcode 获取与 DS API 配置 / Claude Code·Codex 国内可达性 / 镜像源）——知识包内容里的【实测核实点】全部依赖此项，实测后回填 onboarding-d0.md 与 labs.md。
 - [x] ~~三件套正式内容填充~~ **R11 已完成**（activities/challenge-01-agent-app-dev/ 23 文件，lint 全过）。
-- [ ] **「在线版」独立打包安装（R12 约定，R13 澄清：不等用户进度，只等 I3 完成有真实内容）**：applicationId 加 `.online` 后缀、应用名「反转家教·在线版」，与旧版共存不冲突。
+- [ ] **「在线版」独立打包安装（R12 约定，R13 澄清：不等用户进度，只等 I3 完成有真实内容）**：applicationId 加 `.online` 后缀、应用名「反转家教·在线版」，与旧版共存不冲突。**I3 已完成、时机已到，下轮执行打包。**
 - [x] ~~I2 服务端内容接入~~ **R13 已完成**（challenge01_days 解析器 + build_challenge01_tasks 生成器 + challenge01_tasks 冻结模块 + challenge01_seed + 会话模板定义 + 5 测试，目标 5/5、全量基线绿）。
-- [ ] **I3 端上内容链路**：F2 每日任务列表 UI、挑战会话 prefill 注入当日任务、F4 完成会话→进度+1 触发点。
+- [x] ~~I3 端上内容链路~~ **R14 已完成**（tasks 字段服务端全链路打通 + 客户端解析/映射 + F2 每日任务列表 + prefill 注入当日任务 + F4 打卡进度+1 幂等键；服务端 38/38、客户端 4 模块单测全绿）。
 - [ ] **挑战窗口开发（R10 拍板：挑战窗口完全没有，就是我的开发任务；挑战页预置、用户点开即用，不需用户自己创建）**：活动页 → 教学会话 → 掌握度反馈全链路跑通。
 - [ ] 学生卡归并机制（依赖 1d 创建面板的全局创建窗口，归并阶段才需要，不阻塞挑战窗口）。
 - [ ] 最终交接报告（任务收尾时产出）。

@@ -1,6 +1,7 @@
 package com.reversetutor.preview.shell
 
 import com.reversetutor.core.domain.ActivitySummary
+import com.reversetutor.core.domain.ActivityTask
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.canonicalActivitySource
 import com.reversetutor.feature.chat.normalizeActivitySource
@@ -39,6 +40,27 @@ class ChallengeSessionLaunchTest {
         assertEquals(listOf("activity:python-21"), decision.prefill.configuration.sourceSelections)
         assertTrue(decision.prefill.configuration.validationErrors().isEmpty())
         assertTrue(decision.prefill.configuration.goal.contains("21 天"))
+    }
+
+    @Test
+    fun currentDayTaskIsInjectedIntoPrefill() {
+        val decision = resolveChallengeSessionLaunch(
+            activity(),
+            emptyList(),
+            ActivityTask(
+                dayNumber = 3L,
+                title = "设计数据模型",
+                taskMarkdown = "- 画出表结构\n- 写迁移脚本",
+                stageGoal = "完成数据层设计"
+            )
+        ) as ChallengeSessionLaunchDecision.Create
+
+        val config = decision.prefill.configuration
+        assertTrue(config.goal.contains("完成数据层设计"))
+        assertTrue(config.goal.contains("总目标"))
+        assertEquals("- 画出表结构\n- 写迁移脚本", config.plan)
+        assertTrue(config.openingMessage.contains("第 3 天"))
+        assertTrue(config.openingMessage.contains("设计数据模型"))
     }
 
     private fun activity() = ActivitySummary(

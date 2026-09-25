@@ -502,7 +502,15 @@ private fun JsonObject.toActivity(): OnlineActivity = OnlineActivity(
     requiresOnlineConfirmation = requiredBoolean("requiresOnlineConfirmation"),
     allowsDeferredProgress = requiredBoolean("allowsDeferredProgress"),
     state = requiredString("state"),
-    sessionTemplateId = optionalString("sessionTemplateId")
+    sessionTemplateId = optionalString("sessionTemplateId"),
+    tasks = optionalArray("tasks")?.map { it.jsonObject.toActivityTask() }.orEmpty()
+)
+
+private fun JsonObject.toActivityTask(): OnlineActivityTask = OnlineActivityTask(
+    dayNumber = requiredLong("dayNumber"),
+    title = requiredString("title"),
+    taskMarkdown = optionalString("taskMarkdown").orEmpty(),
+    stageGoal = optionalString("stageGoal")
 )
 
 private fun JsonObject.toActivityProgress(): ActivityProgress = ActivityProgress(

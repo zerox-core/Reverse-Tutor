@@ -439,7 +439,9 @@ fun AppShell(
                         challengeRestoreContext = challengeRestoreContext,
                         challengeProgress = challengeRuntimeState.participation?.progress?.toInt()
                             ?: figmaUiState.challengeProgress,
-                        challengeTotal = figmaUiState.challengeTotal,
+                        challengeTotal = challengeRuntimeState.activity?.tasks?.size
+                            ?.takeIf { it > 0 }
+                            ?: figmaUiState.challengeTotal,
                         learningOverviewState = learningOverviewState,
                         onLearningOverviewAction = learningOverviewViewModel::onAction,
                         onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
@@ -514,6 +516,9 @@ fun AppShell(
                                     applyConfirmedChallengeJoin(launch, returnContext)
                                 }
                             }
+                        },
+                        onChallengeCompleteToday = {
+                            appScope.launch { challengeRuntimeCoordinator.reportProgress() }
                         },
                         onOpenNewSession = {
                             challengeSessionPrefill = null
@@ -909,6 +914,7 @@ private fun DestinationContent(
     onOpenChallenge: () -> Unit,
     onChallengeJoined: () -> Unit,
     onChallengeRetry: () -> Unit,
+    onChallengeCompleteToday: () -> Unit,
     onOpenNewSession: () -> Unit,
     onOpenAgentCreation: () -> Unit,
     onOpenAgentCreationImport: () -> Unit,
@@ -1420,6 +1426,7 @@ private fun DestinationContent(
                 onJoin = onChallengeJoined,
                 runtimeState = challengeRuntimeState,
                 onRetry = onChallengeRetry,
+                onCompleteToday = onChallengeCompleteToday,
                 active = challengePageActive,
                 onExitBoundaryChanged = onChallengeExitBoundaryChanged,
                 entryGeneration = challengeEntryGeneration,

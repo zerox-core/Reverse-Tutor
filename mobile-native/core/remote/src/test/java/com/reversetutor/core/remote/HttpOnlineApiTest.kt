@@ -90,6 +90,28 @@ class HttpOnlineApiTest {
     }
 
     @Test
+    fun activityDetailDecodesDailyTasks() = runBlocking {
+        val transport = FakeTransport(
+            OnlineHttpResponse(
+                200,
+                """{"id":"focus-week","title":"Focus Week","description":"Explain daily","revision":2,"startsAtEpochMillis":10,"endsAtEpochMillis":20,"requiresOnlineConfirmation":false,"allowsDeferredProgress":true,"state":"active","sessionTemplateId":"focus-v1","tasks":[{"dayNumber":1,"title":"启动","taskMarkdown":"- 目标","stageGoal":"节奏"},{"dayNumber":2,"title":"复盘","taskMarkdown":"- 讲解","stageGoal":null}]}"""
+            )
+        )
+        val api = HttpOnlineApi("https://online.example", transport)
+
+        val result = api.getActivity("focus-week")
+
+        val activity = (result as OnlineResult.Success).value
+        assertEquals(2, activity.tasks.size)
+        assertEquals(OnlineActivityTask(1L, "启动", "- 目标", "节奏"), activity.tasks[0])
+        assertNull(activity.tasks[1].stageGoal)
+        assertEquals(
+            "https://online.example/api/v1/activities/focus-week",
+            transport.requests.single().url
+        )
+    }
+
+    @Test
     fun activityWritesEncodeIdentityAndProgress() = runBlocking {
         val transport = FakeTransport(
             OnlineHttpResponse(

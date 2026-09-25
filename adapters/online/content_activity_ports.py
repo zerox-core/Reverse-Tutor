@@ -16,6 +16,14 @@ class AssetRecord:
 
 
 @dataclass(frozen=True)
+class ActivityTaskRecord:
+    day_number: int
+    title: str
+    task_markdown: str
+    stage_goal: str | None = None
+
+
+@dataclass(frozen=True)
 class ContentRecord:
     id: str
     slug: str
@@ -61,6 +69,7 @@ class ActivityRecord:
     allows_deferred_progress: bool
     state: Literal["scheduled", "active", "closed", "offline"]
     session_template_id: str | None = None
+    tasks: tuple[ActivityTaskRecord, ...] = ()
 
 
 @dataclass(frozen=True)

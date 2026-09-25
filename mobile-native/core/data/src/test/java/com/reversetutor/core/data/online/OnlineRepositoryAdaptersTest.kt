@@ -1,6 +1,8 @@
 package com.reversetutor.core.data.online
 
 import com.reversetutor.core.domain.ActivitySummary
+import com.reversetutor.core.domain.ActivityTask
+import com.reversetutor.core.domain.OnlineData
 import com.reversetutor.core.domain.ReleaseMetadata
 import com.reversetutor.core.domain.SyncCoordinator
 import com.reversetutor.core.domain.SyncPushResult
@@ -13,6 +15,7 @@ import com.reversetutor.core.remote.ActivityPage
 import com.reversetutor.core.remote.ContentFeedPage
 import com.reversetutor.core.remote.LeaderboardPage
 import com.reversetutor.core.remote.OnlineActivity
+import com.reversetutor.core.remote.OnlineActivityTask
 import com.reversetutor.core.remote.OnlineApi
 import com.reversetutor.core.remote.OnlineContentDetail
 import com.reversetutor.core.remote.OnlineRelease
@@ -141,6 +144,30 @@ class OnlineRepositoryAdaptersTest {
         assertEquals(listOf(Triple("envelope-1", "timeout", true)), repository.failures)
     }
 
+    @Test
+    fun activityDetailMapsDailyTasksToDomain() = runBlocking {
+        val api = FakeOnlineApi().apply {
+            activity = OnlineResult.Success(
+                OnlineActivity(
+                    "activity-1", "Focus", 3, 10, 20,
+                    tasks = listOf(OnlineActivityTask(1L, "启动", "- 目标", "节奏"))
+                )
+            )
+        }
+
+        val result = OnlineActivityRepository(api).detail("activity-1")
+
+        assertEquals(
+            OnlineData.Content(
+                ActivitySummary(
+                    "activity-1", "Focus", 3, 10, 20,
+                    tasks = listOf(ActivityTask(1L, "启动", "- 目标", "节奏"))
+                )
+            ),
+            result
+        )
+    }
+
     private fun envelope(entityType: String) = SyncEnvelope(
         id = "envelope-1",
         spaceId = "space-1",
@@ -182,6 +209,7 @@ private class FakeOnlineApi : OnlineApi {
     var activities: OnlineResult<ActivityPage> = OnlineResult.Success(
         ActivityPage(emptyList(), null, 0)
     )
+    var activity: OnlineResult<OnlineActivity> = OnlineResult.Failure("not_found", false)
     var push: OnlineResult<SyncPushResponse> = OnlineResult.Success(
         SyncPushResponse(cursor = null, items = emptyList())
     )
@@ -203,7 +231,7 @@ private class FakeOnlineApi : OnlineApi {
     override suspend fun listActivities(cursor: String?, limit: Int): OnlineResult<ActivityPage> =
         activities
     override suspend fun getActivity(activityId: String): OnlineResult<OnlineActivity> =
-        OnlineResult.Failure("not_found", false)
+        activity
 
     override suspend fun activityLeaderboard(
         activityId: String,

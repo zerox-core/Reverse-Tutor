@@ -7,6 +7,7 @@ from typing import Callable
 from .content_activity_models import (
     Activity,
     ActivityListResponse,
+    ActivityTask,
     ActivityParticipation,
     AssetRef,
     ContentDetail,
@@ -241,6 +242,15 @@ def _activity(record) -> Activity:
         allows_deferred_progress=record.allows_deferred_progress,
         state=record.state,
         session_template_id=record.session_template_id,
+        tasks=[
+            ActivityTask(
+                day_number=task.day_number,
+                title=task.title,
+                task_markdown=task.task_markdown,
+                stage_goal=task.stage_goal,
+            )
+            for task in record.tasks
+        ],
     )
 
 

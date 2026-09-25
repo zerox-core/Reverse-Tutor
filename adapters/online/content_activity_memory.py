@@ -9,6 +9,7 @@ from .content_activity_ports import (
     ActivityPortConflict,
     ActivityQuery,
     ActivityRecord,
+    ActivityTaskRecord,
     ActivityWriteCommand,
     ContentFeedQuery,
     ContentPage,
@@ -39,6 +40,19 @@ class MemoryContentActivityPort:
                     allows_deferred_progress=True,
                     state="active",
                     session_template_id="focus-week-v1",
+                    tasks=(
+                        ActivityTaskRecord(
+                            day_number=1,
+                            title="启动：明确学习目标",
+                            task_markdown="- 写下本周学习目标\n- 完成第一次讲解",
+                            stage_goal="建立学习节奏",
+                        ),
+                        ActivityTaskRecord(
+                            day_number=2,
+                            title="复盘：整理薄弱点",
+                            task_markdown="- 复盘昨日讲解\n- 整理 3 个薄弱点",
+                        ),
+                    ),
                 )
             }
             self._updated_at = datetime.now(UTC)

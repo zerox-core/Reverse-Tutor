@@ -5,6 +5,7 @@ import com.reversetutor.core.domain.ActivityLeaderboardEntry
 import com.reversetutor.core.domain.ActivityLeaderboardPage
 import com.reversetutor.core.domain.ActivityParticipation
 import com.reversetutor.core.domain.ActivitySummary
+import com.reversetutor.core.domain.ActivityTask
 import com.reversetutor.core.domain.OnlineActivityPage
 import com.reversetutor.core.domain.ContentRepository
 import com.reversetutor.core.domain.OnlineAsset
@@ -24,6 +25,7 @@ import com.reversetutor.core.remote.OnlineApi
 import com.reversetutor.core.remote.ActivityApi
 import com.reversetutor.core.remote.ActivityProgress
 import com.reversetutor.core.remote.OnlineActivity
+import com.reversetutor.core.remote.OnlineActivityTask
 import com.reversetutor.core.remote.OnlineWriteIdentity
 import com.reversetutor.core.remote.InsightApi
 import com.reversetutor.core.remote.WeeklyInsightRequest
@@ -50,7 +52,8 @@ class OnlineActivityRepository(
                     requiresOnlineConfirmation = it.requiresOnlineConfirmation,
                     allowsDeferredProgress = it.allowsDeferredProgress,
                     state = it.state,
-                    sessionTemplateId = it.sessionTemplateId
+                    sessionTemplateId = it.sessionTemplateId,
+                    tasks = it.tasks.map { task -> task.toDomain() }
                 )
             }
             is OnlineResult.Failure -> emptyList()
@@ -142,7 +145,15 @@ private fun OnlineActivity.toDomain(): ActivitySummary = ActivitySummary(
     requiresOnlineConfirmation = requiresOnlineConfirmation,
     allowsDeferredProgress = allowsDeferredProgress,
     state = state,
-    sessionTemplateId = sessionTemplateId
+    sessionTemplateId = sessionTemplateId,
+    tasks = tasks.map { it.toDomain() }
+)
+
+private fun OnlineActivityTask.toDomain(): ActivityTask = ActivityTask(
+    dayNumber = dayNumber,
+    title = title,
+    taskMarkdown = taskMarkdown,
+    stageGoal = stageGoal
 )
 
 private fun ActivityProgress.toDomain(): ActivityParticipation = ActivityParticipation(

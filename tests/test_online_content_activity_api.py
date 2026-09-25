@@ -85,6 +85,20 @@ class RecordingActivityPort:
             allows_deferred_progress=True,
             state="active",
             session_template_id="focus-week-v1",
+            tasks=(
+                SimpleNamespace(
+                    day_number=1,
+                    title="启动：明确学习目标",
+                    task_markdown="- 写下本周学习目标",
+                    stage_goal="建立学习节奏",
+                ),
+                SimpleNamespace(
+                    day_number=2,
+                    title="复盘：整理薄弱点",
+                    task_markdown="- 复盘昨日讲解",
+                    stage_goal=None,
+                ),
+            ),
         )
         self.commands: list[object] = []
         self.results: dict[tuple[str, str, str], object] = {}
@@ -250,6 +264,20 @@ async def test_activity_reads_are_public_paginated_and_canonical(content_client)
     assert listed.json()["items"][0]["startsAtEpochMillis"] == 1_783_987_200_000
     assert detail.status_code == 200
     assert detail.json()["id"] == "focus-week"
+    assert detail.json()["tasks"] == [
+        {
+            "dayNumber": 1,
+            "title": "启动：明确学习目标",
+            "taskMarkdown": "- 写下本周学习目标",
+            "stageGoal": "建立学习节奏",
+        },
+        {
+            "dayNumber": 2,
+            "title": "复盘：整理薄弱点",
+            "taskMarkdown": "- 复盘昨日讲解",
+            "stageGoal": None,
+        },
+    ]
     assert leaderboard.status_code == 200
     assert leaderboard.json()["items"] == [
         {

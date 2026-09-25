@@ -18,6 +18,7 @@ from .content_activity_ports import (
     ActivityQuery,
     ActivityRecord,
     ActivityParticipationRecord,
+    ActivityTaskRecord,
     ActivityWriteCommand,
     AssetRecord,
     ContentFeedQuery,
@@ -239,6 +240,15 @@ def _activity_record(row) -> ActivityRecord:
         allows_deferred_progress=row.allows_deferred_progress,
         state=row.state,
         session_template_id=row.session_template_id,
+        tasks=tuple(
+            ActivityTaskRecord(
+                day_number=task.day_number,
+                title=task.title,
+                task_markdown=task.task_markdown,
+                stage_goal=task.stage_goal,
+            )
+            for task in row.tasks
+        ),
     )
 
 

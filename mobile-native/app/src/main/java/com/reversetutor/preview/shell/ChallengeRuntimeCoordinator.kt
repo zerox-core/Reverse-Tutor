@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-enum class ChallengeRuntimeOperation { Load, Join }
+enum class ChallengeRuntimeOperation { Load, Join, ReportProgress }
 
 data class ChallengeRuntimeFailure(
     val code: String,
@@ -52,6 +52,15 @@ class ChallengeRuntimeCoordinator(
         }
     }
 
+    suspend fun reportProgress(): Boolean {
+        if (!mutex.tryLock()) return false
+        try {
+            return reportProgressLocked()
+        } finally {
+            mutex.unlock()
+        }
+    }
+
     suspend fun retry(): ChallengeRuntimeOperation? {
         if (!mutex.tryLock()) return null
         try {
@@ -59,6 +68,7 @@ class ChallengeRuntimeCoordinator(
             when (failure.operation) {
                 ChallengeRuntimeOperation.Load -> loadLocked()
                 ChallengeRuntimeOperation.Join -> joinLocked()
+                ChallengeRuntimeOperation.ReportProgress -> reportProgressLocked()
             }
             return failure.operation
         } finally {
@@ -85,15 +95,19 @@ class ChallengeRuntimeCoordinator(
                     )
                     return
                 }
-                val activityChanged = previous.activity?.id != active.id
-                when (val leaderboard = repository.leaderboard(active.id)) {
+                val detailed = when (val detail = repository.detail(active.id)) {
+                    is OnlineData.Content -> detail.value
+                    is OnlineData.Failure -> active
+                }
+                val activityChanged = previous.activity?.id != detailed.id
+                when (val leaderboard = repository.leaderboard(detailed.id)) {
                     is OnlineData.Failure -> fail(
                         leaderboard,
                         ChallengeRuntimeOperation.Load
                     )
                     is OnlineData.Content -> {
                         mutableState.value = ChallengeRuntimeState(
-                            activity = active,
+                            activity = detailed,
                             participation = if (activityChanged) null else previous.participation,
                             leaderboard = leaderboard.value
                         )
@@ -139,6 +153,47 @@ class ChallengeRuntimeCoordinator(
             }
         }
         return mutableState.value.joined
+    }
+
+    private suspend fun reportProgressLocked(): Boolean {
+        val repository = activityRepository ?: return false
+        val previous = mutableState.value
+        val activity = previous.activity ?: return false
+        val participation = previous.participation ?: return false
+        if (previous.loading || !participation.joined) return false
+        mutableState.value = previous.copy(loading = true, failure = null)
+        val identity = identityProvider()
+        if (identity == null) {
+            mutableState.value = previous.copy(
+                loading = false,
+                failure = ChallengeRuntimeFailure(
+                    code = "authentication_unavailable",
+                    retryable = true,
+                    operation = ChallengeRuntimeOperation.ReportProgress
+                )
+            )
+            return false
+        }
+        val newProgress = participation.progress + 1
+        val idempotencyKey = "progress:${activity.id}:${identity.accountId}:${newProgress}"
+        when (val result = repository.updateProgress(
+            activityId = activity.id,
+            userId = identity.accountId,
+            deviceId = identity.deviceId,
+            revision = participation.revision,
+            idempotencyKey = idempotencyKey,
+            progress = newProgress
+        )) {
+            is OnlineData.Failure -> fail(result, ChallengeRuntimeOperation.ReportProgress)
+            is OnlineData.Content -> {
+                mutableState.value = previous.copy(
+                    loading = false,
+                    participation = result.value,
+                    failure = null
+                )
+            }
+        }
+        return mutableState.value.participation?.progress == newProgress
     }
 
     private fun fail(

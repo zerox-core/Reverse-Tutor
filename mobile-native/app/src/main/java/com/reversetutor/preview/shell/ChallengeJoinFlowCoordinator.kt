@@ -18,8 +18,11 @@ internal class ChallengeJoinFlowCoordinator(
     }
 
     private suspend fun postConfirmedJoin(): ChallengeSessionLaunchDecision? {
-        val activity = runtimeCoordinator.state.value.activity ?: return null
+        val state = runtimeCoordinator.state.value
+        val activity = state.activity ?: return null
+        val progress = state.participation?.progress ?: 0L
+        val currentTask = activity.tasks.firstOrNull { it.dayNumber == progress + 1L }
         val candidates = runCatching { loadCandidates() }.getOrDefault(emptyList())
-        return resolveChallengeSessionLaunch(activity, candidates)
+        return resolveChallengeSessionLaunch(activity, candidates, currentTask)
     }
 }
