@@ -95,13 +95,24 @@
 - **执行响应**：约定写入 `docs/dev/challenge-01-build-plan.md` §4——applicationId 加独立后缀（如 `.online`）、应用名带「在线版」后缀（全称「反转家教·在线版」）、与旧版共存；打包时机 = I3 端上内容链路完成、有真实内容可跑时。本轮只记录，不打包。
 - **落点**：commit（本轮提交）。
 
+### 2026-09-25 · R13 澄清：两条线独立并行，开发不等用户进度；I2 服务端内容接入完成
+- **用户要点**：质疑「等用户那边推完进度再安装测试」的说法——「两个不是分开搞的吗？」
+- **澄清**：是我表达错了。挑战线开发与用户的其他工作**完全独立、并行推进**，我不等任何前置。「在线版」安装测试的唯一前提 = **I3 端上内容链路完成、有真实内容可跑**，而内容由我自己产出（I1 知识包 23 文件已就位），不依赖用户进度。用户手里的进度与他的开发线并行，互不阻塞。
+- **I2 完成（服务端内容接入）**：
+  - 解析器 `online_db/challenge01_days.py`：days/*.md → ChallengeDay 元组（校验必填字段、文件名↔day_number 一致、正文非空、编号连续 1..N）。
+  - 生成器 `scripts/build_challenge01_tasks.py`：从 days/ 渲染冻结模块 `online_db/challenge01_tasks.py`（17 条任务常量，`--check` 漂移检测）。
+  - seed `online_db/challenge01_seed.py`：slug `challenge-agent-app-dev-17d`、标题「17 天教 AI 学会落地 agent 应用」、total_days=17、state=scheduled（运营经 admin API 发布）、session_template_id=challenge-agent-app-dev-17d-v1、17 条 ActivityTaskDefinition；可重复执行（已存在即跳过）、绝不覆盖已有 slug。
+  - 会话模板内容定义 `activities/challenge-01-agent-app-dev/session-template.md`：知识包引用、17 天编排、学生人设（student-card.yaml session_defaults）、I3 注入点（goal/plan/openingMessage）、完成判据草案。
+  - 测试 5 条（创建+17 任务顺序/可重复/不覆盖/冻结模块与 days/ 漂移/坏 front-matter 拒绝），目标测试 5/5 过；全量 533 passed + 2 failed（仅 test_project_homepage 两条版本漂移既有失败，与本线无关）+ 28 skipped。
+- **落点**：commit（本轮提交）；I3（端上内容链路：F2 任务列表 / prefill 注入当日任务 / F4 进度+1）下轮开工。
+
 ## 待办 / 挂起项
 
 - [ ] §10 待与算法层对齐清单 6 项与用户确认（完成判据接 mastery 闸门 / 误解暴露时机接法 / D0 测评会话状态映射 / PresetCard 注册机制与配方取值 / 17 天编排与遗忘调度 / 递话机制接法）。
 - [ ] 实测清单执行（DeepSeek 注册额度 / zcode 获取与 DS API 配置 / Claude Code·Codex 国内可达性 / 镜像源）——知识包内容里的【实测核实点】全部依赖此项，实测后回填 onboarding-d0.md 与 labs.md。
 - [x] ~~三件套正式内容填充~~ **R11 已完成**（activities/challenge-01-agent-app-dev/ 23 文件，lint 全过）。
-- [ ] **「在线版」独立打包安装（R12 约定，等用户推进进度后执行）**：applicationId 加 `.online` 后缀、应用名「反转家教·在线版」，与旧版共存不冲突；时机 = I3 完成有真实内容可跑时。
-- [ ] **I2 服务端内容接入**（R11 计划）：首期中文活动 seed（slug challenge-agent-app-dev-17d，17 条 tasks 从 days/ 生成）+ session_template 内容定义。
+- [ ] **「在线版」独立打包安装（R12 约定，R13 澄清：不等用户进度，只等 I3 完成有真实内容）**：applicationId 加 `.online` 后缀、应用名「反转家教·在线版」，与旧版共存不冲突。
+- [x] ~~I2 服务端内容接入~~ **R13 已完成**（challenge01_days 解析器 + build_challenge01_tasks 生成器 + challenge01_tasks 冻结模块 + challenge01_seed + 会话模板定义 + 5 测试，目标 5/5、全量基线绿）。
 - [ ] **I3 端上内容链路**：F2 每日任务列表 UI、挑战会话 prefill 注入当日任务、F4 完成会话→进度+1 触发点。
 - [ ] **挑战窗口开发（R10 拍板：挑战窗口完全没有，就是我的开发任务；挑战页预置、用户点开即用，不需用户自己创建）**：活动页 → 教学会话 → 掌握度反馈全链路跑通。
 - [ ] 学生卡归并机制（依赖 1d 创建面板的全局创建窗口，归并阶段才需要，不阻塞挑战窗口）。
