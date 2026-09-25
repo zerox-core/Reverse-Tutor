@@ -52,8 +52,17 @@ class AgentCreationCoordinator(
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val stateStore: AgentCreationStateStore? = null
 ) {
+    /**
+     * R91：状态变更即时通知——用户消息发出后气泡立刻上屏，
+     * 不等整轮 LLM 生成结束才和回复一起出现（2026-09-26 用户真机反馈）。
+     */
+    var onStateChanged: (() -> Unit)? = null
+
     var state: AgentCreationUiState = AgentCreationUiState()
-        private set
+        private set(value) {
+            field = value
+            onStateChanged?.invoke()
+        }
 
     private val history = mutableListOf<AgentCreationHistoryTurn>()
     private val planner = AgentCreationFollowUpPlanner()

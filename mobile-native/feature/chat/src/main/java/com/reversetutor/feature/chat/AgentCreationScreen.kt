@@ -112,6 +112,9 @@ fun AgentCreationRoute(
     }
 
     LaunchedEffect(coordinator) {
+        // R91：协调器每次状态变更即时同步 UI——用户消息发出后气泡立刻上屏，
+        // 不等整轮生成结束才和回复一起出现（2026-09-26 真机反馈）。
+        coordinator.onStateChanged = { sync() }
         coordinator.start()
         sync()
     }

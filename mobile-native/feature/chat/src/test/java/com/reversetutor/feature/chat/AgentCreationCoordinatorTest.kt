@@ -1,6 +1,9 @@
 package com.reversetutor.feature.chat
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -351,5 +354,48 @@ class AgentCreationCoordinatorTest {
 
         assertEquals(1, coordinator.state.feed.size)
         assertEquals(0, gateway.converseCalls)
+    }
+
+    // R91 回归：网关响应被挂起期间，用户气泡必须已经上屏、状态变更已通知，
+    // 不能等整轮生成结束才和回复一起出现（2026-09-26 真机反馈）。
+    @Test
+    fun userBubbleAppearsImmediatelyBeforeGatewayResponds() = runBlocking {
+        val release = CompletableDeferred<Unit>()
+        val blockingGateway = object : AgentCreationGateway {
+            override suspend fun converse(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy
+            ): AgentCreationTurnResult {
+                release.await()
+                return AgentCreationTurnResult(understanding = 10, followUpQuestion = "占位")
+            }
+
+            override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+                ScriptedGateway.cannedAnalysis()
+        }
+        val coordinator = AgentCreationCoordinator(blockingGateway, clock())
+        var notifications = 0
+        coordinator.onStateChanged = { notifications++ }
+        coordinator.start()
+        val baseline = notifications
+
+        val job = async { coordinator.sendUserText("我想学浮力") }
+        yield()
+
+        val midState = coordinator.state
+        assertTrue(midState.busy)
+        val bubbles = midState.feed.filterIsInstance<AgentCreationFeedEntry.User>()
+        assertEquals(1, bubbles.size)
+        assertEquals("我想学浮力", bubbles.single().text)
+        assertTrue(notifications > baseline)
+
+        release.complete(Unit)
+        job.await()
+
+        assertFalse(coordinator.state.busy)
+        assertTrue(coordinator.state.feed.size >= 3)
     }
 }
