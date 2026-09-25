@@ -157,6 +157,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.reversetutor.core.domain.ChapterTransitionPolicy
+import com.reversetutor.core.domain.ChapterTransitionProposal
+import com.reversetutor.core.domain.PathMove
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.Dispatchers
@@ -1076,7 +1079,9 @@ private fun ReverseTeachingMessage(
     onMonologueExpandedChange: (Boolean) -> Unit = {}
 ) {
     when (item.role) {
-        MessageRole.System -> SystemTimelineMessage(item.text)
+        MessageRole.System -> ChapterTransitionPolicy.parseCardText(item.text)
+            ?.let { ChapterTransitionCard(it) }
+            ?: SystemTimelineMessage(item.text)
         MessageRole.Tool -> EvidenceTimelineMessage(item.text)
         MessageRole.User -> UserTimelineMessage(
             item, sources, selected, onTap, onLongPress, onOpenImage, onOpenSource, onReselectInvalidSource, onOpenExternalLink, onCopyRichSource
@@ -1943,6 +1948,71 @@ private fun SystemTimelineMessage(text: String) {
         lineHeight = 17.sp,
         textAlign = TextAlign.Center
     )
+}
+
+/**
+ * R88 章节切换卡片：AI 学生提议 + 用户认可后才出现的时间线卡片。
+ * 白底细边框（8dp 圆角）+ 品牌蓝点缀，正文带"上一章 ✓ → 新章节"与
+ * 教学进度（第 X / Y 节）——进度展示收在卡片里，不做全局进度条。
+ */
+@Composable
+private fun ChapterTransitionCard(proposal: ChapterTransitionProposal) {
+    val accent = Color(0xFF2F5DDF)
+    val ink = Color(0xFF121722)
+    val muted = Color(0xFF6D778C)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 44.dp),
+        color = Color.White,
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, Color(0xFFE3E8F3))
+    ) {
+        Column(
+            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 12.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "✦ 章节更新",
+                    color = accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "第 ${proposal.position + 1} / ${proposal.size} 节",
+                    color = muted,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            when (proposal.move) {
+                PathMove.Advance -> {
+                    if (proposal.fromLabel.isNotBlank()) {
+                        Text(text = "✓ ${proposal.fromLabel} · 已掌握", color = muted, fontSize = 12.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "→ 进入新章节：${proposal.toLabel}", color = ink, fontSize = 13.sp)
+                    } else {
+                        Text(text = "→ 开始学习：${proposal.toLabel}", color = ink, fontSize = 13.sp)
+                    }
+                }
+                PathMove.Regress -> {
+                    Text(text = "↩ 回到基础：${proposal.toLabel}", color = ink, fontSize = 13.sp)
+                    if (proposal.fromLabel.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "${proposal.fromLabel} 先放一放，补牢地基再继续", color = muted, fontSize = 12.sp)
+                    }
+                }
+                else -> {
+                    Text(text = "✓ 学习路径全部完成（共 ${proposal.size} 节）", color = ink, fontSize = 13.sp)
+                    if (proposal.fromLabel.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "最后一章：${proposal.fromLabel}", color = muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

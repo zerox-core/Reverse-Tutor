@@ -47,4 +47,15 @@ internal object LlmStudentExpressionPolicy {
         "soft_guide" -> "不直接给答案，用提问轻轻把老师带回学习主线。"
         else -> "以学生口吻向老师提一个聚焦的问题。"
     }
+
+    /**
+     * R88 章节切换表达指令（guided plan block 用）。关键约束：AI 是学生，
+     * 只能以学生口吻"提议"切换并等老师确认，绝不能宣布教学计划。
+     */
+    fun transitionDirectiveFor(pathMove: String): String = when (pathMove.trim().lowercase()) {
+        "advance" -> "In one line, celebrate that you truly understood the previous chapter and credit the teacher's explanation. Then, as a genuine student, ask whether it is time to start the next chapter shown in Path move (e.g. 老师，我们是不是该学电学了？) and wait for the teacher's confirmation. Never announce a teaching plan or list the syllabus."
+        "regress" -> "Honestly admit that an earlier foundation topic still feels shaky, and ask the teacher to patch it together with you before moving on."
+        "completed" -> "Warmly thank the teacher for guiding you through every chapter on the path, and invite them to quiz you or set one final challenge."
+        else -> ""
+    }
 }

@@ -76,6 +76,8 @@ import com.reversetutor.preview.shell.ChallengeRuntimeCoordinator
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 import com.reversetutor.preview.wiring.session.BackgroundTurnPreparationCoordinator
+import com.reversetutor.preview.wiring.session.ChapterTransitionProposalStore
+import com.reversetutor.preview.wiring.session.SharedPreferencesChapterTransitionProposalStore
 import com.reversetutor.preview.wiring.session.RecentTurnSignalsReader
 import com.reversetutor.preview.wiring.session.SessionConversationAssembly
 import com.reversetutor.preview.wiring.session.SharedPreferencesSessionSummaryStore
@@ -354,6 +356,25 @@ class HybridAppGraph private constructor(
                             .findLatestBySession(sessionId)
                             ?.let { ReplyValidator.styleHintForPayload(it.styleFlagsPayload) }
                             .orEmpty()
+                    },
+                    chapterTransitionStore = SharedPreferencesChapterTransitionProposalStore(appContext),
+                    // R88：章节卡片 = 一条 System 消息；按卡片文本去重，防止重试双卡。
+                    insertTimelineNotice = { spaceId, sessionId, text ->
+                        val cardText = text.trim()
+                        if (cardText.isNotEmpty() &&
+                            messageRepository.listMessages(sessionId).none { it.text == cardText }
+                        ) {
+                            messageRepository.saveMessage(
+                                com.reversetutor.core.model.Message(
+                                    id = "message-${java.util.UUID.randomUUID()}",
+                                    spaceId = spaceId.ifBlank { SessionRepository.defaultSpaceId },
+                                    sessionId = sessionId,
+                                    role = com.reversetutor.core.model.MessageRole.System,
+                                    text = cardText,
+                                    createdAtEpochMillis = System.currentTimeMillis()
+                                )
+                            )
+                        }
                     }
                 )
             val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(

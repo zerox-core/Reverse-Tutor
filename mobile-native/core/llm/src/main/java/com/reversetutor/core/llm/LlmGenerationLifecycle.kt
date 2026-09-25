@@ -103,7 +103,13 @@ data class LlmGuidedTurnPlan(
     val expectedUserMove: String = "",
     val responseFormat: String = "plain",
     val hintLevel: Int = 0,
-    val evidenceRequirement: String = "none"
+    val evidenceRequirement: String = "none",
+    /** R88：路径步态线缆词（start/stay/advance/regress/completed），空 = 无路径。 */
+    val pathMove: String = "",
+    /** R88：路径目标节点标签（章节切换表达用）。 */
+    val pathLabel: String = "",
+    val pathPosition: Int = -1,
+    val pathSize: Int = 0
 ) {
     companion object {
         val AllowedActions = setOf(
@@ -112,8 +118,10 @@ data class LlmGuidedTurnPlan(
         )
         val AllowedFormats = setOf("plain", "steps", "code", "table", "checklist")
         val AllowedEvidence = setOf("none", "local_check", "user_answer", "tool_receipt")
+        val AllowedPathMoves = setOf("start", "stay", "advance", "regress", "completed")
         const val OBJECTIVE_MAX = 120
         const val EXPECTED_MOVE_MAX = 160
+        const val PATH_LABEL_MAX = 48
 
         private val sensitivePatterns = listOf(
             Regex("(?i)sk-[a-z0-9_-]{2,}"),
@@ -141,7 +149,11 @@ data class LlmGuidedTurnPlan(
             expectedUserMove = boundText(expectedUserMove, EXPECTED_MOVE_MAX),
             responseFormat = responseFormat.trim().lowercase().takeIf { it in AllowedFormats } ?: "plain",
             hintLevel = hintLevel.coerceIn(0, 3),
-            evidenceRequirement = evidenceRequirement.trim().lowercase().takeIf { it in AllowedEvidence } ?: "none"
+            evidenceRequirement = evidenceRequirement.trim().lowercase().takeIf { it in AllowedEvidence } ?: "none",
+            pathMove = pathMove.trim().lowercase().takeIf { it in AllowedPathMoves } ?: "",
+            pathLabel = boundText(pathLabel, PATH_LABEL_MAX),
+            pathPosition = pathPosition.coerceIn(-1, 99),
+            pathSize = pathSize.coerceIn(0, 99)
         )
     }
 }
@@ -770,6 +782,17 @@ internal fun LlmGenerationRequest.guidedLearningPlanPromptBlock(): String? =
                 append("\nIf a source check is possible, include an optional checkPlan object in the JSON reply.")
                 append(" It must reference only the supplied source evidence ids and use one rule: exact_text, numeric_tolerance, required_concepts, or rubric.")
                 append(" Never include URLs, credentials, diagnostics, or mastery claims.")
+            }
+            if (plan.pathMove.isNotBlank()) {
+                append("\nPath move: ").append(plan.pathMove)
+                if (plan.pathLabel.isNotBlank()) {
+                    append(" → ").append(plan.pathLabel)
+                }
+                if (plan.pathSize > 0 && plan.pathPosition >= 0) {
+                    append(" (").append(plan.pathPosition + 1).append("/").append(plan.pathSize).append(")")
+                }
+                append("\nTransition expression: ")
+                    .append(LlmStudentExpressionPolicy.transitionDirectiveFor(plan.pathMove))
             }
         }
     }

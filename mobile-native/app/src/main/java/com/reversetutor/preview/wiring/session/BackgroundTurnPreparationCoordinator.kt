@@ -2,6 +2,7 @@ package com.reversetutor.preview.wiring.session
 
 import com.reversetutor.core.data.background.BackgroundGenerationInput
 import com.reversetutor.core.data.background.BackgroundGenerationJob
+import com.reversetutor.core.domain.ChapterTransitionPolicy
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTurnPolicy
@@ -38,6 +39,10 @@ internal class BackgroundTurnPreparationCoordinator(
     private val loadLastTurnStyleHint: suspend (String) -> String = { "" },
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val loadMessages: (String) -> List<ConversationMessageContract> = { emptyList() },
+    /** R88：章节切换提案的会话级一次性暂存（默认 NoOp，测试/预览无感）。 */
+    private val chapterTransitionStore: ChapterTransitionProposalStore = NoOpChapterTransitionProposalStore,
+    /** R88：用户认可切换后，把章节卡片文本作为一条 System 消息写入时间线。 */
+    private val insertTimelineNotice: suspend (String, String, String) -> Unit = { _, _, _ -> },
     private val facade: SessionConversationFacade = SessionConversationFacade()
 ) : BackgroundTurnPreparationPort {
 
@@ -73,6 +78,31 @@ internal class BackgroundTurnPreparationCoordinator(
             }
             val guidedInput = baseGuidedInput.copy(recentSignals = recentSignals).normalized()
             val turnPlan = request.turnPlan ?: guidedInput.selectGuidedLearningPlan()
+
+            // R88 章节切换卡片（两段式）：上一轮 AI 学生以学生口吻提出切换时，
+            // 提案已暂存在 store；本轮用户认可（纯文本确定性判定，不调模型）
+            // 才把卡片写进时间线。提案一次性消费——卡片是仪式，不是状态机。
+            // 卡片属装饰层：任何失败都不得阻断学习回合本身。
+            try {
+                val pendingTransition = chapterTransitionStore.load(request.sessionId)
+                chapterTransitionStore.clear(request.sessionId)
+                if (pendingTransition != null &&
+                    ChapterTransitionPolicy.isTransitionAffirmation(request.userText)
+                ) {
+                    insertTimelineNotice(
+                        request.spaceId,
+                        request.sessionId,
+                        ChapterTransitionPolicy.cardText(pendingTransition)
+                    )
+                }
+                ChapterTransitionPolicy.proposalFor(turnPlan, guidedInput.learningPath)?.let {
+                    chapterTransitionStore.save(request.sessionId, it)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // 装饰性卡片失败静默降级，绝不把学习回合打成 Failed。
+            }
             val policy = SessionTurnPolicy.normalize(
                 request.sessionSnapshot.toSessionPolicyInput(request.userText)
             )

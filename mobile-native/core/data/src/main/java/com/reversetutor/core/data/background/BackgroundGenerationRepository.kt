@@ -669,7 +669,7 @@ private fun String?.toTurnNoteEvidence(): List<LlmContextEvidence> {
     return listOf(LlmContextEvidence("turn-note", "Turn note", note, TurnNoteEvidenceKind))
 }
 
-private fun TurnPlan?.toGuidedPlanEvidence(): List<LlmContextEvidence> {
+internal fun TurnPlan?.toGuidedPlanEvidence(): List<LlmContextEvidence> {
     val plan = this?.normalized() ?: return emptyList()
     val body = listOf(
         plan.actionType.name,
@@ -679,15 +679,22 @@ private fun TurnPlan?.toGuidedPlanEvidence(): List<LlmContextEvidence> {
         plan.expectedUserMove,
         plan.responseFormat.name,
         plan.hintLevel.toString(),
-        plan.evidenceRequirement.name
+        plan.evidenceRequirement.name,
+        plan.pathMove?.name.orEmpty(),
+        plan.pathLabel,
+        plan.pathPosition.toString(),
+        plan.pathSize.toString()
     ).joinToString("|") { it.encodePayloadField() }
     return listOf(LlmContextEvidence("guided-turn-plan", "Guided turn plan", body, GuidedPlanEvidenceKind))
 }
 
-private fun LlmContextEvidence.toGuidedTurnPlan(): TurnPlan? {
+internal fun LlmContextEvidence.toGuidedTurnPlan(): TurnPlan? {
     if (kind != GuidedPlanEvidenceKind) return null
     val fields = body.split('|').map { it.decodePayloadField() }
-    if (fields.size != 8) return null
+    // R88：编码从 8 字段扩到 12（新增路径步态/标签/位置/总数）；
+    // 8 字段是扩容前落盘的旧任务，按 legacy 解码（路径字段为空）。
+    if (fields.size != 8 && fields.size != 12) return null
+    val hasPathFields = fields.size == 12
     val action = runCatching { com.reversetutor.core.domain.TeachingAction.valueOf(fields[0]) }.getOrNull()
         ?: return null
     val secondary = fields[1].takeIf { it.isNotBlank() }?.let {
@@ -697,6 +704,13 @@ private fun LlmContextEvidence.toGuidedTurnPlan(): TurnPlan? {
         .getOrDefault(com.reversetutor.core.domain.ResponseFormat.Plain)
     val evidence = runCatching { com.reversetutor.core.domain.EvidenceRequirement.valueOf(fields[7]) }
         .getOrDefault(com.reversetutor.core.domain.EvidenceRequirement.None)
+    val pathMove = if (hasPathFields) {
+        fields[8].takeIf { it.isNotBlank() }?.let {
+            runCatching { com.reversetutor.core.domain.PathMove.valueOf(it) }.getOrNull()
+        }
+    } else {
+        null
+    }
     return TurnPlan(
         actionType = action,
         secondaryAction = secondary,
@@ -705,7 +719,11 @@ private fun LlmContextEvidence.toGuidedTurnPlan(): TurnPlan? {
         expectedUserMove = fields[4],
         responseFormat = format,
         hintLevel = fields[6].toIntOrNull() ?: 0,
-        evidenceRequirement = evidence
+        evidenceRequirement = evidence,
+        pathMove = pathMove,
+        pathLabel = if (hasPathFields) fields[9] else "",
+        pathPosition = if (hasPathFields) fields[10].toIntOrNull() ?: -1 else -1,
+        pathSize = if (hasPathFields) fields[11].toIntOrNull() ?: 0 else 0
     ).normalized()
 }
 

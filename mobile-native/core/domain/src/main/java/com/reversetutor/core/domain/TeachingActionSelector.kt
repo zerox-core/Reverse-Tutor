@@ -149,7 +149,8 @@ object TeachingActionSelector {
         plan.copy(
             pathMove = decision.move,
             pathPosition = decision.targetIndex,
-            pathSize = input.learningPath.size
+            pathSize = input.learningPath.size,
+            pathLabel = decision.targetLabel
         )
     }
 

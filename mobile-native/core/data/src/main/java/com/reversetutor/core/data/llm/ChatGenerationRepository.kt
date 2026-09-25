@@ -452,7 +452,11 @@ internal fun TurnPlan.toLlmGuidedTurnPlan(): LlmGuidedTurnPlan = LlmGuidedTurnPl
     expectedUserMove = expectedUserMove,
     responseFormat = responseFormat.toWireToken(),
     hintLevel = hintLevel,
-    evidenceRequirement = evidenceRequirement.toWireToken()
+    evidenceRequirement = evidenceRequirement.toWireToken(),
+    pathMove = pathMove?.toWireToken().orEmpty(),
+    pathLabel = pathLabel,
+    pathPosition = pathPosition,
+    pathSize = pathSize
 )
 
 /** `WorkedExample` -> `worked_example`: the canonical wire tokens the LLM whitelist accepts. */

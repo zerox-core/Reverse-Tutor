@@ -118,7 +118,9 @@ data class TurnPlan(
     /** R86：路径目标节点下标（0 起）；无路径 / Completed 为 -1。 */
     val pathPosition: Int = -1,
     /** R86：路径总节点数；无路径为 0。 */
-    val pathSize: Int = 0
+    val pathSize: Int = 0,
+    /** R88：路径目标节点的人类可读标签（章节卡片与提示渲染用）。 */
+    val pathLabel: String = ""
 ) {
     fun normalized(): TurnPlan = TurnPlan(
         actionType = actionType,
@@ -137,7 +139,8 @@ data class TurnPlan(
         nextActionOnFailure = nextActionOnFailure,
         pathMove = pathMove,
         pathPosition = max(-1, pathPosition),
-        pathSize = max(0, pathSize)
+        pathSize = max(0, pathSize),
+        pathLabel = GuidedLearningContracts.boundText(pathLabel, LearningPathPolicy.NODE_LABEL_MAX)
     )
 }
 
