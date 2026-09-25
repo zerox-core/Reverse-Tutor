@@ -57,6 +57,16 @@ android {
             buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"${debugLlmFallbackModels.asBuildConfigString()}\"")
         }
+        create("full") {
+            // 全量版（2026-09-25 用户拍板）：独立身份 .full，与「记忆测试」并存，
+            // 用户卸载旧包后单独安装验证；继承 debug 的全部调试配置。
+            // 库模块只发布 debug/release 变体，消费侧回退到 debug 解析。
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug", "release")
+            applicationIdSuffix = ".full"
+            versionNameSuffix = "-full"
+            resValue("string", "app_name", "全量版")
+        }
         getByName("release") {
             buildConfigField("String", "DEBUG_LLM_API_KEY", "\"\"")
             buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"\"")
