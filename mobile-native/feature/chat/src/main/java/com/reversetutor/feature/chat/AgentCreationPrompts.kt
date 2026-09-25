@@ -77,6 +77,7 @@ object AgentCreationPrompts {
         if (draft.persona.isNotBlank()) line("persona", draft.persona)
         if (draft.learnerDisplayName != "学习者") line("learnerDisplayName", draft.learnerDisplayName)
         if (draft.goal.isNotBlank()) line("goal", draft.goal)
+        if (draft.learningPath.isNotEmpty()) line("learningPath", draft.learningPath.joinToString(" → "))
         if (draft.plan.isNotBlank()) line("plan", draft.plan)
         if (draft.learningScope != "未设置") line("learningScope", draft.learningScope)
         if (draft.modules != "未设置") line("modules", draft.modules)
@@ -129,7 +130,8 @@ object AgentCreationPrompts {
 收集顺序：先弄清学习目标，再和用户一起勾勒 AI 学生的人物性格（persona：他是个怎样的人、怎么提问、卡壳时什么反应），性格定了再谈教学方式。
 每轮只输出一个 JSON 对象，不要输出任何其他文字，不要 markdown 围栏：
 {"understanding":0到100的整数,"followUpQuestion":"追问或null","assistantNote":"对用户说的话或null","requestDocument":true或false,"draft":{...}}
-draft 只写本轮要更新的字段，未提及的字段会保持原值。可用字段：title, learnerRole, learnerProfile, persona, learnerDisplayName, goal, plan, learningScope, modules, stageMilestones, dialogueStrategy, feedbackIntensity(1到5整数), probingIntensity(1到5), scaffoldingIntensity(1到5), correctionPersistence, reviewFrequency, speakingTone, story, openingMessage
+draft 只写本轮要更新的字段，未提及的字段会保持原值。可用字段：title, learnerRole, learnerProfile, persona, learnerDisplayName, goal, plan, learningScope, modules, stageMilestones, dialogueStrategy, feedbackIntensity(1到5整数), probingIntensity(1到5), scaffoldingIntensity(1到5), correctionPersistence, reviewFrequency, speakingTone, story, openingMessage, learningPath
+learningPath 是有序学习路径：JSON 数组，3到8个知识点，按学习先后顺序排列、先基础后提升。goal 明确后必须给出；有文档分析时按「建议路径」的顺序，没有就自己把目标分解成有序知识点。路径给出后除非用户要求调整，否则每轮不要重复输出。
 
 [了解程度评分锚点]（链路：用户目标 → AI 学生的人物性格 persona → 教学方式）
 0-20 只有模糊意向（"想学点东西"）

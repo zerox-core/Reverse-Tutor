@@ -118,7 +118,8 @@ fun NewSessionConfiguration.deepCopy(): NewSessionConfiguration = copy(
     sourceSelections = sourceSelections.toList(),
     customFields = LinkedHashMap(customFields),
     customColumns = customColumns.map(CustomColumn::deepCopy),
-    quickTags = quickTags.mapValues { it.value.deepCopy() }
+    quickTags = quickTags.mapValues { it.value.deepCopy() },
+    learningPath = learningPath.toList()
 )
 
 fun NewSessionConfiguration.withCustomColumns(columns: List<CustomColumn>): NewSessionConfiguration = copy(

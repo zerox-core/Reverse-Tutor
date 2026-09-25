@@ -54,7 +54,9 @@ data class AgentCreationDraftPatch(
     val speakingTone: String? = null,
     val story: String? = null,
     val openingMessage: String? = null,
-    val persona: String? = null
+    val persona: String? = null,
+    /** R86：有序学习路径（3-8 个知识点，先基础后提升）；null = 本轮未提及，保持原值。 */
+    val learningPath: List<String>? = null
 ) {
     fun applyTo(base: NewSessionConfiguration): NewSessionConfiguration = base.copy(
         title = title ?: base.title,
@@ -75,7 +77,8 @@ data class AgentCreationDraftPatch(
         speakingTone = speakingTone ?: base.speakingTone,
         story = story ?: base.story,
         openingMessage = openingMessage ?: base.openingMessage,
-        persona = persona ?: base.persona
+        persona = persona ?: base.persona,
+        learningPath = learningPath ?: base.learningPath
     )
 }
 

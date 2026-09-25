@@ -87,15 +87,43 @@ object TeachingActionSelector {
     fun select(rawInput: GuidedLearningTurnInput): TurnPlan {
         val input = rawInput.normalized()
         val intent = input.userIntentHint
-        val state = input.conceptStateFor(input.conceptKey)
+
+        // ---- R86: ordered-path walk — frozen path + mastery state decide progression
+        // before any scoring. An empty path yields no decision and the behavior is
+        // exactly the pre-R86 one. ----
+        val decision = input.learningPath.takeIf { it.size > 0 }
+            ?.let { LearningPathPolicy.decide(it, input.conceptStates, input.conceptKey) }
+        val effectiveInput = decision?.takeIf { it.targetIndex >= 0 }
+            ?.let { input.copy(conceptKey = input.learningPath.keyAt(it.targetIndex)) }
+            ?: input
+        val state = effectiveInput.conceptStateFor(effectiveInput.conceptKey)
+
+        // ---- Path hard rules: regress repairs with Diagnose, completion reflects ----
+        when (decision?.move) {
+            PathMove.Regress ->
+                return withPath(
+                    buildPlan(TeachingAction.Diagnose, intent, state, effectiveInput),
+                    decision,
+                    effectiveInput
+                ).normalized()
+            PathMove.Completed ->
+                return withPath(
+                    buildPlan(TeachingAction.Reflect, intent, state, effectiveInput),
+                    decision,
+                    effectiveInput
+                ).normalized()
+            else -> Unit
+        }
 
         // ---- Hard rules: deterministic overrides before scoring ----
-        hardRule(intent, state, input)?.let { return it.normalized() }
+        hardRule(intent, state, effectiveInput)?.let {
+            return withPath(it, decision, effectiveInput).normalized()
+        }
 
         // ---- Otherwise score the intent's candidate whitelist ----
         val candidates = candidatesFor(intent)
         val chosen = candidates
-            .map { action -> action to score(action, intent, state, input) }
+            .map { action -> action to score(action, intent, state, effectiveInput) }
             .sortedWith(
                 compareByDescending<Pair<TeachingAction, Double>> { it.second }
                     .thenBy { priority.indexOf(it.first) }
@@ -103,7 +131,26 @@ object TeachingActionSelector {
             .first()
             .first
 
-        return buildPlan(chosen, intent, state, input).normalized()
+        return withPath(
+            buildPlan(chosen, intent, state, effectiveInput),
+            decision,
+            effectiveInput
+        ).normalized()
+    }
+
+    /** R86：把路径步态事实挂到（硬规则或评分产出的）计划上；无路径时原样返回。 */
+    private fun withPath(
+        plan: TurnPlan,
+        decision: PathDecision?,
+        input: GuidedLearningTurnInput
+    ): TurnPlan = if (decision == null) {
+        plan
+    } else {
+        plan.copy(
+            pathMove = decision.move,
+            pathPosition = decision.targetIndex,
+            pathSize = input.learningPath.size
+        )
     }
 
     /**

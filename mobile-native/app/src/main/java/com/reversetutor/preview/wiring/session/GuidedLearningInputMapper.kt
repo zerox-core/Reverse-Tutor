@@ -1,9 +1,13 @@
 package com.reversetutor.preview.wiring.session
 
+import com.reversetutor.core.domain.ConceptLearningState
+import com.reversetutor.core.domain.ConceptStatus
 import com.reversetutor.core.domain.ConversationContextContract
+import com.reversetutor.core.domain.GuidedLearningContracts
 import com.reversetutor.core.domain.GuidedLearningIntentClassifier
 import com.reversetutor.core.domain.GuidedLearningTurnInput
 import com.reversetutor.core.domain.LearnerProfileSnapshot
+import com.reversetutor.core.domain.LearningPathPolicy
 import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTemplateSnapshot
 import com.reversetutor.core.domain.TeachingActionSelector
@@ -83,7 +87,22 @@ internal fun NewSessionConfiguration?.toGuidedLearningTurnInput(
             currentConceptKeys = gapFacts + reviewFacts,
             unresolvedQuestionCount = 0
         ),
-        conceptStates = emptyMap(),
+        // R86：掌握度台账投影 → 各知识点学习状态（0-100 分数段映射五档状态机）。
+        conceptStates = trustedContext?.masteryProjections.orEmpty().associate { snapshot ->
+            GuidedLearningContracts.normalizeConceptKey(snapshot.knowledgePoint) to ConceptLearningState(
+                status = when {
+                    snapshot.score >= 80f -> ConceptStatus.Mastered
+                    snapshot.score >= 55f -> ConceptStatus.Stable
+                    snapshot.score >= 25f -> ConceptStatus.Exploring
+                    snapshot.attempts > 0 -> ConceptStatus.Fragile
+                    else -> ConceptStatus.Unknown
+                },
+                confidence = (snapshot.score / 100f).coerceIn(0f, 1f),
+                attemptCount = snapshot.attempts
+            )
+        },
+        // R86：创建时冻结的有序学习路径（教材目录 / LLM 分解统一落成）。
+        learningPath = LearningPathPolicy.fromLabels(configuration?.learningPath.orEmpty()),
         recentSignals = recentSignals
     )
 

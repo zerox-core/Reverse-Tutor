@@ -112,7 +112,13 @@ data class TurnPlan(
     val hintLevel: Int = GuidedLearningContracts.HINT_LEVEL_MIN,
     val evidenceRequirement: EvidenceRequirement = EvidenceRequirement.None,
     val nextActionOnSuccess: TeachingAction? = null,
-    val nextActionOnFailure: TeachingAction? = null
+    val nextActionOnFailure: TeachingAction? = null,
+    /** R86：本轮路径步态；null = 本会话没有有序路径（旧自由形态）。 */
+    val pathMove: PathMove? = null,
+    /** R86：路径目标节点下标（0 起）；无路径 / Completed 为 -1。 */
+    val pathPosition: Int = -1,
+    /** R86：路径总节点数；无路径为 0。 */
+    val pathSize: Int = 0
 ) {
     fun normalized(): TurnPlan = TurnPlan(
         actionType = actionType,
@@ -128,7 +134,10 @@ data class TurnPlan(
         hintLevel = GuidedLearningContracts.clampHintLevel(hintLevel),
         evidenceRequirement = evidenceRequirement,
         nextActionOnSuccess = nextActionOnSuccess,
-        nextActionOnFailure = nextActionOnFailure
+        nextActionOnFailure = nextActionOnFailure,
+        pathMove = pathMove,
+        pathPosition = max(-1, pathPosition),
+        pathSize = max(0, pathSize)
     )
 }
 
@@ -243,6 +252,8 @@ data class GuidedLearningTurnInput(
     @Deprecated("Use sessionTemplate.correctionTiming")
     val templateCorrectionPersistence: String = "",
     val conceptStates: Map<String, ConceptLearningState> = emptyMap(),
+    /** R86：创建时冻结的有序学习路径；空路径 = 旧自由形态，行为与之前完全一致。 */
+    val learningPath: LearningPath = LearningPath(),
     @Deprecated("Use recentSignals.lastAction")
     val recentActions: List<TeachingAction> = emptyList(),
     @Deprecated("Use recentSignals.askedForHintCount")
@@ -294,6 +305,7 @@ data class GuidedLearningTurnInput(
                 .associate { (key, value) ->
                     GuidedLearningContracts.normalizeConceptKey(key) to value.normalized()
                 },
+            learningPath = learningPath.normalized(),
             recentActions = normalizedActions,
             recentHintsWithoutAnswer = max(0, recentHintsWithoutAnswer)
         )

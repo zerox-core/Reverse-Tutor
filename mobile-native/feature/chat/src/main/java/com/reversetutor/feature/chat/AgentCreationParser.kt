@@ -65,7 +65,8 @@ object AgentCreationParser {
         speakingTone = draft.text("speakingTone"),
         story = draft.text("story"),
         openingMessage = draft.text("openingMessage"),
-        persona = draft.text("persona")
+        persona = draft.text("persona"),
+        learningPath = draft.textListOrNull("learningPath", maxItems = 12)
     )
 
     private fun JsonValue.Object.text(key: String): String? =
@@ -79,6 +80,15 @@ object AgentCreationParser {
         return array.values.mapNotNull { (it as? JsonValue.Text)?.value?.trim()?.take(MAX_LIST_ITEM) }
             .filter { it.isNotEmpty() }
             .take(maxItems)
+    }
+
+    /** 字段级补丁语义（R86）：数组字段缺失 / 解析为空一律 null（= 本轮未提及），绝不误清空。 */
+    private fun JsonValue.Object.textListOrNull(key: String, maxItems: Int): List<String>? {
+        val array = (this[key] as? JsonValue.Array) ?: return null
+        return array.values.mapNotNull { (it as? JsonValue.Text)?.value?.trim()?.take(MAX_LIST_ITEM) }
+            .filter { it.isNotEmpty() }
+            .take(maxItems)
+            .takeIf { it.isNotEmpty() }
     }
 
     /** 提取首个平衡的花括号对象；兼容 ```json 围栏与前后杂文。 */

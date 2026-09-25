@@ -185,6 +185,18 @@ class AgentCreationCoordinator(
         if (newDraft.title.isBlank() && newDraft.goal.isNotBlank()) {
             newDraft = newDraft.copy(title = AgentCreationUnderstanding.proposeTitle(newDraft.goal))
         }
+        // R86 学习路径的客户端兜底：LLM 没给路径时，用文档分析的「建议路径」
+        // （教材目录顺序）补齐——有教材按教材、没教材靠 LLM 分解，两源统一。
+        if (newDraft.learningPath.isEmpty()) {
+            val docPath = state.docAnalysis?.suggestedPath.orEmpty()
+                .map { it.trim().take(48) }
+                .filter { it.isNotEmpty() }
+                .distinct()
+                .take(12)
+            if (docPath.isNotEmpty()) {
+                newDraft = newDraft.copy(learningPath = docPath)
+            }
+        }
         val draftChanged = newDraft != state.draft
 
         // 10.2 双源融合：u_raw = 0.5×u_llm + 0.5×u_det，封顶 + 单调不减。

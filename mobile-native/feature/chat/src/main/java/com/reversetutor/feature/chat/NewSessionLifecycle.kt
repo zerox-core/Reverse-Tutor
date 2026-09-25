@@ -48,7 +48,9 @@ data class NewSessionConfiguration(
     val builtInPresetId: String? = null,
     val quickTags: Map<String, TagFieldSelection> = emptyMap(),
     /** 人物性格（R84）：创建链路「用户目标 → 人物性格 → 教学方式」的中间环。 */
-    val persona: String = ""
+    val persona: String = "",
+    /** 有序学习路径（R86）：教材目录或 LLM 分解统一落成，创建后冻结，算法按掌握度推进。 */
+    val learningPath: List<String> = emptyList()
 ) {
     fun validationErrors(): List<String> = buildList {
         if (title.isBlank()) add("请填写会话名称。")
