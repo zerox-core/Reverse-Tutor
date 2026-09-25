@@ -546,11 +546,12 @@ private fun FileCard(
 @Composable
 private fun DraftSummaryCard(configuration: NewSessionConfiguration) {
     // R84：档案卡视觉——色带头 + 白身 + 字段表，与聊天气泡/输入框拉开辨识度。
+    // 2026-09-26 用户拍板：草案卡主色由 Primary 蓝改为橙色（Warning/WarningSoft）。
     val type = LocalFormalTypeScale.current
     Surface(
         color = FormalColors.Surface,
         shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.35f)),
+        border = BorderStroke(1.dp, FormalColors.Warning.copy(alpha = 0.45f)),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("agent_creation_draft_card")
@@ -561,7 +562,7 @@ private fun DraftSummaryCard(configuration: NewSessionConfiguration) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
-                        FormalColors.PrimarySoft,
+                        FormalColors.WarningSoft,
                         RoundedCornerShape(
                             topStart = FormalShapes.CardRadius,
                             topEnd = FormalShapes.CardRadius
@@ -572,13 +573,13 @@ private fun DraftSummaryCard(configuration: NewSessionConfiguration) {
                 Icon(
                     Icons.Filled.AutoAwesome,
                     contentDescription = null,
-                    tint = FormalColors.Primary,
+                    tint = FormalColors.Warning,
                     modifier = Modifier.size(14.dp)
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
                     text = "会话草案 · 实时更新",
-                    style = type.style(12f, 17f, FontWeight.SemiBold, FormalColors.Primary)
+                    style = type.style(12f, 17f, FontWeight.SemiBold, FormalColors.Warning)
                 )
                 Spacer(Modifier.weight(1f))
                 Surface(
@@ -587,7 +588,7 @@ private fun DraftSummaryCard(configuration: NewSessionConfiguration) {
                 ) {
                     Text(
                         text = "完成度 ${configuration.completionPercent}%",
-                        style = type.style(9f, 13f, FontWeight.Medium, FormalColors.Primary),
+                        style = type.style(9f, 13f, FontWeight.Medium, FormalColors.Warning),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                     )
                 }
