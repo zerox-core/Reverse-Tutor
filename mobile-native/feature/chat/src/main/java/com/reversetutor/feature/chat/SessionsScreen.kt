@@ -129,7 +129,9 @@ fun SessionsRoute(
     }
 
     val sessionListState = SessionListUiState.from(
-        sessions = homeState.sessions,
+        // 挑战会话一律不走普通卡片入口：已加入时由蓝色挑战卡承担入口，
+        // 未加入（含 joined 状态尚未恢复）时也不以普通卡片出现在列表里。
+        sessions = homeState.sessions.filter { it.challengeProvenance == null },
         query = "",
         filter = SessionListFilter.All,
         avatarVisible = avatarVisible
