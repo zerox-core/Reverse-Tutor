@@ -92,6 +92,14 @@ class AgentCreationStateStoreTest {
         val store = restoredStore()
         val coordinator = AgentCreationCoordinator(StaticGateway(), clock(), stateStore = store)
 
+        // R92：快照先挂起等用户确认，不再静默恢复；start() 也不发开场白。
+        assertTrue(coordinator.state.resumeAvailable)
+        assertEquals(AgentCreationPhase.Idle, coordinator.state.phase)
+        coordinator.start()
+        assertTrue(coordinator.state.feed.isEmpty())
+
+        assertTrue(coordinator.resumePending())
+        assertFalse(coordinator.state.resumeAvailable)
         assertEquals(AgentCreationPhase.Conversing, coordinator.state.phase)
         assertEquals(3, coordinator.state.feed.size)
         assertEquals("慢热但较真", coordinator.state.draft.persona)
@@ -109,6 +117,7 @@ class AgentCreationStateStoreTest {
         val store = restoredStore()
         val gateway = StaticGateway()
         val coordinator = AgentCreationCoordinator(gateway, clock(), stateStore = store)
+        coordinator.resumePending()
 
         coordinator.sendUserText("那就按这个来")
 
@@ -158,5 +167,35 @@ class AgentCreationStateStoreTest {
         val store = InMemoryStore()
         AgentCreationCoordinator(StaticGateway(), clock(), stateStore = store)
         assertEquals(0, store.saveCount)
+    }
+
+    // R92：入口询问「创建新会话」= 清掉旧快照与追问进度，从零开始。
+    @Test
+    fun startFreshDiscardsSnapshotAndBeginsNewConversation() {
+        val store = restoredStore()
+        val coordinator = AgentCreationCoordinator(StaticGateway(), clock(), stateStore = store)
+        assertTrue(coordinator.state.resumeAvailable)
+
+        coordinator.startFresh()
+
+        assertEquals(1, store.clearCount)
+        assertFalse(coordinator.state.resumeAvailable)
+        assertEquals(AgentCreationPhase.Conversing, coordinator.state.phase)
+        assertEquals(NewSessionConfiguration(), coordinator.state.draft)
+        // 只有一条新开场白，旧对话流不复现。
+        assertEquals(1, coordinator.state.feed.size)
+        assertTrue(coordinator.state.feed.first() is AgentCreationFeedEntry.Assistant)
+        assertNull(store.snapshot?.feed?.firstOrNull { it.id == "e-1" })
+    }
+
+    // R92：空快照（只有开场都没有的残留）不触发入口询问，行为同无快照。
+    @Test
+    fun emptySnapshotDoesNotPromptResume() {
+        val store = InMemoryStore(AgentCreationSnapshot())
+        val coordinator = AgentCreationCoordinator(StaticGateway(), clock(), stateStore = store)
+
+        assertFalse(coordinator.state.resumeAvailable)
+        assertEquals(AgentCreationPhase.Idle, coordinator.state.phase)
+        assertFalse(coordinator.resumePending())
     }
 }

@@ -455,6 +455,18 @@ object ChatRichContentParser {
                 index += 1
                 continue
             }
+            // 中文序号列表「一、二、三……」（R92）：AI 口语化枚举最常用的写法，
+            // 不识别就会整段糊成一坨，用户点名要条列化展示。
+            val chineseOrdered = Regex("^([一二三四五六七八九十百千两]{1,4})[、．.]\\s*(.+)$").matchEntire(line)
+            if (chineseOrdered != null) {
+                blocks += ChatRichBlock.ListItem(
+                    chineseOrdered.groupValues[2],
+                    ordered = true,
+                    index = chineseOrdinalToInt(chineseOrdered.groupValues[1])
+                )
+                index += 1
+                continue
+            }
             if (line.contains('|') && index + 1 < lines.size && isTableDivider(lines[index + 1])) {
                 val headers = tableCells(line)
                 val rows = mutableListOf<List<String>>()
@@ -479,10 +491,27 @@ object ChatRichContentParser {
 
     private fun startsBlock(lines: List<String>, index: Int): Boolean {
         val line = lines[index]
-        return line.startsWith("```") || line.trim().startsWith("$$") || line.startsWith("> ") ||
+        return line.startsWith("```") || line.trim().startsWith("$") || line.startsWith("> ") ||
             Regex("^(#{1,6})\\s+.+$").matches(line) || Regex("^[-*+]\\s+.+$").matches(line) ||
             Regex("^\\d+[.)]\\s+.+$").matches(line) ||
+            Regex("^[一二三四五六七八九十百千两]{1,4}[、．.]\\s*.+$").matches(line) ||
             (line.contains('|') && index + 1 < lines.size && isTableDivider(lines[index + 1]))
+    }
+
+    /** 中文小写序数转整数（一…九十九）；转换不了返回 null，渲染侧回退按 1 显示。 */
+    internal fun chineseOrdinalToInt(text: String): Int? {
+        val digits = mapOf(
+            '一' to 1, '二' to 2, '两' to 2, '三' to 3, '四' to 4, '五' to 5,
+            '六' to 6, '七' to 7, '八' to 8, '九' to 9
+        )
+        if (text.isEmpty() || text.length > 3) return null
+        if (text.length == 1) return if (text == "十") 10 else digits[text[0]]
+        val tenIndex = text.indexOf('十')
+        if (tenIndex < 0) return null
+        val tens = if (tenIndex == 0) 1 else digits[text[0]] ?: return null
+        val ones = if (tenIndex == text.length - 1) 0 else digits[text[tenIndex + 1]] ?: return null
+        val value = tens * 10 + ones
+        return value.takeIf { it in 1..99 }
     }
 
     private fun isTableDivider(line: String): Boolean =

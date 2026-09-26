@@ -206,6 +206,28 @@ fun AgentCreationRoute(
 
     BackHandler(onBack = onBack)
 
+    // R92：检测到上次未完成的创建——先问「继续上次还是创建新会话」，
+    // 不静默恢复（2026-09-26 用户拍板：直接默认进上次的，想新建太费劲）。
+    if (state.resumeAvailable) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("继续上次的创建？") },
+            text = { Text("检测到上次有一份没创建完的会话草案。可以接着上次的聊，也可以从零创建新会话。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    coordinator.resumePending()
+                    sync()
+                }) { Text("继续上次") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    coordinator.startFresh()
+                    sync()
+                }) { Text("创建新会话") }
+            }
+        )
+    }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -446,11 +468,66 @@ private fun AssistantBubble(text: String) {
             .widthIn(max = 320.dp)
             .testTag("agent_creation_assistant")
     ) {
-        Text(
-            text = text,
-            style = type.style(13f, 20f, color = FormalColors.Ink),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-        )
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            AssistantRichText(text)
+        }
+    }
+}
+
+/**
+ * R92：助手气泡富文本渲染——AI 输出的条列 / 标题 / 加粗按结构展示，
+ * 不再整段糊成一坨（2026-09-26 用户真机反馈：「高中数学学哪些」的
+ * 一二三条列输出应渲染成条列）。复用主聊天的 ChatRichContentParser，
+ * 代码 / 公式 / 表格在创建页降级为等宽 / 纯文本，不搬整套主聊渲染。
+ */
+@Composable
+private fun AssistantRichText(text: String) {
+    val type = LocalFormalTypeScale.current
+    val blocks = remember(text) { ChatRichContentParser.parse(text) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        blocks.forEach { block ->
+            when (block) {
+                is ChatRichBlock.Heading -> Text(
+                    text = block.text,
+                    style = type.style(14f, 20f, weight = FontWeight.Bold, color = FormalColors.Ink)
+                )
+                is ChatRichBlock.Paragraph -> Text(
+                    text = buildRichInlineAnnotatedString(block.inlines),
+                    style = type.style(13f, 20f, color = FormalColors.Ink)
+                )
+                is ChatRichBlock.ListItem -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = if (block.ordered) "${block.index ?: 1}." else "•",
+                        style = type.style(13f, 20f, color = FormalColors.Muted)
+                    )
+                    Text(
+                        text = buildRichInlineAnnotatedString(ChatRichContentParser.parseInlines(block.text)),
+                        style = type.style(13f, 20f, color = FormalColors.Ink),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                is ChatRichBlock.Quote -> Text(
+                    text = block.text,
+                    style = type.style(13f, 20f, color = FormalColors.Muted)
+                )
+                is ChatRichBlock.Code -> Text(
+                    text = block.source,
+                    style = type.style(12f, 18f, color = FormalColors.Muted)
+                )
+                is ChatRichBlock.Formula -> Text(
+                    text = block.source,
+                    style = type.style(13f, 20f, color = FormalColors.Ink)
+                )
+                is ChatRichBlock.Table -> Text(
+                    text = (listOf(block.headers) + block.rows).joinToString("\n") { row -> row.joinToString(" · ") },
+                    style = type.style(12f, 18f, color = FormalColors.Muted)
+                )
+                is ChatRichBlock.PlainText -> Text(
+                    text = block.source,
+                    style = type.style(13f, 20f, color = FormalColors.Ink)
+                )
+            }
+        }
     }
 }
 

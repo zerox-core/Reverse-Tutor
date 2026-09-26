@@ -30,7 +30,9 @@ data class AgentCreationUiState(
     val busy: Boolean = false,
     val requestDocumentActive: Boolean = false,
     val generationError: String? = null,
-    val docAnalysis: AgentCreationDocAnalysis? = null
+    val docAnalysis: AgentCreationDocAnalysis? = null,
+    /** R92：检测到有上次未完成的快照，等用户选「继续上次 / 创建新会话」。 */
+    val resumeAvailable: Boolean = false
 ) {
     /** 兜底钳制：必填缺失时封顶 60（设计方案 §三）。 */
     val displayedUnderstanding: Int
@@ -65,15 +67,25 @@ class AgentCreationCoordinator(
         }
 
     private val history = mutableListOf<AgentCreationHistoryTurn>()
-    private val planner = AgentCreationFollowUpPlanner()
+    private var planner = AgentCreationFollowUpPlanner()
     private var entrySequence = 0
+    /** R92：检测到但未恢复的快照——入口弹窗确认「继续上次」才真正恢复。 */
+    private var pendingSnapshot: AgentCreationSnapshot? = null
 
     init {
-        // R85：有本地快照则恢复——切走页面 / 进程被杀后回到创建窗口接着聊。
-        stateStore?.load()?.let(::restore)
+        // R92：有本地快照不再静默恢复（R85 是静默恢复）——先挂起，
+        // 入口弹窗问「继续上次还是创建新会话」；直接默认进上次的，
+        // 想新建会话的人只能硬着头皮改旧草案，太费劲（2026-09-26 用户拍板）。
+        val snapshot = stateStore?.load()
+        if (snapshot != null && snapshot.feed.isNotEmpty()) {
+            pendingSnapshot = snapshot
+            state = AgentCreationUiState(resumeAvailable = true)
+        }
     }
 
     fun start() {
+        // R92：快照待确认期间不发开场白——等用户在弹窗里二选一。
+        if (state.resumeAvailable) return
         if (state.phase != AgentCreationPhase.Idle) return
         state = state.copy(
             phase = AgentCreationPhase.Conversing,
@@ -89,6 +101,26 @@ class AgentCreationCoordinator(
         state = state.copy(phase = AgentCreationPhase.Created)
         // R85：创建成功后清掉本地快照，下次进创建窗口从零开始。
         stateStore?.clear()
+    }
+
+    /** R92 入口询问「继续上次」：把挂起的快照恢复进对话，接着聊。 */
+    fun resumePending(): Boolean {
+        val snapshot = pendingSnapshot ?: return false
+        pendingSnapshot = null
+        restore(snapshot)
+        persist()
+        return true
+    }
+
+    /** R92 入口询问「创建新会话」：清掉旧快照与追问进度，从零开始。 */
+    fun startFresh() {
+        pendingSnapshot = null
+        stateStore?.clear()
+        history.clear()
+        planner = AgentCreationFollowUpPlanner()
+        entrySequence = 0
+        state = AgentCreationUiState()
+        start()
     }
 
     /** 用户发一条文字消息：→ P2' 生成 → 更新了解程度/草案/追问。 */

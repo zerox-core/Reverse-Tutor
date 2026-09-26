@@ -5,6 +5,7 @@ import com.reversetutor.core.model.MessageRole
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -293,6 +294,38 @@ ${'$'}${'$'}x^2 + y^2${'$'}${'$'}
 
         val malformed = "```kotlin\nval answer = 42"
         assertEquals(listOf(ChatRichBlock.PlainText(malformed)), ChatRichContentParser.parse(malformed))
+    }
+
+    // R92：中文序号「一、二、三……」是 AI 口语化枚举最常用写法，必须识别为有序列表。
+    @Test
+    fun richParserRecognizesChineseOrdinalListItems() {
+        val parsed = ChatRichContentParser.parse(
+            "高中数学范围：\n一、集合与函数\n二、指数函数与对数函数\n三、三角函数\n十二、概率统计"
+        )
+
+        val items = parsed.filterIsInstance<ChatRichBlock.ListItem>()
+        assertEquals(4, items.size)
+        assertTrue(items.all { it.ordered })
+        assertEquals(listOf(1, 2, 3, 12), items.map { it.index })
+        assertEquals("集合与函数", items[0].text)
+        assertEquals("概率统计", items[3].text)
+        // 首行是普通段落，不被吞进列表。
+        assertTrue(parsed.first() is ChatRichBlock.Paragraph)
+    }
+
+    @Test
+    fun chineseOrdinalConversionCoversCommonForms() {
+        assertEquals(1, ChatRichContentParser.chineseOrdinalToInt("一"))
+        assertEquals(2, ChatRichContentParser.chineseOrdinalToInt("两"))
+        assertEquals(9, ChatRichContentParser.chineseOrdinalToInt("九"))
+        assertEquals(10, ChatRichContentParser.chineseOrdinalToInt("十"))
+        assertEquals(11, ChatRichContentParser.chineseOrdinalToInt("十一"))
+        assertEquals(20, ChatRichContentParser.chineseOrdinalToInt("二十"))
+        assertEquals(35, ChatRichContentParser.chineseOrdinalToInt("三十五"))
+        assertEquals(99, ChatRichContentParser.chineseOrdinalToInt("九十九"))
+        assertNull(ChatRichContentParser.chineseOrdinalToInt("一百"))
+        assertNull(ChatRichContentParser.chineseOrdinalToInt("一会儿"))
+        assertNull(ChatRichContentParser.chineseOrdinalToInt(""))
     }
 
     @Test
