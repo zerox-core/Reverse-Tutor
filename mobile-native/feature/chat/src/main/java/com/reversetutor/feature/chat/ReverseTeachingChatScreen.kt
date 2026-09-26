@@ -772,7 +772,7 @@ private fun ReverseTeachingChatHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.dp)
-                .padding(start = 6.dp, end = 10.dp),
+                .padding(start = 6.dp, end = 64.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             FormalHeaderIconButton(

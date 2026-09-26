@@ -43,8 +43,8 @@ internal fun resolveChallengeSessionLaunch(
     val plan = currentTask?.taskMarkdown?.trim()?.takeIf(String::isNotEmpty)
         ?: "按挑战节奏完成学习、讲解与复盘。"
     val openingMessage = currentTask?.let {
-        "今天是第 ${it.dayNumber} 天：${it.title}。先讲讲你准备怎么完成它，再开始今天的讲解与复盘。"
-    } ?: "我们从今天的挑战目标开始吧，请先讲讲你的计划。"
+        "这一课我还没学会：${it.title}。能请你从头讲给我听吗？讲完我们再一起复盘。"
+    } ?: "今天的挑战内容我还没学明白，能请你讲给我听吗？讲完我们再一起复盘。"
     return ChallengeSessionLaunchDecision.Create(
         NewSessionPrefillRequest(
             requestId = "challenge-${activity.id.trim().lowercase(Locale.ROOT)}-${activity.revision}",

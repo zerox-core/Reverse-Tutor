@@ -16,7 +16,7 @@ class FigmaAppUiStateTest {
             .selectSessionSettings(SessionSettingsTab.Persona)
 
         assertTrue(state.challengeJoined)
-        assertEquals("12/21", state.challengeProgressLabel)
+        assertEquals("12/17", state.challengeProgressLabel)
         assertTrue(state.activityAnnouncementDismissed)
         assertEquals(SessionSettingsTab.Persona, state.sessionSettingsTab)
     }

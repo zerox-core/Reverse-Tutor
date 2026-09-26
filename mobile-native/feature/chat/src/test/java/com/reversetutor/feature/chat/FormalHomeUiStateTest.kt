@@ -187,9 +187,9 @@ class FormalHomeUiStateTest {
 
     private fun challenge() = FormalJoinedChallengeUi(
         id = "challenge-1",
-        title = "21 天学习挑战",
-        dayLabel = "挑战进行中 · 第 8 天",
-        todayPrompt = "今天：用三句话讲清楚机会成本",
+        title = "教 AI 学 agent 应用开发挑战",
+        dayLabel = "挑战进行中 · 第 8 课",
+        todayPrompt = "当前任务：讲清楚机会成本",
         progressFraction = 0.38f
     )
 

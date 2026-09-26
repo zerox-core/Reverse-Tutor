@@ -71,7 +71,9 @@ fun SessionsRoute(
     contentRepository: ContentRepository? = null,
     challengeJoined: Boolean = false,
     challengeProgress: Int = 0,
-    challengeTotal: Int = 21,
+    challengeTotal: Int = 17,
+    challengeTitle: String? = null,
+    challengeTodayTask: String? = null,
     onOpenSession: (SessionListItem) -> Unit,
     onNewSession: () -> Unit = {},
     onOpenChallenge: () -> Unit = {},
@@ -136,10 +138,11 @@ fun SessionsRoute(
         val safeTotal = challengeTotal.coerceAtLeast(1)
         val safeProgress = challengeProgress.coerceIn(0, safeTotal)
         FormalJoinedChallengeUi(
-            id = "challenge-21-days",
-            title = "21 天学习挑战",
-            dayLabel = "挑战进行中 · 第 ${safeProgress.coerceAtLeast(1)} 天",
-            todayPrompt = "今天：用三句话讲清楚机会成本",
+            id = "joined-challenge",
+            title = challengeTitle?.takeIf { it.isNotBlank() } ?: "学习挑战",
+            dayLabel = "挑战进行中 · 第 ${(safeProgress + 1).coerceAtMost(safeTotal)} 课",
+            todayPrompt = challengeTodayTask?.takeIf { it.isNotBlank() }?.let { "当前任务：$it" }
+                ?: "当前任务：继续推进挑战内容",
             progressFraction = safeProgress.toFloat() / safeTotal.toFloat()
         )
     } else {
@@ -612,7 +615,7 @@ private fun JoinedChallengeSessionCard(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val trailingWidth = 118.dp
             Text(
-                text = "21天 Python 学习挑战",
+                text = "17 天教 AI 学会落地 agent 应用",
                 color = HomeInk,
                 fontSize = 16.sp,
                 lineHeight = 22.sp,
@@ -648,7 +651,7 @@ private fun JoinedChallengeSessionCard(
                     .padding(top = 13.dp, end = 48.dp)
             )
             Text(
-                text = "剩 15 天",
+                text = "进行中",
                 color = Color(0xFF667085),
                 fontSize = 11.sp,
                 lineHeight = 16.sp,
@@ -658,7 +661,7 @@ private fun JoinedChallengeSessionCard(
                     .padding(top = 12.dp, end = 13.dp)
             )
             Text(
-                text = "今日任务：完成 Python 基础练习，并回传学习数据。",
+                text = "当前任务：完成本阶段挑战内容并回传学习数据。",
                 color = HomeBody,
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
@@ -681,7 +684,7 @@ private fun JoinedChallengeSessionCard(
                     .background(Color(0xFF5D63E8), RoundedCornerShape(2.dp))
             )
             Text(
-                text = "12/21",
+                text = "6/17",
                 color = Color(0xFF5057D8),
                 fontSize = 12.sp,
                 lineHeight = 18.sp,

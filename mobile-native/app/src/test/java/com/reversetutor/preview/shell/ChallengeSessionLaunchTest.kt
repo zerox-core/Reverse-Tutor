@@ -59,7 +59,7 @@ class ChallengeSessionLaunchTest {
         assertTrue(config.goal.contains("完成数据层设计"))
         assertTrue(config.goal.contains("总目标"))
         assertEquals("- 画出表结构\n- 写迁移脚本", config.plan)
-        assertTrue(config.openingMessage.contains("第 3 天"))
+        assertTrue(config.openingMessage.contains("这一课我还没学会"))
         assertTrue(config.openingMessage.contains("设计数据模型"))
     }
 

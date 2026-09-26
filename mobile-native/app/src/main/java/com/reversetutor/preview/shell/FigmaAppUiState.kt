@@ -10,7 +10,7 @@ enum class SessionSettingsTab {
 data class FigmaAppUiState(
     val challengeJoined: Boolean = false,
     val challengeProgress: Int = 12,
-    val challengeTotal: Int = 21,
+    val challengeTotal: Int = 17,
     val activityAnnouncementDismissed: Boolean = false,
     val sessionSettingsTab: SessionSettingsTab = SessionSettingsTab.Library
 ) {

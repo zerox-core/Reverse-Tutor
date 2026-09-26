@@ -9,6 +9,11 @@ internal class ChallengeJoinFlowCoordinator(
         return postConfirmedJoin()
     }
 
+    suspend fun launchJoinedSession(): ChallengeSessionLaunchDecision? {
+        if (!runtimeCoordinator.state.value.joined) return null
+        return postConfirmedJoin()
+    }
+
     suspend fun retry(): ChallengeSessionLaunchDecision? {
         val operation = runtimeCoordinator.retry()
         if (operation != ChallengeRuntimeOperation.Join || !runtimeCoordinator.state.value.joined) {

@@ -18,10 +18,10 @@ class ChallengePresentationTest {
 
         assertEquals("可加入", presentation.statusLabel)
         assertEquals("招募中", presentation.syncLabel)
-        assertEquals("已有 386 人参与", presentation.metaLabel)
-        assertEquals("挑战周期", presentation.metricTitle)
+        assertEquals("长期开放加入", presentation.metaLabel)
+        assertEquals("挑战任务", presentation.metricTitle)
         assertEquals("21", presentation.metricValue)
-        assertEquals(" 天", presentation.metricSuffix)
+        assertEquals(" 个任务", presentation.metricSuffix)
         assertFalse(presentation.showPersonalProgress)
         assertFalse(presentation.showFeedback)
     }
@@ -36,10 +36,10 @@ class ChallengePresentationTest {
 
         assertEquals("进行中", presentation.statusLabel)
         assertEquals("已同步", presentation.syncLabel)
-        assertEquals("距离结束 15 天", presentation.metaLabel)
+        assertEquals("已加入本挑战", presentation.metaLabel)
         assertEquals("学习进度", presentation.metricTitle)
         assertEquals("12", presentation.metricValue)
-        assertEquals(" / 21 天", presentation.metricSuffix)
+        assertEquals(" / 21 个任务", presentation.metricSuffix)
         assertEquals(12f / 21f, presentation.progressFraction)
         assertTrue(presentation.showPersonalProgress)
         assertTrue(presentation.showFeedback)

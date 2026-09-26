@@ -370,29 +370,40 @@ private fun MainChallengeCard(
                 style = type.style(9f, 13f, color = FormalColors.Muted),
                 modifier = Modifier.align(Alignment.TopEnd).padding(top = 40.dp)
             )
-            Column(Modifier.align(Alignment.CenterStart).offset(y = (-52).dp)) {
-                Text(detailState.stageLabel, style = type.style(16f, 24f, FontWeight.Bold, FormalColors.Primary))
-                Text(
-                    detailState.title,
-                    style = type.style(19f, 26f, FontWeight.Bold, FormalColors.Ink),
-                    modifier = Modifier.width(136.dp),
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Schedule, contentDescription = null, tint = FormalColors.Muted, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth()
+                    .offset(y = (-40).dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(detailState.stageLabel, style = type.style(16f, 24f, FontWeight.Bold, FormalColors.Primary))
                     Text(
-                        detailState.availabilityLabel,
-                        style = type.style(12f, 18f, color = FormalColors.Muted),
-                        modifier = Modifier.width(136.dp),
-                        maxLines = 2,
+                        detailState.title,
+                        style = type.style(19f, 26f, FontWeight.Bold, FormalColors.Ink),
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, tint = FormalColors.Muted, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            detailState.availabilityLabel,
+                            style = type.style(12f, 18f, color = FormalColors.Muted),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
+                Spacer(Modifier.width(18.dp))
+                ChallengeCoverArt(
+                    Modifier
+                        .width(126.dp)
+                        .height(154.dp)
+                )
             }
-            ChallengeCourseArt(Modifier.align(Alignment.CenterEnd).offset(y = (-36).dp))
             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
                 if (detailState.availability != ChallengeAvailability.Available) {
                     Text("活动状态", style = type.style(11f, 16f, color = FormalColors.Muted))
@@ -423,23 +434,18 @@ private fun MainChallengeCard(
 }
 
 @Composable
-private fun ChallengeCourseArt(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .width(142.dp)
-            .height(174.dp)
-            .clip(RoundedCornerShape(FormalShapes.CardRadius))
-            .background(FormalColors.PrimarySoft)
-            .padding(15.dp)
+private fun ChallengeCoverArt(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, FormalColors.Border),
+        shadowElevation = 2.dp
     ) {
-        Box(Modifier.offset(y = 30.dp).size(16.dp).clip(CircleShape).background(FormalColors.Primary.copy(alpha = .18f)))
-        Row(Modifier.align(Alignment.BottomStart), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Box(Modifier.width(53.dp).height(80.dp).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)).background(FormalColors.Primary.copy(alpha = .18f)))
-            Box(Modifier.width(53.dp).height(56.dp).clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp)).background(FormalColors.Primary.copy(alpha = .45f)))
-        }
-        Box(
-            Modifier.align(Alignment.BottomStart).offset(x = (-23).dp, y = 12.dp).size(32.dp)
-                .clip(CircleShape).background(FormalColors.Primary)
+        Image(
+            painter = painterResource(R.drawable.challenge_cover),
+            contentDescription = "挑战封面",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
     }
 }

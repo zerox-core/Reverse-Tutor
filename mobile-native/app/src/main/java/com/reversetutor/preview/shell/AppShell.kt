@@ -442,6 +442,11 @@ fun AppShell(
                         challengeTotal = challengeRuntimeState.activity?.tasks?.size
                             ?.takeIf { it > 0 }
                             ?: figmaUiState.challengeTotal,
+                        challengeTitle = challengeRuntimeState.activity?.title,
+                        challengeTodayTask = challengeRuntimeState.activity?.tasks
+                            ?.firstOrNull {
+                                it.dayNumber == (challengeRuntimeState.participation?.progress ?: 0L) + 1L
+                            }?.title,
                         learningOverviewState = learningOverviewState,
                         onLearningOverviewAction = learningOverviewViewModel::onAction,
                         onComposerFocusChanged = workspaceInteractions::onComposerFocusChanged,
@@ -493,7 +498,14 @@ fun AppShell(
                             navigationState = navigationState.navigate(AppDestination.Sessions)
                         },
                         onOpenChallenge = {
-                            openChallenge()
+                            appScope.launch {
+                                val launch = challengeJoinFlowCoordinator.launchJoinedSession()
+                                if (launch != null) {
+                                    applyConfirmedChallengeJoin(launch, ChallengeReturnContext())
+                                } else {
+                                    openChallenge()
+                                }
+                            }
                         },
                         onChallengeReturnContextChanged = {
                             challengeCurrentReturnContext = it
@@ -691,6 +703,11 @@ fun AppShell(
         )
     ) {
         ActivityAnnouncementDialog(
+            activityTitle = challengeRuntimeState.activity?.title?.takeIf { it.isNotBlank() }
+                ?: "学习挑战活动",
+            activitySubtitle = challengeRuntimeState.activity?.description
+                ?.lineSequence()?.firstOrNull()?.takeIf { it.isNotBlank() }
+                ?: "加入挑战，和 AI 学习伙伴一起推进学习计划。",
             onDismiss = {
                 figmaUiState = figmaUiState.dismissActivityAnnouncement()
             },
@@ -892,6 +909,8 @@ private fun DestinationContent(
     challengeRestoreContext: ChallengeReturnContext?,
     challengeProgress: Int,
     challengeTotal: Int,
+    challengeTitle: String?,
+    challengeTodayTask: String?,
     learningOverviewState: LearningOverviewUiState,
     onLearningOverviewAction: (LearningOverviewUiAction) -> Unit,
     onComposerFocusChanged: (Boolean) -> Unit,
@@ -1378,6 +1397,8 @@ private fun DestinationContent(
                 challengeJoined = challengeRuntimeState.joined,
                 challengeProgress = challengeProgress,
                 challengeTotal = challengeTotal,
+                challengeTitle = challengeTitle,
+                challengeTodayTask = challengeTodayTask,
                 onOpenSession = onOpenSession,
                 onNewSession = onOpenNewSession,
                 onOpenAgentCreation = onOpenAgentCreation,
