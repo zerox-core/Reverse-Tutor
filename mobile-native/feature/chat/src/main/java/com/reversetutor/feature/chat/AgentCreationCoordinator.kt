@@ -208,7 +208,27 @@ class AgentCreationCoordinator(
             documentAvailable = hasDoc
         )
         state = state.copy(busy = true, generationError = null)
-        val result = runConverseWithRetry(userText, strategy)
+        // R93 流式上屏：网关边生成边回调口语全量快照，懒建一个占位 Assistant 气泡随回调生长；
+        // 占位气泡不进 history、不落正式文案，轮次结束无论成败都撤掉，由下方逻辑落定正式气泡。
+        var streamingEntryId: String? = null
+        val result = runConverseWithRetry(userText, strategy) { partial ->
+            val placeholderId = streamingEntryId
+            if (placeholderId == null) {
+                val entry = AgentCreationFeedEntry.Assistant(id = nextId(), text = partial)
+                streamingEntryId = entry.id
+                state = state.copy(feed = state.feed + entry)
+            } else {
+                state = state.copy(
+                    feed = state.feed.map {
+                        if (it.id == placeholderId && it is AgentCreationFeedEntry.Assistant) it.copy(text = partial) else it
+                    }
+                )
+            }
+        }
+        streamingEntryId?.let { placeholderId ->
+            state = state.copy(feed = state.feed.filterNot { it.id == placeholderId })
+            streamingEntryId = null
+        }
         state = state.copy(busy = false)
         val turn = result ?: run {
             state = state.copy(
@@ -307,14 +327,15 @@ class AgentCreationCoordinator(
         }
     }
 
-    /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。 */
+    /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。R93：onPartialSpoken 透传流式口语快照。 */
     private suspend fun runConverseWithRetry(
         userText: String,
-        strategy: AgentCreationTurnStrategy
+        strategy: AgentCreationTurnStrategy,
+        onPartialSpoken: (String) -> Unit = {}
     ): AgentCreationTurnResult? {
         repeat(2) { attempt ->
             val outcome = runCatching {
-                gateway.converse(history, userText, state.draft, state.docAnalysis, strategy)
+                gateway.converseStreaming(history, userText, state.draft, state.docAnalysis, strategy, onPartialSpoken)
             }
             outcome.fold(
                 onSuccess = { return it },

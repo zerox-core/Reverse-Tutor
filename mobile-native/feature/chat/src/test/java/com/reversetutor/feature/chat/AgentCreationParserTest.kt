@@ -150,4 +150,40 @@ class AgentCreationParserTest {
         assertEquals(listOf("第一章", "第二章"), analysis.outline)
         assertEquals(30, analysis.knowledgePoints.size)
     }
+
+    // R93：流式宽容抽取——契约 JSON 没生成完时，边到边抽口语字段上屏。
+    @Test
+    fun extractPartialSpokenReadsIncompleteStringPrefix() {
+        val partial = """{"understanding":55,"assistantNote":"记下了，草案"""
+        assertEquals("记下了，草案", AgentCreationParser.extractPartialSpoken(partial))
+    }
+
+    @Test
+    fun extractPartialSpokenJoinsFieldsInJsonOrder() {
+        // followUp 已闭合 + note 增长中：按 JSON 出现顺序换行拼接
+        val partial = """{"understanding":55,"followUpQuestion":"目标是什么？","assistantNote":"记下"""
+        assertEquals("目标是什么？\n记下", AgentCreationParser.extractPartialSpoken(partial))
+    }
+
+    @Test
+    fun extractPartialSpokenUnescapesSequences() {
+        val partial = """{"assistantNote":"第一行\n第二行\"引"""
+        assertEquals("第一行\n第二行\"引", AgentCreationParser.extractPartialSpoken(partial))
+    }
+
+    @Test
+    fun extractPartialSpokenParsesCompletePayload() {
+        val full = """{"understanding":55,"followUpQuestion":"目标是什么？","assistantNote":"记下了。"}"""
+        assertEquals("目标是什么？\n记下了。", AgentCreationParser.extractPartialSpoken(full))
+    }
+
+    @Test
+    fun extractPartialSpokenReturnsNullBeforeSpokenFieldsAppear() {
+        assertNull(AgentCreationParser.extractPartialSpoken(""))
+        assertNull(AgentCreationParser.extractPartialSpoken("""{"understanding"""))
+        assertNull(AgentCreationParser.extractPartialSpoken("""{"understanding":55,"draft":{"title":"浮力"""))
+        // 冒号 / 开引号还没来：不上屏
+        assertNull(AgentCreationParser.extractPartialSpoken("""{"assistantNote"""))
+        assertNull(AgentCreationParser.extractPartialSpoken("""{"assistantNote":"""))
+    }
 }

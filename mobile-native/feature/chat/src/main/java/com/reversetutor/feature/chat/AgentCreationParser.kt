@@ -46,6 +46,76 @@ object AgentCreationParser {
         )
     }
 
+    /**
+     * R93：从「还没生成完的契约 JSON 前缀」宽容抽取当前可见口语文本——
+     * 字符串未闭合、结构残缺都不报错。只认 assistantNote / followUpQuestion
+     * 两个展示字段（草案补丁等不上屏），按 JSON 出现顺序换行拼接；
+     * 返回 null = 暂时抽不出可展示文本（保持现态）。
+     */
+    fun extractPartialSpoken(rawSoFar: String): String? {
+        val fields = listOf("assistantNote", "followUpQuestion")
+            .mapNotNull { key ->
+                val keyIndex = rawSoFar.indexOf("\"$key\"")
+                if (keyIndex < 0) {
+                    null
+                } else {
+                    extractStringFieldPrefix(rawSoFar, key)?.let { keyIndex to it.first }
+                }
+            }
+            .sortedBy { it.first }
+            .map { it.second.trim() }
+            .filter { it.isNotEmpty() }
+        if (fields.isEmpty()) return null
+        return fields.joinToString("\n").take(MAX_FIELD_TEXT)
+    }
+
+    /**
+     * 宽容字符串字段前缀读取：定位 key 后的字符串值，读到未转义的闭合引号为止；
+     * 流中断（未闭合）读到末尾，complete=false。转义按 JSON 语义还原，
+     * \uXXXX 残部直接舍弃。字段未出现或值不是字符串返回 null。
+     */
+    private fun extractStringFieldPrefix(raw: String, key: String): Pair<String, Boolean>? {
+        val keyIndex = raw.indexOf("\"$key\"")
+        if (keyIndex < 0) return null
+        var index = keyIndex + key.length + 2
+        while (index < raw.length && raw[index].isWhitespace()) index++
+        if (index >= raw.length || raw[index] != ':') return null
+        index++
+        while (index < raw.length && raw[index].isWhitespace()) index++
+        if (index >= raw.length || raw[index] != '"') return null
+        index++
+        val result = StringBuilder()
+        while (index < raw.length) {
+            when (val char = raw[index]) {
+                '"' -> return result.toString() to true
+                '\\' -> {
+                    if (index + 1 >= raw.length) return result.toString() to false
+                    when (raw[index + 1]) {
+                        '"', '\\', '/' -> { result.append(raw[index + 1]); index += 2 }
+                        'b' -> { result.append('\b'); index += 2 }
+                        'f' -> { result.append('\u000C'); index += 2 }
+                        'n' -> { result.append('\n'); index += 2 }
+                        'r' -> { result.append('\r'); index += 2 }
+                        't' -> { result.append('\t'); index += 2 }
+                        'u' -> {
+                            if (index + 6 <= raw.length) {
+                                raw.substring(index + 2, index + 6).toIntOrNull(16)?.let { code ->
+                                    result.append(code.toChar())
+                                }
+                                index += 6
+                            } else {
+                                return result.toString() to false
+                            }
+                        }
+                        else -> index += 2
+                    }
+                }
+                else -> { result.append(char); index++ }
+            }
+        }
+        return result.toString() to false
+    }
+
     private fun parseDraftPatch(draft: JsonValue.Object): AgentCreationDraftPatch = AgentCreationDraftPatch(
         title = draft.text("title"),
         learnerRole = draft.text("learnerRole"),

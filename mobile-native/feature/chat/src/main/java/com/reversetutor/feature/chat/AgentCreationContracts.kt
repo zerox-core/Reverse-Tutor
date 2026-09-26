@@ -101,6 +101,21 @@ interface AgentCreationGateway {
         strategy: AgentCreationTurnStrategy = AgentCreationTurnStrategy()
     ): AgentCreationTurnResult
 
+    /**
+     * R93 流式对话：边生成边上屏（2026-09-26 用户拍板：会话与创建链路全部走流式）。
+     * onPartialSpoken 收到「截至目前的完整口语文本」（全量覆盖语义，非增量），
+     * 由协调器维护的占位气泡随回调生长、轮次落定即撤。默认退回非流式 converse，
+     * Fake 与测试网关零改动。
+     */
+    suspend fun converseStreaming(
+        history: List<AgentCreationHistoryTurn>,
+        userText: String,
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?,
+        strategy: AgentCreationTurnStrategy = AgentCreationTurnStrategy(),
+        onPartialSpoken: (String) -> Unit = {}
+    ): AgentCreationTurnResult = converse(history, userText, currentDraft, docAnalysis, strategy)
+
     /** P1 文档分析。R-A 返回脚本化结果；R-C 接真实解析文本。 */
     suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis
 }

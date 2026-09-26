@@ -49,7 +49,7 @@ class RealAgentCreationGatewayTest {
     ) = RealAgentCreationGateway(runtime = runtime, activeProfile = activeProfile)
 
     @Test
-    fun converseAssemblesNonStreamingRequestWithContractPrompt() = runBlocking {
+    fun converseAssemblesStreamingRequestWithContractPrompt() = runBlocking {
         val runtime = RecordingRuntime()
         val gw = gateway(runtime)
         val history = listOf(
@@ -69,8 +69,9 @@ class RealAgentCreationGatewayTest {
             )
         )
 
+        // R93：创建链路全量改流式（2026-09-26 用户拍板），请求必须带 streaming=true
         val request = runtime.requests.single()
-        assertFalse(request.streaming)
+        assertTrue(request.streaming)
         assertEquals("agent-creation", request.sessionId)
         assertEquals("test-model", request.model)
         val prompt = request.userText.orEmpty()
@@ -131,6 +132,39 @@ class RealAgentCreationGatewayTest {
         val gw = gateway(runtime)
         val result = gw.converse(emptyList(), "你好", NewSessionConfiguration(), null, AgentCreationTurnStrategy())
         assertEquals(55, result.understanding)
+    }
+
+    /** R93：把契约 JSON 切成小段模拟 SSE 逐段到达，回放进 onStreamChunk。 */
+    private class ChunkedRuntime(private val chunks: List<String>) : LlmGenerationRuntime {
+        override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+            chunks.forEach { chunk -> request.onStreamChunk?.invoke(chunk) }
+            return LlmGenerationResult.Streamed(chunks)
+        }
+    }
+
+    // R93：流式期间口语字段快照按序回调——首帧是 followUp 前缀（VALID_JSON 里它先出现），
+    // 快照全量覆盖、单调生长，末帧 = followUp 全量 + 换行 + note 全量。
+    @Test
+    fun converseStreamingEmitsPartialSpokenSnapshots() = runBlocking {
+        val runtime = ChunkedRuntime(VALID_JSON.chunked(7))
+        val gw = gateway(runtime)
+        val partials = mutableListOf<String>()
+
+        val result = gw.converseStreaming(
+            history = emptyList(),
+            userText = "你好",
+            currentDraft = NewSessionConfiguration(),
+            docAnalysis = null,
+            strategy = AgentCreationTurnStrategy(),
+            onPartialSpoken = { partials += it }
+        )
+
+        assertEquals(55, result.understanding)
+        assertEquals("目标是什么？", result.followUpQuestion)
+        assertTrue(partials.isNotEmpty())
+        assertTrue("目标是什么？".startsWith(partials.first()))
+        assertTrue(partials.zipWithNext().all { (prev, next) -> next.length >= prev.length })
+        assertEquals("目标是什么？\n记下了。", partials.last())
     }
 
     @Test

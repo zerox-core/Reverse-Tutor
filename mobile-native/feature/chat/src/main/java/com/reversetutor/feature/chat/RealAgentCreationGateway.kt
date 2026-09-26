@@ -22,7 +22,7 @@ class AgentCreationGenerationException(message: String) : IllegalStateException(
  *
  * 设计约束（设计方案 v3 · 第十章）：
  * - 不经教学轮 envelope / sessionPolicy——纯 prompt→文本生成；
- * - 非流式（streaming=false），一轮一答，解析失败由协调器重试；
+ * - R93 起流式（streaming=true）：边生成边把口语字段抽取上屏，解析失败由协调器重试；
  * - 确定性推进逻辑（追问策略、了解度融合、收敛）全在协调器，
  *   本类只负责把策略快照译成提示词、把返回文本译回契约对象。
  */
@@ -39,6 +39,20 @@ class RealAgentCreationGateway(
         currentDraft: NewSessionConfiguration,
         docAnalysis: AgentCreationDocAnalysis?,
         strategy: AgentCreationTurnStrategy
+    ): AgentCreationTurnResult = converseStreaming(history, userText, currentDraft, docAnalysis, strategy)
+
+    /**
+     * R93 流式主链路：onStreamChunk 逐段累计契约 JSON 前缀，
+     * 从中宽容抽取口语字段（assistantNote / followUpQuestion），
+     * 以「全量快照、去重后」回调上屏；最终仍以整段契约解析为准。
+     */
+    override suspend fun converseStreaming(
+        history: List<AgentCreationHistoryTurn>,
+        userText: String,
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?,
+        strategy: AgentCreationTurnStrategy,
+        onPartialSpoken: (String) -> Unit
     ): AgentCreationTurnResult {
         val profile = activeProfile()
             ?.takeIf { it.enabled && it.model.isNotBlank() }
@@ -66,8 +80,19 @@ class RealAgentCreationGateway(
             capabilities = LlmProfileCapabilityResolver.infer(profile),
             token = LlmGenerationToken("agent-creation-turn-$turn")
         )
-        val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(streaming = false)
-            ?: throw AgentCreationNoModelException()
+        val streamed = StringBuilder()
+        var lastEmitted: String? = null
+        val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(
+            streaming = true,
+            onStreamChunk = { chunk ->
+                streamed.append(chunk)
+                val partial = AgentCreationParser.extractPartialSpoken(streamed.toString())
+                if (partial != null && partial != lastEmitted) {
+                    lastEmitted = partial
+                    onPartialSpoken(partial)
+                }
+            }
+        ) ?: throw AgentCreationNoModelException()
         return when (val result = runtime.generate(request)) {
             is LlmGenerationResult.Success ->
                 AgentCreationParser.parseTurnResult(result.text)

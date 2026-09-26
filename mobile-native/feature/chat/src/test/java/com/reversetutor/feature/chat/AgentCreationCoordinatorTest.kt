@@ -398,4 +398,98 @@ class AgentCreationCoordinatorTest {
         assertFalse(coordinator.state.busy)
         assertTrue(coordinator.state.feed.size >= 3)
     }
+
+    // R93：流式期间占位气泡随口语快照生长，轮次落定后占位撤掉、正式气泡接管；
+    // 同时坐实协调器走 converseStreaming（老 converse 被调会直接 error）。
+    @Test
+    fun streamingPartialsGrowPlaceholderBubbleThenFinalize() = runBlocking {
+        val gateway = object : AgentCreationGateway {
+            override suspend fun converseStreaming(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy,
+                onPartialSpoken: (String) -> Unit
+            ): AgentCreationTurnResult {
+                onPartialSpoken("记下")
+                onPartialSpoken("记下了。")
+                return AgentCreationTurnResult(
+                    understanding = 30,
+                    assistantNote = "记下了。",
+                    followUpQuestion = "目标是什么？"
+                )
+            }
+
+            override suspend fun converse(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy
+            ): AgentCreationTurnResult = error("R93 起创建链路走 converseStreaming，不应再调 converse")
+
+            override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+                ScriptedGateway.cannedAnalysis()
+        }
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        val seen = mutableListOf<String>()
+        coordinator.onStateChanged = {
+            coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+                .lastOrNull()?.let { seen += it.text }
+        }
+        coordinator.start()
+
+        coordinator.sendUserText("我想学浮力")
+
+        // 流式期间两帧快照都被通知上屏过
+        assertTrue(seen.contains("记下"))
+        assertTrue(seen.contains("记下了。"))
+        // 落定：开场 + note + followUp 三条助手气泡，无占位残留、无双份
+        val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+        assertEquals(3, assistants.size)
+        assertEquals("记下了。", assistants[1].text)
+        assertEquals("目标是什么？", assistants[2].text)
+    }
+
+    // R93：生成失败时流式占位气泡也必须撤掉，不留半截话（降级话术照常出现、照重重试）。
+    @Test
+    fun streamingPlaceholderRemovedOnGenerationFailure() = runBlocking {
+        var calls = 0
+        val gateway = object : AgentCreationGateway {
+            override suspend fun converseStreaming(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy,
+                onPartialSpoken: (String) -> Unit
+            ): AgentCreationTurnResult {
+                calls++
+                onPartialSpoken("半截话")
+                throw IllegalStateException("stream broken")
+            }
+
+            override suspend fun converse(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy
+            ): AgentCreationTurnResult = error("R93 起创建链路走 converseStreaming，不应再调 converse")
+
+            override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+                ScriptedGateway.cannedAnalysis()
+        }
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        coordinator.start()
+
+        coordinator.sendUserText("随便聊聊")
+
+        assertEquals(2, calls)
+        assertNotNull(coordinator.state.generationError)
+        val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+        assertFalse(assistants.any { it.text.contains("半截话") })
+        assertTrue(assistants.last().text.contains("再说一遍"))
+    }
 }
