@@ -118,12 +118,23 @@
 - **门禁**：服务端定向 38/38 过；全量 538 passed + 2 failed（仅 test_project_homepage 两条版本漂移既有基线，与本线无关）+ 28 skipped；客户端 `gradlew :app :core:remote :core:data :core:domain testDebugUnitTest` BUILD SUCCESSFUL（3m05s，单测全绿）。
 - **落点**：commit（本轮提交）；「在线版」独立打包（R12 约定时机已到）下轮开工。
 
+### 2026-09-26 · R15 「在线版」独立打包落地：online 构建变体 + 联调服务端 + 模拟器 E2E 全通
+- **用户要点**：确认当前是「横切解耦的骨架搭起来了」，授权继续把后续内容搭完，之后针对活动做真实细节落地。
+- **打包实现**：
+  - `mobile-native/app/build.gradle.kts` 新增 `online` buildType：applicationIdSuffix=".online"、versionNameSuffix="-online"、应用名「反转家教·在线版」、显式 debug 签名 + isDebuggable + matchingFallbacks=["debug"]、透传 DEBUG_LLM_* 四项 BuildConfig。
+  - 新增 `app/src/online/AndroidManifest.xml` + `app/src/online/res/xml/online_network_security_config.xml`：仅 online 变体放开 localhost/127.0.0.1/10.0.2.2/192.168.0.102 明文 HTTP（开发联调专用，正式环境走 HTTPS）。
+- **联调服务端（从零搭起）**：sqlite 库 + alembic 三迁移到 head（0001_online_auth_foundation / 0002_migration_audit / 0003_content_and_activities）→ `challenge01_seed` 种入 17 天活动 → admin API 发布为 active；uvicorn 0.0.0.0:8100（8000 被本机另一服务占用）。启动脚本与库在 F:\aily_scratch（launch_online_server.py / online_dev.sqlite3），机器重启后需重跑。
+- **坑（已修）**：首版装机后挑战页显示「当前离线」——targetSdk 34 默认禁明文 HTTP，UrlConnectionOnlineHttpTransport 在框架层被拦、请求从未出机（服务端零日志、logcat 无异常），模拟器 nc 探测 TCP 通才锁定是策略拦截；加 networkSecurityConfig 后恢复。
+- **装机验证（emulator-5554）**：APK com.reversetutor.preview.online（0.2.0-newmp-online，76.4MB）与旧版/记忆测试版三包共存；主界面下滑进挑战页显示「进行中 · 17 天教 AI 学会落地 agent 应用 · 活动信息已确认 · 挑战周期 17 天 · 可加入」；详情页标题/目标/规则/「加入挑战」完整渲染；服务端日志收到端上 activities list/detail/leaderboard + content feed 四类真实请求。加入/打卡流程因模拟器前台被其他应用反复抢占未在 UI 验（join/reportProgress 已有单测覆盖）。
+- **门禁**：assembleOnline 构建成功（首轮打包时同构建单测全绿；本轮仅新增变体 manifest/资源文件，无代码改动）。
+- **落点**：commit（本轮提交）；I4（大纲外显「书」形态 + 替换硬编码 progress/FeedbackPill/metaLabels）下轮开工。
+
 ## 待办 / 挂起项
 
 - [ ] §10 待与算法层对齐清单 6 项与用户确认（完成判据接 mastery 闸门 / 误解暴露时机接法 / D0 测评会话状态映射 / PresetCard 注册机制与配方取值 / 17 天编排与遗忘调度 / 递话机制接法）。
 - [ ] 实测清单执行（DeepSeek 注册额度 / zcode 获取与 DS API 配置 / Claude Code·Codex 国内可达性 / 镜像源）——知识包内容里的【实测核实点】全部依赖此项，实测后回填 onboarding-d0.md 与 labs.md。
 - [x] ~~三件套正式内容填充~~ **R11 已完成**（activities/challenge-01-agent-app-dev/ 23 文件，lint 全过）。
-- [ ] **「在线版」独立打包安装（R12 约定，R13 澄清：不等用户进度，只等 I3 完成有真实内容）**：applicationId 加 `.online` 后缀、应用名「反转家教·在线版」，与旧版共存不冲突。**I3 已完成、时机已到，下轮执行打包。**
+- [x] ~~「在线版」独立打包安装（R12 约定）~~ **R15 已完成**（online buildType + 变体专属 networkSecurityConfig + 联调服务端 8100 + 模拟器三包共存 + 挑战页真实内容 E2E 全通；真机安装待用户连机）。
 - [x] ~~I2 服务端内容接入~~ **R13 已完成**（challenge01_days 解析器 + build_challenge01_tasks 生成器 + challenge01_tasks 冻结模块 + challenge01_seed + 会话模板定义 + 5 测试，目标 5/5、全量基线绿）。
 - [x] ~~I3 端上内容链路~~ **R14 已完成**（tasks 字段服务端全链路打通 + 客户端解析/映射 + F2 每日任务列表 + prefill 注入当日任务 + F4 打卡进度+1 幂等键；服务端 38/38、客户端 4 模块单测全绿）。
 - [ ] **挑战窗口开发（R10 拍板：挑战窗口完全没有，就是我的开发任务；挑战页预置、用户点开即用，不需用户自己创建）**：活动页 → 教学会话 → 掌握度反馈全链路跑通。

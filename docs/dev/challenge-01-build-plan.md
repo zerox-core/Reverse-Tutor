@@ -58,8 +58,8 @@
 ## 4. 安装测试约定（R12 用户拍板，2026-09-25）
 
 - 开发版与用户手机上的旧版本**必须共存、不冲突**：applicationId 加独立后缀（如 `.online`），应用名带「在线版」后缀（全称为「反转家教·在线版」），图标/名称一眼可区分，分开测试不混淆。
-- **当前不打包**：知识包内容刚落库、尚无真实可测内容，等用户推进进度后再打包装机测试。
-- 打包时机：I3 端上内容链路完成、有真实内容可跑时，出独立「在线版」APK 装真机验证。
+- **R15 已落地（2026-09-26）**：新增 `online` buildType（applicationId 后缀 `.online`、versionName 后缀 `-online`、应用名「反转家教·在线版」、debug 签名）；online 变体专属 `networkSecurityConfig` 仅放开 localhost / 127.0.0.1 / 10.0.2.2 / 192.168.0.102 明文 HTTP（联调专用，正式环境走 HTTPS）。APK 已与旧版、记忆测试版三包共存装入模拟器，挑战页真实活动内容 E2E 验证通过。
+- 联调方式：服务端 `py F:\aily_scratch\launch_online_server.py`（uvicorn 0.0.0.0:8100，sqlite 库 `F:\aily_scratch\online_dev.sqlite3`，已 alembic head + challenge01 seed + admin 发布 active；机器重启后需重跑）。构建：`gradlew assembleOnline -PreverseTutorOnlineBaseUrl=http://<开发机IP>:8100`。
 
 ## 5. 每增量验收门禁
 - 服务端/端上代码改动：`py -m pytest -q --ignore=tests/test_project_homepage.py` 全绿 + 对应端上单测绿。

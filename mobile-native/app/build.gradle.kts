@@ -57,6 +57,19 @@ android {
             buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"${debugLlmFallbackModels.asBuildConfigString()}\"")
         }
+        create("online") {
+            // 在线版（R12 约定）：挑战线开发版独立身份，与旧版、记忆测试版并排安装。
+            applicationIdSuffix = ".online"
+            versionNameSuffix = "-online"
+            resValue("string", "app_name", "反转家教·在线版")
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+            matchingFallbacks += listOf("debug")
+            buildConfigField("String", "DEBUG_LLM_API_KEY", "\"${debugLlmApiKey.asBuildConfigString()}\"")
+            buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"${debugLlmBaseUrl.asBuildConfigString()}\"")
+            buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")
+            buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"${debugLlmFallbackModels.asBuildConfigString()}\"")
+        }
         getByName("release") {
             buildConfigField("String", "DEBUG_LLM_API_KEY", "\"\"")
             buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"\"")
