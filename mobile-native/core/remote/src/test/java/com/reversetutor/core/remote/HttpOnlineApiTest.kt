@@ -181,6 +181,29 @@ class HttpOnlineApiTest {
     }
 
     @Test
+    fun getActivityParticipationUsesGetAndDecodesContract() = runBlocking {
+        val transport = FakeTransport(
+            OnlineHttpResponse(
+                200,
+                """{"activityId":"focus-week","userId":"user-1","joined":true,"progress":3,"revision":5,"state":"joined","idempotencyKey":"join-1"}"""
+            )
+        )
+        val api = authenticatedApi(transport)
+
+        val mine = api.getActivityParticipation("focus-week")
+
+        val progress = (mine as OnlineResult.Success).value
+        assertTrue(progress.joined)
+        assertEquals(3L, progress.progress)
+        assertEquals("joined", progress.state)
+        assertEquals(
+            "https://online.example/api/v1/activities/focus-week/participation",
+            transport.requests[0].url
+        )
+        assertEquals("GET", transport.requests[0].method)
+    }
+
+    @Test
     fun syncPushEncodesPayloadAndDecodesPerItemResult() = runBlocking {
         val transport = FakeTransport(
             OnlineHttpResponse(

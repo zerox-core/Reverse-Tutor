@@ -96,6 +96,12 @@ class SqlAlchemyActivityPort:
         row = self._store.get_activity(activity_id)
         return _activity_record(row) if row is not None else None
 
+    def participation(
+        self, activity_id: str, account_id: str
+    ) -> ActivityParticipationRecord | None:
+        row = self._store.get_participation(activity_id, _account_id(account_id))
+        return _participation_record(row) if row is not None else None
+
     def join(
         self, command: ActivityWriteCommand
     ) -> ActivityParticipationRecord | None:

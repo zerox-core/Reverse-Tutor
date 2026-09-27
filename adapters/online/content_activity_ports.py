@@ -157,6 +157,10 @@ class ActivityPort(Protocol):
 
     def get_activity(self, activity_id: str, at: datetime) -> ActivityRecord | None: ...
 
+    def participation(
+        self, activity_id: str, account_id: str
+    ) -> ActivityParticipationRecord | None: ...
+
     def join(
         self, command: ActivityWriteCommand
     ) -> ActivityParticipationRecord | None: ...

@@ -102,6 +102,7 @@ class RecordingActivityPort:
         )
         self.commands: list[object] = []
         self.results: dict[tuple[str, str, str], object] = {}
+        self.participation_record = None
 
     def list_activities(self, query):
         assert query.at.tzinfo is UTC
@@ -116,6 +117,11 @@ class RecordingActivityPort:
     def get_activity(self, activity_id, at):
         assert at.tzinfo is UTC
         return self.activity if activity_id == self.activity.id else None
+
+    def participation(self, activity_id, account_id):
+        if activity_id != self.activity.id:
+            return None
+        return self.participation_record
 
     def join(self, command):
         return self._write("join", command, joined=True, progress=0, state="joined")
@@ -370,3 +376,57 @@ async def test_activity_idempotency_keys_follow_the_canonical_length_limit(conte
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_request"
+async def test_activity_participation_returns_stored_record(content_client):
+    client, _, activity_port = content_client
+    _, headers = await authenticated(client)
+    activity_port.participation_record = SimpleNamespace(
+        activity_id="focus-week",
+        user_id="account-1",
+        joined=True,
+        progress=5,
+        revision=4,
+        state="joined",
+        idempotency_key="join-key",
+    )
+
+    response = await client.get(
+        "/api/v1/activities/focus-week/participation",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["joined"] is True
+    assert payload["progress"] == 5
+    assert payload["revision"] == 4
+    assert payload["state"] == "joined"
+
+
+async def test_activity_participation_returns_stub_when_never_joined(content_client):
+    client, _, _ = content_client
+    _, headers = await authenticated(client)
+
+    response = await client.get(
+        "/api/v1/activities/focus-week/participation",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["joined"] is False
+    assert payload["progress"] == 0
+    assert payload["revision"] == 0
+    assert payload["state"] == "left"
+
+
+async def test_activity_participation_unknown_activity_is_canonical_404(content_client):
+    client, _, _ = content_client
+    _, headers = await authenticated(client)
+
+    response = await client.get(
+        "/api/v1/activities/unknown-activity/participation",
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "activity_not_found"

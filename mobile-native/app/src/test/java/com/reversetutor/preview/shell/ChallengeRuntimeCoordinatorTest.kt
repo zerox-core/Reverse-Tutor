@@ -404,6 +404,57 @@ class ChallengeRuntimeCoordinatorTest {
 
         assertTrue(repository.progressCalls.isEmpty())
     }
+
+    @Test
+    fun loadRestoresJoinedParticipationFromServer() = runBlocking {
+        val active = activity(id = "active-2", revision = 3L)
+        val restored = participation(
+            activityId = active.id,
+            userId = "account-9",
+            revision = 9L,
+            idempotencyKey = "join:active-2:account-9:3"
+        )
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            participationResults = listOf(OnlineData.Content(restored))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+
+        coordinator.load()
+
+        assertEquals(restored, coordinator.state.value.participation)
+        assertTrue(coordinator.state.value.joined)
+        assertNull(coordinator.state.value.failure)
+    }
+
+    @Test
+    fun loadLeavesParticipationEmptyWhenServerSaysNotJoined() = runBlocking {
+        val active = activity(id = "active-2")
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            participationResults = listOf(
+                OnlineData.Content(
+                    ActivityParticipation(
+                        activityId = active.id,
+                        userId = "",
+                        joined = false,
+                        progress = 0L,
+                        revision = 0L,
+                        state = "left",
+                        idempotencyKey = ""
+                    )
+                )
+            )
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+
+        coordinator.load()
+
+        assertNull(coordinator.state.value.participation)
+        assertFalse(coordinator.state.value.joined)
+    }
 }
 
 private data class JoinCall(
@@ -429,6 +480,7 @@ private class FakeActivityRepository(
     joinResults: List<OnlineData<ActivityParticipation>> = emptyList(),
     detailResults: List<OnlineData<ActivitySummary>> = emptyList(),
     updateProgressResults: List<OnlineData<ActivityParticipation>> = emptyList(),
+    participationResults: List<OnlineData<ActivityParticipation>> = emptyList(),
     private val joinGate: CompletableDeferred<Unit>? = null
 ) : ActivityRepository {
     private val listResults = ArrayDeque(listResults)
@@ -436,6 +488,7 @@ private class FakeActivityRepository(
     private val joinResults = ArrayDeque(joinResults)
     private val detailResults = ArrayDeque(detailResults)
     private val updateProgressResults = ArrayDeque(updateProgressResults)
+    private val participationResults = ArrayDeque(participationResults)
     val leaderboardActivityIds = mutableListOf<String>()
     val joinCalls = mutableListOf<JoinCall>()
     val progressCalls = mutableListOf<ProgressCall>()
@@ -490,6 +543,10 @@ private class FakeActivityRepository(
         revision: Long,
         idempotencyKey: String
     ): OnlineData<ActivityParticipation> = error("Not used")
+
+    override suspend fun participation(activityId: String): OnlineData<ActivityParticipation> =
+        participationResults.removeFirstOrNull()
+            ?: OnlineData.Failure("not_configured", retryable = false)
 }
 
 private fun activity(

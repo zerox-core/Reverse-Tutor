@@ -44,6 +44,7 @@ import com.reversetutor.core.remote.AndroidOnlineAuthStateStore
 import com.reversetutor.core.remote.HttpOnlineApi
 import com.reversetutor.core.remote.OnlineAuthSessionManager
 import com.reversetutor.core.remote.OnlineAuthTokenProvider
+import com.reversetutor.core.remote.DiscoveryOnlineHttpTransport
 import com.reversetutor.core.remote.UrlConnectionOnlineHttpTransport
 import com.reversetutor.feature.chat.AgentCreationGateway
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
@@ -443,7 +444,17 @@ class HybridAppGraph private constructor(
             context: Context,
             configuration: HybridOnlineConfiguration.Http
         ): HybridHttpOnlineRuntime {
-            val transport = UrlConnectionOnlineHttpTransport()
+            // 开发机 IP 会随 DHCP 漂移：请求失败时自动探测/发现可用地址并缓存
+            val baseUrlCache = context.applicationContext.getSharedPreferences(
+                "online_base_url_cache",
+                Context.MODE_PRIVATE
+            )
+            val transport = DiscoveryOnlineHttpTransport(
+                delegate = UrlConnectionOnlineHttpTransport(),
+                seedBaseUrl = configuration.baseUrl,
+                loadCachedBaseUrl = { baseUrlCache.getString("active_base_url", null) },
+                saveCachedBaseUrl = { baseUrlCache.edit().putString("active_base_url", it).apply() }
+            )
             val authSessionManager = when (val provider = configuration.authTokenProvider) {
                 is OnlineAuthSessionManager -> provider
                 null -> OnlineAuthSessionManager(

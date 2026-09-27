@@ -186,6 +186,13 @@ class HttpOnlineApi(
             write.toJson()
         ) { it.toActivityProgress() }
 
+    override suspend fun getActivityParticipation(
+        activityId: String
+    ): OnlineResult<ActivityProgress> =
+        get("/api/v1/activities/${activityId.pathSegment()}/participation") {
+            it.toActivityProgress()
+        }
+
     override suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse> {
         val rejected = request.items.filterNot { it.isSyncable() }.map {
             SyncPushItemResult(

@@ -109,6 +109,11 @@ class OnlineHybridService:
     def get_activity(self, activity_id: str):
         return self._content_activity.get_activity(activity_id)
 
+    def get_activity_participation(self, activity_id: str, account_id: str):
+        return self._content_activity.get_activity_participation(
+            activity_id, account_id
+        )
+
     def join_activity(
         self,
         activity_id: str,

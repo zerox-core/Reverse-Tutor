@@ -74,6 +74,9 @@ class OnlineActivityRepository(
     override suspend fun detail(activityId: String): OnlineData<ActivitySummary> =
         api.getActivity(activityId).mapOnline { it.toDomain() }
 
+    override suspend fun participation(activityId: String): OnlineData<ActivityParticipation> =
+        api.getActivityParticipation(activityId).mapOnline { it.toDomain() }
+
     override suspend fun leaderboard(
         activityId: String,
         cursor: String?,

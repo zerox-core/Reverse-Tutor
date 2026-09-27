@@ -255,6 +255,10 @@ private class FakeOnlineApi : OnlineApi {
         write: OnlineWriteIdentity
     ): OnlineResult<ActivityProgress> = OnlineResult.Failure("not_implemented", false)
 
+    override suspend fun getActivityParticipation(
+        activityId: String
+    ): OnlineResult<ActivityProgress> = OnlineResult.Failure("not_implemented", false)
+
     override suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse> {
         pushCalls++
         return push

@@ -179,6 +179,25 @@ def update_activity_progress(
     return result
 
 
+@router.get(
+    "/activities/{activityId}/participation",
+    response_model=ActivityParticipation,
+    tags=["Activities"],
+    operation_id="getActivityParticipation",
+)
+def get_activity_participation(
+    activity_id: ActivityIdPath,
+    context: AuthContextDep,
+) -> ActivityParticipation:
+    result = online_service.get_activity_participation(
+        activity_id,
+        str(context.account_id),
+    )
+    if result is None:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    return result
+
+
 @router.delete(
     "/activities/{activityId}/participation",
     response_model=ActivityParticipation,

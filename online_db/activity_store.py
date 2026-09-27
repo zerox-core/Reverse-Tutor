@@ -450,6 +450,29 @@ class SqlAlchemyActivityStore:
                 for participation, activity in database.execute(statement).all()
             )
 
+    def get_participation(
+        self, activity_slug: str, account_id: UUID
+    ) -> ActivityParticipationRecord | None:
+        with self._session_factory() as database:
+            activity = database.scalar(
+                select(Activity).where(Activity.slug == activity_slug)
+            )
+            if activity is None:
+                return None
+            participation = database.scalar(
+                select(ActivityParticipation).where(
+                    ActivityParticipation.activity_id == activity.id,
+                    ActivityParticipation.account_id == account_id,
+                )
+            )
+            if participation is None:
+                return None
+            return self._participation_record(
+                participation,
+                activity,
+                participation.last_idempotency_key,
+            )
+
     def leaderboard(
         self, activity_slug: str, *, limit: int = 50
     ) -> tuple[ActivityLeaderboardRecord, ...]:

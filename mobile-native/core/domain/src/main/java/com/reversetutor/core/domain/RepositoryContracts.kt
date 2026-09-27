@@ -150,6 +150,7 @@ interface ActivityRepository {
     suspend fun listCachedActivities(): List<ActivitySummary>
     suspend fun list(cursor: String? = null, limit: Int = 20): OnlineData<OnlineActivityPage>
     suspend fun detail(activityId: String): OnlineData<ActivitySummary>
+    suspend fun participation(activityId: String): OnlineData<ActivityParticipation>
     suspend fun leaderboard(
         activityId: String,
         cursor: String? = null,

@@ -100,6 +100,11 @@ class ChallengeRuntimeCoordinator(
                     is OnlineData.Failure -> active
                 }
                 val activityChanged = previous.activity?.id != detailed.id
+                // 启动/重进时从服务端恢复"我的参与"状态：进程被杀后蓝卡不丢
+                val restored = when (val mine = repository.participation(detailed.id)) {
+                    is OnlineData.Content -> mine.value.takeIf { it.joined }
+                    is OnlineData.Failure -> null
+                }
                 when (val leaderboard = repository.leaderboard(detailed.id)) {
                     is OnlineData.Failure -> fail(
                         leaderboard,
@@ -108,7 +113,8 @@ class ChallengeRuntimeCoordinator(
                     is OnlineData.Content -> {
                         mutableState.value = ChallengeRuntimeState(
                             activity = detailed,
-                            participation = if (activityChanged) null else previous.participation,
+                            participation = restored
+                                ?: if (activityChanged) null else previous.participation,
                             leaderboard = leaderboard.value
                         )
                     }
