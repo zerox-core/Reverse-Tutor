@@ -82,6 +82,20 @@ data class AgentCreationDraftPatch(
     )
 }
 
+/**
+ * R98 阶段事件：思考块由「原始推理残片」改为「产品流程窗口」（2026-09-28 用户拍板）——
+ * 每轮创建对话按固定阶段推进（理解输入 → 连接模型 → 深度思考 → 生成回复 → 自检修正），
+ * 各段带耗时、活动段有且仅有一个；模型原始推理完整保留在 Assistant.reasoning、
+ * 收进二级折叠，不再 600 字截窗（实测思考 997/1857 字被裁到 600，
+ * 开头的理解与规划恰是被裁掉的部分，用户「看不到思考逻辑」）。
+ */
+data class AgentCreationStageEvent(
+    val key: String,
+    val label: String,
+    val elapsedSeconds: Long = 0L,
+    val active: Boolean = false
+)
+
 /** 对话历史轮（喂给网关的纯文本形态）。 */
 data class AgentCreationHistoryTurn(
     val isUser: Boolean,
@@ -116,7 +130,8 @@ interface AgentCreationGateway {
         docAnalysis: AgentCreationDocAnalysis?,
         strategy: AgentCreationTurnStrategy = AgentCreationTurnStrategy(),
         onPartialSpoken: (String) -> Unit = {},
-        onReasoning: (String) -> Unit = {}
+        onReasoning: (String) -> Unit = {},
+        onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit = {}
     ): AgentCreationTurnResult = converse(history, userText, currentDraft, docAnalysis, strategy)
 
     /** P1 文档分析。R-A 返回脚本化结果；R-C 接真实解析文本。 */
@@ -128,10 +143,10 @@ sealed interface AgentCreationFeedEntry {
     val id: String
 
     /**
-     * R97 思考块：reasoning 走独立结构化字段，不与口语正文混排；
-     * stage 非空 = 本轮进行中（头部显示阶段文案 + 计时），
-     * thinkingDone = 思考阶段已结束（正文已开始接管）。
-     * reasoning 不落快照——编解码器契约保持 [TagAssistant, id, text] 不变。
+     * R98 阶段化思考块：stages 非空且含活动段 = 本轮进行中；
+     * thinkingDone = 思考阶段已结束（正文已开始接管）；
+     * reasoning 全量保留（不再 600 截窗），收进 UI 二级折叠；
+     * reasoning 与 stages 均不落快照——编解码器契约保持 [TagAssistant, id, text] 不变。
      */
     data class Assistant(
         override val id: String,
@@ -139,7 +154,7 @@ sealed interface AgentCreationFeedEntry {
         val reasoning: String? = null,
         val reasoningElapsedSeconds: Long = 0L,
         val thinkingDone: Boolean = false,
-        val stage: String? = null
+        val stages: List<AgentCreationStageEvent> = emptyList()
     ) : AgentCreationFeedEntry
 
     data class User(override val id: String, val text: String) : AgentCreationFeedEntry

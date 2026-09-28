@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,10 +33,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -53,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -107,6 +113,7 @@ fun AgentCreationRoute(
     var creating by remember { mutableStateOf(false) }
     var createError by remember { mutableStateOf<String?>(null) }
     val feedState = rememberLazyListState()
+    val type = LocalFormalTypeScale.current
 
     fun sync() {
         state = coordinator.state
@@ -248,7 +255,40 @@ fun AgentCreationRoute(
                 onCreate = ::handleCreateClick
             )
             UnderstandingBar(understanding = state.displayedUnderstanding)
-            Column(
+            // R98 滚动三规则（2026-09-28 用户拍板）：
+            // ① 停在最底 → 新条目自动跟随；② 向上翻看历史 → 原地不动，浮出「新消息」
+            //    胶囊，点了才滑到最底；③ 自己发出的消息一律回到底部。
+            // 键盘规则：弹起键盘前停在最新一条 → 键盘起来后仍驻留最新一条；
+            // 在上方翻历史 → 原位不动。
+            val atBottom by remember {
+                derivedStateOf {
+                    val layout = feedState.layoutInfo
+                    val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
+                    state.feed.isNotEmpty() && lastVisible >= state.feed.size - 1
+                }
+            }
+            var showNewMessagePill by remember { mutableStateOf(false) }
+            LaunchedEffect(state.feed.size) {
+                if (state.feed.isNotEmpty()) {
+                    val mine = state.feed.lastOrNull() is AgentCreationFeedEntry.User
+                    if (atBottom || mine) {
+                        feedState.animateScrollToItem(state.feed.size - 1)
+                        showNewMessagePill = false
+                    } else {
+                        showNewMessagePill = true
+                    }
+                }
+            }
+            LaunchedEffect(atBottom) {
+                if (atBottom) showNewMessagePill = false
+            }
+            val imeOpen = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+            LaunchedEffect(imeOpen) {
+                if (imeOpen && atBottom && state.feed.isNotEmpty()) {
+                    feedState.animateScrollToItem(state.feed.size - 1)
+                }
+            }
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -280,9 +320,29 @@ fun AgentCreationRoute(
                         }
                     }
                 }
-                LaunchedEffect(state.feed.size, state.busy) {
-                    if (state.feed.isNotEmpty()) {
-                        feedState.animateScrollToItem(state.feed.size - 1)
+                if (showNewMessagePill) {
+                    Surface(
+                        onClick = {
+                            showNewMessagePill = false
+                            scope.launch {
+                                if (state.feed.isNotEmpty()) {
+                                    feedState.animateScrollToItem(state.feed.size - 1)
+                                }
+                            }
+                        },
+                        color = FormalColors.Primary,
+                        shape = RoundedCornerShape(FormalShapes.PillRadius),
+                        shadowElevation = FormalElevations.Panel,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 8.dp)
+                            .testTag("agent_creation_new_messages")
+                    ) {
+                        Text(
+                            text = "新消息 ▾",
+                            style = type.style(11f, 15f, FontWeight.Bold, androidx.compose.ui.graphics.Color.White),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        )
                     }
                 }
             }
@@ -452,10 +512,10 @@ private fun UnderstandingBar(understanding: Int) {
 
 @Composable
 private fun AssistantBubble(entry: AgentCreationFeedEntry.Assistant) {
-    // R97：DeepSeek 式思考块挂在正文气泡上方——思考期占位正文为空，
-    // 只显示思考块头部；正文到达后思考块收起、正文气泡接管。
+    // R98：阶段化思考块挂在正文气泡上方——进行期占位正文为空，
+    // 只显示阶段块；正文到达后阶段块收起为汇总行、正文气泡接管。
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        ReasoningBlock(entry)
+        StageBlock(entry)
         if (entry.text.isNotEmpty()) {
             Surface(
                 color = FormalColors.Surface,
@@ -711,20 +771,25 @@ private fun DraftRow(label: String, value: String) {
 }
 
 /**
- * R97：DeepSeek 式思考块——思考期头部轮播阶段文案 + 实时计时 + 动态点，
- * 轮次落定后收起为「已思考 · Ns」，点头部可再展开；思考正文用衬线字体
- * 与口语气泡区分（2026-09-28 用户需求：不同字体、可折叠隐藏、状态栏上块、计时）。
+ * R98 阶段化思考块（2026-09-28 用户拍板）：展示「产品在做什么」的阶段流——
+ * 理解输入 → 连接模型 → 深度思考 → 生成回复 →（自检修正），各段带耗时、
+ * 活动段高亮 + 三点呼吸；模型原始推理完整收进「查看完整思考过程」二级折叠
+ * （衬线字体，与口语气泡区分）。OFF 轮（无思考）落定后整块消失，不残留。
  */
 @Composable
-private fun ReasoningBlock(entry: AgentCreationFeedEntry.Assistant) {
-    if (entry.reasoning == null && entry.stage == null) return
+private fun StageBlock(entry: AgentCreationFeedEntry.Assistant) {
+    val streaming = entry.stages.any { it.active }
+    if (entry.stages.isEmpty() && entry.reasoning == null) return
+    if (!streaming && entry.reasoning == null) return
     val type = LocalFormalTypeScale.current
-    val streaming = entry.stage != null && !entry.thinkingDone
     var expanded by remember(entry.id) { mutableStateOf(streaming) }
-    // 思考期默认展开；思考结束自动收起一次（DeepSeek 行为）。
+    var reasoningExpanded by remember(entry.id) { mutableStateOf(false) }
+    // 进行期默认展开；轮次落定自动收起一次（DeepSeek 行为）。
     LaunchedEffect(streaming) {
         if (!streaming) expanded = false
     }
+    val doneLabel = entry.stages.lastOrNull { it.key == "done" }?.label
+        ?: ("已思考 · " + entry.reasoningElapsedSeconds + "s")
     Surface(
         color = FormalColors.Surface,
         shape = RoundedCornerShape(4.dp),
@@ -741,10 +806,10 @@ private fun ReasoningBlock(entry: AgentCreationFeedEntry.Assistant) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (streaming) {
-                    StreamingHeader(entry)
+                    StageStreamingHeader(entry)
                 } else {
                     Text(
-                        text = (if (expanded) "▾ " else "▸ ") + "已思考 · " + entry.reasoningElapsedSeconds + "s",
+                        text = (if (expanded) "▾ " else "▸ ") + doneLabel,
                         style = type.style(11f, 16f, color = FormalColors.Muted),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -752,31 +817,71 @@ private fun ReasoningBlock(entry: AgentCreationFeedEntry.Assistant) {
                     )
                 }
             }
-            if (expanded && entry.reasoning != null) {
+            if (expanded) {
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    text = entry.reasoning,
-                    style = type.style(11f, 17f, color = FormalColors.Muted)
-                        .copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif),
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+                entry.stages.forEach { stage ->
+                    StageRow(stage)
+                }
+                if (entry.reasoning != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = (if (reasoningExpanded) "▾ " else "▸ ") + "查看完整思考过程",
+                        style = type.style(10f, 14f, color = FormalColors.Muted),
+                        modifier = Modifier.clickable { reasoningExpanded = !reasoningExpanded }
+                    )
+                    if (reasoningExpanded) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = entry.reasoning,
+                            style = type.style(11f, 17f, color = FormalColors.Muted)
+                                .copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif),
+                            modifier = Modifier
+                                .heightIn(max = 260.dp)
+                                .verticalScroll(rememberScrollState())
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-/** 思考期头部：阶段文案轮播 + 本地每秒跳动的计时（与协调器回调解耦，帧间不冻住）。 */
+/** 单行阶段：活动段主色高亮 + 三点呼吸；完成段灰字打勾带耗时（亚秒段不显示 0s）。 */
 @Composable
-private fun StreamingHeader(entry: AgentCreationFeedEntry.Assistant) {
+private fun StageRow(stage: AgentCreationStageEvent) {
     val type = LocalFormalTypeScale.current
-    val stages = listOf("正在理解你说的…", "正在更新会话草案…", "正在琢磨怎么接话…")
-    var stageIndex by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(1600)
-            stageIndex = (stageIndex + 1) % stages.size
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        if (stage.active) {
+            Text(
+                text = stage.label,
+                style = type.style(11f, 16f, FontWeight.Medium, FormalColors.Primary),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            WorkingDots()
+        } else {
+            val prefix = if (stage.key == "done") "" else "✓ "
+            val suffix = if (stage.key != "done" && stage.elapsedSeconds > 0) " · " + stage.elapsedSeconds + "s" else ""
+            Text(
+                text = prefix + stage.label + suffix,
+                style = type.style(11f, 16f, color = FormalColors.Muted),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
+}
+
+/** 进行期头部：当前阶段名 + 本地每秒跳动的全程计时 + 三点呼吸。 */
+@Composable
+private fun StageStreamingHeader(entry: AgentCreationFeedEntry.Assistant) {
+    val type = LocalFormalTypeScale.current
+    val activeLabel = entry.stages.lastOrNull { it.active }?.label ?: "正在处理…"
     val startEpoch = remember(entry.id) {
         System.currentTimeMillis() / 1000L - entry.reasoningElapsedSeconds
     }
@@ -789,7 +894,7 @@ private fun StreamingHeader(entry: AgentCreationFeedEntry.Assistant) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            text = stages[stageIndex] + " · " + (nowEpoch - startEpoch) + "s",
+            text = activeLabel + " · " + (nowEpoch - startEpoch) + "s",
             style = type.style(11f, 16f, color = FormalColors.Muted),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

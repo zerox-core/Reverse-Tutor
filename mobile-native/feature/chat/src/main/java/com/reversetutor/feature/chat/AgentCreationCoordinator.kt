@@ -210,19 +210,33 @@ class AgentCreationCoordinator(
         state = state.copy(busy = true, generationError = null)
         // R93 流式上屏：网关边生成边回调口语全量快照，懒建一个占位 Assistant 气泡随回调生长；
         // 占位气泡不进 history、不落正式文案，轮次结束无论成败都撤掉，由下方逻辑落定正式气泡。
+        // R98 阶段化思考块（2026-09-28 用户拍板方案）：思考块展示「产品在做什么」的阶段流
+        // （理解输入 → 连接模型 → 深度思考 → 生成回复 → 自检修正），活动段有且仅有一个；
+        // 模型原始推理完整保留进二级折叠——取消 600 字截窗（实测 997/1857 字思考被裁到 600，
+        // 开头的理解与规划恰是被裁部分，用户反馈「看不到思考逻辑」）。
         var streamingEntryId: String? = null
-        // R95 思考流：正文契约未到时，把模型 reasoning 先流进占位气泡，
-        // 正文一出现立即接管；思考不进 history、不落正式文案、不落快照。
-        // R97：reasoning 落到结构化字段（独立思考块），不再拼进正文文本；
-        // 思考耗时 = 正文首块到达前的秒数（由注入时钟计量，可测）。
         var spokenStarted = false
         var thinkingSeconds = 0L
         val reasoningBuffer = StringBuilder()
         val turnStartedAt = nowEpochMillis()
+        val stageList = mutableListOf<AgentCreationStageEvent>()
+        var activeStageStartedAt = turnStartedAt
+        var decisionReceived = false
+        fun stageElapsed(since: Long) = ((nowEpochMillis() - since) / 1000L).coerceAtLeast(0L)
+        fun activateStage(key: String, label: String) {
+            val idx = stageList.indexOfLast { it.active }
+            if (idx >= 0 && stageList[idx].key == key) return
+            if (idx >= 0) {
+                stageList[idx] = stageList[idx].copy(active = false, elapsedSeconds = stageElapsed(activeStageStartedAt))
+            }
+            stageList += AgentCreationStageEvent(key, label, active = true)
+            activeStageStartedAt = nowEpochMillis()
+        }
         fun upsertPlaceholder(text: String) {
             val placeholderId = streamingEntryId
-            val elapsedSeconds = if (spokenStarted) thinkingSeconds else (nowEpochMillis() - turnStartedAt) / 1000L
-            val reasoningShown = reasoningBuffer.takeLast(600).toString().ifEmpty { null }
+            val elapsedSeconds = if (spokenStarted) thinkingSeconds else stageElapsed(turnStartedAt)
+            val reasoningShown = reasoningBuffer.toString().ifEmpty { null }
+            val stagesSnapshot = stageList.toList()
             if (placeholderId == null) {
                 val entry = AgentCreationFeedEntry.Assistant(
                     id = nextId(),
@@ -230,7 +244,7 @@ class AgentCreationCoordinator(
                     reasoning = reasoningShown,
                     reasoningElapsedSeconds = elapsedSeconds,
                     thinkingDone = spokenStarted,
-                    stage = "thinking"
+                    stages = stagesSnapshot
                 )
                 streamingEntryId = entry.id
                 state = state.copy(feed = state.feed + entry)
@@ -242,38 +256,79 @@ class AgentCreationCoordinator(
                                 text = text,
                                 reasoning = reasoningShown ?: it.reasoning,
                                 reasoningElapsedSeconds = elapsedSeconds,
-                                thinkingDone = spokenStarted
+                                thinkingDone = spokenStarted,
+                                stages = stagesSnapshot
                             )
                         } else it
                     }
                 )
             }
         }
-        // R97：轮次一启动就落占位气泡——思考块头部（阶段文案 + 计时）从第 0 秒可见，
-        // 与 reasoning 是否已到无关；状态栏不再固定在输入框上方（R84 布局撤销）。
+        // R98 轮次一启动就落「理解输入」段——阶段块从第 0 秒可见。
+        activateStage("understand", "正在理解你的输入…")
         upsertPlaceholder("")
         val result = runConverseWithRetry(
             userText = userText,
             strategy = strategy,
+            onThinkingDecision = { decision ->
+                // 决策结果即产品流程：「理解输入」段改写成决策结论，并补「连接模型」段
+                // 覆盖请求发出到首块到达的等待（旧网关不回调时保留原文案，首块到达时直接进下一段）。
+                if (!decisionReceived) {
+                    decisionReceived = true
+                    activateStage("connect", "正在连接模型…")
+                    val idx = stageList.indexOfLast { it.key == "understand" }
+                    if (idx >= 0) {
+                        stageList[idx] = stageList[idx].copy(
+                            label = if (decision.enabled) "这是值得深想的问题 · 开启深度思考" else "直接回答"
+                        )
+                    }
+                    upsertPlaceholder("")
+                }
+            },
+            onRetryAttempt = {
+                // R98 自检与修正：重试不再静默——补一段「自检未通过」，
+                // 并重置本轮流式缓存（修 R97 静默重试把两段思考拼进一个块的问题）。
+                activateStage("selfcheck", "第一次生成没通过自检 · 正在重新生成")
+                reasoningBuffer.setLength(0)
+                spokenStarted = false
+                thinkingSeconds = 0L
+                upsertPlaceholder("")
+            },
             onPartialSpoken = { partial ->
                 if (!spokenStarted) {
-                    thinkingSeconds = (nowEpochMillis() - turnStartedAt) / 1000L
+                    thinkingSeconds = stageElapsed(turnStartedAt)
                     spokenStarted = true
+                    activateStage("generating", "生成回复中…")
                 }
                 upsertPlaceholder(partial)
             },
             onReasoning = { chunk ->
                 if (!spokenStarted) {
+                    activateStage("thinking", "深度思考中…")
                     reasoningBuffer.append(chunk)
-                    // 展示侧只保留末段，防长推理把重组成本顶爆。
                     upsertPlaceholder("")
                 }
             }
         )
-        // R97：轮次结束撤占位，但把 reasoning 与思考耗时携带到落定逻辑——
-        // 正式气泡保留思考块（收起为「已思考 · Ns」），思考仍不进 history、不落快照。
-        val carriedReasoning = reasoningBuffer.takeLast(600).toString().ifEmpty { null }
-        val carriedSeconds = if (spokenStarted) thinkingSeconds else (nowEpochMillis() - turnStartedAt) / 1000L
+        // R98：收掉活动段并补「完成」汇总段；reasoning 全量携带到正式气泡（不再截窗），
+        // 思考仍不进 history、不落快照。
+        val carriedReasoning = reasoningBuffer.toString().ifEmpty { null }
+        val carriedSeconds = if (spokenStarted) thinkingSeconds else stageElapsed(turnStartedAt)
+        run {
+            val idx = stageList.indexOfLast { it.active }
+            if (idx >= 0) {
+                stageList[idx] = stageList[idx].copy(active = false, elapsedSeconds = stageElapsed(activeStageStartedAt))
+            }
+        }
+        val totalSeconds = stageElapsed(turnStartedAt)
+        val doneLabel = if (carriedReasoning != null) {
+            "共用时 " + totalSeconds + "s（思考 " + thinkingSeconds + "s + 生成 " +
+                (totalSeconds - thinkingSeconds).coerceAtLeast(0L) + "s）"
+        } else {
+            "共用时 " + totalSeconds + "s"
+        }
+        stageList += AgentCreationStageEvent("done", doneLabel, elapsedSeconds = totalSeconds)
+        val carriedStages = stageList.toList()
         streamingEntryId?.let { placeholderId ->
             state = state.copy(feed = state.feed.filterNot { it.id == placeholderId })
             streamingEntryId = null
@@ -359,7 +414,7 @@ class AgentCreationCoordinator(
             null
         }
         val spoken = note ?: followUp ?: "我更新了一下草案，继续聊聊？"
-        appendAssistant(spoken, reasoning = carriedReasoning, reasoningElapsedSeconds = carriedSeconds)
+        appendAssistant(spoken, reasoning = carriedReasoning, reasoningElapsedSeconds = carriedSeconds, stages = carriedStages)
         if (followUp != null && note != null) {
             appendAssistant(followUp)
         }
@@ -376,16 +431,19 @@ class AgentCreationCoordinator(
         }
     }
 
-    /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。R93：onPartialSpoken 透传流式口语快照；R95：onReasoning 透传思考流。 */
+    /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。R93：onPartialSpoken 透传流式口语快照；R95：onReasoning 透传思考流；R98：onThinkingDecision 透传决策、onRetryAttempt 在重试前回调（自检段 + 缓存重置）。 */
     private suspend fun runConverseWithRetry(
         userText: String,
         strategy: AgentCreationTurnStrategy,
+        onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit = {},
+        onRetryAttempt: () -> Unit = {},
         onPartialSpoken: (String) -> Unit = {},
         onReasoning: (String) -> Unit = {}
     ): AgentCreationTurnResult? {
         repeat(2) { attempt ->
+            if (attempt > 0) onRetryAttempt()
             val outcome = runCatching {
-                gateway.converseStreaming(history, userText, state.draft, state.docAnalysis, strategy, onPartialSpoken, onReasoning)
+                gateway.converseStreaming(history, userText, state.draft, state.docAnalysis, strategy, onPartialSpoken, onReasoning, onThinkingDecision)
             }
             outcome.fold(
                 onSuccess = { return it },
@@ -403,7 +461,8 @@ class AgentCreationCoordinator(
     private fun appendAssistant(
         text: String,
         reasoning: String? = null,
-        reasoningElapsedSeconds: Long = 0L
+        reasoningElapsedSeconds: Long = 0L,
+        stages: List<AgentCreationStageEvent> = emptyList()
     ) {
         state = state.copy(
             feed = state.feed + AgentCreationFeedEntry.Assistant(
@@ -411,7 +470,8 @@ class AgentCreationCoordinator(
                 text = text,
                 reasoning = reasoning,
                 reasoningElapsedSeconds = reasoningElapsedSeconds,
-                thinkingDone = reasoning != null
+                thinkingDone = reasoning != null,
+                stages = stages
             )
         )
         history += AgentCreationHistoryTurn(isUser = false, text = text)

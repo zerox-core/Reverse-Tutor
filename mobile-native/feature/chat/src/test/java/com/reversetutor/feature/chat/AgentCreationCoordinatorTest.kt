@@ -411,7 +411,8 @@ class AgentCreationCoordinatorTest {
                 docAnalysis: AgentCreationDocAnalysis?,
                 strategy: AgentCreationTurnStrategy,
                 onPartialSpoken: (String) -> Unit,
-                onReasoning: (String) -> Unit
+                onReasoning: (String) -> Unit,
+                onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
             ): AgentCreationTurnResult {
                 onPartialSpoken("记下")
                 onPartialSpoken("记下了。")
@@ -465,7 +466,8 @@ class AgentCreationCoordinatorTest {
                 docAnalysis: AgentCreationDocAnalysis?,
                 strategy: AgentCreationTurnStrategy,
                 onPartialSpoken: (String) -> Unit,
-                onReasoning: (String) -> Unit
+                onReasoning: (String) -> Unit,
+                onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
             ): AgentCreationTurnResult {
                 calls++
                 onPartialSpoken("半截话")
@@ -495,8 +497,8 @@ class AgentCreationCoordinatorTest {
         assertTrue(assistants.last().text.contains("再说一遍"))
     }
 
-    // R95→R97 回归：思考流落进结构化 reasoning 字段（独立思考块），正文一到即接管；
-    // 落定后思考随正式气泡保留（收起态「已思考」），思考文本不进正文字段、不进 history。
+    // R98 回归：思考流落进结构化 reasoning 字段 + 阶段流（理解→思考→生成→完成），
+    // 落定后正式气泡保留全量思考（收进二级折叠）与完整阶段耗时，思考不进正文字段、不进 history。
     @Test
     fun streamingReasoningFillsPlaceholderUntilSpokenArrives() = runBlocking {
         val gateway = object : AgentCreationGateway {
@@ -507,7 +509,8 @@ class AgentCreationCoordinatorTest {
                 docAnalysis: AgentCreationDocAnalysis?,
                 strategy: AgentCreationTurnStrategy,
                 onPartialSpoken: (String) -> Unit,
-                onReasoning: (String) -> Unit
+                onReasoning: (String) -> Unit,
+                onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
             ): AgentCreationTurnResult {
                 onReasoning("推理一")
                 onReasoning("推理二")
@@ -539,18 +542,126 @@ class AgentCreationCoordinatorTest {
 
         coordinator.sendUserText("我想学浮力")
 
-        // 推理期间占位气泡带结构化 reasoning + stage，思考文本不混进正文字段
-        assertTrue(seen.any { it.reasoning == "推理一" && it.stage != null && !it.thinkingDone })
-        assertTrue(seen.any { it.reasoning == "推理一推理二" && it.stage != null && !it.thinkingDone })
-        // 正文首块一到即标思考结束（stage 仍在 = 本轮进行中）
-        assertTrue(seen.any { it.thinkingDone && it.stage != null && it.text == "正文" })
-        // 落定：无思考残影混进正文，正式气泡保留思考（收起态）、stage 清空
+        // 推理期间占位气泡带结构化 reasoning + 活动「深度思考」段，思考文本不混进正文字段
+        assertTrue(seen.any { e ->
+            e.reasoning == "推理一" && e.stages.any { s -> s.key == "thinking" && s.active } && !e.thinkingDone
+        })
+        assertTrue(seen.any { e -> e.reasoning == "推理一推理二" && !e.thinkingDone })
+        // 正文首块一到即标思考结束，进入「生成回复」段
+        assertTrue(seen.any { e ->
+            e.thinkingDone && e.text == "正文" && e.stages.any { s -> s.key == "generating" && s.active }
+        })
+        // 落定：正式气泡保留全量思考与完整阶段流（全部完结），无思考残影混进正文
         val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
-        assertFalse(assistants.any { it.text.contains("思考中") || it.text.contains("推理一") })
+        assertFalse(assistants.any { it.text.contains("推理一") })
         assertEquals("正文", assistants[1].text)
         assertEquals("推理一推理二", assistants[1].reasoning)
-        assertNull(assistants[1].stage)
         assertTrue(assistants[1].thinkingDone)
+        assertTrue(assistants[1].stages.none { it.active })
+        assertEquals(listOf("understand", "thinking", "generating", "done"), assistants[1].stages.map { it.key })
+        assertTrue(assistants[1].stages.last().label.startsWith("共用时"))
         assertTrue(assistants[1].reasoningElapsedSeconds >= 0)
+    }
+
+    // R98：契约解析失败的重试不再静默——阶段流里留下「自检修正」段，
+    // 且上一段的思考缓存被重置，不再把两段推理拼进一个块。
+    @Test
+    fun retryShowsSelfcheckStageAndResetsReasoning() = runBlocking {
+        var calls = 0
+        val gateway = object : AgentCreationGateway {
+            override suspend fun converseStreaming(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy,
+                onPartialSpoken: (String) -> Unit,
+                onReasoning: (String) -> Unit,
+                onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
+            ): AgentCreationTurnResult {
+                calls++
+                if (calls == 1) {
+                    onReasoning("错误推理")
+                    onPartialSpoken("半截话")
+                    throw IllegalStateException("contract parse failed")
+                }
+                onReasoning("正确推理")
+                onPartialSpoken("正文")
+                return AgentCreationTurnResult(
+                    understanding = 30,
+                    assistantNote = "正文"
+                )
+            }
+
+            override suspend fun converse(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy
+            ): AgentCreationTurnResult = error("R93 起创建链路走 converseStreaming，不应再调 converse")
+
+            override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+                ScriptedGateway.cannedAnalysis()
+        }
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        coordinator.start()
+
+        coordinator.sendUserText("我想学浮力")
+
+        assertEquals(2, calls)
+        val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+        assertEquals("正文", assistants[1].text)
+        // 思考缓存已重置：只剩第二次的推理，不拼第一段
+        assertEquals("正确推理", assistants[1].reasoning)
+        // 自检段可见且已完结，全流无活动段
+        assertTrue(assistants[1].stages.any { it.key == "selfcheck" && !it.active })
+        assertTrue(assistants[1].stages.none { it.active })
+    }
+
+    // R98：无思考轮（OFF）阶段流只有「理解输入 → 生成回复 → 完成」，
+    // 无思考段、无 reasoning——OFF 完成态整块消失的判断条件齐备。
+    @Test
+    fun noReasoningTurnSkipsThinkingStage() = runBlocking {
+        val gateway = object : AgentCreationGateway {
+            override suspend fun converseStreaming(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy,
+                onPartialSpoken: (String) -> Unit,
+                onReasoning: (String) -> Unit,
+                onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
+            ): AgentCreationTurnResult {
+                onPartialSpoken("直接回答你")
+                return AgentCreationTurnResult(
+                    understanding = 30,
+                    assistantNote = "直接回答你"
+                )
+            }
+
+            override suspend fun converse(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy
+            ): AgentCreationTurnResult = error("R93 起创建链路走 converseStreaming，不应再调 converse")
+
+            override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+                ScriptedGateway.cannedAnalysis()
+        }
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        coordinator.start()
+
+        coordinator.sendUserText("好的")
+
+        val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+        assertEquals("直接回答你", assistants[1].text)
+        assertNull(assistants[1].reasoning)
+        assertFalse(assistants[1].thinkingDone)
+        assertEquals(listOf("understand", "generating", "done"), assistants[1].stages.map { it.key })
+        assertTrue(assistants[1].stages.none { it.active })
     }
 }

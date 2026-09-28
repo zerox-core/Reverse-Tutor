@@ -54,7 +54,8 @@ class RealAgentCreationGateway(
         docAnalysis: AgentCreationDocAnalysis?,
         strategy: AgentCreationTurnStrategy,
         onPartialSpoken: (String) -> Unit,
-        onReasoning: (String) -> Unit
+        onReasoning: (String) -> Unit,
+        onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
     ): AgentCreationTurnResult {
         val profile = activeProfile()
             ?.takeIf { it.enabled && it.model.isNotBlank() }
@@ -86,6 +87,8 @@ class RealAgentCreationGateway(
             "thinking decision=" + (if (thinkingDecision.enabled) "ON" else "OFF") +
                 " reason=" + thinkingDecision.reason
         )
+        // R98：决策结果透传给协调器——「开启深度思考 / 直接回答」是产品流程的一部分，要上屏。
+        onThinkingDecision(thinkingDecision)
         val plan = LlmGenerationPlanner.plan(
             sessionId = SESSION_ID,
             userMessageId = "agent-creation-user-$turn",
