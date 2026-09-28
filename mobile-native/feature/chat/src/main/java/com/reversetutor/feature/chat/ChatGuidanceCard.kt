@@ -171,6 +171,7 @@ internal fun ChatGuidanceCard(
                                         ChatDetourPath.WEB -> "guidance-detour-web"
                                         ChatDetourPath.MANUAL -> "guidance-detour-manual"
                                         ChatDetourPath.DEMO -> "guidance-detour-demo"
+                                        ChatDetourPath.CUSTOM -> "guidance-detour-custom"
                                     }
                                 ),
                             shape = RoundedCornerShape(8.dp),

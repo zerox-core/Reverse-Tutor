@@ -220,6 +220,7 @@ class ChatStagnationDetectorTest {
         assertTrue(texts.all { it.isNotBlank() })
         assertTrue(ChatGuidanceContent.detourText(ChatDetourPath.AGENT).contains("agent"))
         assertTrue(ChatGuidanceContent.detourText(ChatDetourPath.WEB).contains("网页"))
+        assertTrue(ChatGuidanceContent.detourText(ChatDetourPath.CUSTOM).contains("在这里"))
     }
 
     @Test
