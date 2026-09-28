@@ -173,4 +173,61 @@ class ChatStagnationDetectorTest {
         assertEquals(ChatGuidanceMode.OFF, ChatGuidanceMode.fromLabel("关闭"))
         assertEquals(ChatGuidanceMode.HIGH, ChatGuidanceMode.fromLabel("高"))
     }
+
+    @Test
+    fun pathPreferenceWillTriggersWhenStudentPushesOldPath() {
+        val messages = listOf(
+            assistant("a1", "Lab A 是不是去 DeepSeek 网页版写个统计 ERROR 的脚本？你能跑一遍吗？"),
+            user("u1", "他妈的我不会啊了，ds怎么写啊，我不是应该要装个agent吗"),
+            assistant("a2", "那我们还是先去 DeepSeek 网页版，把脚本写出来好不好？")
+        )
+        val signal = ChatStagnationDetector.detect(messages, ChatGuidanceSensitivity.STANDARD)
+        assertNotNull(signal)
+        assertTrue(ChatGuidanceReason.PATH_PREFERENCE in signal!!.reasons)
+    }
+
+    @Test
+    fun pathPreferenceAcceptedByStudentDoesNotTrigger() {
+        val messages = listOf(
+            assistant("a1", "Lab A 打算怎么做呢？"),
+            user("u1", "我想用 agent 跑这个脚本"),
+            assistant("a2", "可以，那你把任务转成给 agent 的一条指令，跑完把输出贴给我。")
+        )
+        val signal = ChatStagnationDetector.detect(messages, ChatGuidanceSensitivity.STANDARD)
+        if (signal != null) {
+            assertFalse(ChatGuidanceReason.PATH_PREFERENCE in signal.reasons)
+        }
+    }
+
+    @Test
+    fun teachingMentionOfAgentDoesNotTriggerPathPreference() {
+        val messages = listOf(
+            assistant("a1", "agent 和普通聊天机器人差在哪呀？"),
+            user("u1", "你记住：agent 的核心是自己跑循环——观察、行动、再看结果，不用人一步步喂。"),
+            assistant("a2", "那这个循环是谁在执行呢？"),
+            user("u2", "是工具在替人执行，我上午亲手做实验时循环全是我人肉跑的。")
+        )
+        val signal = ChatStagnationDetector.detect(messages, ChatGuidanceSensitivity.STANDARD)
+        if (signal != null) {
+            assertFalse(ChatGuidanceReason.PATH_PREFERENCE in signal.reasons)
+        }
+    }
+
+    @Test
+    fun detourTextDiffersPerPath() {
+        val texts = ChatDetourPath.entries.map { ChatGuidanceContent.detourText(it) }
+        assertEquals(ChatDetourPath.entries.size, texts.toSet().size)
+        assertTrue(texts.all { it.isNotBlank() })
+        assertTrue(ChatGuidanceContent.detourText(ChatDetourPath.AGENT).contains("agent"))
+        assertTrue(ChatGuidanceContent.detourText(ChatDetourPath.WEB).contains("网页"))
+    }
+
+    @Test
+    fun scaffoldTextForPathPreferenceMentionsNewPath() {
+        val signal = ChatGuidanceSignal(
+            triggerMessageId = "u1",
+            reasons = setOf(ChatGuidanceReason.PATH_PREFERENCE)
+        )
+        assertTrue(ChatGuidanceContent.scaffoldText(signal).contains("换条路"))
+    }
 }

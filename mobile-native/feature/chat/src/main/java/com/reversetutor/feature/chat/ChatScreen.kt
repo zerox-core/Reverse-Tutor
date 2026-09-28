@@ -540,7 +540,6 @@ fun ChatRoute(
                     ChatGuidanceUiState(
                         signal = signal,
                         scaffoldText = ChatGuidanceContent.scaffoldText(signal),
-                        detourText = ChatGuidanceContent.detourText(),
                         examples = ChatGuidanceContent.examples(
                             signal,
                             detectionMessages.filterNot { it.isAssistant }.takeLast(3).joinToString(" ") { it.text }
@@ -561,11 +560,11 @@ fun ChatRoute(
         val current = guidance
         if (current != null) {
             when (action) {
-                ChatGuidanceAction.APPLY_SCAFFOLD -> updateComposer(
+                ChatGuidanceAction.ApplyScaffold -> updateComposer(
                     composer.copy(text = current.scaffoldText, sendFailure = null, notice = null)
                 )
-                ChatGuidanceAction.APPLY_DETOUR -> updateComposer(
-                    composer.copy(text = current.detourText, sendFailure = null, notice = null)
+                is ChatGuidanceAction.ApplyDetour -> updateComposer(
+                    composer.copy(text = ChatGuidanceContent.detourText(action.path), sendFailure = null, notice = null)
                 )
             }
         }

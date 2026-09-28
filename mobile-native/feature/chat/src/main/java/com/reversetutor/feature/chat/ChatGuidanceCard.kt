@@ -32,10 +32,14 @@ import androidx.compose.ui.unit.sp
 /**
  * v1 死循环干预底部引导卡（2026-09-28 拍板）：检测命中后从底部滑出，
  * 不打断对话。三个动作：教AI一句 / 换条路 / 看示例。
- * 「教AI一句」「换条路」把预置文案填进输入框由老师确认发送；
+ * 「教AI一句」把预置文案填进输入框由老师确认发送；
+ * 「换条路」展开四条路径选项（2026-09-28 拍板升级），选中即生成明确指令；
  * 「看示例」在卡内展开可直接照抄的最小操作步骤。
  */
-enum class ChatGuidanceAction { APPLY_SCAFFOLD, APPLY_DETOUR }
+sealed interface ChatGuidanceAction {
+    data object ApplyScaffold : ChatGuidanceAction
+    data class ApplyDetour(val path: ChatDetourPath) : ChatGuidanceAction
+}
 
 private val GuidanceCardBorder = Color(0xFFE3E7F0)
 private val GuidanceTextPrimary = Color(0xFF121722)
@@ -50,6 +54,10 @@ internal fun ChatGuidanceCard(
     modifier: Modifier = Modifier
 ) {
     var examplesExpanded by remember(guidance.signal.triggerMessageId) { mutableStateOf(false) }
+    // 路径意志命中时直接展开换路选项（2026-09-28 拍板）。
+    var detourExpanded by remember(guidance.signal.triggerMessageId) {
+        mutableStateOf(ChatGuidanceReason.PATH_PREFERENCE in guidance.signal.reasons)
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -100,7 +108,7 @@ internal fun ChatGuidanceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
-                    onClick = { onAction(ChatGuidanceAction.APPLY_SCAFFOLD) },
+                    onClick = { onAction(ChatGuidanceAction.ApplyScaffold) },
                     modifier = Modifier.testTag("guidance-teach"),
                     shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = GuidanceActionBlue),
@@ -112,7 +120,7 @@ internal fun ChatGuidanceCard(
                     Text("教AI一句", fontSize = 13.sp)
                 }
                 OutlinedButton(
-                    onClick = { onAction(ChatGuidanceAction.APPLY_DETOUR) },
+                    onClick = { detourExpanded = !detourExpanded },
                     modifier = Modifier.testTag("guidance-detour"),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -120,7 +128,11 @@ internal fun ChatGuidanceCard(
                         vertical = 4.dp
                     )
                 ) {
-                    Text("换条路", fontSize = 13.sp, color = GuidanceActionBlue)
+                    Text(
+                        if (detourExpanded) "收起换路" else "换条路",
+                        fontSize = 13.sp,
+                        color = GuidanceActionBlue
+                    )
                 }
                 TextButton(
                     onClick = { examplesExpanded = !examplesExpanded },
@@ -135,6 +147,41 @@ internal fun ChatGuidanceCard(
                         fontSize = 13.sp,
                         color = GuidanceActionBlue
                     )
+                }
+            }
+            AnimatedVisibility(visible = detourExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "选一条你想走的路，指令直接填进输入框：",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = GuidanceTextPrimary
+                    )
+                    ChatDetourPath.entries.forEach { path ->
+                        OutlinedButton(
+                            onClick = { onAction(ChatGuidanceAction.ApplyDetour(path)) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag(
+                                    when (path) {
+                                        ChatDetourPath.AGENT -> "guidance-detour-agent"
+                                        ChatDetourPath.WEB -> "guidance-detour-web"
+                                        ChatDetourPath.MANUAL -> "guidance-detour-manual"
+                                        ChatDetourPath.DEMO -> "guidance-detour-demo"
+                                    }
+                                ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = 12.dp,
+                                vertical = 4.dp
+                            )
+                        ) {
+                            Text(path.label, fontSize = 13.sp, color = GuidanceActionBlue)
+                        }
+                    }
                 }
             }
             AnimatedVisibility(visible = examplesExpanded) {
