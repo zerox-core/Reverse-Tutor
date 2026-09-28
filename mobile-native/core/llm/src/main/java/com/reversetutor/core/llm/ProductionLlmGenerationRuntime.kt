@@ -96,6 +96,12 @@ class ProductionLlmGenerationRuntime(
                         line.sseData().mapNotNull(::parseText).forEach { text ->
                             request.onStreamChunk?.invoke(text)
                         }
+                        // R95: surface the model's thinking stream (reasoning_content /
+                        // thinking_delta / thought parts) so callers can render live
+                        // reasoning while the visible contract text is still pending.
+                        line.sseData().mapNotNull(::parseReasoning).forEach { text ->
+                            request.onReasoningChunk?.invoke(text)
+                        }
                     },
                     shouldAbort = { request.streamAbortRequested() }
                 )
@@ -123,13 +129,14 @@ class ProductionLlmGenerationRuntime(
                 AnthropicCompatibleGenerationRuntime().buildPayload(request)
             LlmProviderProtocol.GeminiNative -> buildGeminiPayload(request)
         }.let { base ->
-            // 2026-09-20 实测（RTSTREAM 探针）：reasoning 模型的 delta.content
-            // 集中在结尾爆发（269 行 reasoning_content 流了约 6 秒、正文 7 段
-            // 在 160ms 内放完），App 端观感就是“一整坨上屏”。请求关闭思考，
-            // 让正文从头逐段流出；不认识该字段的供应商会忽略它。
+            // R94 实测：即便请求关思考（enable_thinking=false），正文仍集中在
+            // 结尾爆发（约 4.5s 静默后 146ms 内放完），关思考没有收益。
+            // R95 起改为打开思考流：SSE 的 reasoning_content 经 onReasoningChunk
+            // 暴露，创建页用「思考中」占位气泡承接，正文到达后接管显示。
+            // 不认识该字段的供应商会忽略它。
             if (protocol == LlmProviderProtocol.OpenAiCompatible && request.streaming) {
                 base.copy(body = base.body + mapOf(
-                    "enable_thinking" to false,
+                    "enable_thinking" to true,
                     // Slice 5: ask for the trailing usage chunk on the stream;
                     // providers that do not know the field ignore it.
                     "stream_options" to mapOf("include_usage" to true)
@@ -205,6 +212,18 @@ class ProductionLlmGenerationRuntime(
         }
         return text?.takeIf { it.isNotEmpty() }
     }
+
+    // R95: thinking/reasoning counterpart of parseText — returns the delta
+    // reasoning carried by an SSE chunk, or null when the chunk has none.
+    private fun parseReasoning(json: String): String? {
+        val root = ProviderJson.parse(json) as? Map<*, *> ?: return null
+        val text = when (protocol) {
+            LlmProviderProtocol.OpenAiCompatible -> root.openAiReasoning()
+            LlmProviderProtocol.AnthropicCompatible -> root.anthropicReasoning()
+            LlmProviderProtocol.GeminiNative -> root.geminiReasoning()
+        }
+        return text?.takeIf { it.isNotEmpty() }
+    }
 }
 
 private fun buildGeminiPayload(request: LlmGenerationRequest): LlmProviderPayload {
@@ -255,6 +274,30 @@ private fun Map<*, *>.openAiText(): String? {
     val delta = choice["delta"] as? Map<*, *>
     val message = choice["message"] as? Map<*, *>
     return (delta?.get("content") ?: message?.get("content")) as? String
+}
+
+// R95: reasoning/thinking delta extractors, one per protocol.
+private fun Map<*, *>.openAiReasoning(): String? {
+    val choice = (this["choices"] as? List<*>)?.firstOrNull() as? Map<*, *> ?: return null
+    val delta = choice["delta"] as? Map<*, *>
+    val message = choice["message"] as? Map<*, *>
+    return (delta?.get("reasoning_content") ?: message?.get("reasoning_content")) as? String
+}
+
+private fun Map<*, *>.anthropicReasoning(): String? {
+    val delta = this["delta"] as? Map<*, *> ?: return null
+    return delta["thinking"] as? String
+}
+
+private fun Map<*, *>.geminiReasoning(): String? {
+    val candidates = this["candidates"] as? List<*> ?: return null
+    val parts = candidates.flatMap { candidate ->
+        val content = (candidate as? Map<*, *>)?.get("content") as? Map<*, *> ?: emptyMap<String, Any>()
+        (content["parts"] as? List<*>).orEmpty().filterIsInstance<Map<*, *>>()
+    }
+    return parts.mapNotNull { part ->
+        if (part["thought"] == true) part["text"] as? String else null
+    }.joinToString(separator = "")
 }
 
 private fun Map<*, *>.anthropicText(): String? {

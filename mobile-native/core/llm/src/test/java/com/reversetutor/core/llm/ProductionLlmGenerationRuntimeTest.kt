@@ -98,6 +98,32 @@ class ProductionLlmGenerationRuntimeTest {
         assertEquals("AB", result.visibleText)
     }
 
+    // R95：推理模型的思考流（reasoning_content）先于正文逐段回调，正文照常进 onStreamChunk。
+    @Test
+    fun streamingRuntimeSurfacesReasoningChunksBeforeContent() = runBlocking {
+        val transport = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(
+                200,
+                "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"思考一\"}}]}\n" +
+                    "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"思考二\"}}]}\n" +
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"答案\"}}]}\n\n" +
+                    "data: [DONE]"
+            )
+        )
+        val reasoning = mutableListOf<String>()
+        val content = mutableListOf<String>()
+        val result = productionRuntime(LlmProviderProtocol.OpenAiCompatible, transport).generate(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                onStreamChunk = content::add,
+                onReasoningChunk = reasoning::add
+            )
+        )
+
+        assertEquals(listOf("思考一", "思考二"), reasoning)
+        assertEquals(listOf("答案"), content)
+        assertEquals("答案", result.visibleText)
+    }
+
     @Test
     fun localImageUriIsResolvedToProviderPayloadWithoutLeakingItsUri() = runBlocking {
         val transport = FakeProviderHttpTransport(

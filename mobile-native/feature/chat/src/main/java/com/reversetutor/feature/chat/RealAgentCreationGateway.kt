@@ -1,5 +1,6 @@
 package com.reversetutor.feature.chat
 
+import android.util.Log
 import com.reversetutor.core.llm.LlmGenerationPlan
 import com.reversetutor.core.llm.LlmGenerationPlanner
 import com.reversetutor.core.llm.LlmGenerationResult
@@ -52,7 +53,8 @@ class RealAgentCreationGateway(
         currentDraft: NewSessionConfiguration,
         docAnalysis: AgentCreationDocAnalysis?,
         strategy: AgentCreationTurnStrategy,
-        onPartialSpoken: (String) -> Unit
+        onPartialSpoken: (String) -> Unit,
+        onReasoning: (String) -> Unit
     ): AgentCreationTurnResult {
         val profile = activeProfile()
             ?.takeIf { it.enabled && it.model.isNotBlank() }
@@ -82,18 +84,52 @@ class RealAgentCreationGateway(
         )
         val streamed = StringBuilder()
         var lastEmitted: String? = null
+        // R95 思考流：reasoning_content 逐段累计并透传，静默推理期也有内容上屏。
+        val reasoning = StringBuilder()
+        var reasonCount = 0
+        // R94 流式时序诊断（2026-09-27 用户反馈「还是没流式」）：逐 chunk 记录
+        // 到达时刻与累计长度，用来区分「模型/中继整坨返回」与「App 端没及时上屏」。
+        val streamStartedAt = System.currentTimeMillis()
+        var chunkCount = 0
         val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(
             streaming = true,
             onStreamChunk = { chunk ->
                 streamed.append(chunk)
+                chunkCount += 1
+                Log.d(
+                    STREAM_LOG_TAG,
+                    "chunk #$chunkCount +${chunk.length}ch total=${streamed.length} " +
+                        "elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
+                )
                 val partial = AgentCreationParser.extractPartialSpoken(streamed.toString())
                 if (partial != null && partial != lastEmitted) {
                     lastEmitted = partial
+                    Log.d(
+                        STREAM_LOG_TAG,
+                        "partial len=${partial.length} " +
+                            "elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
+                    )
                     onPartialSpoken(partial)
                 }
+            },
+            onReasoningChunk = { chunk ->
+                reasoning.append(chunk)
+                reasonCount += 1
+                Log.d(
+                    STREAM_LOG_TAG,
+                    "reason #" + reasonCount + " +" + chunk.length + "ch total=" + reasoning.length + " " +
+                        "elapsed=" + (System.currentTimeMillis() - streamStartedAt) + "ms"
+                )
+                onReasoning(chunk)
             }
         ) ?: throw AgentCreationNoModelException()
-        return when (val result = runtime.generate(request)) {
+        val result = runtime.generate(request)
+        Log.d(
+            STREAM_LOG_TAG,
+            "stream done type=${result::class.simpleName} chunks=$chunkCount reasons=$reasonCount " +
+                "total=${streamed.length} elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
+        )
+        return when (result) {
             is LlmGenerationResult.Success ->
                 AgentCreationParser.parseTurnResult(result.text)
                     ?: throw AgentCreationGenerationException("contract parse failed")
@@ -116,5 +152,6 @@ class RealAgentCreationGateway(
 
     private companion object {
         const val SESSION_ID = "agent-creation"
+        const val STREAM_LOG_TAG = "RtCreationStream"
     }
 }

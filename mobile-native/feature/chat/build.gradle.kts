@@ -28,6 +28,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // R95: RealAgentCreationGateway 在流式路径打 Log.d 诊断日志（真机验证依赖），
+    // JVM 单测无 android.util.Log 实现，返回默认值即可。
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {

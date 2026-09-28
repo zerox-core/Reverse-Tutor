@@ -211,20 +211,39 @@ class AgentCreationCoordinator(
         // R93 流式上屏：网关边生成边回调口语全量快照，懒建一个占位 Assistant 气泡随回调生长；
         // 占位气泡不进 history、不落正式文案，轮次结束无论成败都撤掉，由下方逻辑落定正式气泡。
         var streamingEntryId: String? = null
-        val result = runConverseWithRetry(userText, strategy) { partial ->
+        // R95 思考流：正文契约未到时，把模型 reasoning 先流进同一个占位气泡，
+        // 正文一出现立即接管；思考不进 history、不落正式文案、不落快照。
+        var spokenStarted = false
+        val reasoningBuffer = StringBuilder()
+        fun upsertPlaceholder(text: String) {
             val placeholderId = streamingEntryId
             if (placeholderId == null) {
-                val entry = AgentCreationFeedEntry.Assistant(id = nextId(), text = partial)
+                val entry = AgentCreationFeedEntry.Assistant(id = nextId(), text = text)
                 streamingEntryId = entry.id
                 state = state.copy(feed = state.feed + entry)
             } else {
                 state = state.copy(
                     feed = state.feed.map {
-                        if (it.id == placeholderId && it is AgentCreationFeedEntry.Assistant) it.copy(text = partial) else it
+                        if (it.id == placeholderId && it is AgentCreationFeedEntry.Assistant) it.copy(text = text) else it
                     }
                 )
             }
         }
+        val result = runConverseWithRetry(
+            userText = userText,
+            strategy = strategy,
+            onPartialSpoken = { partial ->
+                spokenStarted = true
+                upsertPlaceholder(partial)
+            },
+            onReasoning = { chunk ->
+                if (!spokenStarted) {
+                    reasoningBuffer.append(chunk)
+                    // 展示侧只保留末段，防长推理把重组成本顶爆。
+                    upsertPlaceholder("思考中：" + reasoningBuffer.takeLast(600))
+                }
+            }
+        )
         streamingEntryId?.let { placeholderId ->
             state = state.copy(feed = state.feed.filterNot { it.id == placeholderId })
             streamingEntryId = null
@@ -327,15 +346,16 @@ class AgentCreationCoordinator(
         }
     }
 
-    /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。R93：onPartialSpoken 透传流式口语快照。 */
+    /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。R93：onPartialSpoken 透传流式口语快照；R95：onReasoning 透传思考流。 */
     private suspend fun runConverseWithRetry(
         userText: String,
         strategy: AgentCreationTurnStrategy,
-        onPartialSpoken: (String) -> Unit = {}
+        onPartialSpoken: (String) -> Unit = {},
+        onReasoning: (String) -> Unit = {}
     ): AgentCreationTurnResult? {
         repeat(2) { attempt ->
             val outcome = runCatching {
-                gateway.converseStreaming(history, userText, state.draft, state.docAnalysis, strategy, onPartialSpoken)
+                gateway.converseStreaming(history, userText, state.draft, state.docAnalysis, strategy, onPartialSpoken, onReasoning)
             }
             outcome.fold(
                 onSuccess = { return it },

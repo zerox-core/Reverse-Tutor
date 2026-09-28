@@ -39,6 +39,13 @@ data class LlmGenerationRequest(
     /** Process-local preview only; never persisted or sent to a provider. */
     val onStreamChunk: ((String) -> Unit)? = null,
     /**
+     * R95: process-local thinking/reasoning preview streamed ahead of the
+     * visible content (OpenAI-style reasoning_content, Anthropic
+     * thinking_delta, Gemini thought parts). Preview only; never persisted
+     * or sent to a provider.
+     */
+    val onReasoningChunk: ((String) -> Unit)? = null,
+    /**
      * Expression-loop slice 3: red-line watchdog abort signal. Streaming
      * transports poll it between lines and cut the stream early when the
      * validator hits; ignored by non-streaming calls.

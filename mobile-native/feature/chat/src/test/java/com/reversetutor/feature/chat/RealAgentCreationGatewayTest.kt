@@ -142,6 +142,46 @@ class RealAgentCreationGatewayTest {
         }
     }
 
+    /** R95：模拟推理模型——reasoning_content 先逐段流，正文最后到。 */
+    private class ReasoningThenContentRuntime(
+        private val reasoning: List<String>,
+        private val content: String
+    ) : LlmGenerationRuntime {
+        override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+            reasoning.forEach { chunk -> request.onReasoningChunk?.invoke(chunk) }
+            val contentChunks = content.chunked(7)
+            contentChunks.forEach { chunk -> request.onStreamChunk?.invoke(chunk) }
+            return LlmGenerationResult.Streamed(contentChunks)
+        }
+    }
+
+    // R95：思考流先于正文回调，口语快照照常单调生长。
+    @Test
+    fun converseStreamingForwardsReasoningChunksBeforeSpoken() = runBlocking {
+        val runtime = ReasoningThenContentRuntime(
+            reasoning = listOf("用户想学导数。", "先确认基础。"),
+            content = VALID_JSON
+        )
+        val gw = gateway(runtime)
+        val reasons = mutableListOf<String>()
+        val partials = mutableListOf<String>()
+
+        val result = gw.converseStreaming(
+            history = emptyList(),
+            userText = "你好",
+            currentDraft = NewSessionConfiguration(),
+            docAnalysis = null,
+            strategy = AgentCreationTurnStrategy(),
+            onPartialSpoken = { partials += it },
+            onReasoning = { reasons += it }
+        )
+
+        assertEquals(55, result.understanding)
+        assertEquals(listOf("用户想学导数。", "先确认基础。"), reasons)
+        assertTrue(partials.isNotEmpty())
+        assertEquals("目标是什么？\n记下了。", partials.last())
+    }
+
     // R93：流式期间口语字段快照按序回调——首帧是 followUp 前缀（VALID_JSON 里它先出现），
     // 快照全量覆盖、单调生长，末帧 = followUp 全量 + 换行 + note 全量。
     @Test

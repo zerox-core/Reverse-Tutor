@@ -410,7 +410,8 @@ class AgentCreationCoordinatorTest {
                 currentDraft: NewSessionConfiguration,
                 docAnalysis: AgentCreationDocAnalysis?,
                 strategy: AgentCreationTurnStrategy,
-                onPartialSpoken: (String) -> Unit
+                onPartialSpoken: (String) -> Unit,
+                onReasoning: (String) -> Unit
             ): AgentCreationTurnResult {
                 onPartialSpoken("记下")
                 onPartialSpoken("记下了。")
@@ -463,7 +464,8 @@ class AgentCreationCoordinatorTest {
                 currentDraft: NewSessionConfiguration,
                 docAnalysis: AgentCreationDocAnalysis?,
                 strategy: AgentCreationTurnStrategy,
-                onPartialSpoken: (String) -> Unit
+                onPartialSpoken: (String) -> Unit,
+                onReasoning: (String) -> Unit
             ): AgentCreationTurnResult {
                 calls++
                 onPartialSpoken("半截话")
@@ -491,5 +493,56 @@ class AgentCreationCoordinatorTest {
         val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
         assertFalse(assistants.any { it.text.contains("半截话") })
         assertTrue(assistants.last().text.contains("再说一遍"))
+    }
+
+    // R95 回归：思考流先占位、正文一到即接管——推理期间占位气泡有内容在动，
+    // 落定后不留思考残影、思考不进正式气泡。
+    @Test
+    fun streamingReasoningFillsPlaceholderUntilSpokenArrives() = runBlocking {
+        val gateway = object : AgentCreationGateway {
+            override suspend fun converseStreaming(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy,
+                onPartialSpoken: (String) -> Unit,
+                onReasoning: (String) -> Unit
+            ): AgentCreationTurnResult {
+                onReasoning("推理一")
+                onReasoning("推理二")
+                onPartialSpoken("正文")
+                return AgentCreationTurnResult(
+                    understanding = 30,
+                    assistantNote = "正文"
+                )
+            }
+
+            override suspend fun converse(
+                history: List<AgentCreationHistoryTurn>,
+                userText: String,
+                currentDraft: NewSessionConfiguration,
+                docAnalysis: AgentCreationDocAnalysis?,
+                strategy: AgentCreationTurnStrategy
+            ): AgentCreationTurnResult = error("R93 起创建链路走 converseStreaming，不应再调 converse")
+
+            override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+                ScriptedGateway.cannedAnalysis()
+        }
+        val coordinator = AgentCreationCoordinator(gateway, clock())
+        val seen = mutableListOf<String>()
+        coordinator.onStateChanged = {
+            coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+                .lastOrNull()?.let { seen += it.text }
+        }
+        coordinator.start()
+
+        coordinator.sendUserText("我想学浮力")
+
+        assertTrue(seen.contains("思考中：推理一"))
+        assertTrue(seen.contains("思考中：推理一推理二"))
+        val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+        assertFalse(assistants.any { it.text.contains("思考中") })
+        assertEquals("正文", assistants[1].text)
     }
 }

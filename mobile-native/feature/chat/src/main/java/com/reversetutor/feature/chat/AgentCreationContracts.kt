@@ -106,6 +106,8 @@ interface AgentCreationGateway {
      * onPartialSpoken 收到「截至目前的完整口语文本」（全量覆盖语义，非增量），
      * 由协调器维护的占位气泡随回调生长、轮次落定即撤。默认退回非流式 converse，
      * Fake 与测试网关零改动。
+     * R95：onReasoning 逐段收到模型思考流（reasoning_content），正文未到时
+     * 先流进占位气泡，静默推理期也有内容在动；默认空实现，旧网关零改动。
      */
     suspend fun converseStreaming(
         history: List<AgentCreationHistoryTurn>,
@@ -113,7 +115,8 @@ interface AgentCreationGateway {
         currentDraft: NewSessionConfiguration,
         docAnalysis: AgentCreationDocAnalysis?,
         strategy: AgentCreationTurnStrategy = AgentCreationTurnStrategy(),
-        onPartialSpoken: (String) -> Unit = {}
+        onPartialSpoken: (String) -> Unit = {},
+        onReasoning: (String) -> Unit = {}
     ): AgentCreationTurnResult = converse(history, userText, currentDraft, docAnalysis, strategy)
 
     /** P1 文档分析。R-A 返回脚本化结果；R-C 接真实解析文本。 */
