@@ -46,6 +46,12 @@ data class LlmGenerationRequest(
      */
     val onReasoningChunk: ((String) -> Unit)? = null,
     /**
+     * R96: per-turn thinking switch decided by the caller (null = default on).
+     * Wired to enable_thinking on OpenAI-compatible streaming requests;
+     * ignored by providers that do not know the field.
+     */
+    val thinkingEnabled: Boolean? = null,
+    /**
      * Expression-loop slice 3: red-line watchdog abort signal. Streaming
      * transports poll it between lines and cut the stream early when the
      * validator hits; ignored by non-streaming calls.

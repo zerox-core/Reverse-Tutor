@@ -216,6 +216,26 @@ class RealAgentCreationGatewayTest {
         assertNotNull(analysis.suggestedPath.firstOrNull())
     }
 
+    // R96：思考预算按轮决策——首轮/复材输入开，非首轮短答复关。
+    @Test
+    fun converseDecidesThinkingBudgetPerTurn() = runBlocking {
+        val runtime = RecordingRuntime()
+        val gw = gateway(runtime)
+        val strategy = AgentCreationTurnStrategy()
+
+        // 首轮：开启
+        gw.converse(emptyList(), "我想把初中物理浮力讲明白", NewSessionConfiguration(), null, strategy)
+        assertEquals(true, runtime.requests.last().thinkingEnabled)
+
+        // 非首轮短答复：关闭
+        gw.converse(emptyList(), "好的", NewSessionConfiguration(), null, strategy)
+        assertEquals(false, runtime.requests.last().thinkingEnabled)
+
+        // 非首轮多约束输入：开启
+        gw.converse(emptyList(), "讲浮力，并且不要太难，同时还要带练习", NewSessionConfiguration(), null, strategy)
+        assertEquals(true, runtime.requests.last().thinkingEnabled)
+    }
+
     private companion object {
         val VALID_JSON = """
             {

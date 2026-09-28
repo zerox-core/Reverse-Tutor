@@ -134,9 +134,11 @@ class ProductionLlmGenerationRuntime(
             // R95 起改为打开思考流：SSE 的 reasoning_content 经 onReasoningChunk
             // 暴露，创建页用「思考中」占位气泡承接，正文到达后接管显示。
             // 不认识该字段的供应商会忽略它。
+            // R96: 每轮是否思考由调用方决策（feature/chat ThinkingBudgetDecider），
+            // null 走 R95 默认开启。
             if (protocol == LlmProviderProtocol.OpenAiCompatible && request.streaming) {
                 base.copy(body = base.body + mapOf(
-                    "enable_thinking" to true,
+                    "enable_thinking" to (request.thinkingEnabled ?: true),
                     // Slice 5: ask for the trailing usage chunk on the stream;
                     // providers that do not know the field ignore it.
                     "stream_options" to mapOf("include_usage" to true)

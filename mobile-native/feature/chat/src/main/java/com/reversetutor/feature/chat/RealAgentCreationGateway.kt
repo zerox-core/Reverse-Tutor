@@ -74,6 +74,18 @@ class RealAgentCreationGateway(
             strategy = strategy
         )
         val turn = turnSequence++
+        // R96：按轮决策是否请求思考——资料/复材输入开（保质量，思考期有「思考中」
+        // 气泡可见），短答复承接轮关（时延从 ~32s 回到秒级）。
+        val thinkingDecision = ThinkingBudgetDecider.decide(
+            userText = trimmed,
+            hasDocAnalysis = docAnalysis != null,
+            isFirstTurn = turn == 0
+        )
+        Log.d(
+            STREAM_LOG_TAG,
+            "thinking decision=" + (if (thinkingDecision.enabled) "ON" else "OFF") +
+                " reason=" + thinkingDecision.reason
+        )
         val plan = LlmGenerationPlanner.plan(
             sessionId = SESSION_ID,
             userMessageId = "agent-creation-user-$turn",
@@ -93,6 +105,7 @@ class RealAgentCreationGateway(
         var chunkCount = 0
         val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(
             streaming = true,
+            thinkingEnabled = thinkingDecision.enabled,
             onStreamChunk = { chunk ->
                 streamed.append(chunk)
                 chunkCount += 1

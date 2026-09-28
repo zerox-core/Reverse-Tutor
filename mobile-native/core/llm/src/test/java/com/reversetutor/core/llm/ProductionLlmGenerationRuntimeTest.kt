@@ -124,6 +124,32 @@ class ProductionLlmGenerationRuntimeTest {
         assertEquals("答案", result.visibleText)
     }
 
+    // R96：thinkingEnabled=false 时请求体 enable_thinking 关闭；null 走默认开启。
+    @Test
+    fun streamingRuntimeHonoursPerTurnThinkingSwitch() = runBlocking {
+        val transportOff = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(
+                200,
+                "data: {\"choices\":[{\"delta\":{\"content\":\"答案\"}}]}\n\ndata: [DONE]"
+            )
+        )
+        productionRuntime(LlmProviderProtocol.OpenAiCompatible, transportOff).generate(
+            request(LlmProviderKind.OpenAiCompatible).copy(thinkingEnabled = false)
+        )
+        assertTrue(transportOff.singleRequest().jsonBody.contains("\"enable_thinking\":false"))
+
+        val transportDefault = FakeProviderHttpTransport(
+            ProviderHttpResult.Response(
+                200,
+                "data: {\"choices\":[{\"delta\":{\"content\":\"答案\"}}]}\n\ndata: [DONE]"
+            )
+        )
+        productionRuntime(LlmProviderProtocol.OpenAiCompatible, transportDefault).generate(
+            request(LlmProviderKind.OpenAiCompatible)
+        )
+        assertTrue(transportDefault.singleRequest().jsonBody.contains("\"enable_thinking\":true"))
+    }
+
     @Test
     fun localImageUriIsResolvedToProviderPayloadWithoutLeakingItsUri() = runBlocking {
         val transport = FakeProviderHttpTransport(
