@@ -38,6 +38,7 @@ data class NewSessionConfiguration(
     val correctionPersistence: String = "适中",
     val reviewFrequency: String = "每周",
     val speakingTone: String = "自然",
+    val stagnationIntervention: String = "自动",
     val story: String = "",
     val sourceSelections: List<String> = emptyList(),
     val customFields: Map<String, String> = emptyMap(),

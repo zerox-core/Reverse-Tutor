@@ -12,7 +12,12 @@ import android.provider.MediaStore
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.RepeatMode
 
 import androidx.compose.animation.core.animateFloat
@@ -180,6 +185,9 @@ enum class ChatOverflowAction(val label: String) {
 @Composable
 internal fun ReverseTeachingChatScreen(
     state: ChatUiState,
+    guidance: ChatGuidanceUiState? = null,
+    onGuidanceAction: (ChatGuidanceAction) -> Unit = {},
+    onDismissGuidance: () -> Unit = {},
     sessionContract: SessionConversationContract? = null,
     onAssistantInteraction: (SessionAssistantInteraction) -> Unit = {},
     onComposerTextChange: (String) -> Unit,
@@ -439,6 +447,20 @@ internal fun ReverseTeachingChatScreen(
                         onInteraction = onAssistantInteraction
                     )
                 }
+            }
+        }
+        // v1 死循环干预（2026-09-28 拍板）：底部滑出引导卡，不打断对话。
+        AnimatedVisibility(
+            visible = guidance != null,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+        ) {
+            guidance?.let { current ->
+                ChatGuidanceCard(
+                    guidance = current,
+                    onAction = onGuidanceAction,
+                    onDismiss = onDismissGuidance
+                )
             }
         }
         // 生成状态行固定在输入框上方（2026-09-20 拍板）：此前是 LazyColumn 尾部

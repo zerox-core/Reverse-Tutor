@@ -118,6 +118,7 @@ object NewSessionSnapshotCodec {
             configuration.correctionPersistence,
             configuration.reviewFrequency,
             configuration.speakingTone,
+            configuration.stagnationIntervention,
             pack(configuration.quickTags.entries.flatMap { (field, selection) ->
                 selection.values.flatMap { value -> listOf(field, value.tagId.orEmpty(), value.text) }
             })
@@ -126,7 +127,7 @@ object NewSessionSnapshotCodec {
 
     fun decodeConfiguration(value: String): NewSessionConfiguration {
         val fields = unpack(value)
-        require(fields.size == 13 || fields.size == 14 || fields.size == 27 || fields.size == 28) {
+        require(fields.size == 13 || fields.size == 14 || fields.size == 27 || fields.size == 28 || fields.size == 29) {
             "Unexpected new-session configuration field count"
         }
         val legacy = fields.size == 13 || fields.size == 14
@@ -165,6 +166,7 @@ object NewSessionSnapshotCodec {
             correctionPersistence = fields.getOrNull(24) ?: "适中",
             reviewFrequency = fields.getOrNull(25) ?: "每周",
             speakingTone = fields.getOrNull(26) ?: "自然",
+            stagnationIntervention = fields.getOrNull(28) ?: "自动",
             quickTags = fields.getOrNull(27)?.let(::unpack).orEmpty()
                 .chunked(3)
                 .mapNotNull { triple ->
