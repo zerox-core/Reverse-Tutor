@@ -495,8 +495,8 @@ class AgentCreationCoordinatorTest {
         assertTrue(assistants.last().text.contains("再说一遍"))
     }
 
-    // R95 回归：思考流先占位、正文一到即接管——推理期间占位气泡有内容在动，
-    // 落定后不留思考残影、思考不进正式气泡。
+    // R95→R97 回归：思考流落进结构化 reasoning 字段（独立思考块），正文一到即接管；
+    // 落定后思考随正式气泡保留（收起态「已思考」），思考文本不进正文字段、不进 history。
     @Test
     fun streamingReasoningFillsPlaceholderUntilSpokenArrives() = runBlocking {
         val gateway = object : AgentCreationGateway {
@@ -530,19 +530,27 @@ class AgentCreationCoordinatorTest {
                 ScriptedGateway.cannedAnalysis()
         }
         val coordinator = AgentCreationCoordinator(gateway, clock())
-        val seen = mutableListOf<String>()
+        val seen = mutableListOf<AgentCreationFeedEntry.Assistant>()
         coordinator.onStateChanged = {
             coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
-                .lastOrNull()?.let { seen += it.text }
+                .lastOrNull()?.let { seen += it }
         }
         coordinator.start()
 
         coordinator.sendUserText("我想学浮力")
 
-        assertTrue(seen.contains("思考中：推理一"))
-        assertTrue(seen.contains("思考中：推理一推理二"))
+        // 推理期间占位气泡带结构化 reasoning + stage，思考文本不混进正文字段
+        assertTrue(seen.any { it.reasoning == "推理一" && it.stage != null && !it.thinkingDone })
+        assertTrue(seen.any { it.reasoning == "推理一推理二" && it.stage != null && !it.thinkingDone })
+        // 正文首块一到即标思考结束（stage 仍在 = 本轮进行中）
+        assertTrue(seen.any { it.thinkingDone && it.stage != null && it.text == "正文" })
+        // 落定：无思考残影混进正文，正式气泡保留思考（收起态）、stage 清空
         val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
-        assertFalse(assistants.any { it.text.contains("思考中") })
+        assertFalse(assistants.any { it.text.contains("思考中") || it.text.contains("推理一") })
         assertEquals("正文", assistants[1].text)
+        assertEquals("推理一推理二", assistants[1].reasoning)
+        assertNull(assistants[1].stage)
+        assertTrue(assistants[1].thinkingDone)
+        assertTrue(assistants[1].reasoningElapsedSeconds >= 0)
     }
 }

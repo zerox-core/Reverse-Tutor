@@ -127,7 +127,20 @@ interface AgentCreationGateway {
 sealed interface AgentCreationFeedEntry {
     val id: String
 
-    data class Assistant(override val id: String, val text: String) : AgentCreationFeedEntry
+    /**
+     * R97 思考块：reasoning 走独立结构化字段，不与口语正文混排；
+     * stage 非空 = 本轮进行中（头部显示阶段文案 + 计时），
+     * thinkingDone = 思考阶段已结束（正文已开始接管）。
+     * reasoning 不落快照——编解码器契约保持 [TagAssistant, id, text] 不变。
+     */
+    data class Assistant(
+        override val id: String,
+        val text: String,
+        val reasoning: String? = null,
+        val reasoningElapsedSeconds: Long = 0L,
+        val thinkingDone: Boolean = false,
+        val stage: String? = null
+    ) : AgentCreationFeedEntry
 
     data class User(override val id: String, val text: String) : AgentCreationFeedEntry
 

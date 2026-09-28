@@ -211,39 +211,69 @@ class AgentCreationCoordinator(
         // R93 流式上屏：网关边生成边回调口语全量快照，懒建一个占位 Assistant 气泡随回调生长；
         // 占位气泡不进 history、不落正式文案，轮次结束无论成败都撤掉，由下方逻辑落定正式气泡。
         var streamingEntryId: String? = null
-        // R95 思考流：正文契约未到时，把模型 reasoning 先流进同一个占位气泡，
+        // R95 思考流：正文契约未到时，把模型 reasoning 先流进占位气泡，
         // 正文一出现立即接管；思考不进 history、不落正式文案、不落快照。
+        // R97：reasoning 落到结构化字段（独立思考块），不再拼进正文文本；
+        // 思考耗时 = 正文首块到达前的秒数（由注入时钟计量，可测）。
         var spokenStarted = false
+        var thinkingSeconds = 0L
         val reasoningBuffer = StringBuilder()
+        val turnStartedAt = nowEpochMillis()
         fun upsertPlaceholder(text: String) {
             val placeholderId = streamingEntryId
+            val elapsedSeconds = if (spokenStarted) thinkingSeconds else (nowEpochMillis() - turnStartedAt) / 1000L
+            val reasoningShown = reasoningBuffer.takeLast(600).toString().ifEmpty { null }
             if (placeholderId == null) {
-                val entry = AgentCreationFeedEntry.Assistant(id = nextId(), text = text)
+                val entry = AgentCreationFeedEntry.Assistant(
+                    id = nextId(),
+                    text = text,
+                    reasoning = reasoningShown,
+                    reasoningElapsedSeconds = elapsedSeconds,
+                    thinkingDone = spokenStarted,
+                    stage = "thinking"
+                )
                 streamingEntryId = entry.id
                 state = state.copy(feed = state.feed + entry)
             } else {
                 state = state.copy(
                     feed = state.feed.map {
-                        if (it.id == placeholderId && it is AgentCreationFeedEntry.Assistant) it.copy(text = text) else it
+                        if (it.id == placeholderId && it is AgentCreationFeedEntry.Assistant) {
+                            it.copy(
+                                text = text,
+                                reasoning = reasoningShown ?: it.reasoning,
+                                reasoningElapsedSeconds = elapsedSeconds,
+                                thinkingDone = spokenStarted
+                            )
+                        } else it
                     }
                 )
             }
         }
+        // R97：轮次一启动就落占位气泡——思考块头部（阶段文案 + 计时）从第 0 秒可见，
+        // 与 reasoning 是否已到无关；状态栏不再固定在输入框上方（R84 布局撤销）。
+        upsertPlaceholder("")
         val result = runConverseWithRetry(
             userText = userText,
             strategy = strategy,
             onPartialSpoken = { partial ->
-                spokenStarted = true
+                if (!spokenStarted) {
+                    thinkingSeconds = (nowEpochMillis() - turnStartedAt) / 1000L
+                    spokenStarted = true
+                }
                 upsertPlaceholder(partial)
             },
             onReasoning = { chunk ->
                 if (!spokenStarted) {
                     reasoningBuffer.append(chunk)
                     // 展示侧只保留末段，防长推理把重组成本顶爆。
-                    upsertPlaceholder("思考中：" + reasoningBuffer.takeLast(600))
+                    upsertPlaceholder("")
                 }
             }
         )
+        // R97：轮次结束撤占位，但把 reasoning 与思考耗时携带到落定逻辑——
+        // 正式气泡保留思考块（收起为「已思考 · Ns」），思考仍不进 history、不落快照。
+        val carriedReasoning = reasoningBuffer.takeLast(600).toString().ifEmpty { null }
+        val carriedSeconds = if (spokenStarted) thinkingSeconds else (nowEpochMillis() - turnStartedAt) / 1000L
         streamingEntryId?.let { placeholderId ->
             state = state.copy(feed = state.feed.filterNot { it.id == placeholderId })
             streamingEntryId = null
@@ -329,7 +359,7 @@ class AgentCreationCoordinator(
             null
         }
         val spoken = note ?: followUp ?: "我更新了一下草案，继续聊聊？"
-        appendAssistant(spoken)
+        appendAssistant(spoken, reasoning = carriedReasoning, reasoningElapsedSeconds = carriedSeconds)
         if (followUp != null && note != null) {
             appendAssistant(followUp)
         }
@@ -370,8 +400,20 @@ class AgentCreationCoordinator(
         state = state.copy(feed = state.feed + AgentCreationFeedEntry.User(id = nextId(), text = text))
     }
 
-    private fun appendAssistant(text: String) {
-        state = state.copy(feed = state.feed + AgentCreationFeedEntry.Assistant(id = nextId(), text = text))
+    private fun appendAssistant(
+        text: String,
+        reasoning: String? = null,
+        reasoningElapsedSeconds: Long = 0L
+    ) {
+        state = state.copy(
+            feed = state.feed + AgentCreationFeedEntry.Assistant(
+                id = nextId(),
+                text = text,
+                reasoning = reasoning,
+                reasoningElapsedSeconds = reasoningElapsedSeconds,
+                thinkingDone = reasoning != null
+            )
+        )
         history += AgentCreationHistoryTurn(isUser = false, text = text)
     }
 

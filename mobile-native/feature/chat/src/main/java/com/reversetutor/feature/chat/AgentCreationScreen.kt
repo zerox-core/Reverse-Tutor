@@ -14,6 +14,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -264,7 +265,7 @@ fun AgentCreationRoute(
                 ) {
                     items(state.feed, key = { it.id }) { entry ->
                         when (entry) {
-                            is AgentCreationFeedEntry.Assistant -> AssistantBubble(entry.text)
+                            is AgentCreationFeedEntry.Assistant -> AssistantBubble(entry)
                             is AgentCreationFeedEntry.User -> UserBubble(entry.text)
                             is AgentCreationFeedEntry.FileCard -> FileCard(
                                 card = entry,
@@ -284,11 +285,6 @@ fun AgentCreationRoute(
                         feedState.animateScrollToItem(state.feed.size - 1)
                     }
                 }
-            }
-            // R84：生成中状态条固定在输入框上方、不随对话流滚走——
-            // 发出消息后用户始终看得到动态反馈，不会再觉得卡在页面上。
-            if (state.busy) {
-                WorkingStatusBar()
             }
             BottomComposer(
                 input = input,
@@ -455,21 +451,27 @@ private fun UnderstandingBar(understanding: Int) {
 }
 
 @Composable
-private fun AssistantBubble(text: String) {
-    val type = LocalFormalTypeScale.current
-    Surface(
-        color = FormalColors.Surface,
-        shape = RoundedCornerShape(
-            topStart = 4.dp, topEnd = FormalShapes.CardRadius,
-            bottomStart = FormalShapes.CardRadius, bottomEnd = FormalShapes.CardRadius
-        ),
-        border = BorderStroke(1.dp, FormalColors.Border),
-        modifier = Modifier
-            .widthIn(max = 320.dp)
-            .testTag("agent_creation_assistant")
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-            AssistantRichText(text)
+private fun AssistantBubble(entry: AgentCreationFeedEntry.Assistant) {
+    // R97：DeepSeek 式思考块挂在正文气泡上方——思考期占位正文为空，
+    // 只显示思考块头部；正文到达后思考块收起、正文气泡接管。
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        ReasoningBlock(entry)
+        if (entry.text.isNotEmpty()) {
+            Surface(
+                color = FormalColors.Surface,
+                shape = RoundedCornerShape(
+                    topStart = 4.dp, topEnd = FormalShapes.CardRadius,
+                    bottomStart = FormalShapes.CardRadius, bottomEnd = FormalShapes.CardRadius
+                ),
+                border = BorderStroke(1.dp, FormalColors.Border),
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .testTag("agent_creation_assistant")
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    AssistantRichText(entry.text)
+                }
+            }
         }
     }
 }
@@ -708,8 +710,64 @@ private fun DraftRow(label: String, value: String) {
     }
 }
 
+/**
+ * R97：DeepSeek 式思考块——思考期头部轮播阶段文案 + 实时计时 + 动态点，
+ * 轮次落定后收起为「已思考 · Ns」，点头部可再展开；思考正文用衬线字体
+ * 与口语气泡区分（2026-09-28 用户需求：不同字体、可折叠隐藏、状态栏上块、计时）。
+ */
 @Composable
-private fun WorkingStatusBar() {
+private fun ReasoningBlock(entry: AgentCreationFeedEntry.Assistant) {
+    if (entry.reasoning == null && entry.stage == null) return
+    val type = LocalFormalTypeScale.current
+    val streaming = entry.stage != null && !entry.thinkingDone
+    var expanded by remember(entry.id) { mutableStateOf(streaming) }
+    // 思考期默认展开；思考结束自动收起一次（DeepSeek 行为）。
+    LaunchedEffect(streaming) {
+        if (!streaming) expanded = false
+    }
+    Surface(
+        color = FormalColors.Surface,
+        shape = RoundedCornerShape(4.dp),
+        border = BorderStroke(1.dp, FormalColors.Border),
+        modifier = Modifier
+            .widthIn(max = 320.dp)
+            .testTag("agent_creation_reasoning")
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (streaming) {
+                    StreamingHeader(entry)
+                } else {
+                    Text(
+                        text = (if (expanded) "▾ " else "▸ ") + "已思考 · " + entry.reasoningElapsedSeconds + "s",
+                        style = type.style(11f, 16f, color = FormalColors.Muted),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            if (expanded && entry.reasoning != null) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = entry.reasoning,
+                    style = type.style(11f, 17f, color = FormalColors.Muted)
+                        .copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Serif),
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+/** 思考期头部：阶段文案轮播 + 本地每秒跳动的计时（与协调器回调解耦，帧间不冻住）。 */
+@Composable
+private fun StreamingHeader(entry: AgentCreationFeedEntry.Assistant) {
     val type = LocalFormalTypeScale.current
     val stages = listOf("正在理解你说的…", "正在更新会话草案…", "正在琢磨怎么接话…")
     var stageIndex by remember { mutableStateOf(0) }
@@ -719,6 +777,31 @@ private fun WorkingStatusBar() {
             stageIndex = (stageIndex + 1) % stages.size
         }
     }
+    val startEpoch = remember(entry.id) {
+        System.currentTimeMillis() / 1000L - entry.reasoningElapsedSeconds
+    }
+    var nowEpoch by remember(entry.id) { mutableStateOf(System.currentTimeMillis() / 1000L) }
+    LaunchedEffect(entry.id) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            nowEpoch = System.currentTimeMillis() / 1000L
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = stages[stageIndex] + " · " + (nowEpoch - startEpoch) + "s",
+            style = type.style(11f, 16f, color = FormalColors.Muted),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        WorkingDots()
+    }
+}
+
+/** R84 遗产：三点呼吸动画，从原输入框上方状态条迁到思考块头部。 */
+@Composable
+private fun WorkingDots() {
     val dotsTransition = rememberInfiniteTransition(label = "working-dots")
     val dotAlphas = List(3) { index ->
         dotsTransition.animateFloat(
@@ -732,19 +815,7 @@ private fun WorkingStatusBar() {
             label = "working-dot-$index"
         )
     }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(FormalColors.Surface)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .testTag("agent_creation_working"),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = stages[stageIndex],
-            style = type.style(11f, 16f, color = FormalColors.Muted)
-        )
-        Spacer(Modifier.width(8.dp))
+    Row(verticalAlignment = Alignment.CenterVertically) {
         dotAlphas.forEach { alpha ->
             Box(
                 modifier = Modifier
