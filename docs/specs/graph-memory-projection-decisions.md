@@ -113,7 +113,7 @@ Event(id, nodeId, sessionId, type, timestamp, summary, effectiveness)
 
 ## 未决项
 
-- 遗忘曲线的具体函数与数值口径（等用户提供真实记忆遗忘算法后替换 D7 占位参数）；
+- 遗忘曲线的具体函数与数值口径 → 设计稿已产出：docs/specs/forgetting-curve-design.md（2026-09-29，指数衰减 + 复习链倍增 + 三阶段状态机，**待拍板 §7 四组数值后落代码**）；
 - 节点样式单独重做（视觉迭代）；
 - 呼吸期交互细节（抢救流程的具体 UI）；
 - 聚合预算 8、晋升阈值等为初始值，上线后按真实数据调。
