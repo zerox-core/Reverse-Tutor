@@ -347,6 +347,10 @@ class HybridAppGraph private constructor(
                     assembleContext = { spaceId, sessionId, userText ->
                         sessionConversationAssembly.assembleContext(spaceId, sessionId, userText)
                     },
+                    // 1g 闲聊兼容：OffTopic 回合走轻装配，跳过 RAG/图谱/记忆端口。
+                    assembleLightweightContext = { spaceId, sessionId ->
+                        sessionConversationAssembly.assembleLightweightContext(spaceId, sessionId)
+                    },
                     enqueueJob = { input, now ->
                         backgroundGenerationRepository.enqueueGenerationJob(input, now)
                     },

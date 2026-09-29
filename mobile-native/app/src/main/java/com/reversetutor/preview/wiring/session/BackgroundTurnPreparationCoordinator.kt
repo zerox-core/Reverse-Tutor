@@ -4,6 +4,7 @@ import com.reversetutor.core.data.background.BackgroundGenerationInput
 import com.reversetutor.core.data.background.BackgroundGenerationJob
 import com.reversetutor.core.domain.ChapterTransitionPolicy
 import com.reversetutor.core.domain.ConversationContextContract
+import com.reversetutor.core.domain.GuidedLearningIntentClassifier
 import com.reversetutor.core.domain.RecentTurnSignals
 import com.reversetutor.core.domain.SessionTurnPolicy
 import com.reversetutor.core.domain.TurnNoteAssembler
@@ -34,6 +35,12 @@ import kotlinx.coroutines.CancellationException
 internal class BackgroundTurnPreparationCoordinator(
     private val isSessionDeleted: suspend (String) -> Boolean,
     private val assembleContext: suspend (String, String, String) -> ConversationContextContract,
+    /**
+     * 1g 闲聊兼容：OffTopic 回合的轻量装配入口——只读最近消息，跳过 RAG
+     * embedding / 图谱 / 掌握度 / 记忆端口与早史压缩。null = 调用方未接线
+     * （旧测试构造 / 预览壳），OffTopic 回落全装配，行为不变。
+     */
+    private val assembleLightweightContext: (suspend (String, String) -> ConversationContextContract)? = null,
     private val enqueueJob: suspend (BackgroundGenerationInput, Long) -> BackgroundGenerationJob,
     private val loadRecentTurnSignals: suspend (String, String) -> RecentTurnSignals = { _, _ -> RecentTurnSignals() },
     private val loadLastTurnStyleHint: suspend (String) -> String = { "" },
@@ -57,7 +64,24 @@ internal class BackgroundTurnPreparationCoordinator(
                 return BackgroundTurnPreparationResult.SessionUnavailable
             }
 
-            val context = assembleContext(request.spaceId, request.sessionId, request.userText)
+            // 1g 闲聊兼容（意图分流）：确定性分类器提前到装配之前——OffTopic
+            // 闲聊不进重装配管线（RAG embedding 网络调用、图谱、掌握度、
+            // 记忆与早史压缩全部跳过），只读最近消息，保证随意对话不被检索/
+            // 记忆装配拖慢或污染。保守边界：带图片附件的回合一律重装配（图片
+            // 需要完整证据面）；其余意图（含 GoalChange——换目标可能需要新主题
+            // 检索）维持全装配；轻量入口未接线时 OffTopic 回落全装配。分类器
+            // 与 toGuidedLearningTurnInput 内部同源（纯内存规则，双跑成本可
+            // 忽略），判定标准唯一。
+            val earlyIntent = GuidedLearningIntentClassifier.classify(request.userText)
+            val lightweightAssemblyTurn = earlyIntent == UserIntent.OffTopic &&
+                request.imageAttachments.isEmpty()
+
+            val context = if (lightweightAssemblyTurn) {
+                assembleLightweightContext?.invoke(request.spaceId, request.sessionId)
+                    ?: assembleContext(request.spaceId, request.sessionId, request.userText)
+            } else {
+                assembleContext(request.spaceId, request.sessionId, request.userText)
+            }
             val baseGuidedInput = request.sessionSnapshot.toGuidedLearningTurnInput(
                 spaceId = request.spaceId,
                 sessionId = request.sessionId,

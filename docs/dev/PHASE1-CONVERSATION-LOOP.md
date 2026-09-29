@@ -46,10 +46,11 @@ E2E 实测发现审计漏判：intake 分派原接在 SessionConversationAssembl
 - 暂定：1f-t1 事件类型四分+图谱 Node/Event 投影（属大阶段三任务线，届时直接采用 spec 阈值）；1f-t2 BYOK 提取器（V2 决策#5 后期项）；1f-t4 分身窗口内置不可删契约落点（NEWMP-V2 待定）
 - 观察（记录不处理）：RuleBasedMemoryExtractor 对 KEY[15] 类句式不产 LEARNING_EVENT；生产轮次写 turn_run_trajectories 而非 turn_runs
 
-### 1g 闲聊兼容
+### 1g 闲聊兼容 ✅ 已完成（2026-09-29）
 意图分流：闲聊类输入不进重装配管线（或走轻量路径），保证随意对话体验不被 RAG/记忆装配拖慢或污染。
-- 分流规则需有明确判定标准（规则/小模型/提示词），动工时若标准不明确记入暂定项
-- 验收：闲聊不进装配的单测 + 模拟器实测响应路径
+- 落地形态：BackgroundTurnPreparationCoordinator 用确定性 GuidedLearningIntentClassifier 在装配前分流；OffTopic 且无图片附件走轻量装配（SessionConversationAssembly.assembleLightweightContext，仅读最近 10 条消息、跳过摘要/RAG/记忆/图谱端口）；GoalChange 与带图回合一律保守走全装配；轻量入口未接线（旧构造）自动回落全装配，向后兼容。
+- 判定标准：复用 core/domain 既有规则分类器（固定优先级 + OFF_TOPIC_MARKERS + 精确匹配），无新增小模型依赖。
+- 验收：路由单测 5 条全绿（含 GoalChange 保守、图片兜底、未接线回落）；全量 3755 用例 0 失败；模拟器 E2E 双回合实测——学习问题走完整装配模板（Response format: steps / Evidence requirement: user_answer），闲聊「hi」走轻量路径（plain / none / 低信息密度），两回合流式均 ~6s 完成，回复正常渲染。详见 docs/verification/1g-chitchat-routing.md。
 
 ## 大阶段一完成定义
 1a-1g（除暂定项外）全部完成并各自提交推送 → 派遣分支窗口跑整体验证（全量构建 + 全量单测 + 模拟器 E2E）→ 测试文档存 docs/verification/ → 进入大阶段二。
