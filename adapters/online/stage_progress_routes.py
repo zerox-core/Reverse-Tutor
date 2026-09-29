@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Path, Query
 
 from online_db.activity_store import (
     ActivityNotFound,
@@ -20,7 +20,11 @@ from .auth_models import AuthContext
 from .auth_routes import AuthContextDep
 from .errors import OnlineApiError
 from .stage_progress_models import (
+    ActivityStageDefinitionModel,
+    StageEvidenceEventListResponse,
+    StageEvidenceEventModel,
     StageEvidenceRecordRequest,
+    StageListResponse,
     StageProgressItemModel,
     StageProgressResponse,
 )
@@ -174,3 +178,85 @@ def get_stage_progress(
     ) as exc:
         raise _lookup_error(exc)
     return _progress_payload(record)
+
+
+
+@router.get(
+    "/activities/{activityId}/stages",
+    response_model=StageListResponse,
+    operation_id="listActivityStages",
+)
+def list_activity_stages(
+    activity_id: ActivitySlugPath,
+    context: AuthContextDep,
+) -> StageListResponse:
+    """Stage ladder for the progress panel (stage-progress spec §5).
+
+    Stage-granularity definitions (name + capability + acceptance evidence
+    keys + covered task days); the panel renders these instead of the legacy
+    task-level counters. Activity-level read: no participation required.
+    """
+    try:
+        records = _store().list_activity_stages(activity_id)
+    except (ActivityNotFound, ActivityStagesNotDefined) as exc:
+        raise _lookup_error(exc)
+    return StageListResponse(
+        activity_slug=activity_id,
+        stages=[
+            ActivityStageDefinitionModel(
+                stage_index=record.stage_index,
+                name=record.name,
+                capability=record.capability,
+                evidence_keys=list(record.evidence_keys),
+                task_day_numbers=list(record.task_day_numbers),
+                evidence_level=record.evidence_level,
+                evidence_refs=list(record.evidence_refs),
+            )
+            for record in records
+        ],
+    )
+
+
+@router.get(
+    "/activities/{activityId}/evidence",
+    response_model=StageEvidenceEventListResponse,
+    operation_id="listActivityStageEvidence",
+)
+def list_stage_evidence(
+    activity_id: ActivitySlugPath,
+    context: AuthContextDep,
+    stage_index: Annotated[int | None, Query(alias="stageIndex", ge=1)] = None,
+) -> StageEvidenceEventListResponse:
+    """Evidence events recorded for the authenticated participant.
+
+    Panel detail behind "本阶段证据 x/y": which acceptance criteria already
+    have events, with kind / artifact_ref / path_tag (skip-ahead events are
+    returned as bookkept). Optional stageIndex filter narrows to one stage.
+    """
+    try:
+        events = _store().list_evidence_events(
+            activity_id, _account_uuid(context), stage_index=stage_index
+        )
+    except (
+        ActivityNotFound,
+        ActivityStagesNotDefined,
+        ActivityParticipationNotFound,
+        StageIndexNotFound,
+    ) as exc:
+        raise _lookup_error(exc)
+    return StageEvidenceEventListResponse(
+        activity_slug=activity_id,
+        events=[
+            StageEvidenceEventModel(
+                stage_index=event.stage_index,
+                evidence_key=event.evidence_key,
+                kind=event.kind,
+                artifact_ref=event.artifact_ref,
+                path_tag=event.path_tag,
+                idempotency_key=event.idempotency_key,
+                recorded_at_epoch_millis=_to_epoch_millis(event.created_at),
+            )
+            for event in events
+        ],
+        total=len(events),
+    )

@@ -466,3 +466,189 @@ async def test_get_stage_progress_requires_auth(progress_client):
     response = await client.get(f"/api/v1/activities/{SLUG}/stage-progress")
 
     assert response.status_code == 401
+
+
+
+# --- panel read: stage ladder ------------------------------------------------
+
+
+async def test_list_stages_returns_ladder(progress_client):
+    client, _, activity_store = progress_client
+    issued, headers = await _bootstrap(client)
+    _join(activity_store, SLUG, issued["accountId"])
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/stages", headers=headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["activitySlug"] == SLUG
+    assert len(body["stages"]) == 2
+    stage1 = body["stages"][0]
+    assert stage1["stageIndex"] == 1
+    assert stage1["name"] == "基础概念"
+    assert stage1["capability"] == "学生能讲清基础概念"
+    assert stage1["evidenceKeys"] == ["explain", "verify"]
+    assert stage1["taskDayNumbers"] == [1, 2]
+    assert stage1["evidenceLevel"] == "evidenced"
+    assert stage1["evidenceRefs"] == []
+    stage2 = body["stages"][1]
+    assert stage2["stageIndex"] == 2
+    assert stage2["evidenceKeys"] == ["explain"]
+    assert stage2["taskDayNumbers"] == [3, 4, 5]
+
+
+async def test_list_stages_without_participation_ok(progress_client):
+    client, _, _ = progress_client
+    _, headers = await _bootstrap(client)
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/stages", headers=headers)
+
+    assert response.status_code == 200, response.text
+    assert len(response.json()["stages"]) == 2
+
+
+async def test_list_stages_unknown_activity_404(progress_client):
+    client, _, _ = progress_client
+    _, headers = await _bootstrap(client)
+
+    response = await client.get("/api/v1/activities/ghost/stages", headers=headers)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "activity_not_found"
+
+
+async def test_list_stages_not_defined_404(progress_client):
+    client, _, _ = progress_client
+    _, headers = await _bootstrap(client)
+
+    response = await client.get(
+        f"/api/v1/activities/{NO_STAGES_SLUG}/stages", headers=headers
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "stages_not_defined"
+
+
+async def test_list_stages_requires_auth(progress_client):
+    client, _, _ = progress_client
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/stages")
+
+    assert response.status_code == 401
+
+
+# --- panel read: evidence event list -----------------------------------------
+
+
+async def test_list_evidence_empty(progress_client):
+    client, _, activity_store = progress_client
+    issued, headers = await _bootstrap(client)
+    _join(activity_store, SLUG, issued["accountId"])
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/evidence", headers=headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["activitySlug"] == SLUG
+    assert body["events"] == []
+    assert body["total"] == 0
+
+
+async def test_list_evidence_returns_recorded_events(progress_client):
+    client, _, activity_store = progress_client
+    issued, headers = await _bootstrap(client)
+    _join(activity_store, SLUG, issued["accountId"])
+    await client.post(
+        f"/api/v1/activities/{SLUG}/evidence",
+        json=_evidence_body(1, "explain", "ev-1"),
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/activities/{SLUG}/evidence",
+        json=_evidence_body(2, "explain", "ev-skip", kind="probe_transfer"),
+        headers=headers,
+    )
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/evidence", headers=headers)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total"] == 2
+    events = body["events"]
+    assert events[0]["stageIndex"] == 1
+    assert events[0]["evidenceKey"] == "explain"
+    assert events[0]["kind"] == "probe_recite"
+    assert events[0]["artifactRef"] == "session://demo/ev-1"
+    assert events[0]["pathTag"] == "in_order"
+    assert events[0]["idempotencyKey"] == "ev-1"
+    assert events[0]["recordedAtEpochMillis"] > 0
+    assert events[1]["stageIndex"] == 2
+    assert events[1]["kind"] == "probe_transfer"
+    assert events[1]["pathTag"] == "skip_ahead"
+
+
+async def test_list_evidence_stage_index_filter(progress_client):
+    client, _, activity_store = progress_client
+    issued, headers = await _bootstrap(client)
+    _join(activity_store, SLUG, issued["accountId"])
+    await client.post(
+        f"/api/v1/activities/{SLUG}/evidence",
+        json=_evidence_body(1, "explain", "ev-1"),
+        headers=headers,
+    )
+    await client.post(
+        f"/api/v1/activities/{SLUG}/evidence",
+        json=_evidence_body(2, "explain", "ev-skip"),
+        headers=headers,
+    )
+
+    response = await client.get(
+        f"/api/v1/activities/{SLUG}/evidence?stageIndex=2", headers=headers
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["total"] == 1
+    assert body["events"][0]["stageIndex"] == 2
+    assert body["events"][0]["idempotencyKey"] == "ev-skip"
+
+
+async def test_list_evidence_unknown_stage_index_404(progress_client):
+    client, _, activity_store = progress_client
+    issued, headers = await _bootstrap(client)
+    _join(activity_store, SLUG, issued["accountId"])
+
+    response = await client.get(
+        f"/api/v1/activities/{SLUG}/evidence?stageIndex=9", headers=headers
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "stage_not_found"
+
+
+async def test_list_evidence_without_participation_404(progress_client):
+    client, _, _ = progress_client
+    _, headers = await _bootstrap(client)
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/evidence", headers=headers)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "participation_not_found"
+
+
+async def test_list_evidence_unknown_activity_404(progress_client):
+    client, _, _ = progress_client
+    _, headers = await _bootstrap(client)
+
+    response = await client.get("/api/v1/activities/ghost/evidence", headers=headers)
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "activity_not_found"
+
+
+async def test_list_evidence_requires_auth(progress_client):
+    client, _, _ = progress_client
+
+    response = await client.get(f"/api/v1/activities/{SLUG}/evidence")
+
+    assert response.status_code == 401

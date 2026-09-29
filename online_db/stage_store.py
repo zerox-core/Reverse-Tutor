@@ -90,6 +90,17 @@ class ActivityStageProgressRecord:
     updated_at: datetime
 
 
+@dataclass(frozen=True)
+class ActivityEvidenceEventRecord:
+    stage_index: int
+    evidence_key: str
+    kind: str
+    artifact_ref: str
+    path_tag: str
+    idempotency_key: str
+    created_at: datetime
+
+
 class StageStoreError(RuntimeError):
     pass
 
@@ -348,6 +359,60 @@ class SqlAlchemyStageStore:
             if participation is None:
                 raise ActivityParticipationNotFound(str(account_id))
             return self._snapshot(database, activity, participation, stages, resolved_now)
+
+    def list_evidence_events(
+        self,
+        activity_slug: str,
+        account_id: UUID,
+        *,
+        stage_index: int | None = None,
+    ) -> tuple[ActivityEvidenceEventRecord, ...]:
+        with self._session_factory() as database:
+            activity = self._require_activity(database, activity_slug, lock=False)
+            stages = self._stage_rows(database, activity.id)
+            if not stages:
+                raise ActivityStagesNotDefined(activity_slug)
+            stage_by_id = {row.id: row for row in stages}
+            stage_row = None
+            if stage_index is not None:
+                stage_row = next(
+                    (row for row in stages if row.stage_index == stage_index), None
+                )
+                if stage_row is None:
+                    raise StageIndexNotFound(stage_index, activity_slug)
+            participation = database.scalar(
+                select(ActivityParticipation).where(
+                    ActivityParticipation.activity_id == activity.id,
+                    ActivityParticipation.account_id == account_id,
+                )
+            )
+            if participation is None or participation.state == "left":
+                raise ActivityParticipationNotFound(str(account_id))
+            statement = (
+                select(ActivityEvidenceEvent)
+                .where(ActivityEvidenceEvent.participation_id == participation.id)
+                .order_by(
+                    ActivityEvidenceEvent.created_at.asc(),
+                    ActivityEvidenceEvent.evidence_key.asc(),
+                )
+            )
+            if stage_row is not None:
+                statement = statement.where(
+                    ActivityEvidenceEvent.stage_id == stage_row.id
+                )
+            rows = database.scalars(statement).all()
+            return tuple(
+                ActivityEvidenceEventRecord(
+                    stage_index=stage_by_id[row.stage_id].stage_index,
+                    evidence_key=row.evidence_key,
+                    kind=row.kind,
+                    artifact_ref=row.artifact_ref,
+                    path_tag=row.path_tag,
+                    idempotency_key=row.idempotency_key,
+                    created_at=_as_utc(row.created_at),
+                )
+                for row in rows
+            )
 
     def _recompute(
         self,

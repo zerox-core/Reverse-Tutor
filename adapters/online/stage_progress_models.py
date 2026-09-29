@@ -50,3 +50,43 @@ class StageProgressResponse(CamelModel):
     progress: int
     revision: int
     updated_at_epoch_millis: int
+
+
+
+class ActivityStageDefinitionModel(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage_index: int
+    name: str
+    capability: str
+    evidence_keys: list[str]
+    task_day_numbers: list[int]
+    evidence_level: str
+    evidence_refs: list[str]
+
+
+class StageListResponse(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_slug: str
+    stages: list[ActivityStageDefinitionModel]
+
+
+class StageEvidenceEventModel(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage_index: int
+    evidence_key: str
+    kind: EvidenceKind
+    artifact_ref: str
+    path_tag: str
+    idempotency_key: str
+    recorded_at_epoch_millis: int
+
+
+class StageEvidenceEventListResponse(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_slug: str
+    events: list[StageEvidenceEventModel]
+    total: int
