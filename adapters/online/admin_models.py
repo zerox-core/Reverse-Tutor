@@ -80,3 +80,53 @@ class AdminActivityListResponse(CamelModel):
     items: list[AdminActivity]
     next_cursor: str | None
     updated_at_epoch_millis: int
+
+class AdminStageMaterialInput(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(min_length=1, max_length=200)
+    text: str = Field(min_length=1, max_length=20000)
+    ref: str | None = Field(default=None, max_length=500)
+
+
+class AdminStagePlanGenerateRequest(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    materials: list[AdminStageMaterialInput] = Field(min_length=1, max_length=20)
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+
+class AdminStageDraft(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage_index: int = Field(ge=1)
+    name: str = Field(min_length=1, max_length=200)
+    capability: str = Field(min_length=1, max_length=500)
+    evidence_keys: list[str] = Field(min_length=1, max_length=20)
+    task_day_numbers: list[int] = Field(min_length=1, max_length=365)
+    evidence_level: Literal["evidenced", "inferred"]
+    evidence_refs: list[str] = Field(default_factory=list, max_length=20)
+
+
+class AdminStagePlanGenerateResponse(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_slug: str
+    total_days: int
+    stages: list[AdminStageDraft]
+    inferred_stage_indexes: list[int]
+    persisted: bool = False
+
+
+class AdminStagesConfirmRequest(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stages: list[AdminStageDraft] = Field(min_length=1, max_length=50)
+
+
+class AdminStagesResponse(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_slug: str
+    stages: list[AdminStageDraft]
+

@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Path, Query, status
 from sqlalchemy.exc import IntegrityError
 
+from llm import chat_json
 from online_db.activity_store import (
     ActivityDefinition,
     ActivityNotFound,
@@ -16,13 +17,32 @@ from online_db.activity_store import (
     ActivityTaskDefinition,
 )
 
+from online_db.stage_generation import (
+    MaterialDigest,
+    StagePlanValidationError,
+    generate_stage_plan,
+)
+from online_db.stage_store import (
+    ActivityStagesNotDefined,
+    StageDefinition,
+)
 from .admin_models import (
     AdminActivity,
     AdminActivityCreateRequest,
     AdminActivityListResponse,
+    AdminStageDraft,
+    AdminStagePlanGenerateRequest,
+    AdminStagePlanGenerateResponse,
+    AdminStagesConfirmRequest,
+    AdminStagesResponse,
     AdminActivityTask,
 )
-from .admin_service import AdminActivityServiceUnavailable, admin_activity_service
+from .admin_service import (
+    AdminActivityServiceUnavailable,
+    AdminStageServiceUnavailable,
+    admin_activity_service,
+    admin_stage_service,
+)
 from .errors import OnlineApiError
 
 router = APIRouter(prefix="/api/admin/v1", tags=["Admin"])
@@ -62,6 +82,30 @@ def _store():
             "Admin activity store is not configured",
             retryable=True,
         )
+
+
+def _stage_store():
+    try:
+        return admin_stage_service.stage_store
+    except AdminStageServiceUnavailable:
+        raise OnlineApiError(
+            503,
+            "stage_store_unavailable",
+            "Stage store is not configured",
+            retryable=True,
+        )
+
+
+def _stage_payload(item) -> AdminStageDraft:
+    return AdminStageDraft(
+        stage_index=item.stage_index,
+        name=item.name,
+        capability=item.capability,
+        evidence_keys=list(item.evidence_keys),
+        task_day_numbers=list(item.task_day_numbers),
+        evidence_level=item.evidence_level,
+        evidence_refs=list(item.evidence_refs),
+    )
 
 
 def _now() -> datetime:
@@ -226,3 +270,117 @@ def close_activity(slug: AdminSlugPath) -> AdminActivity:
 )
 def offline_activity(slug: AdminSlugPath) -> AdminActivity:
     return _transition(slug, "offline")
+
+
+@router.post(
+    "/activities/{slug}/stage-plan/generate",
+    response_model=AdminStagePlanGenerateResponse,
+    dependencies=[Depends(require_admin)],
+    operation_id="adminGenerateStagePlan",
+)
+async def generate_activity_stage_plan(
+    slug: AdminSlugPath, request: AdminStagePlanGenerateRequest
+) -> AdminStagePlanGenerateResponse:
+    """Generate a material-driven stage draft (no persistence, human review first)."""
+    record = _store().get_activity(slug)
+    if record is None:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    materials = tuple(
+        MaterialDigest(
+            title=material.title,
+            text=material.text,
+            ref=material.ref or "",
+        )
+        for material in request.materials
+    )
+    temperature = 0.3 if request.temperature is None else request.temperature
+    try:
+        plan = await generate_stage_plan(
+            materials,
+            activity_title=record.title,
+            activity_description=record.description,
+            total_days=record.total_days,
+            chat_json=chat_json,
+            temperature=temperature,
+        )
+    except StagePlanValidationError as exc:
+        raise OnlineApiError(
+            502,
+            "stage_plan_invalid",
+            f"Generated stage plan failed validation: {exc}",
+            retryable=True,
+        )
+    except Exception as exc:
+        raise OnlineApiError(
+            502,
+            "stage_plan_generation_failed",
+            f"Stage plan generation failed: {type(exc).__name__}: {str(exc)[:300]}",
+            retryable=True,
+        )
+    return AdminStagePlanGenerateResponse(
+        activity_slug=slug,
+        total_days=record.total_days,
+        stages=[_stage_payload(draft) for draft in plan.stages],
+        inferred_stage_indexes=[
+            draft.stage_index
+            for draft in plan.stages
+            if draft.evidence_level == "inferred"
+        ],
+        persisted=False,
+    )
+
+
+@router.put(
+    "/activities/{slug}/stages",
+    response_model=AdminStagesResponse,
+    dependencies=[Depends(require_admin)],
+    operation_id="adminDefineActivityStages",
+)
+def define_activity_stages(
+    slug: AdminSlugPath, request: AdminStagesConfirmRequest
+) -> AdminStagesResponse:
+    """Persist the human-confirmed stage ladder (in-place redefine)."""
+    definitions = tuple(
+        StageDefinition(
+            stage_index=stage.stage_index,
+            name=stage.name,
+            capability=stage.capability,
+            evidence_keys=tuple(stage.evidence_keys),
+            task_day_numbers=tuple(stage.task_day_numbers),
+            evidence_level=stage.evidence_level,
+            evidence_refs=tuple(stage.evidence_refs),
+        )
+        for stage in request.stages
+    )
+    try:
+        records = _stage_store().define_activity_stages(slug, definitions, _now())
+    except ActivityNotFound:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    except ValueError as exc:
+        raise OnlineApiError(422, "invalid_stage_definitions", str(exc))
+    return AdminStagesResponse(
+        activity_slug=slug,
+        stages=[_stage_payload(record) for record in records],
+    )
+
+
+@router.get(
+    "/activities/{slug}/stages",
+    response_model=AdminStagesResponse,
+    dependencies=[Depends(require_admin)],
+    operation_id="adminListActivityStages",
+)
+def list_activity_stages(slug: AdminSlugPath) -> AdminStagesResponse:
+    try:
+        records = _stage_store().list_activity_stages(slug)
+    except ActivityNotFound:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    except ActivityStagesNotDefined:
+        raise OnlineApiError(
+            404, "stages_not_defined", "Stages are not defined for this activity"
+        )
+    return AdminStagesResponse(
+        activity_slug=slug,
+        stages=[_stage_payload(record) for record in records],
+    )
+
