@@ -27,6 +27,9 @@ ALLOWED_TABLES = {
     "activity_stages",
     "activity_evidence_events",
     "activity_progress_states",
+    "activity_probe_plans",
+    "activity_teaching_profiles",
+    "activity_knowledge_paths",
 }
 
 

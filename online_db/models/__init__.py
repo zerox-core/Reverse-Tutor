@@ -14,6 +14,12 @@ from online_db.models.auth import (
 from online_db.models.content import ContentAsset, ContentItem
 from online_db.models.idempotency import IdempotencyRecord
 from online_db.models.migration import MigrationRun, MigrationValidationResult
+from online_db.models.probe import (
+    ActivityKnowledgePath,
+    ActivityProbePlan,
+    ActivityTeachingProfile,
+    TEACHING_LEVELS,
+)
 from online_db.models.stage import (
     ActivityEvidenceEvent,
     ActivityProgressState,
@@ -25,11 +31,14 @@ __all__ = [
     "AccountDevice",
     "Activity",
     "ActivityEvidenceEvent",
+    "ActivityKnowledgePath",
     "ActivityParticipation",
+    "ActivityProbePlan",
     "ActivityProgressEvent",
     "ActivityProgressState",
     "ActivityStage",
     "ActivityTask",
+    "ActivityTeachingProfile",
     "AnonymousAccount",
     "AuthAuditEvent",
     "AuthSession",
@@ -40,4 +49,5 @@ __all__ = [
     "MigrationRun",
     "MigrationValidationResult",
     "RefreshToken",
+    "TEACHING_LEVELS",
 ]
