@@ -469,7 +469,7 @@ def test_left_participation_rejects_evidence(sqlite_session_factory):
 
 def test_custom_forgetting_curve_blocks_promotion(sqlite_session_factory):
     class ExpiredCurve:
-        def evidence_valid(self, *, stage_index, evidence_key, recorded_at, now):
+        def evidence_valid(self, *, stage_index, evidence_key, kind="", recorded_at, now):
             return False
 
     account_id = _create_account(sqlite_session_factory)

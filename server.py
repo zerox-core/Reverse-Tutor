@@ -46,6 +46,7 @@ from adapters.online.stage_progress_service import stage_progress_service
 from adapters.online.auth_routes import reset_auth_service, set_auth_service
 from adapters.online.discovery import DiscoveryResponder
 from adapters.online.dependencies import build_postgres_online_services
+from adapters.online.engine_activity_hook import EngineActivitySessionHook
 from adapters.online.errors import OnlineApiError, error_response
 from adapters.online.health import reset_online_runtime_status, set_online_runtime_status
 from adapters.online.request_context import request_id_from_header, request_id_var
@@ -70,6 +71,11 @@ def configure_online_auth_from_env() -> bool:
         admin_stage_service.set_stage_store(services.stage_store)
         admin_probe_plan_service.set_probe_plan_store(services.probe_plan_store)
         stage_progress_service.set_stage_store(services.stage_store)
+        engine.set_activity_hook(
+            EngineActivitySessionHook(
+                services.stage_store, services.probe_plan_store
+            )
+        )
         return True
     if os.getenv("ONLINE_AUTH_ALLOW_IN_MEMORY", "") == "1":
         reset_auth_service()
@@ -79,6 +85,7 @@ def configure_online_auth_from_env() -> bool:
         admin_stage_service.reset_stage_store()
         admin_probe_plan_service.reset_probe_plan_store()
         stage_progress_service.reset_stage_store()
+        engine.reset_activity_hook()
         return False
     raise RuntimeError(
         "ONLINE_DATABASE_URL is required unless ONLINE_AUTH_ALLOW_IN_MEMORY=1"
@@ -109,6 +116,7 @@ async def app_lifespan(_app: FastAPI):
         admin_stage_service.reset_stage_store()
         admin_probe_plan_service.reset_probe_plan_store()
         stage_progress_service.reset_stage_store()
+        engine.reset_activity_hook()
 
 
 # --- App ---------------------------------------------------------------------

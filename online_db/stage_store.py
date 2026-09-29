@@ -492,6 +492,7 @@ class SqlAlchemyStageStore:
             if not self._forgetting_curve.evidence_valid(
                 stage_index=stage.stage_index,
                 evidence_key=event.evidence_key,
+                kind=event.kind,
                 recorded_at=_as_utc(event.created_at),
                 now=now,
             ):

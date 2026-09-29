@@ -12,6 +12,7 @@ from .sqlalchemy_content_activity import (
 from online_db.activity_store import SqlAlchemyActivityStore
 from online_db.auth_store import SqlAlchemyAuthStore
 from online_db.content_store import SqlAlchemyContentStore
+from online_db.forgetting_curve import StageEvidenceForgettingCurve
 from online_db.idempotency_store import SqlAlchemyIdempotencyStore
 from online_db.probe_plan_store import SqlAlchemyProbePlanStore
 from online_db.schema_check import assert_online_schema_at_head
@@ -54,7 +55,10 @@ def build_postgres_online_services(database_url: str) -> PostgresOnlineServices:
         ),
         activity_port=SqlAlchemyActivityPort(activity_store),
         activity_store=activity_store,
-        stage_store=SqlAlchemyStageStore(session_factory),
+        stage_store=SqlAlchemyStageStore(
+            session_factory,
+            forgetting_curve=StageEvidenceForgettingCurve(),
+        ),
         probe_plan_store=SqlAlchemyProbePlanStore(session_factory),
     )
 

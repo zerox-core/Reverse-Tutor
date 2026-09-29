@@ -27,11 +27,14 @@ Pure Python, no I/O, no third-party dependencies. Events may arrive unordered;
 results are deterministic.
 
 Seam for stage evidence validity (used by ``SqlAlchemyStageStore``):
-``NoopForgettingCurve`` remains the wired default (production semantics
-unchanged). ``StageEvidenceForgettingCurve`` is the real implementation —
-anchored per docs/specs/stage-progress-model.md §10 ("阶段证据可作为
-delayed_retrieval 的挂点") — kept un-wired until the anchor mapping and the
-rollout are ratified.
+``NoopForgettingCurve`` remains the unwired fallback (never decays).
+``StageEvidenceForgettingCurve`` is the real implementation — anchored per
+docs/specs/stage-progress-model.md §10 ("阶段证据可作为 delayed_retrieval
+的挂点"). Round-C wiring (pending user audit): ``dependencies.py`` now
+injects ``StageEvidenceForgettingCurve`` as the production default, and the
+seam accepts an optional per-event ``kind`` so each DB evidence kind decays
+on its own anchor effectiveness (``KIND_EFFECTIVENESS``); events without a
+recognised kind keep the documented delayed_retrieval anchor.
 """
 from __future__ import annotations
 
@@ -78,6 +81,21 @@ REVIEW_CHAIN_EVIDENCE_TYPES: frozenset[str] = frozenset(
 #: §10: 阶段证据可作为 delayed_retrieval 的挂点). Ratification pending — see
 #: ``StageEvidenceForgettingCurve``.
 STAGE_EVIDENCE_ANCHOR_TYPE = "delayed_retrieval"
+
+#: Per-kind anchor effectiveness for DB ``activity_evidence_events.kind``
+#: (Round-C proposal, pending user audit). Maps each DB evidence kind onto
+#: the closest Kotlin evidence type: baseline probes and manual marks are
+#: conservative (explanation), recite probes are retrieval, transfer probes
+#: and artifacts are transfer, error-correction probes are correction.
+#: Kinds outside this map fall back to ``STAGE_EVIDENCE_ANCHOR_TYPE``.
+KIND_EFFECTIVENESS: dict[str, float] = {
+    "baseline_probe": EVIDENCE_EFFECTIVENESS["explanation"],
+    "probe_recite": EVIDENCE_EFFECTIVENESS["retrieval"],
+    "probe_transfer": EVIDENCE_EFFECTIVENESS["transfer"],
+    "probe_error": EVIDENCE_EFFECTIVENESS["correction"],
+    "artifact": EVIDENCE_EFFECTIVENESS["transfer"],
+    "manual": EVIDENCE_EFFECTIVENESS["explanation"],
+}
 
 
 # ---------------------------------------------------------------------------
@@ -271,23 +289,26 @@ class ForgettingCurve(Protocol):
         *,
         stage_index: int,
         evidence_key: str,
+        kind: str = "",
         recorded_at: datetime,
         now: datetime,
     ) -> bool:
         """Return True when the evidence recorded at ``recorded_at`` is still
-        valid at ``now``."""
+        valid at ``now``. ``kind`` is the DB evidence kind ("" when the
+        caller does not track kinds)."""
         ...  # pragma: no cover
 
 
 class NoopForgettingCurve:
-    """Placeholder that never decays evidence (wired default — production
-    semantics unchanged until the stage-evidence anchor mapping is ratified)."""
+    """Placeholder that never decays evidence (unwired fallback — keeps the
+    pre-rollout production semantics)."""
 
     def evidence_valid(
         self,
         *,
         stage_index: int,
         evidence_key: str,
+        kind: str = "",
         recorded_at: datetime,
         now: datetime,
     ) -> bool:
@@ -297,17 +318,19 @@ class NoopForgettingCurve:
 class StageEvidenceForgettingCurve:
     """Real curve for the seam, on the D7 three-stage model.
 
-    Each recorded stage evidence event is anchored as
-    ``STAGE_EVIDENCE_ANCHOR_TYPE`` (delayed_retrieval per
-    stage-progress-model.md §10) and decays on its own initial stability
-    ``S_0 = 24 × eff²``; it stops counting once
-    ``Δt > ABSORB_THRESHOLD × S_0`` (absorbed — mirroring the Kotlin
-    ``Absorbed`` verdict: projection hidden, data kept). Backend stage
-    evidence is one event per (stage, evidence_key), so no review chain
-    applies at this seam.
+    Each recorded stage evidence event decays on its own initial stability
+    ``S_0 = 24 × eff²`` and stops counting once ``Δt > ABSORB_THRESHOLD ×
+    S_0`` (absorbed — mirroring the Kotlin ``Absorbed`` verdict: projection
+    hidden, data kept). Backend stage evidence is one event per (stage,
+    evidence_key), so no review chain applies at this seam.
 
-    NOT wired as the default: the anchor mapping and the rollout (existing
-    evidence must not silently expire) are pending ratification.
+    Anchor effectiveness (Round-C wiring, pending user audit): when the
+    caller supplies a DB evidence ``kind`` present in
+    ``KIND_EFFECTIVENESS``, that per-kind effectiveness is used; otherwise
+    the documented ``STAGE_EVIDENCE_ANCHOR_TYPE`` anchor (delayed_retrieval
+    per stage-progress-model.md §10) applies. Rollout note: previously
+    recorded evidence starts decaying from its own ``created_at`` once this
+    curve is wired — ratification of that behaviour is part of the audit.
     """
 
     def evidence_valid(
@@ -315,10 +338,13 @@ class StageEvidenceForgettingCurve:
         *,
         stage_index: int,
         evidence_key: str,
+        kind: str = "",
         recorded_at: datetime,
         now: datetime,
     ) -> bool:
-        eff = EVIDENCE_EFFECTIVENESS[STAGE_EVIDENCE_ANCHOR_TYPE]
+        eff = KIND_EFFECTIVENESS.get(
+            kind, EVIDENCE_EFFECTIVENESS[STAGE_EVIDENCE_ANCHOR_TYPE]
+        )
         stability = initial_stability_days(eff)
         elapsed = _elapsed_days(now, recorded_at)
         return elapsed <= ABSORB_THRESHOLD * stability
