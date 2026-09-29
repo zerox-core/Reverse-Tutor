@@ -128,4 +128,4 @@ strength(node, t) = Σ_i eff_i × R_i(t)     （涌现值，不手存）
   - `BlackHoleGraphEngine.kt`：节点级遗忘档案（protection / forgettingFull / 远期预扣 elapsedProtectionSeconds / initialForget），无档案节点沿用 physics 全局时长（R82 语义：无证据不遗忘）。
   - `BlackHoleGraphScreen.kt` / `ContextHubScreen.kt`（GlobalGraphRoute）/ `AppShell.kt` / `HybridAppGraph.kt`：账本→投影→引擎全链接线；图谱重建时远期遗忘进度不重置。
 - 测试：core:domain ForgettingCurveTest 17/17；feature:memory BlackHoleGraphEngineTest 39/39（含 7 条节点级档案新测）、GraphForgettingProjectionTest 6/6；两模块全部单测 0 失败；:app 与 :app-graphtest 编译通过。
-- 待验证：模拟器 E2E（c9 保护 4s / 衰减 6s 演示链路 + 呼吸期点击抢救 toast）与真实学习数据联调，留待下一轮。
+- 模拟器 E2E 已验证（R104，2026-09-29，emulator-5554 + app-graphtest 演示档案 c8/c9）：1x 全速下计数「已遗忘 0→2」，c8、c9 按 4s 保护 / 6s 衰减档案先后坠入；0.3x 慢速下呼吸期点击命中带 3.5s 远期预扣的节点，toast「已抢救回归『函数单调性』：复习完成，遗忘清零」、计数归零——抢救链路（点击→遗忘清零→冷却重置）全通。真实学习数据联调待后端接口。
