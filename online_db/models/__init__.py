@@ -25,6 +25,7 @@ from online_db.models.stage import (
     ActivityProgressState,
     ActivityStage,
     EVIDENCE_EVENT_KINDS,
+    STAGE_EVIDENCE_LEVELS,
 )
 
 __all__ = [
@@ -49,5 +50,6 @@ __all__ = [
     "MigrationRun",
     "MigrationValidationResult",
     "RefreshToken",
+    "STAGE_EVIDENCE_LEVELS",
     "TEACHING_LEVELS",
 ]

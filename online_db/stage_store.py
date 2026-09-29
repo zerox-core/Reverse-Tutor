@@ -39,6 +39,7 @@ from online_db.models import (
     ActivityProgressState,
     ActivityStage,
     EVIDENCE_EVENT_KINDS,
+    STAGE_EVIDENCE_LEVELS,
 )
 
 
@@ -49,6 +50,8 @@ class StageDefinition:
     capability: str
     evidence_keys: tuple[str, ...] = ()
     task_day_numbers: tuple[int, ...] = ()
+    evidence_level: str = "evidenced"
+    evidence_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,8 @@ class ActivityStageRecord:
     task_day_numbers: tuple[int, ...]
     created_at: datetime
     updated_at: datetime
+    evidence_level: str = "evidenced"
+    evidence_refs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -157,6 +162,8 @@ class SqlAlchemyStageStore:
                             capability=definition.capability,
                             evidence_keys=list(definition.evidence_keys),
                             task_day_numbers=list(definition.task_day_numbers),
+                            evidence_level=definition.evidence_level,
+                            evidence_refs=list(definition.evidence_refs),
                             created_at=now,
                             updated_at=now,
                         )
@@ -166,6 +173,8 @@ class SqlAlchemyStageStore:
                     row.capability = definition.capability
                     row.evidence_keys = list(definition.evidence_keys)
                     row.task_day_numbers = list(definition.task_day_numbers)
+                    row.evidence_level = definition.evidence_level
+                    row.evidence_refs = list(definition.evidence_refs)
                     row.updated_at = now
             for index, row in by_index.items():
                 if index not in defined:
@@ -518,6 +527,8 @@ class SqlAlchemyStageStore:
                 capability=row.capability,
                 evidence_keys=tuple(row.evidence_keys),
                 task_day_numbers=tuple(row.task_day_numbers),
+                evidence_level=row.evidence_level,
+                evidence_refs=tuple(row.evidence_refs or []),
                 created_at=_as_utc(row.created_at),
                 updated_at=_as_utc(row.updated_at),
             )
@@ -551,6 +562,14 @@ def _validate_stage_definitions(
             raise ValueError(
                 f"stage {stage.stage_index} needs at least one task day number"
             )
+        if stage.evidence_level not in STAGE_EVIDENCE_LEVELS:
+            raise ValueError(
+                f"stage {stage.stage_index} evidence_level must be one of"
+                f" {STAGE_EVIDENCE_LEVELS}"
+            )
+        for ref in stage.evidence_refs:
+            if not isinstance(ref, str) or not ref.strip():
+                raise ValueError("evidence_refs entries must be non-empty strings")
         if len(set(stage.evidence_keys)) != len(stage.evidence_keys):
             raise ValueError(f"stage {stage.stage_index} has duplicate evidence keys")
         for key in stage.evidence_keys:

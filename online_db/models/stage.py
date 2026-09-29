@@ -32,6 +32,11 @@ EVIDENCE_EVENT_KINDS: tuple[str, ...] = (
 )
 
 
+STAGE_EVIDENCE_LEVELS: tuple[str, ...] = ("evidenced", "inferred")
+
+_STAGE_EVIDENCE_LEVEL_SQL = "'evidenced','inferred'"
+
+
 class ActivityStage(OnlineBase):
     __tablename__ = "activity_stages"
 
@@ -50,6 +55,12 @@ class ActivityStage(OnlineBase):
     capability: Mapped[str] = mapped_column(Text, nullable=False)
     evidence_keys: Mapped[list] = mapped_column(JSON, nullable=False)
     task_day_numbers: Mapped[list] = mapped_column(JSON, nullable=False)
+    evidence_level: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default=text("'evidenced'")
+    )
+    evidence_refs: Mapped[list] = mapped_column(
+        JSON, nullable=False, server_default=text("'[]'")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -64,6 +75,10 @@ class ActivityStage(OnlineBase):
             name="uq_activity_stages_activity_id_stage_index",
         ),
         CheckConstraint("stage_index >= 1", name="stage_index"),
+        CheckConstraint(
+            f"evidence_level IN ({_STAGE_EVIDENCE_LEVEL_SQL})",
+            name="stage_evidence_level",
+        ),
         Index("ix_activity_stages_activity_id_stage_index", "activity_id", "stage_index"),
     )
 
