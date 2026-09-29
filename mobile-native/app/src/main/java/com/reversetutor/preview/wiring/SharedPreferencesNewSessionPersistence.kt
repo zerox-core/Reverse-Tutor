@@ -118,6 +118,7 @@ object NewSessionSnapshotCodec {
             configuration.correctionPersistence,
             configuration.reviewFrequency,
             configuration.speakingTone,
+            configuration.stagnationIntervention,
             pack(configuration.quickTags.entries.flatMap { (field, selection) ->
                 selection.values.flatMap { value -> listOf(field, value.tagId.orEmpty(), value.text) }
             }),
@@ -128,7 +129,14 @@ object NewSessionSnapshotCodec {
 
     fun decodeConfiguration(value: String): NewSessionConfiguration {
         val fields = unpack(value)
-        require(fields.size == 13 || fields.size == 14 || fields.size == 27 || fields.size == 28 || fields.size == 29 || fields.size == 30) {
+        // 快照格式版本（2026-09-29 挑战线 × Android 线合并统一）：
+        //   13/14 = 早期精简格式；27/28 = 分叉前格式（quickTags@27）
+        //   29 = 挑战线开发格式（stagnation@27, quickTags@28）
+        //   30 = Android 线开发格式（quickTags@27, persona@28, learningPath@29）
+        //   31 = 合并后统一格式（stagnation@27, quickTags@28, persona@29, learningPath@30）
+        val snapshotSize = fields.size
+        require(snapshotSize == 13 || snapshotSize == 14 || snapshotSize == 27 || snapshotSize == 28 ||
+            snapshotSize == 29 || snapshotSize == 30 || snapshotSize == 31) {
             "Unexpected new-session configuration field count"
         }
         val legacy = fields.size == 13 || fields.size == 14
@@ -167,7 +175,13 @@ object NewSessionSnapshotCodec {
             correctionPersistence = fields.getOrNull(24) ?: "适中",
             reviewFrequency = fields.getOrNull(25) ?: "每周",
             speakingTone = fields.getOrNull(26) ?: "自然",
-            quickTags = fields.getOrNull(27)?.let(::unpack).orEmpty()
+            stagnationIntervention = if (snapshotSize == 29 || snapshotSize == 31) {
+                fields.getOrNull(27) ?: "自动"
+            } else {
+                "自动"
+            },
+            quickTags = fields.getOrNull(if (snapshotSize == 29 || snapshotSize == 31) 28 else 27)
+                ?.let(::unpack).orEmpty()
                 .chunked(3)
                 .mapNotNull { triple ->
                     triple.takeIf { it.size == 3 }?.let {
@@ -176,8 +190,16 @@ object NewSessionSnapshotCodec {
                 }
                 .groupBy({ it.first }, { it.second })
                 .mapValues { TagFieldSelection(it.value) },
-            persona = fields.getOrNull(28) ?: "",
-            learningPath = fields.getOrNull(29)?.let(::unpack).orEmpty()
+            persona = when (snapshotSize) {
+                30 -> fields.getOrNull(28) ?: ""
+                31 -> fields.getOrNull(29) ?: ""
+                else -> ""
+            },
+            learningPath = when (snapshotSize) {
+                30 -> fields.getOrNull(29)
+                31 -> fields.getOrNull(30)
+                else -> null
+            }?.let(::unpack).orEmpty()
         )
     }
 

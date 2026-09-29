@@ -22,6 +22,7 @@ class PostgresOnlineServices:
     auth_service: AuthService
     content_port: PublicContentPort
     activity_port: ActivityPort
+    activity_store: SqlAlchemyActivityStore
 
 
 def build_postgres_auth_service(database_url: str) -> AuthService:
@@ -41,11 +42,14 @@ def build_postgres_content_activity_ports(
 def build_postgres_online_services(database_url: str) -> PostgresOnlineServices:
     assert_online_schema_at_head(database_url)
     session_factory = build_online_session_factory(database_url)
-    content_port, activity_port = _content_activity_ports(session_factory)
+    activity_store = SqlAlchemyActivityStore(session_factory)
     return PostgresOnlineServices(
         auth_service=_auth_service(session_factory),
-        content_port=content_port,
-        activity_port=activity_port,
+        content_port=SqlAlchemyPublicContentPort(
+            SqlAlchemyContentStore(session_factory)
+        ),
+        activity_port=SqlAlchemyActivityPort(activity_store),
+        activity_store=activity_store,
     )
 
 

@@ -164,7 +164,8 @@ private fun encodeDocument(document: SessionSettingsDocument): JSONObject = JSON
         .put("scaffolding", document.strategy.scaffoldingIntensity)
         .put("correction", document.strategy.correctionPersistence)
         .put("review", document.strategy.reviewFrequency)
-        .put("tone", document.strategy.speakingTone))
+        .put("tone", document.strategy.speakingTone)
+        .put("stagnation", document.strategy.stagnationIntervention))
     .put("snapshot", NewSessionSnapshotCodec.encodeConfiguration(document.snapshot))
     .put("tags", JSONObject().also { tags ->
         document.quickTags.forEach { (field, selection) ->
@@ -205,7 +206,8 @@ private fun decodeDocument(json: JSONObject): SessionSettingsDocument {
             scaffoldingIntensity = strategy.getInt("scaffolding"),
             correctionPersistence = strategy.getString("correction"),
             reviewFrequency = strategy.getString("review"),
-            speakingTone = strategy.getString("tone")
+            speakingTone = strategy.getString("tone"),
+            stagnationIntervention = strategy.optString("stagnation", "自动")
         ),
         snapshot = NewSessionSnapshotCodec.decodeConfiguration(json.getString("snapshot")),
         quickTags = tags.keys().asSequence().associateWith { field ->

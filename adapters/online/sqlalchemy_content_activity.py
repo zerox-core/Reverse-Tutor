@@ -18,6 +18,7 @@ from .content_activity_ports import (
     ActivityQuery,
     ActivityRecord,
     ActivityParticipationRecord,
+    ActivityTaskRecord,
     ActivityWriteCommand,
     AssetRecord,
     ContentFeedQuery,
@@ -94,6 +95,12 @@ class SqlAlchemyActivityPort:
         del at
         row = self._store.get_activity(activity_id)
         return _activity_record(row) if row is not None else None
+
+    def participation(
+        self, activity_id: str, account_id: str
+    ) -> ActivityParticipationRecord | None:
+        row = self._store.get_participation(activity_id, _account_id(account_id))
+        return _participation_record(row) if row is not None else None
 
     def join(
         self, command: ActivityWriteCommand
@@ -239,6 +246,15 @@ def _activity_record(row) -> ActivityRecord:
         allows_deferred_progress=row.allows_deferred_progress,
         state=row.state,
         session_template_id=row.session_template_id,
+        tasks=tuple(
+            ActivityTaskRecord(
+                day_number=task.day_number,
+                title=task.title,
+                task_markdown=task.task_markdown,
+                stage_goal=task.stage_goal,
+            )
+            for task in row.tasks
+        ),
     )
 
 

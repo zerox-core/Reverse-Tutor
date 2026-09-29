@@ -1,6 +1,8 @@
 package com.reversetutor.preview.shell
 
+import com.reversetutor.core.domain.ActivityParticipation
 import com.reversetutor.core.domain.ActivitySummary
+import com.reversetutor.core.domain.ActivityTask
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -60,5 +62,46 @@ class ChallengeDetailUiStateTest {
         assertEquals(ChallengeJoinAction.Retry, state.joinAction)
         assertFalse(state.participationLabel.contains("已加入"))
         assertTrue(state.sourcesLabel.contains("template-1"))
+    }
+
+    @Test
+    fun taskStatusesFollowJoinedParticipationProgress() {
+        val activity = ActivitySummary(
+            id = "activity-1",
+            title = "真实活动",
+            revision = 2L,
+            description = "真实目标",
+            state = "active",
+            tasks = listOf(
+                ActivityTask(dayNumber = 1L, title = "启动", stageGoal = "节奏"),
+                ActivityTask(dayNumber = 2L, title = "深入"),
+                ActivityTask(dayNumber = 3L, title = "复盘")
+            )
+        )
+        val state = ChallengeDetailUiState.from(
+            ChallengeRuntimeState(
+                activity = activity,
+                participation = ActivityParticipation(
+                    activityId = activity.id,
+                    userId = "account-9",
+                    joined = true,
+                    progress = 1L,
+                    revision = 2L,
+                    state = "joined",
+                    idempotencyKey = "join:activity-1"
+                )
+            ),
+            fallbackJoined = false
+        )
+
+        assertEquals(
+            listOf(
+                ChallengeTaskStatus.Done,
+                ChallengeTaskStatus.Current,
+                ChallengeTaskStatus.Upcoming
+            ),
+            state.tasks.map { it.status }
+        )
+        assertEquals(2L, state.currentTask?.dayNumber)
     }
 }

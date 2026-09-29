@@ -117,6 +117,27 @@ class ActivityIdempotencyConflict(ActivityStoreError):
     pass
 
 
+class ActivityStateTransitionError(ActivityStoreError):
+    def __init__(self, current: str, target: str) -> None:
+        super().__init__(
+            f"Cannot transition activity from '{current}' to '{target}'"
+        )
+        self.current = current
+        self.target = target
+
+
+_ACTIVITY_STATE_TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("scheduled", "active"),
+        ("active", "closed"),
+        ("scheduled", "offline"),
+        ("active", "offline"),
+        ("closed", "offline"),
+        ("offline", "offline"),
+    }
+)
+
+
 class SqlAlchemyActivityStore:
     def __init__(self, session_factory: sessionmaker[Session]) -> None:
         self._session_factory = session_factory
@@ -200,6 +221,19 @@ class SqlAlchemyActivityStore:
                 self._activity_record(database, row)
                 for row in database.scalars(statement).all()
             )
+
+    def set_activity_state(
+        self, slug: str, state: str, now: datetime
+    ) -> ActivityRecord:
+        now = _utc_input(now)
+        with self._session_factory() as database, database.begin():
+            activity = self._require_activity(database, slug)
+            if (activity.state, state) not in _ACTIVITY_STATE_TRANSITIONS:
+                raise ActivityStateTransitionError(activity.state, state)
+            activity.state = state
+            activity.updated_at = now
+            database.flush()
+            return self._activity_record(database, activity)
 
     def join_activity(
         self,
@@ -414,6 +448,29 @@ class SqlAlchemyActivityStore:
                     participation.last_idempotency_key,
                 )
                 for participation, activity in database.execute(statement).all()
+            )
+
+    def get_participation(
+        self, activity_slug: str, account_id: UUID
+    ) -> ActivityParticipationRecord | None:
+        with self._session_factory() as database:
+            activity = database.scalar(
+                select(Activity).where(Activity.slug == activity_slug)
+            )
+            if activity is None:
+                return None
+            participation = database.scalar(
+                select(ActivityParticipation).where(
+                    ActivityParticipation.activity_id == activity.id,
+                    ActivityParticipation.account_id == account_id,
+                )
+            )
+            if participation is None:
+                return None
+            return self._participation_record(
+                participation,
+                activity,
+                participation.last_idempotency_key,
             )
 
     def leaderboard(

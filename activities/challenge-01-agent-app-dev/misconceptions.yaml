@@ -1,0 +1,72 @@
+# 误解内容条目（喂给源码纠错机制，机制以 misconception-correction.md 为唯一准绳）
+# 每条：id / kp / false_rule（≤20 字，可直接匹配 evaluation.misconception）/ counter_example（最小反例素材）/ answer_points（标准答案要点）/ exposure_hint（内容编排建议暴露时机，最终以动作引擎决策为准）
+
+- id: E9
+  kp: M0
+  false_rule: agent 工具就是更聪明的自动补全
+  counter_example: 补全只预测下一个词，按一次 Tab 出一截；Lab B-D 里 agent 自己跑了命令、读了结果、又改了代码——用记录表里亲眼所见的一幕举证。
+  answer_points: 补全是单次预测、无循环；agent 是感知-行动-观察的 loop。
+  exposure_hint: D2 讲授「差在哪」时
+
+- id: E10
+  kp: M0
+  false_rule: 有 Claude Code 就不用懂原理
+  counter_example: 让它改一个你没看懂的项目，产出对不对你凭什么验收？出了偏差你怎么纠？
+  answer_points: 不懂原理无法验收产出、无法纠偏；工具越强越需要判断力（埋 M5/M6 钩子）。
+  exposure_hint: D2 收尾或 D11 可靠性模块
+
+- id: E1
+  kp: M1
+  false_rule: agent 就是给 LLM 写个好 prompt
+  counter_example: 同一个 prompt，放网页版里问（Lab A）和放进带工具的 loop 里跑（Lab B），行为一样吗？
+  answer_points: 本质是 loop + 工具 + 状态，prompt 只是其中一环。
+  exposure_hint: D3 概念日
+
+- id: E2
+  kp: M1
+  false_rule: 定时跑的流程也是 agent
+  counter_example: 每天 9 点自动发日报的脚本，路径是人写死的，模型运行时没有做任何决定。
+  answer_points: 判据是路径是否由模型在运行时决定；定时流程是 workflow。
+  exposure_hint: D3-D4 归类练习
+
+- id: E3
+  kp: M3
+  false_rule: 工具全塞给它自己会挑
+  counter_example: 给它 50 个工具让它写脚本，它先花三轮「研究」工具；只给 3 个对口的，一次就做对。
+  answer_points: 工具过多稀释注意力、抬高误选率；个位数到十几个为宜，按任务裁剪。
+  exposure_hint: D7-D8 工具设计
+
+- id: E4
+  kp: M4
+  false_rule: 上下文窗口大就全塞进去
+  counter_example: 把整个项目文档塞进 prompt 后，它反而答非所问；裁剪到相关两页，回答立刻聚焦。
+  answer_points: 噪声稀释注意力 + 成本爆炸；要裁剪 / 摘要 / 分层注入。
+  exposure_hint: D9-D10 上下文工程
+
+- id: E5
+  kp: M5
+  false_rule: 让它自己反思几遍就不会错
+  counter_example: 让它反思三遍同一个错误答案，它一遍比一遍自信——但没有任何外部验证，错还是错。
+  answer_points: 无外部验证的反思是空转，还会放大自信幻觉；验证必须来自工具结果或人。
+  exposure_hint: D11-D12 可靠性
+
+- id: E6
+  kp: M6
+  false_rule: demo 跑通就能上线
+  counter_example: demo 只走了 happy path；用户发一条空消息、断网重试、并发十个请求，哪个先崩？
+  answer_points: demo ≠ 产品；需要 eval 集、重试与降级、成本与延迟预算。
+  exposure_hint: D13-D14 评测
+
+- id: E7
+  kp: M7
+  false_rule: 全用最贵模型效果最好
+  counter_example: 简单分类任务用最贵模型，效果持平便宜档、成本差一个数量级（回扣 Lab 实操账单）。
+  answer_points: 按任务难度做模型分级路由；贵 ≠ 适合。
+  exposure_hint: D15-D16 部署运营
+
+- id: E8
+  kp: M7
+  false_rule: 上线后出问题看日志就行
+  counter_example: 用户凌晨反馈「答非所问」，你翻三万行日志找到下班；有结构化监控的话，错误率曲线半小时前就在报警。
+  answer_points: 日志是事后翻案，监控是实时发现；无结构化监控等于裸奔。
+  exposure_hint: D15-D16 部署运营

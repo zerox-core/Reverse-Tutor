@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -47,6 +48,8 @@ internal object ActivityAnnouncementPresentation {
 
 @Composable
 fun ActivityAnnouncementDialog(
+    activityTitle: String = "学习挑战活动",
+    activitySubtitle: String = "加入挑战，和 AI 学习伙伴一起推进学习计划。",
     onDismiss: () -> Unit,
     onViewChallenge: () -> Unit
 ) {
@@ -113,15 +116,19 @@ fun ActivityAnnouncementDialog(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                "21天 Python\n学习挑战",
+                                activityTitle,
                                 style = type.style(20f, 27f, FontWeight.Bold, FormalColors.Ink),
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "掌握核心语法，用每日挑战构建稳定的编程学习节奏。",
+                                activitySubtitle,
                                 style = type.style(9f, 14f, color = FormalColors.Muted),
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

@@ -18,6 +18,12 @@ ALLOWED_TABLES = {
     "activity_tasks",
     "activity_participations",
     "activity_progress_events",
+    "activity_stages",
+    "activity_evidence_events",
+    "activity_progress_states",
+    "activity_probe_plans",
+    "activity_teaching_profiles",
+    "activity_knowledge_paths",
 }
 
 FORBIDDEN_TABLES = {

@@ -101,7 +101,8 @@ data class ConversationStrategy(
     val scaffoldingIntensity: Int = 3,
     val correctionPersistence: String = "适中",
     val reviewFrequency: String = "每周",
-    val speakingTone: String = "自然"
+    val speakingTone: String = "自然",
+    val stagnationIntervention: String = "自动"
 )
 
 data class SessionSettingsDocument(
@@ -143,7 +144,8 @@ data class SessionSettingsDocument(
                     scaffoldingIntensity = copy.scaffoldingIntensity,
                     correctionPersistence = copy.correctionPersistence,
                     reviewFrequency = copy.reviewFrequency,
-                    speakingTone = copy.speakingTone
+                    speakingTone = copy.speakingTone,
+                    stagnationIntervention = copy.stagnationIntervention
                 ),
                 snapshot = copy,
                 quickTags = copy.quickTags.mapValues { it.value.deepCopy() }
@@ -678,7 +680,8 @@ private fun SessionSettingsDocument.mirrorSnapshotFields(): SessionSettingsDocum
         scaffoldingIntensity = snapshot.scaffoldingIntensity,
         correctionPersistence = snapshot.correctionPersistence,
         reviewFrequency = snapshot.reviewFrequency,
-        speakingTone = snapshot.speakingTone
+        speakingTone = snapshot.speakingTone,
+        stagnationIntervention = snapshot.stagnationIntervention
     )
 )
 
@@ -703,6 +706,7 @@ private fun SessionSettingsDocument.normalized(): SessionSettingsDocument = copy
         correctionPersistence = strategy.correctionPersistence,
         reviewFrequency = strategy.reviewFrequency,
         speakingTone = strategy.speakingTone,
+        stagnationIntervention = strategy.stagnationIntervention,
         quickTags = quickTags.mapValues { it.value.deepCopy() }
     ).deepCopy(),
     quickTags = quickTags.mapValues { it.value.deepCopy() }

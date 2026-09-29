@@ -7,6 +7,7 @@ from typing import Callable
 from .content_activity_models import (
     Activity,
     ActivityListResponse,
+    ActivityTask,
     ActivityParticipation,
     AssetRef,
     ContentDetail,
@@ -107,6 +108,24 @@ class ContentActivityService:
     def get_activity(self, activity_id: str) -> Activity | None:
         record = self.activity_port.get_activity(activity_id, self._now())
         return _activity(record) if record else None
+
+    def get_activity_participation(
+        self, activity_id: str, account_id: str
+    ) -> ActivityParticipation | None:
+        if self.activity_port.get_activity(activity_id, self._now()) is None:
+            return None
+        record = self.activity_port.participation(activity_id, account_id)
+        if record is None:
+            return ActivityParticipation(
+                activity_id=activity_id,
+                user_id=account_id,
+                joined=False,
+                progress=0,
+                revision=0,
+                state="left",
+                idempotency_key="",
+            )
+        return _participation(record)
 
     def join_activity(
         self,
@@ -241,6 +260,15 @@ def _activity(record) -> Activity:
         allows_deferred_progress=record.allows_deferred_progress,
         state=record.state,
         session_template_id=record.session_template_id,
+        tasks=[
+            ActivityTask(
+                day_number=task.day_number,
+                title=task.title,
+                task_markdown=task.task_markdown,
+                stage_goal=task.stage_goal,
+            )
+            for task in record.tasks
+        ],
     )
 
 

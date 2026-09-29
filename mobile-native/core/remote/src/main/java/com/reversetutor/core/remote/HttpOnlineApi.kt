@@ -186,6 +186,13 @@ class HttpOnlineApi(
             write.toJson()
         ) { it.toActivityProgress() }
 
+    override suspend fun getActivityParticipation(
+        activityId: String
+    ): OnlineResult<ActivityProgress> =
+        get("/api/v1/activities/${activityId.pathSegment()}/participation") {
+            it.toActivityProgress()
+        }
+
     override suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse> {
         val rejected = request.items.filterNot { it.isSyncable() }.map {
             SyncPushItemResult(
@@ -502,7 +509,15 @@ private fun JsonObject.toActivity(): OnlineActivity = OnlineActivity(
     requiresOnlineConfirmation = requiredBoolean("requiresOnlineConfirmation"),
     allowsDeferredProgress = requiredBoolean("allowsDeferredProgress"),
     state = requiredString("state"),
-    sessionTemplateId = optionalString("sessionTemplateId")
+    sessionTemplateId = optionalString("sessionTemplateId"),
+    tasks = optionalArray("tasks")?.map { it.jsonObject.toActivityTask() }.orEmpty()
+)
+
+private fun JsonObject.toActivityTask(): OnlineActivityTask = OnlineActivityTask(
+    dayNumber = requiredLong("dayNumber"),
+    title = requiredString("title"),
+    taskMarkdown = optionalString("taskMarkdown").orEmpty(),
+    stageGoal = optionalString("stageGoal")
 )
 
 private fun JsonObject.toActivityProgress(): ActivityProgress = ActivityProgress(

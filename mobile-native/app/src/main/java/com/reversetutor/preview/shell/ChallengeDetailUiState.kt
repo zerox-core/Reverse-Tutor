@@ -20,6 +20,19 @@ internal data class ChallengeRuleUi(
     val body: String
 )
 
+internal enum class ChallengeTaskStatus {
+    Done,
+    Current,
+    Upcoming
+}
+
+internal data class ChallengeTaskUi(
+    val dayNumber: Long,
+    val title: String,
+    val stageGoal: String?,
+    val status: ChallengeTaskStatus
+)
+
 internal data class ChallengeDetailUiState(
     val title: String,
     val stageLabel: String,
@@ -29,8 +42,12 @@ internal data class ChallengeDetailUiState(
     val participationLabel: String,
     val availability: ChallengeAvailability,
     val availabilityLabel: String,
-    val joinAction: ChallengeJoinAction
+    val joinAction: ChallengeJoinAction,
+    val tasks: List<ChallengeTaskUi> = emptyList()
 ) {
+    val currentTask: ChallengeTaskUi?
+        get() = tasks.firstOrNull { it.status == ChallengeTaskStatus.Current }
+
     companion object {
         fun from(runtime: ChallengeRuntimeState?, fallbackJoined: Boolean): ChallengeDetailUiState {
             val activity = runtime?.activity
@@ -62,6 +79,19 @@ internal data class ChallengeDetailUiState(
                 joined -> "已加入 · 进度 ${runtime?.participation?.progress ?: 0}"
                 failure?.operation == ChallengeRuntimeOperation.Join -> "加入未确认，详情与进度未改变"
                 else -> "尚未加入"
+            }
+            val progress = runtime?.participation?.progress ?: 0L
+            val taskUis = activity?.tasks.orEmpty().map { task ->
+                ChallengeTaskUi(
+                    dayNumber = task.dayNumber,
+                    title = task.title,
+                    stageGoal = task.stageGoal,
+                    status = when {
+                        joined && task.dayNumber <= progress -> ChallengeTaskStatus.Done
+                        joined && task.dayNumber == progress + 1L -> ChallengeTaskStatus.Current
+                        else -> ChallengeTaskStatus.Upcoming
+                    }
+                )
             }
             return ChallengeDetailUiState(
                 title = activity?.title?.takeIf(String::isNotBlank) ?: "活动暂不可用",
@@ -102,7 +132,8 @@ internal data class ChallengeDetailUiState(
                     ChallengeAvailability.Offline -> "当前离线，无法确认活动信息"
                     ChallengeAvailability.Unavailable -> "当前没有可用活动"
                 },
-                joinAction = joinAction
+                joinAction = joinAction,
+                tasks = taskUis
             )
         }
     }

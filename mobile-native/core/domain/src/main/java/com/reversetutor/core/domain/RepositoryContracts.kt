@@ -150,6 +150,7 @@ interface ActivityRepository {
     suspend fun listCachedActivities(): List<ActivitySummary>
     suspend fun list(cursor: String? = null, limit: Int = 20): OnlineData<OnlineActivityPage>
     suspend fun detail(activityId: String): OnlineData<ActivitySummary>
+    suspend fun participation(activityId: String): OnlineData<ActivityParticipation>
     suspend fun leaderboard(
         activityId: String,
         cursor: String? = null,
@@ -189,7 +190,15 @@ data class ActivitySummary(
     val requiresOnlineConfirmation: Boolean = false,
     val allowsDeferredProgress: Boolean = false,
     val state: String = "offline",
-    val sessionTemplateId: String? = null
+    val sessionTemplateId: String? = null,
+    val tasks: List<ActivityTask> = emptyList()
+)
+
+data class ActivityTask(
+    val dayNumber: Long,
+    val title: String,
+    val taskMarkdown: String = "",
+    val stageGoal: String? = null
 )
 
 data class OnlineActivityPage(

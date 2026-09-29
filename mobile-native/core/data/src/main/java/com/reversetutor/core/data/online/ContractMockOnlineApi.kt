@@ -124,6 +124,23 @@ class ContractMockOnlineApi : OnlineApi {
         "left"
     )
 
+    override suspend fun getActivityParticipation(
+        activityId: String
+    ): OnlineResult<ActivityProgress> {
+        if (activityId != activity.id) return OnlineResult.Failure("not_found", false)
+        return OnlineResult.Success(
+            participation[activityId] ?: ActivityProgress(
+                activityId = activityId,
+                userId = "",
+                joined = false,
+                progress = 0,
+                revision = 0,
+                state = "left",
+                idempotencyKey = ""
+            )
+        )
+    }
+
     override suspend fun pushSync(request: SyncPushRequest): OnlineResult<SyncPushResponse> =
         OnlineResult.Success(
             SyncPushResponse(

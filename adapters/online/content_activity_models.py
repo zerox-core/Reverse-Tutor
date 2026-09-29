@@ -55,6 +55,15 @@ class ContentDetail(ContentFeedItem):
     body_assets: list[AssetRef] = Field(max_length=5)
 
 
+class ActivityTask(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    day_number: int = Field(ge=1, le=366)
+    title: str = Field(min_length=1, max_length=200)
+    task_markdown: str = Field(default="", max_length=8000)
+    stage_goal: str | None = Field(default=None, max_length=500)
+
+
 class Activity(CamelModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -68,6 +77,7 @@ class Activity(CamelModel):
     allows_deferred_progress: bool
     state: Literal["scheduled", "active", "closed", "offline"]
     session_template_id: str | None = None
+    tasks: list[ActivityTask] = Field(default_factory=list, max_length=64)
 
 
 class ActivityListResponse(CamelModel):

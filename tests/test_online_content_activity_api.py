@@ -85,9 +85,24 @@ class RecordingActivityPort:
             allows_deferred_progress=True,
             state="active",
             session_template_id="focus-week-v1",
+            tasks=(
+                SimpleNamespace(
+                    day_number=1,
+                    title="启动：明确学习目标",
+                    task_markdown="- 写下本周学习目标",
+                    stage_goal="建立学习节奏",
+                ),
+                SimpleNamespace(
+                    day_number=2,
+                    title="复盘：整理薄弱点",
+                    task_markdown="- 复盘昨日讲解",
+                    stage_goal=None,
+                ),
+            ),
         )
         self.commands: list[object] = []
         self.results: dict[tuple[str, str, str], object] = {}
+        self.participation_record = None
 
     def list_activities(self, query):
         assert query.at.tzinfo is UTC
@@ -102,6 +117,11 @@ class RecordingActivityPort:
     def get_activity(self, activity_id, at):
         assert at.tzinfo is UTC
         return self.activity if activity_id == self.activity.id else None
+
+    def participation(self, activity_id, account_id):
+        if activity_id != self.activity.id:
+            return None
+        return self.participation_record
 
     def join(self, command):
         return self._write("join", command, joined=True, progress=0, state="joined")
@@ -250,6 +270,20 @@ async def test_activity_reads_are_public_paginated_and_canonical(content_client)
     assert listed.json()["items"][0]["startsAtEpochMillis"] == 1_783_987_200_000
     assert detail.status_code == 200
     assert detail.json()["id"] == "focus-week"
+    assert detail.json()["tasks"] == [
+        {
+            "dayNumber": 1,
+            "title": "启动：明确学习目标",
+            "taskMarkdown": "- 写下本周学习目标",
+            "stageGoal": "建立学习节奏",
+        },
+        {
+            "dayNumber": 2,
+            "title": "复盘：整理薄弱点",
+            "taskMarkdown": "- 复盘昨日讲解",
+            "stageGoal": None,
+        },
+    ]
     assert leaderboard.status_code == 200
     assert leaderboard.json()["items"] == [
         {
@@ -342,3 +376,57 @@ async def test_activity_idempotency_keys_follow_the_canonical_length_limit(conte
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "invalid_request"
+async def test_activity_participation_returns_stored_record(content_client):
+    client, _, activity_port = content_client
+    _, headers = await authenticated(client)
+    activity_port.participation_record = SimpleNamespace(
+        activity_id="focus-week",
+        user_id="account-1",
+        joined=True,
+        progress=5,
+        revision=4,
+        state="joined",
+        idempotency_key="join-key",
+    )
+
+    response = await client.get(
+        "/api/v1/activities/focus-week/participation",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["joined"] is True
+    assert payload["progress"] == 5
+    assert payload["revision"] == 4
+    assert payload["state"] == "joined"
+
+
+async def test_activity_participation_returns_stub_when_never_joined(content_client):
+    client, _, _ = content_client
+    _, headers = await authenticated(client)
+
+    response = await client.get(
+        "/api/v1/activities/focus-week/participation",
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["joined"] is False
+    assert payload["progress"] == 0
+    assert payload["revision"] == 0
+    assert payload["state"] == "left"
+
+
+async def test_activity_participation_unknown_activity_is_canonical_404(content_client):
+    client, _, _ = content_client
+    _, headers = await authenticated(client)
+
+    response = await client.get(
+        "/api/v1/activities/unknown-activity/participation",
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "activity_not_found"

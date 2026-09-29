@@ -503,6 +503,74 @@ fun ChatRoute(
         }
     }
 
+    // v1 死循环干预（2026-09-28 拍板）：本地多信号检测命中后，底部滑出引导卡。
+    val guidanceMode = ChatGuidanceMode.fromLabel(sessionSnapshot?.stagnationIntervention)
+    var guidanceEscalated by remember(sessionId) { mutableStateOf(false) }
+    var guidanceFireCount by remember(sessionId) { mutableIntStateOf(0) }
+    var lastFiredGuidanceTriggerId by remember(sessionId) { mutableStateOf<String?>(null) }
+    var dismissedGuidanceTriggerId by remember(sessionId) { mutableStateOf<String?>(null) }
+    val guidanceGenerating =
+        generation is ChatGenerationUiState.Streaming || generation is ChatGenerationUiState.Pending
+    val guidance: ChatGuidanceUiState? = remember(
+        records,
+        visibleTimelineEntries,
+        guidanceMode,
+        guidanceEscalated,
+        sessionId,
+        guidanceGenerating,
+        dismissedGuidanceTriggerId
+    ) {
+        if (guidanceMode == ChatGuidanceMode.OFF || guidanceGenerating) null
+        else {
+            val detectionMessages = if (visibleTimelinePort == null)
+                records.map { ChatGuidanceMessage(it.message.id, it.message.role == MessageRole.Assistant, it.message.text) }
+            else
+                visibleTimelineEntries.map { ChatGuidanceMessage(it.id, it.role == MessageRole.Assistant, it.text) }
+            val sensitivity = when (guidanceMode) {
+                ChatGuidanceMode.LOW -> ChatGuidanceSensitivity.LOW
+                ChatGuidanceMode.STANDARD -> ChatGuidanceSensitivity.STANDARD
+                ChatGuidanceMode.HIGH -> ChatGuidanceSensitivity.HIGH
+                ChatGuidanceMode.AUTO -> if (guidanceEscalated) ChatGuidanceSensitivity.HIGH else ChatGuidanceSensitivity.STANDARD
+                ChatGuidanceMode.OFF -> null
+            }
+            if (sensitivity == null) null
+            else ChatStagnationDetector.detect(detectionMessages, sensitivity, guidanceEscalated)
+                ?.takeIf { it.triggerMessageId != dismissedGuidanceTriggerId }
+                ?.let { signal ->
+                    ChatGuidanceUiState(
+                        signal = signal,
+                        scaffoldText = ChatGuidanceContent.scaffoldText(signal),
+                        examples = ChatGuidanceContent.examples(
+                            signal,
+                            detectionMessages.filterNot { it.isAssistant }.takeLast(3).joinToString(" ") { it.text }
+                        )
+                    )
+                }
+        }
+    }
+    LaunchedEffect(guidance?.signal?.triggerMessageId) {
+        val triggerId = guidance?.signal?.triggerMessageId ?: return@LaunchedEffect
+        if (triggerId != lastFiredGuidanceTriggerId) {
+            lastFiredGuidanceTriggerId = triggerId
+            guidanceFireCount += 1
+            if (guidanceFireCount >= 2) guidanceEscalated = true
+        }
+    }
+    val onGuidanceAction: (ChatGuidanceAction) -> Unit = { action ->
+        val current = guidance
+        if (current != null) {
+            when (action) {
+                ChatGuidanceAction.ApplyScaffold -> updateComposer(
+                    composer.copy(text = current.scaffoldText, sendFailure = null, notice = null)
+                )
+                is ChatGuidanceAction.ApplyDetour -> updateComposer(
+                    composer.copy(text = ChatGuidanceContent.detourText(action.path), sendFailure = null, notice = null)
+                )
+            }
+        }
+    }
+    val onDismissGuidance: () -> Unit = { guidance?.let { dismissedGuidanceTriggerId = it.signal.triggerMessageId } }
+
     val routeState = if (visibleTimelinePort == null) {
         buildChatRouteUiState(
             sessionTitle = sessionTitle,
@@ -571,6 +639,9 @@ fun ChatRoute(
 
     ChatScreen(
         state = routeState,
+        guidance = guidance,
+        onGuidanceAction = onGuidanceAction,
+        onDismissGuidance = onDismissGuidance,
         sessionContract = sessionContract,
         onAssistantInteraction = { interaction ->
             when (interaction) {
@@ -945,6 +1016,9 @@ private fun SourceType.toChatTypeLabel(): String = when (this) {
 @Composable
 fun ChatScreen(
     state: ChatUiState,
+    guidance: ChatGuidanceUiState? = null,
+    onGuidanceAction: (ChatGuidanceAction) -> Unit = {},
+    onDismissGuidance: () -> Unit = {},
     sessionContract: SessionConversationContract? = null,
     onAssistantInteraction: (SessionAssistantInteraction) -> Unit = {},
     onComposerTextChange: (String) -> Unit,
@@ -1009,6 +1083,9 @@ fun ChatScreen(
 ) {
     ReverseTeachingChatScreen(
         state = state,
+        guidance = guidance,
+        onGuidanceAction = onGuidanceAction,
+        onDismissGuidance = onDismissGuidance,
         sessionContract = sessionContract,
         onAssistantInteraction = onAssistantInteraction,
         onComposerTextChange = onComposerTextChange,

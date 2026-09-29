@@ -17,6 +17,7 @@ interface ActivityApi {
         limit: Int = 20
     ): OnlineResult<ActivityPage>
     suspend fun getActivity(activityId: String): OnlineResult<OnlineActivity>
+    suspend fun getActivityParticipation(activityId: String): OnlineResult<ActivityProgress>
     suspend fun activityLeaderboard(
         activityId: String,
         cursor: String? = null,

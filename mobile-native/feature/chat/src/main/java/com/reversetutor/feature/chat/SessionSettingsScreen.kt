@@ -717,6 +717,10 @@ private fun StrategyPage(coordinator: SessionSettingsCoordinator, refresh: () ->
     SegmentedSettingGroup("说话语气", strategy.speakingTone, listOf("温和", "自然", "直接")) {
         coordinator.setSpeakingTone(it); refresh()
     }
+    // v1 死循环干预（2026-09-28 拍板）：自动为默认带升降档，手动档位可覆盖。
+    SegmentedSettingGroup("死循环干预", strategy.stagnationIntervention, listOf("自动", "关闭", "低", "标准", "高")) {
+        coordinator.setStrategy { current -> current.copy(stagnationIntervention = it) }; refresh()
+    }
 }
 
 @Composable
