@@ -71,6 +71,25 @@ data class BlackHolePhysics(
     val entranceSeconds: Float = 0.9f
 )
 
+/**
+ * R103 遗忘曲线：节点级遗忘时序档案（docs/specs/forgetting-curve-design.md 定稿落地）。
+ *
+ * 由学习事实事件流经 core:domain ForgettingCurve 投影（feature:memory
+ * GraphForgettingProjection），populate 时随节点建档：
+ * - protectionSeconds = 1.0 × S_last（D7 冷却保护期，天 -> 秒）；
+ * - forgettingFullSeconds = 2.0 × S_last（D7 断链离散期 1.0S -> 3.0S，forget 0 -> 1）；
+ * - elapsedProtectionSeconds：建档时已过保护时长（图谱重建远期预扣——app 重启后
+ *   不重新满血，从真实进度继续）；
+ * - initialForget：建档时已积累的遗忘值（远期已遗忘节点 = 1f，直接淡出）。
+ * 无档案节点回落 physics 全局时长（生产 = Float.MAX_VALUE，R82「无证据不遗忘」）。
+ */
+data class BlackHoleForgetProfile(
+    val protectionSeconds: Float,
+    val forgettingFullSeconds: Float,
+    val elapsedProtectionSeconds: Float = 0f,
+    val initialForget: Float = 0f
+)
+
 enum class BlackHoleNodeMode {
     Free,
     Dragging,
@@ -101,6 +120,9 @@ class BlackHoleNode(
     var cooling: Boolean = true
     /** 保护期已过的时长（秒，随倍率）；达到 physics.protectionSeconds 即过保、开始遗忘。 */
     var coolingElapsed: Float = 0f
+
+    /** R103 遗忘曲线：节点级遗忘档案；null = 无证据节点，走 physics 全局时长。 */
+    var forgetProfile: BlackHoleForgetProfile? = null
 
     /** 节点基础半径：9+2.4√degree → 10.5+2.8√degree（R68 +17%）→ 14+3.9√degree（R92 +35%）
      *  → 20+4.5√degree（R94 用户拍板「增大节点面积」——黑洞删除后画布空间充裕，节点再放大，
@@ -198,7 +220,8 @@ class BlackHoleGraphEngine(
      */
     fun populate(
         graphNodes: List<Triple<String, String, GraphNodeKind>>,
-        edges: List<Pair<String, String>>
+        edges: List<Pair<String, String>>,
+        forgetProfiles: Map<String, BlackHoleForgetProfile> = emptyMap()
     ) {
         nodeList.clear()
         edgeList.clear()
@@ -223,6 +246,7 @@ class BlackHoleGraphEngine(
                 forget = 0f
             )
             nodeList.add(node)
+            applyForgetProfile(node, forgetProfiles[id])
         }
         val ids = nodeList.mapTo(HashSet()) { it.id }
         edges.filter { it.first in ids && it.second in ids }.forEach { edgeList.add(it) }
@@ -230,10 +254,35 @@ class BlackHoleGraphEngine(
         settled = false
         draggingId = null
         dragWasDecaying = false
-        absorbedTotal = 0
+        absorbedTotal = nodeList.count { it.absorbed } // R103：远期已遗忘节点计入「已遗忘」
         rescuedTotal = 0
         simAccum = 0f
         entrance = 0f
+    }
+
+    /** R103：按遗忘档案初始化节点时序（图谱重建时远期事件预扣，避免重启后重新满血）。 */
+    private fun applyForgetProfile(node: BlackHoleNode, profile: BlackHoleForgetProfile?) {
+        node.forgetProfile = profile
+        if (profile == null) return
+        if (profile.initialForget >= 1f) {
+            // 远期已遗忘（Δt > 3.0S）：建档即淡出，不再走闪烁旅程
+            node.cooling = false
+            node.coolingElapsed = profile.protectionSeconds
+            node.forget = 1f
+            node.absorbed = true
+            node.absorbFade = 0f
+            return
+        }
+        if (profile.elapsedProtectionSeconds >= profile.protectionSeconds) {
+            // 建档时已过保：直接进入衰减期（forget 预扣 = 断链离散进度）
+            node.cooling = false
+            node.coolingElapsed = profile.protectionSeconds
+            node.forget = profile.initialForget
+        } else {
+            node.cooling = true
+            node.coolingElapsed = profile.elapsedProtectionSeconds
+            node.forget = 0f
+        }
     }
 
     /** R87：节点是否处于衰减期（过保、遗忘增长中）——可点按/拖拽抢救。 */
@@ -424,16 +473,21 @@ class BlackHoleGraphEngine(
      */
     private fun advanceForgetting(dt: Float) {
         val scaled = dt * timeScale
-        val step = scaled / physics.forgettingFullSeconds
         nodeList.forEach { node ->
             if (node.gone || node.absorbed) return@forEach
+            // R103 遗忘曲线：节点级档案优先；无档案节点沿用 physics 全局时长
+            // （生产无证据 = Float.MAX_VALUE 不遗忘，R82 语义保留）。
+            val protectionSeconds = node.forgetProfile?.protectionSeconds ?: physics.protectionSeconds
             if (node.cooling) {
                 node.coolingElapsed += scaled
-                if (node.coolingElapsed >= physics.protectionSeconds) {
+                if (node.coolingElapsed >= protectionSeconds) {
                     node.cooling = false
                 }
                 return@forEach
             }
+            val forgettingFullSeconds =
+                node.forgetProfile?.forgettingFullSeconds ?: physics.forgettingFullSeconds
+            val step = scaled / forgettingFullSeconds
             node.forget = (node.forget + step).coerceAtMost(1f)
             if (node.forget >= 1f) {
                 // R94：遗忘走满 = 真实遗忘（闪烁旅程的终点），进入淡出流程

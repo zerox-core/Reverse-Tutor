@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.graph.GraphNodeEditInput
+import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.memory.MemoryRepository
 import kotlinx.coroutines.launch
 
@@ -155,6 +156,7 @@ fun ContextHubRoute(
 fun GlobalGraphRoute(
     graphRepository: GraphRepository,
     memoryRepository: MemoryRepository,
+    learningLedgerRepository: LearningLedgerRepository,
     onOpenGraphChatEvidence: (String) -> Unit = {},
     onOpenGraphSourceEvidence: (String) -> Unit = {},
     onOpenSettings: () -> Unit,
@@ -172,6 +174,10 @@ fun GlobalGraphRoute(
     }
     var selectedNodeId by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
+    // R103 遗忘曲线：学习事实 -> 节点级档案（与 snapshot 同批加载，避免引擎空档案重建）
+    var forgetProfiles by remember {
+        mutableStateOf<Map<String, BlackHoleForgetProfile>>(emptyMap())
+    }
 
     LaunchedEffect(selectedNodeId) {
         onWorkspaceChromeObscuredChanged(selectedNodeId != null)
@@ -212,6 +218,11 @@ fun GlobalGraphRoute(
         state = try {
             val snapshot = graphRepository.snapshot()
             val memorySnapshot = memoryRepository.snapshot()
+            val receipts = learningLedgerRepository.listLearningFacts()
+            forgetProfiles = GraphForgettingProjection.profiles(
+                nodes = snapshot.nodes,
+                receipts = receipts
+            )
             KnowledgeGraphUiState.from(
                 nodes = snapshot.nodes,
                 edges = snapshot.edges,
@@ -243,7 +254,8 @@ fun GlobalGraphRoute(
         },
         onRetry = { refreshKey += 1 },
         onGraphInteractionChanged = onGraphInteractionChanged,
-        onCanvasModeChange = onCanvasModeChange
+        onCanvasModeChange = onCanvasModeChange,
+        forgetProfiles = forgetProfiles
     )
 }
 

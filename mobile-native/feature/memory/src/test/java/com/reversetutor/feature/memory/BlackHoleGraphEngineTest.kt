@@ -580,4 +580,167 @@ class BlackHoleGraphEngineTest {
         assertEquals(BlackHoleNodeMode.InertiaSliding, node.mode)
         assertEquals(0, engine.rescuedCount)
     }
+
+    // ---------- R103 遗忘曲线：节点级档案（forgetProfiles） ----------
+
+    @Test
+    fun forget_profile_overrides_global_durations() {
+        val engine = BlackHoleGraphEngine(
+            physics = BlackHolePhysics(protectionSeconds = 1000f, forgettingFullSeconds = 5000f)
+        )
+        engine.populate(
+            graphNodes = listOf(Triple("a", "甲", GraphNodeKind.Concept)),
+            edges = emptyList(),
+            forgetProfiles = mapOf(
+                "a" to BlackHoleForgetProfile(protectionSeconds = 4f, forgettingFullSeconds = 6f)
+            )
+        )
+        val node = engine.nodes.first { it.id == "a" }
+        assertTrue("profile node starts protected", node.cooling)
+        tickSeconds(engine, 3.5f)
+        assertTrue("still protected before profile duration elapses", node.cooling)
+        tickSeconds(engine, 1f) // 累计 4.5s：过保 + 已衰减 ~0.5s
+        assertFalse("protection must use profile duration, not physics", node.cooling)
+        assertTrue(
+            "decay already advancing at profile rate (~0.083): ${node.forget}",
+            node.forget in 0.04f..0.14f
+        )
+        val before = node.forget
+        tickSeconds(engine, 1.5f)
+        assertEquals("linear decay at profile rate", before + 1.5f / 6f, node.forget, 0.02f)
+    }
+
+    @Test
+    fun no_profile_nodes_use_global_physics_durations() {
+        val engine = BlackHoleGraphEngine(
+            physics = BlackHolePhysics(protectionSeconds = 2f, forgettingFullSeconds = 100f)
+        )
+        engine.populate(
+            graphNodes = listOf(
+                Triple("a", "甲", GraphNodeKind.Concept),
+                Triple("b", "乙", GraphNodeKind.Concept)
+            ),
+            edges = emptyList(),
+            forgetProfiles = mapOf(
+                "a" to BlackHoleForgetProfile(protectionSeconds = 200f, forgettingFullSeconds = 400f)
+            )
+        )
+        tickSeconds(engine, 3f)
+        val a = engine.nodes.first { it.id == "a" }
+        val b = engine.nodes.first { it.id == "b" }
+        assertTrue("profile node still protected", a.cooling)
+        assertFalse("global node protection expired by physics", b.cooling)
+        assertEquals(0f, a.forget, 1e-4f)
+        assertTrue("global node decays with physics duration", b.forget > 0f)
+    }
+
+    @Test
+    fun profile_elapsed_preoccupies_protection_window() {
+        // 图谱重建远期预扣：建档时保护期已预扣 3.5s（4s 档）-> 再 tick 0.6s 即过保
+        val engine = BlackHoleGraphEngine()
+        engine.populate(
+            graphNodes = listOf(Triple("a", "甲", GraphNodeKind.Concept)),
+            edges = emptyList(),
+            forgetProfiles = mapOf(
+                "a" to BlackHoleForgetProfile(
+                    protectionSeconds = 4f,
+                    forgettingFullSeconds = 6f,
+                    elapsedProtectionSeconds = 3.5f
+                )
+            )
+        )
+        val node = engine.nodes.first { it.id == "a" }
+        assertTrue(node.cooling)
+        tickSeconds(engine, 0.6f) // 预扣 3.5s + 0.6s > 4s：过保（留浮点帧余量）
+        assertFalse("pre-elapsed protection should expire sooner", node.cooling)
+        assertTrue("decay just started", node.forget < 0.05f)
+    }
+
+    @Test
+    fun profile_expired_protection_starts_decaying_at_initial_forget() {
+        // 建档时已过保（Decaying 远期节点）：forget 从 initialForget 起步继续走
+        val engine = BlackHoleGraphEngine()
+        engine.populate(
+            graphNodes = listOf(Triple("a", "甲", GraphNodeKind.Concept)),
+            edges = emptyList(),
+            forgetProfiles = mapOf(
+                "a" to BlackHoleForgetProfile(
+                    protectionSeconds = 4f,
+                    forgettingFullSeconds = 6f,
+                    elapsedProtectionSeconds = 10f,
+                    initialForget = 0.5f
+                )
+            )
+        )
+        val node = engine.nodes.first { it.id == "a" }
+        assertFalse("already past protection at populate", node.cooling)
+        assertEquals(0.5f, node.forget, 1e-4f)
+        tickSeconds(engine, 1f)
+        assertEquals("initialForget + 1s/6s", 0.667f, node.forget, 0.01f)
+    }
+
+    @Test
+    fun profile_absorbed_far_past_node_fades_out_immediately() {
+        // 远期已遗忘（Δt > 3.0S）：重建即淡出，不走闪烁旅程，且计入「已遗忘」
+        val engine = BlackHoleGraphEngine()
+        engine.populate(
+            graphNodes = listOf(Triple("a", "甲", GraphNodeKind.Concept)),
+            edges = emptyList(),
+            forgetProfiles = mapOf(
+                "a" to BlackHoleForgetProfile(
+                    protectionSeconds = 4f,
+                    forgettingFullSeconds = 6f,
+                    elapsedProtectionSeconds = 100f,
+                    initialForget = 1f
+                )
+            )
+        )
+        val node = engine.nodes.first { it.id == "a" }
+        assertTrue("absorbed at populate", node.absorbed)
+        assertEquals(1, engine.absorbedCount)
+        tickSeconds(engine, 0.5f) // absorbFadeSeconds = 0.15：早已淡出移除
+        assertTrue("node removed after fade", engine.nodes.none { it.id == "a" })
+    }
+
+    @Test
+    fun rescue_with_profile_reprotects_for_profile_duration() {
+        val engine = BlackHoleGraphEngine()
+        engine.populate(
+            graphNodes = listOf(Triple("a", "甲", GraphNodeKind.Concept)),
+            edges = emptyList(),
+            forgetProfiles = mapOf(
+                "a" to BlackHoleForgetProfile(protectionSeconds = 2f, forgettingFullSeconds = 6f)
+            )
+        )
+        val node = engine.nodes.first { it.id == "a" }
+        tickSeconds(engine, 2.5f) // 保护 2s：留浮点帧余量再断言过保
+        assertFalse(node.cooling)
+        tickSeconds(engine, 1f)
+        node.forget = 0.4f // 手动推过闪烁呼吸门（0.35）
+        assertTrue(engine.rescueNode("a"))
+        assertEquals(0f, node.forget, 1e-4f)
+        assertTrue("rescued node re-protected", node.cooling)
+        tickSeconds(engine, 1.5f)
+        assertTrue("re-protection uses profile duration", node.cooling)
+        tickSeconds(engine, 1f)
+        assertFalse(node.cooling)
+    }
+
+    @Test
+    fun populate_without_profiles_keeps_legacy_behavior() {
+        // 老调用（不传档案）：默认参数，行为与 R103 前完全一致
+        val engine = BlackHoleGraphEngine(
+            physics = BlackHolePhysics(protectionSeconds = 1f, forgettingFullSeconds = 100f)
+        )
+        engine.populate(
+            graphNodes = listOf(Triple("a", "甲", GraphNodeKind.Concept)),
+            edges = emptyList()
+        )
+        val node = engine.nodes.first { it.id == "a" }
+        assertTrue(node.cooling)
+        assertEquals(0, engine.absorbedCount)
+        tickSeconds(engine, 1.1f)
+        assertFalse(node.cooling)
+        assertTrue(node.forget > 0f)
+    }
 }

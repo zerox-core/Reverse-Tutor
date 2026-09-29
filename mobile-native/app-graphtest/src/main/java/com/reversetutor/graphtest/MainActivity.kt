@@ -15,6 +15,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.reversetutor.core.model.GraphNodeKind
 import com.reversetutor.core.model.GraphNodeStatus
+import com.reversetutor.feature.memory.BlackHoleForgetProfile
 import com.reversetutor.feature.memory.BlackHoleGraphScreen
 import com.reversetutor.feature.memory.GraphLayoutEdge
 import com.reversetutor.feature.memory.GraphLayoutNode
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
                     onSelectedNodeChange = { selectedNodeId = it },
                     title = "知识图谱测试",
                     subtitle = "演示数据 · 真机交互验证版",
+                    forgetProfiles = DemoGraph.forgetProfiles,
                     onBack = { finish() }
                 )
             }
@@ -68,6 +70,19 @@ private object DemoGraph {
         val label: String,
         val kind: GraphNodeKind,
         val status: GraphNodeStatus = GraphNodeStatus.Active
+    )
+
+    /** R103 遗忘曲线演示档案（真实曲线的缩时版，供模拟器/真机全程验证）：
+     * c9「参数方程」4s 冷却保护 -> 6s 断链离散（0.35 闪烁门 = 2.1s 处开始呼吸）
+     * -> 坠入淡出；c8「函数单调性」建档已预扣 3.5s 保护、更快进入闪烁；
+     * 其余节点无档案 = 不遗忘（R82 无证据语义）。点按/拖拽闪烁节点 = 抢救回归。 */
+    val forgetProfiles: Map<String, BlackHoleForgetProfile> = mapOf(
+        "c9" to BlackHoleForgetProfile(protectionSeconds = 4f, forgettingFullSeconds = 6f),
+        "c8" to BlackHoleForgetProfile(
+            protectionSeconds = 4f,
+            forgettingFullSeconds = 6f,
+            elapsedProtectionSeconds = 3.5f
+        )
     )
 
     private val specs: List<Spec> = listOf(

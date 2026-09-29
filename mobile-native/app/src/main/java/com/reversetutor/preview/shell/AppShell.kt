@@ -1852,6 +1852,7 @@ private fun DestinationContent(
             GlobalGraphRoute(
                 graphRepository = graphRepository,
                 memoryRepository = memoryRepository,
+                learningLedgerRepository = hybridAppGraph.learningLedgerRepository,
                 onOpenGraphChatEvidence = { messageId ->
                     pendingChatEvidenceTarget = messageId
                     onOpenChat()

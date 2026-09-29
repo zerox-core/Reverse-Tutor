@@ -169,6 +169,8 @@ class HybridAppGraph private constructor(
     val sourceRepository: SourceRepository,
     val memoryRepository: MemoryRepository,
     val graphRepository: GraphRepository,
+    /** R103 遗忘曲线：学习事实账本（GlobalGraphRoute 投影节点遗忘档案）。 */
+    val learningLedgerRepository: LearningLedgerRepository,
     val learningRepository: LearningRepositoryImpl,
     val conversationRunRepository: ConversationRunRepositoryImpl,
     val modelConnectionRepository: ModelConnectionRepositoryImpl,
@@ -440,6 +442,7 @@ class HybridAppGraph private constructor(
                 sourceRepository = sourceRepository,
                 memoryRepository = memoryRepository,
                 graphRepository = graphRepository,
+                learningLedgerRepository = learningLedgerRepository,
                 learningRepository = learningRepository,
                 conversationRunRepository = conversationRunRepository,
                 modelConnectionRepository = modelConnectionRepository,

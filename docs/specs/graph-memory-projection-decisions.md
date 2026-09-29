@@ -121,3 +121,9 @@ Event(id, nodeId, sessionId, type, timestamp, summary, effectiveness)
 ## 变更记录
 
 - 2026-09-19：初版定稿。D3 / D5 / D6 / D8 经用户决策卡逐项拍板（均采推荐值）。
+
+---
+
+## R103 补记（2026-09-29）：遗忘曲线未决项已决
+
+原先唯一未决项「遗忘曲线具体函数数值」已定稿并落代码：事件级指数衰减 R(t)=exp(-dt/S)，S0=24xeff^2（天），复链增益 G=2（封顶 180 天），lapse 按 2 次成功对消；D7 三阶段 = 1.0S 保护 / 1.0S-3.0S 衰减 / >3.0S 吞噬，抢救=追加复习事件。默认数值与推导见 docs/specs/forgetting-curve-design.md（§7）。代码：core/domain ForgettingCurve.kt + feature/memory GraphForgettingProjection.kt（节点级遗忘档案接线），单测 17+6+39 全绿。

@@ -116,3 +116,16 @@ strength(node, t) = Σ_i eff_i × R_i(t)     （涌现值，不手存）
 3. GraphRepository 接线：Node.strength 改由 §5 计算，engine 的 forget 输入改由 §4 状态机供给；
 4. 模拟器 E2E：timeScale 加速下观察冷却→断链→坠入全旅程与抢救回归；
 5. 更新本文件状态为「已定稿」并回写决策文档未决项。
+
+---
+
+## R103 落地记录（2026-09-29，已定稿并落代码）
+
+- 状态：§7 默认数值已全部写入代码，单元测试全绿，图谱引擎已接线。
+- 实现：
+  - `core/domain` 新增 `ForgettingCurve.kt`（纯函数 stabilityDays / stage / strength，常量与证据效能表），配套 `ForgettingCurveTest.kt` 17 条数值单测。
+  - `feature/memory` 新增 `GraphForgettingProjection.kt`（LearningFactReceipt 账本 → 节点级 BlackHoleForgetProfile 投影），配套 `GraphForgettingProjectionTest.kt` 6 条单测。
+  - `BlackHoleGraphEngine.kt`：节点级遗忘档案（protection / forgettingFull / 远期预扣 elapsedProtectionSeconds / initialForget），无档案节点沿用 physics 全局时长（R82 语义：无证据不遗忘）。
+  - `BlackHoleGraphScreen.kt` / `ContextHubScreen.kt`（GlobalGraphRoute）/ `AppShell.kt` / `HybridAppGraph.kt`：账本→投影→引擎全链接线；图谱重建时远期遗忘进度不重置。
+- 测试：core:domain ForgettingCurveTest 17/17；feature:memory BlackHoleGraphEngineTest 39/39（含 7 条节点级档案新测）、GraphForgettingProjectionTest 6/6；两模块全部单测 0 失败；:app 与 :app-graphtest 编译通过。
+- 待验证：模拟器 E2E（c9 保护 4s / 衰减 6s 演示链路 + 呼吸期点击抢救 toast）与真实学习数据联调，留待下一轮。

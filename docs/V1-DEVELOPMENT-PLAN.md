@@ -146,7 +146,7 @@
 
 **待后端输入（阻塞项）**
 
-- 真实遗忘曲线函数数值（替换图谱 protectionSeconds=90f / forgettingFullSeconds=240f 等占位）；
+- 真实遗忘曲线函数数值 —— 已定稿并落代码（R103，2026-09-29）：默认数值与推导见 docs/specs/forgetting-curve-design.md §7，图谱节点按 1.0S 保护 / 1.0S-3.0S 衰减 / >3.0S 吞噬接线，protectionSeconds=90f / forgettingFullSeconds=240f 占位已由节点级档案取代；
 - AI 输出问题定义。
 
 **工程治理待办（沿用宪章体系）**

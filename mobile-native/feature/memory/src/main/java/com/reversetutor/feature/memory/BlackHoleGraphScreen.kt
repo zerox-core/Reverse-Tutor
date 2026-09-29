@@ -378,6 +378,7 @@ fun BlackHoleGraphScreen(
     onRetry: () -> Unit = {},
     onGraphInteractionChanged: (Boolean) -> Unit = {},
     onCanvasModeChange: (Boolean) -> Unit = {},
+    forgetProfiles: Map<String, BlackHoleForgetProfile> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     var darkTheme by remember { mutableStateOf(false) }
@@ -398,7 +399,8 @@ fun BlackHoleGraphScreen(
                 onOpenChatEvidence = onOpenChatEvidence,
                 onOpenSourceEvidence = onOpenSourceEvidence,
                 onGraphInteractionChanged = onGraphInteractionChanged,
-                onCanvasModeChange = onCanvasModeChange
+                onCanvasModeChange = onCanvasModeChange,
+                forgetProfiles = forgetProfiles
             )
             GraphRenderStatus.Loading -> BlackHoleGraphMessage("正在加载图谱…", palette = palette, showSpinner = true)
             GraphRenderStatus.Empty -> BlackHoleGraphMessage("这里还没有图谱节点", palette = palette, actionLabel = null, onAction = null)
@@ -429,25 +431,22 @@ private fun BlackHoleGraphReadyContent(
     onOpenChatEvidence: ((GraphLayoutNode) -> Unit)?,
     onOpenSourceEvidence: ((GraphLayoutNode) -> Unit)?,
     onGraphInteractionChanged: (Boolean) -> Unit,
-    onCanvasModeChange: (Boolean) -> Unit
+    onCanvasModeChange: (Boolean) -> Unit,
+    forgetProfiles: Map<String, BlackHoleForgetProfile>
 ) {
     val snapshot = state.renderSnapshot(true)
     val layoutNodes = state.allNodes
-    val engine = remember(snapshot) {
-        // R82 用户拍板：暂不做真实遗忘——保护期不过期，全部节点保持刚创建状态正常公转（待后端遗忘曲线）。
+    val engine = remember(snapshot, forgetProfiles) {
+        // R103 遗忘曲线定稿落地（docs/specs/forgetting-curve-design.md）：physics 保护期
+        // 仍为 MAX_VALUE——无档案（无证据）节点不遗忘（R82 语义保留给无证据节点）；
+        // 有档案节点由 ForgettingCurve 投影的 BlackHoleForgetProfile 驱动
+        // （1.0S 冷却保护 / 2.0S 断链离散）。R96 c9 手工播种随之退役。
         BlackHoleGraphEngine(physics = BlackHolePhysics(protectionSeconds = Float.MAX_VALUE)).apply {
             populate(
                 graphNodes = layoutNodes.map { Triple(it.id, it.label, it.kind) },
-                edges = snapshot.edges.map { it.fromNodeId to it.toNodeId }
+                edges = snapshot.edges.map { it.fromNodeId to it.toNodeId },
+                forgetProfiles = forgetProfiles
             )
-            // R96 演示种子（用户要看遗忘闪烁实况）：把「参数方程」直接置为遗忘中途
-            // （遗忘 0.5 > 闪烁门 0.35，入场即呼吸闪烁），1× 倍率约 2 分钟走满淡出消失；
-            // 点按/拖拽闪烁节点 = 抢救回归（保护期无限，救回后不再遗忘）。
-            // 空安全查找：真实 App 数据没有该 id 时自动跳过，不影响生产页面。
-            nodes.firstOrNull { it.id == "c9" }?.let { demo ->
-                demo.cooling = false
-                demo.forget = 0.5f
-            }
         }
     }
     val camera = remember(engine) { BlackHoleCamera() }
