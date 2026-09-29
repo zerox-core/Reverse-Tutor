@@ -112,6 +112,62 @@ class DiscoveryOnlineHttpTransportTest {
     }
 
     @Test
+    fun prefixedSeedBaseUrlPassesThroughWithoutDoubling() = runBlocking {
+        val delegate = RecordingTransport { OnlineHttpResponse(200, "{}") }
+        val transport = DiscoveryOnlineHttpTransport(
+            delegate = delegate,
+            seedBaseUrl = "https://reverse-tutor.example.cn/online-api",
+            probeTransport = RecordingTransport {
+                throw OnlineTransportException("network_failure", retryable = true)
+            },
+            discover = { emptyList() },
+            loadCachedBaseUrl = { null }
+        )
+
+        val response = transport.execute(
+            OnlineHttpRequest("GET", "https://reverse-tutor.example.cn/online-api/api/v1/activities?limit=20")
+        )
+
+        assertEquals(200, response.statusCode)
+        assertEquals(
+            "https://reverse-tutor.example.cn/online-api/api/v1/activities?limit=20",
+            delegate.requests.last().url
+        )
+    }
+
+    @Test
+    fun recoveryFromPrefixedSeedToLanCandidateStripsPrefix() = runBlocking {
+        val delegate = RecordingTransport { request ->
+            if (request.url.startsWith("https://reverse-tutor.example.cn")) {
+                throw OnlineTransportException("network_failure", retryable = true)
+            }
+            OnlineHttpResponse(200, "{}")
+        }
+        val transport = DiscoveryOnlineHttpTransport(
+            delegate = delegate,
+            seedBaseUrl = "https://reverse-tutor.example.cn/online-api",
+            probeTransport = RecordingTransport { request ->
+                if (request.url == "http://192.168.0.100:8100/api/v1/health") {
+                    OnlineHttpResponse(200, "{}")
+                } else {
+                    throw OnlineTransportException("network_failure", retryable = true)
+                }
+            },
+            discover = { listOf("http://192.168.0.100:8100") },
+            loadCachedBaseUrl = { null }
+        )
+
+        val response = transport.execute(
+            OnlineHttpRequest("GET", "https://reverse-tutor.example.cn/online-api/api/v1/content/feed?limit=4")
+        )
+
+        assertEquals(200, response.statusCode)
+        assertEquals(
+            "http://192.168.0.100:8100/api/v1/content/feed?limit=4",
+            delegate.requests.last().url
+        )
+    }
+    @Test
     fun parseBaseUrlsExtractsUrlsFromDiscoveryPayload() {
         val payload =
             """{"service":"reverse-tutor-online","magic":"REVERSE_TUTOR_DISCOVER_V1","baseUrls":["http://192.168.0.100:8100","http://198.18.0.1:8100"]}"""

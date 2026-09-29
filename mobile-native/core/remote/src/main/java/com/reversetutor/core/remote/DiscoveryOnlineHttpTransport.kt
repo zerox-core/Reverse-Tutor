@@ -28,7 +28,7 @@ class DiscoveryOnlineHttpTransport(
     private var activeBaseUrl: String = seedBaseUrl.trimEnd('/')
 
     override suspend fun execute(request: OnlineHttpRequest): OnlineHttpResponse {
-        val effective = if (baseOf(request.url) != activeBaseUrl) {
+        val effective = if (!request.url.startsWith(activeBaseUrl)) {
             request.copy(url = rewriteTo(request.url, activeBaseUrl))
         } else {
             request
@@ -68,8 +68,18 @@ class DiscoveryOnlineHttpTransport(
         false
     }
 
-    private fun rewriteTo(url: String, baseUrl: String): String =
-        baseUrl.trimEnd('/') + pathOf(url)
+    private fun rewriteTo(url: String, baseUrl: String): String {
+        val pathAfterOrigin = pathOf(url)
+        // 种子地址可能带路径前缀（如 HTTPS 反代 https://host/online-api）：
+        // 前缀属于旧基址，改写前需剥掉，否则拼出 /online-api/online-api 双前缀
+        val seedPrefix = pathOf(seedBaseUrl.trim().trimEnd('/'))
+        val apiPath = if (seedPrefix.length > 1 && pathAfterOrigin.startsWith(seedPrefix)) {
+            pathAfterOrigin.removePrefix(seedPrefix)
+        } else {
+            pathAfterOrigin
+        }
+        return baseUrl.trim().trimEnd('/') + apiPath
+    }
 
     internal companion object {
         const val EMULATOR_FALLBACK_BASE_URL = "http://10.0.2.2:8100"
