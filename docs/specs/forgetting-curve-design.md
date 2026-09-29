@@ -129,3 +129,14 @@ strength(node, t) = Σ_i eff_i × R_i(t)     （涌现值，不手存）
   - `BlackHoleGraphScreen.kt` / `ContextHubScreen.kt`（GlobalGraphRoute）/ `AppShell.kt` / `HybridAppGraph.kt`：账本→投影→引擎全链接线；图谱重建时远期遗忘进度不重置。
 - 测试：core:domain ForgettingCurveTest 17/17；feature:memory BlackHoleGraphEngineTest 39/39（含 7 条节点级档案新测）、GraphForgettingProjectionTest 6/6；两模块全部单测 0 失败；:app 与 :app-graphtest 编译通过。
 - 模拟器 E2E 已验证（R104，2026-09-29，emulator-5554 + app-graphtest 演示档案 c8/c9）：1x 全速下计数「已遗忘 0→2」，c8、c9 按 4s 保护 / 6s 衰减档案先后坠入；0.3x 慢速下呼吸期点击命中带 3.5s 远期预扣的节点，toast「已抢救回归『函数单调性』：复习完成，遗忘清零」、计数归零——抢救链路（点击→遗忘清零→冷却重置）全通。真实学习数据联调待后端接口。
+
+## R113 Python 等价实现落地记录（2026-09-29）
+
+- 背景：挑战活动（challenge）后端需要 Python 侧同算法实现，服务端口径与 Android 客户端（R103 Kotlin）保持数值一致。
+- 实现：
+  - `online_db/forgetting_curve.py` 扩写：保留既有 `ForgettingCurve` Protocol 与 `NoopForgettingCurve`（默认仍接线、永不过期），新增与 Kotlin 同参数的纯函数集——证据效能表、S_0 = 24×eff²、复习链 G=2 / 封顶 180 天、lapse 惩罚系数 2、三阶段状态机（1.0S / 3.0S）、strength 双轨求和；常量与边界判定（含 `<=` 阈值）逐一对齐 Kotlin 源。
+  - 新增 `StageEvidenceForgettingCurve`（阶段证据接缝的真实实现，**未接线**）：把一条阶段证据锚定为 delayed_retrieval（eff 0.82，S_0≈16.1 天），超过 3S≈48 天视为失效。锚定映射与启用时机均待拍板（stage-progress-model.md §10 未决项）；启用会让既有证据开始过期，属行为变更，故默认仍为 Noop。
+  - `tests/test_forgetting_curve.py` 19 条数值测试，逐条镜像 Kotlin `ForgettingCurveTest.kt` 的 17 条断言（同容差），另加 2 条接缝语义测试。
+- 测试：test_forgetting_curve.py 19/19 通过；阶段进度回归 test_online_stage_progress_api.py 30/30 通过（Python 3.11.9）。
+- 待拍板：① 阶段证据→delayed_retrieval 锚定是否认可；② 是否/何时把 StageEvidenceForgettingCurve 接为默认（接入后旧证据约 48 天起开始失效，需配合迁移口径）。
+
