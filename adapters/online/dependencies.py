@@ -13,6 +13,7 @@ from online_db.activity_store import SqlAlchemyActivityStore
 from online_db.auth_store import SqlAlchemyAuthStore
 from online_db.content_store import SqlAlchemyContentStore
 from online_db.idempotency_store import SqlAlchemyIdempotencyStore
+from online_db.probe_plan_store import SqlAlchemyProbePlanStore
 from online_db.schema_check import assert_online_schema_at_head
 from online_db.session import build_online_session_factory
 from online_db.stage_store import SqlAlchemyStageStore
@@ -25,6 +26,7 @@ class PostgresOnlineServices:
     activity_port: ActivityPort
     activity_store: SqlAlchemyActivityStore
     stage_store: SqlAlchemyStageStore
+    probe_plan_store: SqlAlchemyProbePlanStore
 
 
 def build_postgres_auth_service(database_url: str) -> AuthService:
@@ -53,6 +55,7 @@ def build_postgres_online_services(database_url: str) -> PostgresOnlineServices:
         activity_port=SqlAlchemyActivityPort(activity_store),
         activity_store=activity_store,
         stage_store=SqlAlchemyStageStore(session_factory),
+        probe_plan_store=SqlAlchemyProbePlanStore(session_factory),
     )
 
 

@@ -130,3 +130,68 @@ class AdminStagesResponse(CamelModel):
     activity_slug: str
     stages: list[AdminStageDraft]
 
+
+ProbeKind = Literal["probe_recite", "probe_transfer", "probe_error"]
+
+
+class AdminProbeRubric(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pass_criteria: str = Field(alias="pass", min_length=1, max_length=2000)
+    partial_criteria: str = Field(alias="partial", min_length=1, max_length=2000)
+    fail_signals: list[str] = Field(min_length=1, max_length=10)
+
+
+class AdminProbeItem(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    evidence_key: str = Field(min_length=1, max_length=120)
+    kind: ProbeKind
+    question: str = Field(min_length=1, max_length=4000)
+    rubric: AdminProbeRubric
+    followups: list[str] = Field(default_factory=list, max_length=3)
+
+
+class AdminProbeStagePlan(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    stage_index: int = Field(ge=1)
+    entry_question: str = Field(min_length=1, max_length=4000)
+    probes: list[AdminProbeItem] = Field(min_length=1, max_length=20)
+
+
+class AdminProbePlanGenerateRequest(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    temperature: float | None = Field(default=None, ge=0.0, le=2.0)
+
+
+class AdminProbePlanGenerateResponse(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_slug: str
+    account_id: str
+    stages: list[AdminProbeStagePlan]
+    persisted: bool = False
+
+
+class AdminProbePlanConfirmRequest(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model: str = Field(min_length=1, max_length=120)
+    stages: list[AdminProbeStagePlan] = Field(min_length=1, max_length=50)
+
+
+class AdminProbeStagePlanRecord(AdminProbeStagePlan):
+    stage_name: str
+    capability: str
+    model: str
+    updated_at_epoch_millis: int
+
+
+class AdminProbePlanResponse(CamelModel):
+    model_config = ConfigDict(extra="forbid")
+
+    activity_slug: str
+    account_id: str
+    stages: list[AdminProbeStagePlanRecord]

@@ -4,6 +4,7 @@ import hmac
 import os
 from datetime import UTC, datetime
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Path, Query, status
 from sqlalchemy.exc import IntegrityError
@@ -12,10 +13,18 @@ from llm import chat_json
 from online_db.activity_store import (
     ActivityDefinition,
     ActivityNotFound,
+    ActivityParticipationNotFound,
     ActivityRecord,
     ActivityStateTransitionError,
     ActivityTaskDefinition,
 )
+from online_db.probe_plan_prompts import (
+    ProbePlan,
+    ProbePlanValidationError,
+    generate_probe_plan,
+    validate_probe_plan,
+)
+from online_db.probe_plan_store import ProbePlanNotFound
 
 from online_db.stage_generation import (
     MaterialDigest,
@@ -30,6 +39,14 @@ from .admin_models import (
     AdminActivity,
     AdminActivityCreateRequest,
     AdminActivityListResponse,
+    AdminProbeItem,
+    AdminProbePlanConfirmRequest,
+    AdminProbePlanGenerateRequest,
+    AdminProbePlanGenerateResponse,
+    AdminProbePlanResponse,
+    AdminProbeRubric,
+    AdminProbeStagePlan,
+    AdminProbeStagePlanRecord,
     AdminStageDraft,
     AdminStagePlanGenerateRequest,
     AdminStagePlanGenerateResponse,
@@ -39,8 +56,10 @@ from .admin_models import (
 )
 from .admin_service import (
     AdminActivityServiceUnavailable,
+    AdminProbePlanServiceUnavailable,
     AdminStageServiceUnavailable,
     admin_activity_service,
+    admin_probe_plan_service,
     admin_stage_service,
 )
 from .errors import OnlineApiError
@@ -384,3 +403,226 @@ def list_activity_stages(slug: AdminSlugPath) -> AdminStagesResponse:
         stages=[_stage_payload(record) for record in records],
     )
 
+
+AccountIdPath = Annotated[UUID, Path(alias="accountId")]
+
+
+def _probe_plan_store():
+    try:
+        return admin_probe_plan_service.probe_plan_store
+    except AdminProbePlanServiceUnavailable:
+        raise OnlineApiError(
+            503,
+            "probe_plan_store_unavailable",
+            "Probe plan store is not configured",
+            retryable=True,
+        )
+
+
+def _probe_stage_plan_payload(stage_plan) -> AdminProbeStagePlan:
+    return AdminProbeStagePlan(
+        stage_index=stage_plan.stage_index,
+        entry_question=stage_plan.entry_question,
+        probes=[
+            AdminProbeItem(
+                evidence_key=probe.evidence_key,
+                kind=probe.kind,
+                question=probe.question,
+                rubric=AdminProbeRubric(
+                    pass_criteria=probe.rubric.pass_criteria,
+                    partial_criteria=probe.rubric.partial_criteria,
+                    fail_signals=list(probe.rubric.fail_signals),
+                ),
+                followups=list(probe.followups),
+            )
+            for probe in stage_plan.probes
+        ],
+    )
+
+
+def _probe_record_payload(record) -> AdminProbeStagePlanRecord:
+    base = _probe_stage_plan_payload(record)
+    return AdminProbeStagePlanRecord(
+        **base.model_dump(),
+        stage_name=record.stage_name,
+        capability=record.capability,
+        model=record.model,
+        updated_at_epoch_millis=_to_epoch_millis(record.updated_at),
+    )
+
+
+def _probe_plan_from_request(
+    stages_payload: list[AdminProbeStagePlan], stage_records
+) -> ProbePlan:
+    raw = {
+        "stages": [
+            {
+                "stage_index": stage.stage_index,
+                "entry_question": stage.entry_question,
+                "probes": [
+                    {
+                        "evidence_key": probe.evidence_key,
+                        "kind": probe.kind,
+                        "question": probe.question,
+                        "rubric": {
+                            "pass": probe.rubric.pass_criteria,
+                            "partial": probe.rubric.partial_criteria,
+                            "fail_signals": list(probe.rubric.fail_signals),
+                        },
+                        "followups": list(probe.followups),
+                    }
+                    for probe in stage.probes
+                ],
+            }
+            for stage in stages_payload
+        ]
+    }
+    return validate_probe_plan(raw, stage_records)
+
+
+@router.post(
+    "/activities/{slug}/participations/{accountId}/probe-plan/generate",
+    response_model=AdminProbePlanGenerateResponse,
+    dependencies=[Depends(require_admin)],
+    operation_id="adminGenerateProbePlan",
+)
+async def generate_participation_probe_plan(
+    slug: AdminSlugPath,
+    account_id: AccountIdPath,
+    request: AdminProbePlanGenerateRequest,
+) -> AdminProbePlanGenerateResponse:
+    """Generate a probe-plan draft for a participation (no persistence).
+
+    Probe plan + rubric are finalized at session creation and stored with the
+    session strategy (stage-progress spec §11.3): generation runs against the
+    current stage definitions and the human review gate (PUT confirm)
+    persists the finalized plan.
+    """
+    record = _store().get_activity(slug)
+    if record is None:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    try:
+        stage_records = _stage_store().list_activity_stages(slug)
+    except ActivityStagesNotDefined:
+        raise OnlineApiError(
+            404, "stages_not_defined", "Stages are not defined for this activity"
+        )
+    temperature = 0.3 if request.temperature is None else request.temperature
+    try:
+        plan = await generate_probe_plan(
+            stage_records,
+            activity_title=record.title,
+            activity_description=record.description,
+            chat_json=chat_json,
+            temperature=temperature,
+        )
+    except ProbePlanValidationError as exc:
+        raise OnlineApiError(
+            502,
+            "probe_plan_invalid",
+            f"Generated probe plan failed validation: {exc}",
+            retryable=True,
+        )
+    except Exception as exc:
+        raise OnlineApiError(
+            502,
+            "probe_plan_generation_failed",
+            f"Probe plan generation failed: {type(exc).__name__}: {str(exc)[:300]}",
+            retryable=True,
+        )
+    return AdminProbePlanGenerateResponse(
+        activity_slug=slug,
+        account_id=str(account_id),
+        stages=[_probe_stage_plan_payload(stage_plan) for stage_plan in plan.stages],
+        persisted=False,
+    )
+
+
+@router.put(
+    "/activities/{slug}/participations/{accountId}/probe-plan",
+    response_model=AdminProbePlanResponse,
+    dependencies=[Depends(require_admin)],
+    operation_id="adminConfirmProbePlan",
+)
+def confirm_participation_probe_plan(
+    slug: AdminSlugPath,
+    account_id: AccountIdPath,
+    request: AdminProbePlanConfirmRequest,
+) -> AdminProbePlanResponse:
+    """Persist the human-confirmed probe plan (per-stage upsert)."""
+    try:
+        stage_records = _stage_store().list_activity_stages(slug)
+    except ActivityNotFound:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    except ActivityStagesNotDefined:
+        raise OnlineApiError(
+            404, "stages_not_defined", "Stages are not defined for this activity"
+        )
+    try:
+        plan = _probe_plan_from_request(request.stages, stage_records)
+    except ProbePlanValidationError as exc:
+        raise OnlineApiError(422, "invalid_probe_plan", str(exc))
+    try:
+        records = _probe_plan_store().save_probe_plan(
+            slug,
+            account_id,
+            plan=plan,
+            model=request.model,
+            now=_now(),
+        )
+    except ActivityNotFound:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    except ActivityStagesNotDefined:
+        raise OnlineApiError(
+            404, "stages_not_defined", "Stages are not defined for this activity"
+        )
+    except ActivityParticipationNotFound:
+        raise OnlineApiError(
+            404,
+            "participation_not_found",
+            "No active participation for this activity",
+        )
+    except (ProbePlanValidationError, ValueError) as exc:
+        raise OnlineApiError(422, "invalid_probe_plan", str(exc))
+    return AdminProbePlanResponse(
+        activity_slug=slug,
+        account_id=str(account_id),
+        stages=[_probe_record_payload(record) for record in records],
+    )
+
+
+@router.get(
+    "/activities/{slug}/participations/{accountId}/probe-plan",
+    response_model=AdminProbePlanResponse,
+    dependencies=[Depends(require_admin)],
+    operation_id="adminListProbePlan",
+)
+def list_participation_probe_plan(
+    slug: AdminSlugPath, account_id: AccountIdPath
+) -> AdminProbePlanResponse:
+    """List the stored probe plan of a participation (all stages)."""
+    try:
+        records = _probe_plan_store().list_stage_plans(slug, account_id)
+    except ActivityNotFound:
+        raise OnlineApiError(404, "activity_not_found", "Activity not found")
+    except ActivityStagesNotDefined:
+        raise OnlineApiError(
+            404, "stages_not_defined", "Stages are not defined for this activity"
+        )
+    except ActivityParticipationNotFound:
+        raise OnlineApiError(
+            404,
+            "participation_not_found",
+            "No active participation for this activity",
+        )
+    except ProbePlanNotFound:
+        raise OnlineApiError(
+            404,
+            "probe_plan_not_found",
+            "No probe plan stored for this participation",
+        )
+    return AdminProbePlanResponse(
+        activity_slug=slug,
+        account_id=str(account_id),
+        stages=[_probe_record_payload(record) for record in records],
+    )
