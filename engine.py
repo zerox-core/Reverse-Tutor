@@ -74,11 +74,12 @@ VERIFICATION_STATUSES = {"none", "passed", "partial", "failed"}
 # 会话无 activity 链接时整条链路不生效（安全默认、纯增量）。
 
 ACTIVITY_EVIDENCE_INSTRUCTION = (
-    "# 阶段证据判定输出\n"
-    "如果本轮用户（老师）的教学表现已经满足上面探针计划中某条证据的判定标准，"
-    "在输出 JSON 顶层增加 \"activity_evidence\": {\"stage_index\": 阶段号, "
-    "\"evidence_key\": \"证据键\"}：只能从上面计划列出的组合里选，一轮最多一条，"
-    "拿不准就不要输出。"
+    "# 什么时候算我真懂了\n"
+    "这一轮聊完，如果老师的讲解让你对上面某条想搞懂的东西真的懂了"
+    "（达到「我就算真懂了」那一档），就在输出 JSON 顶层加一个字段 "
+    "\"activity_evidence\": {\"stage_index\": 阶段号, "
+    "\"evidence_key\": \"那条的名字\"}。名字只能照抄上面清单里「」中的词，"
+    "一轮最多写一条；只是懂了一半、或者拿不准，就不要写这个字段。"
 )
 
 _ACTIVITY_HOOK = None

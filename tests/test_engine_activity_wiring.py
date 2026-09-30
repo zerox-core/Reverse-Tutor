@@ -17,7 +17,7 @@ import engine
 
 ACCOUNT_ID = str(uuid4())
 ACTIVITY_SETTINGS = {"activity": {"slug": "challenge-01", "accountId": ACCOUNT_ID}}
-PLAN_BLOCK = "# 阶段探针计划（随会话策略定稿；缺口驱动、一次只出一个探针）\n## 阶段 1 · 基础概念\n- 证据 explain · probe_recite：讲清概念"
+PLAN_BLOCK = "# 我在这个挑战里想搞懂的东西\n## 阶段 1 · 基础概念\n- 关于「explain」，我打算这样向老师请教：讲清概念"
 
 
 class FakeHook:

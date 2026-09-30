@@ -308,25 +308,34 @@ def plan_to_payload(plan: ProbePlan) -> list[dict[str, Any]]:
 def render_probe_plan_block(
     plan: ProbePlan, stages: Sequence[ActivityStageRecord]
 ) -> str:
-    """把定稿计划渲染成注入会话策略的文本块（存档形态）。"""
+    """把定稿计划渲染成注入会话策略的文本块（存档形态）。
+
+    措辞按「教学层结论 → 表达层包装」拍板：教学层的探针/rubric/证据键
+    全部翻译成 AI 学生第一人称的理解状态（我哪里还没懂、讲到什么程度
+    我就懂了），不出现判分语言（判定/过/不过信号/probe_* 种类名），
+    防止注入块把学生人格拉成考官腔。evidence_key 保留（写回证据时
+    需要按名引用），以「key」形式呈现。
+    """
     names = {stage.stage_index: stage.name for stage in stages}
     lines = [
-        "# 阶段探针计划（随会话策略定稿；缺口驱动、一次只出一个探针）"
+        "# 我在这个挑战里想搞懂的东西"
+        "（这份清单放在心里就好，别逐条念给老师听；"
+        "哪里还没懂就先问哪里，一次只请教一个）"
     ]
     for stage_plan in plan.stages:
         lines.append(
             f"## 阶段 {stage_plan.stage_index} · {names.get(stage_plan.stage_index, '')}"
         )
-        lines.append(f"- 入口问题（baseline_probe）：{stage_plan.entry_question}")
+        lines.append(f"- 开场我最好奇的：{stage_plan.entry_question}")
         for probe in stage_plan.probes:
             lines.append(
-                f"- 证据 {probe.evidence_key} · {probe.kind}：{probe.question}"
+                f"- 关于「{probe.evidence_key}」，我打算这样向老师请教：{probe.question}"
             )
-            lines.append(f"  判定：过={probe.rubric.pass_criteria}")
-            lines.append(f"  部分过={probe.rubric.partial_criteria}")
+            lines.append(f"  老师讲到这个份上，我就算真懂了：{probe.rubric.pass_criteria}")
+            lines.append(f"  讲到这个份上算懂了一半：{probe.rubric.partial_criteria}")
             lines.append(
-                f"  不过信号={'；'.join(probe.rubric.fail_signals)}"
+                f"  听到这些说明我还没真懂，别急着算我会了：{'；'.join(probe.rubric.fail_signals)}"
             )
             if probe.followups:
-                lines.append(f"  存疑追问（≤{MAX_FOLLOWUP_PROBES}）：{'；'.join(probe.followups)}")
+                lines.append(f"  还没懂透我就接着追问（最多{MAX_FOLLOWUP_PROBES}句）：{'；'.join(probe.followups)}")
     return "\n".join(lines)

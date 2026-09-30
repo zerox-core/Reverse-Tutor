@@ -125,11 +125,11 @@ def hooked(sqlite_session_factory):
 def test_render_block_renders_archived_plan(hooked):
     hook, _, account_id = hooked
     block = hook.render_block(activity_slug=SLUG, account_id=str(account_id))
-    assert "# 阶段探针计划" in block
+    assert "# 我在这个挑战里想搞懂的东西" in block
     assert "## 阶段 1 · 基础概念" in block
-    assert "入口问题（baseline_probe）：先给我讲讲这个概念是什么？" in block
-    assert "证据 explain · probe_recite：用自己的话复述概念定义" in block
-    assert "判定：过=定义要点齐全且有自己的话" in block
+    assert "开场我最好奇的：先给我讲讲这个概念是什么？" in block
+    assert "关于「explain」，我打算这样向老师请教：用自己的话复述概念定义" in block
+    assert "我就算真懂了：定义要点齐全且有自己的话" in block
 
 
 def test_record_turn_evidence_uses_kind_from_plan(hooked):

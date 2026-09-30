@@ -380,13 +380,16 @@ def test_render_probe_plan_block_content(sqlite_session_factory):
     block = render_probe_plan_block(plan, stages)
     assert "阶段 1 · S1" in block
     assert "阶段 2 · S2" in block
-    assert "baseline_probe" in block
-    assert "probe_error" in block
-    assert "probe_transfer" in block
-    assert "判定：过=" in block
-    assert "部分过=" in block
-    assert "不过信号=" in block
-    assert "存疑追问" in block
+    # 表达层包装：学生第一人称理解状态
+    assert "开场我最好奇的" in block
+    assert "我就算真懂了" in block
+    assert "懂了一半" in block
+    assert "别急着算我会了" in block
+    assert "接着追问" in block
+    # 判分语言与实现词汇不得泄漏进人格上下文
+    assert "判定" not in block
+    assert "probe_" not in block
+    assert "baseline" not in block
 
 
 # ---------------------------------------------------------------------------
