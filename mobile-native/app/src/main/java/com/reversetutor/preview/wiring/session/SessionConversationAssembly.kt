@@ -24,6 +24,10 @@ import com.reversetutor.feature.chat.ConversationMessageContract
 import com.reversetutor.feature.chat.SessionConversationContract
 import com.reversetutor.feature.chat.SessionConversationFacade
 import com.reversetutor.core.domain.LearningFactReceipt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharedFlow
 import com.reversetutor.core.domain.LearningOverviewContract
 
 /**
@@ -140,6 +144,34 @@ class SessionConversationAssembly(
     private val listLearningFactsForOverview: (suspend (String) -> List<LearningFactReceipt>)? =
         learningLedgerRepository?.let { repo -> { spaceId -> repo.listLearningFacts(spaceId) } }
 
+    /** V1 方向三「每日总结」：后台懒生成状态与生成器（绝不阻塞聊天轮次）。 */
+    private val dailySummaryGenerationState = DailySummaryGenerationState()
+
+    private val dailySummaryGenerationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val dailySummaryGenerator: DailySummaryGenerator? = learningLedgerRepository?.let { ledger ->
+        DailySummaryGenerator(
+            generateSummary = chatGenerationRepository::generateSessionSummary,
+            findStored = { spaceId, dayStart ->
+                learningRepository.findLatestDailySummary(
+                    spaceId,
+                    dayStart,
+                    DailySummaryGenerator.GeneratorVersion
+                )
+            },
+            saveStored = { summary -> learningRepository.saveDailySummary(summary) },
+            listLearningFacts = ledger::listLearningFacts,
+            listPlanTasks = learningRepository::listTasks,
+            listTokenUsage = learningRepository::listTokenUsage,
+            pickSessionId = { spaceId ->
+                sessionRepository.listSessions(spaceId).firstOrNull { !it.archived }?.id
+            },
+            state = dailySummaryGenerationState,
+            generationScope = dailySummaryGenerationScope,
+            nowEpochMillis = nowEpochMillis
+        )
+    }
+
     private val overviewCoordinator: LearningOverviewCoordinator = LearningOverviewCoordinator(
         sessionPort = LearningOverviewSessionPortAdapter(sessionRepository),
         progressPort = LearningOverviewProgressPortAdapter(
@@ -154,6 +186,12 @@ class SessionConversationAssembly(
             nowEpochMillis = nowEpochMillis
         ),
         weakPointPort = LearningOverviewWeakPointPortAdapter(memoryRepository),
+        dailySummaryPort = LearningOverviewDailySummaryPortAdapter(
+            learningRepository,
+            listLearningFacts = listLearningFactsForOverview,
+            generationState = dailySummaryGenerationState,
+            nowEpochMillis = nowEpochMillis
+        ),
         tokenPort = LearningOverviewTokenPortAdapter(
             listTokenUsage = learningRepository::listTokenUsage,
             sessionIdForTurn = { turnId ->
@@ -256,4 +294,13 @@ class SessionConversationAssembly(
      */
     suspend fun overview(scope: LearningOverviewScope): LearningOverviewContract =
         overviewCoordinator.generate(scope)
+
+    /** 每日总结懒生成入口：空数据日不烧额度，已有有效总结不重复生成。 */
+    suspend fun requestDailySummaryGeneration(scope: LearningOverviewScope) {
+        dailySummaryGenerator?.requestGeneration(scope.spaceId)
+    }
+
+    /** 后台生成结束事件（成功或失败），面板据此静默刷新。 */
+    val dailySummaryUpdates: SharedFlow<Unit>
+        get() = dailySummaryGenerationState.updates
 }

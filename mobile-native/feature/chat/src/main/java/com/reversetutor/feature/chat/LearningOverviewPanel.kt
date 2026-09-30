@@ -205,6 +205,7 @@ private fun OverviewBody(
         if (state.warnings.isNotEmpty()) {
             WarningBanner(warnings = state.warnings)
         }
+        DailySummaryCard(state = state)
         ProgressCard(state = state)
         TodayPlanCard(state = state)
         WeeklyMainlineCard(state = state, onOpenWeekly = onOpenWeekly)
@@ -227,6 +228,67 @@ private fun WarningBanner(warnings: List<String>) {
             style = type.style(11f, 16f, FontWeight.Medium, FormalColors.Warning),
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
+    }
+}
+
+@Composable
+private fun DailySummaryCard(state: LearningOverviewUiState) {
+    val type = LocalFormalTypeScale.current
+    val daily = state.dailySummary
+    OverviewCard {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "每日总结",
+                    style = type.style(12f, 17f, FontWeight.Bold, FormalColors.Ink),
+                    modifier = Modifier.weight(1f)
+                )
+                if (state.dailySummaryAiStateLabel.isNotBlank()) {
+                    Text(
+                        state.dailySummaryAiStateLabel,
+                        style = type.style(10f, 14f, color = FormalColors.Muted),
+                        modifier = Modifier.testTag("learning_overview_daily_ai_state")
+                    )
+                }
+            }
+            if (!daily.hasActivity) {
+                Text(
+                    "今天还没有学习记录",
+                    style = type.style(11f, 16f, color = FormalColors.Muted),
+                    modifier = Modifier.testTag("learning_overview_daily_empty")
+                )
+            } else {
+                Text(
+                    "知识点 ${daily.knowledgePoints.size} 个 · 证据 ${daily.evidenceCount} 条（通过 ${daily.passedCount}）",
+                    style = type.style(11f, 16f, color = FormalColors.Ink),
+                    modifier = Modifier.testTag("learning_overview_daily_stats")
+                )
+                val extras = listOfNotNull(
+                    if (daily.masteredTodayCount > 0) "新掌握 ${daily.masteredTodayCount}" else null,
+                    if (daily.planCompletedCount > 0) "完成计划 ${daily.planCompletedCount}" else null
+                ).joinToString(" · ")
+                if (extras.isNotBlank()) {
+                    Text(extras, style = type.style(10f, 14f, color = FormalColors.Muted))
+                }
+                if (daily.knowledgePoints.isNotEmpty()) {
+                    Text(
+                        daily.knowledgePoints.joinToString("、"),
+                        style = type.style(10f, 14f, color = FormalColors.Muted),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("learning_overview_daily_knowledge_points")
+                    )
+                }
+                val aiText = daily.aiText
+                if (!aiText.isNullOrBlank()) {
+                    Text(
+                        aiText,
+                        style = type.style(11f, 17f, color = FormalColors.Ink),
+                        modifier = Modifier.testTag("learning_overview_daily_ai_text")
+                    )
+                }
+            }
+        }
     }
 }
 

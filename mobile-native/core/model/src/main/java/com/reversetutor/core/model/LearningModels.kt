@@ -35,6 +35,24 @@ data class WeeklySummary(
     val stale: Boolean = false
 )
 
+/**
+ * Persisted AI daily summary for the home panel (V1 方向三「每日总结」).
+ * Mirrors [WeeklySummary] at day granularity. [sourceRevision] records the
+ * learning-ledger evidence count at generation time so the lazy generator
+ * can tell when the day has moved on enough to justify a regeneration.
+ */
+data class DailySummary(
+    val id: String,
+    val spaceId: String,
+    val dayStartEpochMillis: Long,
+    val dayEndEpochMillis: Long = 0L,
+    val sourceRevision: Long = 0L,
+    val generatorVersion: String = "",
+    val summary: String = "",
+    val generatedAtEpochMillis: Long = 0L,
+    val stale: Boolean = false
+)
+
 data class TokenUsageRecord(
     val id: String,
     val spaceId: String,

@@ -99,13 +99,27 @@ class LearningOverviewCoordinatorTest {
         }
     }
 
+    private class FakeDailySummaryPort(
+        var contract: DailySummaryContract = DailySummaryContract(),
+        var shouldFail: Boolean = false
+    ) : LearningOverviewDailySummaryPort {
+        override suspend fun getDailySummary(
+            spaceId: String,
+            sessionIds: List<String>?
+        ): DailySummaryContract {
+            if (shouldFail) throw RuntimeException("daily error")
+            return contract
+        }
+    }
+
     private fun makeCoordinator(
         session: FakeSessionPort = FakeSessionPort(),
         progress: FakeProgressPort = FakeProgressPort(),
         plan: FakePlanPort = FakePlanPort(),
         thread: FakeThreadPort = FakeThreadPort(),
         weak: FakeWeakPointPort = FakeWeakPointPort(),
-        token: FakeTokenPort = FakeTokenPort()
+        token: FakeTokenPort = FakeTokenPort(),
+        daily: LearningOverviewDailySummaryPort? = null
     ): LearningOverviewCoordinator = LearningOverviewCoordinator(
         sessionPort = session,
         progressPort = progress,
@@ -113,6 +127,7 @@ class LearningOverviewCoordinatorTest {
         threadPort = thread,
         weakPointPort = weak,
         tokenPort = token,
+        dailySummaryPort = daily,
         nowEpochMillis = { 1000L }
     )
 
@@ -284,5 +299,30 @@ class LearningOverviewCoordinatorTest {
         // Warnings for failed sources
         assertTrue(result.warnings.any { it.source == "progress" })
         assertTrue(result.warnings.any { it.source == "tokenUsage" })
+    }
+
+    @Test
+    fun dailySummaryPortFlowsThroughContract() = runBlocking {
+        val contract = DailySummaryContract(
+            evidenceCount = 7,
+            passedCount = 5,
+            knowledgePoints = listOf("极限", "导数"),
+            aiText = "你今天复习了极限与导数",
+            aiState = DailySummaryAiState.Ready
+        )
+        val coordinator = makeCoordinator(daily = FakeDailySummaryPort(contract = contract))
+        val result = coordinator.generate(LearningOverviewScope("s1"))
+
+        assertEquals(contract, result.dailySummary)
+    }
+
+    @Test
+    fun dailySummaryFailureDegradesToDefaultWithWarning() = runBlocking {
+        val coordinator = makeCoordinator(daily = FakeDailySummaryPort(shouldFail = true))
+        val result = coordinator.generate(LearningOverviewScope("s1"))
+
+        assertEquals(DailySummaryContract(), result.dailySummary)
+        assertTrue(result.warnings.any { it.source == "dailySummary" })
+    
     }
 }

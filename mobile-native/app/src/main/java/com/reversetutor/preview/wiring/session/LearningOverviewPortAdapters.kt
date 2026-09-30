@@ -9,6 +9,9 @@ import com.reversetutor.core.domain.LearningOverviewProgressPort
 import com.reversetutor.core.domain.LearningOverviewSessionPort
 import com.reversetutor.core.domain.LearningOverviewThreadPort
 import com.reversetutor.core.domain.LearningOverviewTokenPort
+import com.reversetutor.core.domain.DailySummaryAiState
+import com.reversetutor.core.domain.DailySummaryContract
+import com.reversetutor.core.domain.LearningOverviewDailySummaryPort
 import com.reversetutor.core.domain.LearningOverviewWeakPointPort
 import com.reversetutor.core.domain.LearningProgressContract
 import com.reversetutor.core.domain.LearningThreadContract
@@ -16,7 +19,9 @@ import com.reversetutor.core.domain.MasteryLedgerProjection
 import com.reversetutor.core.domain.TodayPlanTask
 import com.reversetutor.core.domain.TokenUsageOverviewContract
 import com.reversetutor.core.domain.WeakPointContract
+import com.reversetutor.core.model.DailySummary
 import com.reversetutor.core.model.ErrorLog
+import com.reversetutor.core.model.StudyPlanTask
 import com.reversetutor.core.model.StudyPlanTaskState
 import com.reversetutor.core.model.TokenUsageRecord
 import java.util.Calendar
@@ -192,6 +197,70 @@ class LearningOverviewWeakPointPortAdapter(
                 compareByDescending<WeakPointContract> { it.errorCount }.thenBy { it.id }
             )
             .take(limit)
+    }
+}
+
+/**
+ * 每日总结读适配器：统计部分永远由确定性折叠得出；AI 总结段只读当日
+ * 落库结果（仓库优先、接缝兜底），配合 [DailySummaryGenerationState]
+ * 呈现 生成中/失败 状态。不造数：无台账接缝时返回全默认契约。
+ */
+class LearningOverviewDailySummaryPortAdapter(
+    private val learningRepository: LearningRepositoryImpl? = null,
+    private val listLearningFacts: (suspend (String) -> List<LearningFactReceipt>)? = null,
+    private val listPlanTasks: (suspend (String) -> List<StudyPlanTask>)? = null,
+    private val listTokenUsage: (suspend (String) -> List<TokenUsageRecord>)? = null,
+    private val findStoredSummary: (suspend (String, Long) -> DailySummary?)? = null,
+    private val generationState: DailySummaryGenerationState? = null,
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val timeZone: TimeZone = TimeZone.getDefault()
+) : LearningOverviewDailySummaryPort {
+    override suspend fun getDailySummary(
+        spaceId: String,
+        sessionIds: List<String>?
+    ): DailySummaryContract {
+        val readFacts = listLearningFacts ?: return DailySummaryContract()
+        val now = nowEpochMillis()
+        val dayStart = dayStartMillis(now, timeZone)
+        val planTasks = learningRepository?.listTasks(spaceId)
+            ?: listPlanTasks?.invoke(spaceId)
+            ?: emptyList()
+        val tokenUsage = learningRepository?.listTokenUsage(spaceId)
+            ?: listTokenUsage?.invoke(spaceId)
+            ?: emptyList()
+        val stats = computeDailyActivityStats(
+            facts = readFacts(spaceId),
+            planTasks = planTasks,
+            tokenUsage = tokenUsage,
+            sessionIds = sessionIds,
+            dayStart = dayStart,
+            now = now
+        )
+        val stored = learningRepository?.findLatestDailySummary(
+            spaceId,
+            dayStart,
+            DailySummaryGenerator.GeneratorVersion
+        ) ?: findStoredSummary?.invoke(spaceId, dayStart)
+        val key = dailySummaryKey(spaceId, dayStart)
+        val aiText = stored?.summary?.takeIf { it.isNotBlank() }
+        val aiState = when {
+            generationState?.isInFlight(key) == true -> DailySummaryAiState.Generating
+            aiText != null -> DailySummaryAiState.Ready
+            generationState?.isFailed(key) == true -> DailySummaryAiState.Failed
+            else -> DailySummaryAiState.None
+        }
+        return DailySummaryContract(
+            dayStartEpochMillis = dayStart,
+            evidenceCount = stats.evidenceCount,
+            passedCount = stats.passedCount,
+            knowledgePoints = stats.knowledgePoints,
+            masteredTodayCount = stats.masteredTodayCount,
+            planCompletedCount = stats.planCompletedCount,
+            totalTokens = stats.totalTokens,
+            aiText = aiText,
+            aiState = aiState,
+            aiGeneratedAtEpochMillis = stored?.generatedAtEpochMillis ?: 0L
+        )
     }
 }
 

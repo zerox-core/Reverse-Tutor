@@ -60,6 +60,7 @@ import com.reversetutor.core.data.local.entity.SyncOutboxEntity
 import com.reversetutor.core.data.local.entity.TokenUsageRecordEntity
 import com.reversetutor.core.data.local.entity.TurnRunEntity
 import com.reversetutor.core.data.local.entity.TurnTrajectoryEntity
+import com.reversetutor.core.data.local.entity.DailySummaryEntity
 import com.reversetutor.core.data.local.entity.WeeklySummaryEntity
 import com.reversetutor.core.data.local.entity.WidgetLayoutPreferenceEntity
 import com.reversetutor.core.data.local.entity.WorldTreeDraftEntity
@@ -113,6 +114,7 @@ import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
         TurnTrajectoryEntity::class,
         StudyPlanTaskEntity::class,
         WeeklySummaryEntity::class,
+        DailySummaryEntity::class,
         TokenUsageRecordEntity::class,
         WidgetLayoutPreferenceEntity::class,
         SearchDocumentEntity::class,

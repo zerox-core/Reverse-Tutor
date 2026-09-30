@@ -10,6 +10,7 @@ import com.reversetutor.core.model.SyncEnvelope
 import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
+import com.reversetutor.core.model.DailySummary
 import com.reversetutor.core.model.WeeklySummary
 import com.reversetutor.core.model.WidgetLayoutPreference
 import com.reversetutor.core.model.CreateWorldTreeDraftCommand
@@ -93,6 +94,15 @@ interface LearningInsightRepository {
     ): WeeklySummary?
 
     suspend fun saveWeeklySummary(summary: WeeklySummary): WeeklySummary
+
+    /** Latest stored daily summary for one day bucket (any source revision). */
+    suspend fun findLatestDailySummary(
+        spaceId: String,
+        dayStartEpochMillis: Long,
+        generatorVersion: String
+    ): DailySummary?
+
+    suspend fun saveDailySummary(summary: DailySummary): DailySummary
 }
 
 interface TokenUsageRepository {

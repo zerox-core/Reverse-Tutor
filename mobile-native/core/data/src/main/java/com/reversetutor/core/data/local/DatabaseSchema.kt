@@ -4,7 +4,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 19
+    const val version = 20
     const val exportSchema = true
 
     val migration1To2: Migration = object : Migration(1, 2) {
@@ -163,6 +163,35 @@ object DatabaseSchema {
         }
     }
 
+    /** V1 方向三「每日总结」：AI 每日总结的持久化表（懒生成、按天一条）。 */
+    val migration19To20: Migration = object : Migration(19, 20) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS daily_summaries (
+                    id TEXT NOT NULL,
+                    spaceId TEXT NOT NULL,
+                    dayStartEpochMillis INTEGER NOT NULL,
+                    dayEndEpochMillis INTEGER NOT NULL,
+                    sourceRevision INTEGER NOT NULL,
+                    generatorVersion TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    generatedAtEpochMillis INTEGER NOT NULL,
+                    stale INTEGER NOT NULL,
+                    PRIMARY KEY(id)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS index_daily_summaries_spaceId ON daily_summaries(spaceId)"
+            )
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS index_daily_summaries_spaceId_dayStartEpochMillis_generatorVersion " +
+                    "ON daily_summaries(spaceId, dayStartEpochMillis, generatorVersion)"
+            )
+        }
+    }
+
     val migrations: Array<Migration> = arrayOf(
         migration1To2,
         migration2To3,
@@ -181,7 +210,8 @@ object DatabaseSchema {
         migration15To16,
         migration16To17,
         migration17To18,
-        migration18To19
+        migration18To19,
+        migration19To20
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {

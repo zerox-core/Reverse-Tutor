@@ -7,6 +7,7 @@ import com.reversetutor.core.data.local.entity.toEntity
 import com.reversetutor.core.domain.LearningInsightRepository
 import com.reversetutor.core.domain.StudyPlanRepository
 import com.reversetutor.core.domain.TokenUsageRepository
+import com.reversetutor.core.model.DailySummary
 import com.reversetutor.core.model.StudyPlanTask
 import com.reversetutor.core.model.SyncEnvelope
 import com.reversetutor.core.model.TokenUsageRecord
@@ -40,6 +41,25 @@ class LearningRepositoryImpl(
         database.learningDao().upsertWeeklySummary(summary.toEntity())
         return summary
     }
+
+    override suspend fun findLatestDailySummary(
+        spaceId: String,
+        dayStartEpochMillis: Long,
+        generatorVersion: String
+    ): DailySummary? =
+        database.learningDao().findLatestDailySummary(
+            spaceId,
+            dayStartEpochMillis,
+            generatorVersion
+        )?.toDomain()
+
+    override suspend fun saveDailySummary(summary: DailySummary): DailySummary {
+        database.learningDao().upsertDailySummary(summary.toEntity())
+        return summary
+    }
+
+    suspend fun listDailySummaries(spaceId: String): List<DailySummary> =
+        database.learningDao().listDailySummaries(spaceId).map { it.toDomain() }
 
     override suspend fun saveUsage(record: TokenUsageRecord): TokenUsageRecord {
         database.learningDao().insertTokenUsage(record.toEntity())

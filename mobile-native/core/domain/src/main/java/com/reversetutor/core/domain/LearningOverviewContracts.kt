@@ -86,7 +86,8 @@ data class LearningOverviewContract(
     val weakPoints: List<WeakPointContract>,
     val tokenUsage: TokenUsageOverviewContract,
     val warnings: List<ContextWarning> = emptyList(),
-    val isNoData: Boolean = false
+    val isNoData: Boolean = false,
+    val dailySummary: DailySummaryContract = DailySummaryContract()
 )
 
 // ---------------------------------------------------------------------------
@@ -111,6 +112,38 @@ interface LearningOverviewThreadPort {
 
 interface LearningOverviewWeakPointPort {
     suspend fun listWeakPoints(spaceId: String, sessionIds: List<String>?, limit: Int): List<WeakPointContract>
+}
+
+// ---------------------------------------------------------------------------
+// Daily summary (V1 方向三「每日总结」)
+// ---------------------------------------------------------------------------
+
+/** AI 总结段状态：None 未生成 / Generating 后台生成中 / Ready 有文本 / Failed 本次会话内生成失败。 */
+enum class DailySummaryAiState { None, Generating, Ready, Failed }
+
+/**
+ * 每日总结卡契约。统计字段全部由确定性折叠得出、永远在；[aiText] 是后台
+ * 懒生成的 AI 人话总结，缺失/失败时只显示统计。生成绝不在聊天轮次内同步
+ * 发生——由面板打开时的懒触发走后台通道。
+ */
+data class DailySummaryContract(
+    val dayStartEpochMillis: Long = 0L,
+    val evidenceCount: Int = 0,
+    val passedCount: Int = 0,
+    val knowledgePoints: List<String> = emptyList(),
+    val masteredTodayCount: Int = 0,
+    val planCompletedCount: Int = 0,
+    val totalTokens: Long = 0L,
+    val aiText: String? = null,
+    val aiState: DailySummaryAiState = DailySummaryAiState.None,
+    val aiGeneratedAtEpochMillis: Long = 0L
+) {
+    val hasActivity: Boolean
+        get() = evidenceCount > 0 || planCompletedCount > 0 || totalTokens > 0L
+}
+
+interface LearningOverviewDailySummaryPort {
+    suspend fun getDailySummary(spaceId: String, sessionIds: List<String>?): DailySummaryContract
 }
 
 interface LearningOverviewTokenPort {
