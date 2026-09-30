@@ -23,6 +23,7 @@ import com.reversetutor.core.domain.WindowMemoryContextPort
 import com.reversetutor.feature.chat.ConversationMessageContract
 import com.reversetutor.feature.chat.SessionConversationContract
 import com.reversetutor.feature.chat.SessionConversationFacade
+import com.reversetutor.core.domain.LearningFactReceipt
 import com.reversetutor.core.domain.LearningOverviewContract
 
 /**
@@ -132,11 +133,26 @@ class SessionConversationAssembly(
         nowEpochMillis = nowEpochMillis
     )
 
+    /**
+     * Step-2 面板真数据接缝：学习台账读口，供进度/本周主线适配器做确定性聚合。
+     * 未注入台账仓库时为 null，适配器保持诚实的空/默认契约。
+     */
+    private val listLearningFactsForOverview: (suspend (String) -> List<LearningFactReceipt>)? =
+        learningLedgerRepository?.let { repo -> { spaceId -> repo.listLearningFacts(spaceId) } }
+
     private val overviewCoordinator: LearningOverviewCoordinator = LearningOverviewCoordinator(
         sessionPort = LearningOverviewSessionPortAdapter(sessionRepository),
-        progressPort = LearningOverviewProgressPortAdapter(learningRepository, nowEpochMillis),
+        progressPort = LearningOverviewProgressPortAdapter(
+            learningRepository,
+            nowEpochMillis,
+            listLearningFacts = listLearningFactsForOverview
+        ),
         planPort = LearningOverviewPlanPortAdapter(learningRepository),
-        threadPort = LearningOverviewThreadPortAdapter(learningRepository),
+        threadPort = LearningOverviewThreadPortAdapter(
+            learningRepository,
+            listLearningFacts = listLearningFactsForOverview,
+            nowEpochMillis = nowEpochMillis
+        ),
         weakPointPort = LearningOverviewWeakPointPortAdapter(memoryRepository),
         tokenPort = LearningOverviewTokenPortAdapter(
             listTokenUsage = learningRepository::listTokenUsage,
