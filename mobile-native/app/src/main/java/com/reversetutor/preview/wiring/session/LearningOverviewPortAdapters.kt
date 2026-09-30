@@ -26,6 +26,7 @@ import com.reversetutor.core.model.StudyPlanTaskState
 import com.reversetutor.core.model.TokenUsageRecord
 import java.util.Calendar
 import java.util.TimeZone
+import kotlin.math.roundToInt
 
 /**
  * Adapts existing repository read capabilities to the non-frozen home learning
@@ -62,14 +63,88 @@ class LearningOverviewSessionPortAdapter(
     }
 }
 
+/**
+ * 今日计划读适配器（V1 方向三「学习计划卡片」读侧增强）。
+ *
+ * 「今日」语义（对齐周报 visibleInTodayWidget 并扩展逾期）：
+ * - Cancelled 永不显示；
+ * - Completed 仅当 completedAt 落在今天窗口内才显示（昨天完成的不占今天的卡）；
+ * - 其余（Proposed/Planned/InProgress）：无到期、今天到期、已逾期都算今日；
+ *   明天及以后到期的不上今日卡。
+ *
+ * 排序：未完成在前（按到期升序，无到期沉底），已完成沉底（按完成时间倒序）。
+ * status 输出 "done"/"pending"，与面板 TodayTaskStatus 及协调器完成计数对齐。
+ *
+ * 混合构造：生产传 [learningRepository]；单测只传 [listPlanTasks] 缝合点、无需 Room。
+ */
 class LearningOverviewPlanPortAdapter(
-    private val learningRepository: LearningRepositoryImpl
+    private val learningRepository: LearningRepositoryImpl? = null,
+    private val listPlanTasks: (suspend (String) -> List<StudyPlanTask>)? = null,
+    private val nowEpochMillis: () -> Long = System::currentTimeMillis,
+    private val timeZone: TimeZone = TimeZone.getDefault()
 ) : LearningOverviewPlanPort {
-    override suspend fun listTodayPlan(spaceId: String): List<TodayPlanTask> =
-        learningRepository.listTasks(spaceId)
-            .filter { it.state != StudyPlanTaskState.Cancelled }
-            .map { TodayPlanTask(it.id, it.title, it.state.name, it.sourceSessionId) }
+    override suspend fun listTodayPlan(spaceId: String): List<TodayPlanTask> {
+        val tasks = learningRepository?.listTasks(spaceId)
+            ?: listPlanTasks?.invoke(spaceId)
+            ?: return emptyList()
+        val (dayStart, dayEnd) = planDayWindow(nowEpochMillis(), timeZone)
+        val visible = tasks.mapNotNull { task ->
+            val dueAt = task.dueAtEpochMillis
+            when {
+                task.state == StudyPlanTaskState.Cancelled -> null
+                task.state == StudyPlanTaskState.Completed ->
+                    if (task.completedAtEpochMillis in dayStart until dayEnd) task else null
+                dueAt == null || dueAt < dayEnd -> task
+                else -> null
+            }
+        }
+        val incomplete = visible
+            .filter { it.state != StudyPlanTaskState.Completed }
+            .sortedWith(
+                compareBy<StudyPlanTask> { it.dueAtEpochMillis ?: Long.MAX_VALUE }
+                    .thenBy { it.createdAtEpochMillis }
+                    .thenBy { it.id }
+            )
+        val completed = visible
+            .filter { it.state == StudyPlanTaskState.Completed }
+            .sortedWith(
+                compareByDescending<StudyPlanTask> { it.completedAtEpochMillis }
+                    .thenBy { it.id }
+            )
+        return (incomplete + completed).map { task ->
+            TodayPlanTask(
+                id = task.id,
+                title = task.title,
+                status = if (task.state == StudyPlanTaskState.Completed) "done" else "pending",
+                knowledgePoint = task.sourceSessionId,
+                dueAtEpochMillis = task.dueAtEpochMillis,
+                dueDayOffset = task.dueAtEpochMillis?.let { planDayOffset(it, dayStart, timeZone) }
+            )
+        }
+    }
 }
+
+/** 当地时区「今天」[起, 止) 窗口。 */
+private fun planDayWindow(nowEpochMillis: Long, timeZone: TimeZone): Pair<Long, Long> {
+    val calendar = Calendar.getInstance(timeZone).apply {
+        timeInMillis = nowEpochMillis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }
+    val start = calendar.timeInMillis
+    calendar.add(Calendar.DAY_OF_YEAR, 1)
+    return start to calendar.timeInMillis
+}
+
+/** dueAt 相对今天 00:00 的天数偏移（roundToInt 吸收 DST 23/25 小时日）。 */
+private fun planDayOffset(dueAtEpochMillis: Long, dayStart: Long, timeZone: TimeZone): Int {
+    val dueStart = planDayWindow(dueAtEpochMillis, timeZone).first
+    return ((dueStart - dayStart).toDouble() / PLAN_DAY_MILLIS).roundToInt()
+}
+
+private const val PLAN_DAY_MILLIS = 86_400_000.0
 
 class LearningOverviewProgressPortAdapter(
     private val learningRepository: LearningRepositoryImpl? = null,

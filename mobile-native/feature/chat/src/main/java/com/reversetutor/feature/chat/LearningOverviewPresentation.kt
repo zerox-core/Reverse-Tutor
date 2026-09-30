@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.domain.ContextWarning
 import com.reversetutor.core.domain.LearningOverviewScope
+import com.reversetutor.core.domain.TodayPlanTask
 import com.reversetutor.core.domain.WeakPointContract
 import kotlin.math.roundToInt
 
@@ -123,3 +124,26 @@ enum class TodayTaskStatus(val displayLabel: String, val dotColor: Color) {
             if (status == "done") DONE else PENDING
     }
 }
+
+// ---------------------------------------------------------------------------
+// Today plan due labels（V1 方向三「学习计划卡片」读侧增强）
+// ---------------------------------------------------------------------------
+
+/**
+ * 到期文案：已完成或无到期时间不显示；0=今天到期；负数=逾期 N 天；
+ * 正数为兜底（正常已被今日过滤排除）。
+ */
+fun TodayPlanTask.dueLabel(): String {
+    if (status == "done") return ""
+    val offset = dueDayOffset ?: return ""
+    return when {
+        offset == 0 -> "今天到期"
+        offset < 0 -> "逾期 ${-offset} 天"
+        offset == 1 -> "明天到期"
+        else -> "${offset} 天后到期"
+    }
+}
+
+/** 逾期且未完成 → 面板用警示色显示到期标签。 */
+fun TodayPlanTask.isDueOverdue(): Boolean =
+    status != "done" && (dueDayOffset ?: 0) < 0

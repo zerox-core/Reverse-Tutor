@@ -38,7 +38,10 @@ data class TodayPlanTask(
     val id: String,
     val title: String,
     val status: String,
-    val knowledgePoint: String? = null
+    val knowledgePoint: String? = null,
+    val dueAtEpochMillis: Long? = null,
+    /** 相对「今天」的到期偏移：0=今天到期，负数=逾期 N 天，正数=未来（正常已被今日过滤排除）；null=无到期时间。 */
+    val dueDayOffset: Int? = null
 )
 
 data class TodayPlanContract(
