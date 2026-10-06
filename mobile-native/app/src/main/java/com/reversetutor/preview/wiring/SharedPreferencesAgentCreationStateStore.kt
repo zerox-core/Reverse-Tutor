@@ -8,6 +8,8 @@ import com.reversetutor.feature.chat.AgentCreationHistoryTurn
 import com.reversetutor.feature.chat.AgentCreationPlannerState
 import com.reversetutor.feature.chat.AgentCreationSnapshot
 import com.reversetutor.feature.chat.AgentCreationStateStore
+import com.reversetutor.feature.chat.SlotEntry
+import com.reversetutor.feature.chat.SlotStatus
 
 /**
  * R85：创建会话状态的本地仓库——快照落 SharedPreferences，
@@ -55,17 +57,26 @@ object AgentCreationSnapshotCodec {
             if (snapshot.planner.converged) "1" else "0",
             pack(snapshot.planner.askedCounts.entries.flatMap { listOf(it.key, it.value.toString()) }),
             pack(snapshot.history.map { pack(listOf(if (it.isUser) "1" else "0", it.text)) }),
-            pack(snapshot.feed.map(::encodeFeedEntry)),
+            // R100：孵化草案卡 / 学习流程图卡不落快照（首版无 checkpoint），编码时直接滤掉。
+            pack(snapshot.feed.mapNotNull(::encodeFeedEntry)),
             snapshot.docAnalysis?.let(::encodeDocAnalysis).orEmpty(),
             if (snapshot.planner.documentAsked) "1" else "0",
-            if (snapshot.planner.pathConfirmAsked) "1" else "0"
+            if (snapshot.planner.pathConfirmAsked) "1" else "0",
+            // R102 第 14 字段：信息槽位（name/statusOrdinal/round/value 四元组展平后 pack）。
+            pack(
+                snapshot.slots.entries.flatMap { (name, entry) ->
+                    listOf(name, entry.status.ordinal.toString(), entry.round.toString(), entry.value)
+                }
+            )
         )
     )
 
     /** 损坏 / 版本不符一律返回 null：创建窗口从零开始，不抛异常。 */
     fun decode(value: String): AgentCreationSnapshot? = runCatching {
         val fields = unpack(value)
-        if ((fields.size != FieldCount && fields.size != FieldCountV2) || fields[0] != Version) return null
+        if ((fields.size != FieldCount && fields.size != FieldCountV2 && fields.size != FieldCountV3) ||
+            fields[0] != Version
+        ) return null
         val askedCounts = unpack(fields[7]).chunked(2).mapNotNull { pair ->
             pair.takeIf { it.size == 2 }?.let { it[0] to (it[1].toIntOrNull() ?: return@let null) }
         }.toMap()
@@ -83,11 +94,22 @@ object AgentCreationSnapshotCodec {
             ),
             history = unpack(fields[8]).mapNotNull(::decodeHistoryTurn),
             feed = unpack(fields[9]).mapNotNull(::decodeFeedEntry),
-            docAnalysis = fields[10].takeIf { it.isNotEmpty() }?.let(::decodeDocAnalysis)
+            docAnalysis = fields[10].takeIf { it.isNotEmpty() }?.let(::decodeDocAnalysis),
+            slots = fields.getOrNull(13)?.let { packed ->
+                unpack(packed).chunked(4).mapNotNull { quad ->
+                    quad.takeIf { it.size == 4 }?.let {
+                        it[0] to SlotEntry(
+                            status = SlotStatus.values().getOrElse(it[1].toIntOrNull() ?: -1) { SlotStatus.Empty },
+                            round = it[2].toIntOrNull() ?: 0,
+                            value = it[3]
+                        )
+                    }
+                }.toMap()
+            }.orEmpty()
         )
     }.getOrNull()
 
-    private fun encodeFeedEntry(entry: AgentCreationFeedEntry): String = when (entry) {
+    private fun encodeFeedEntry(entry: AgentCreationFeedEntry): String? = when (entry) {
         is AgentCreationFeedEntry.Assistant -> pack(listOf(TagAssistant, entry.id, entry.text))
         is AgentCreationFeedEntry.User -> pack(listOf(TagUser, entry.id, entry.text))
         is AgentCreationFeedEntry.FileCard -> pack(
@@ -96,6 +118,9 @@ object AgentCreationSnapshotCodec {
         is AgentCreationFeedEntry.DraftCard -> pack(
             listOf(TagDraftCard, entry.id, NewSessionSnapshotCodec.encodeConfiguration(entry.configuration))
         )
+        // R100：方案B 新卡首版不落快照（无 checkpoint）。
+        is AgentCreationFeedEntry.IncubationDraftCard -> null
+        is AgentCreationFeedEntry.LearningFlowCard -> null
     }
 
     private fun decodeFeedEntry(value: String): AgentCreationFeedEntry? {
@@ -193,6 +218,7 @@ object AgentCreationSnapshotCodec {
     private const val Version = "v1"
     private const val FieldCount = 11
     private const val FieldCountV2 = 13
+    private const val FieldCountV3 = 14
     private const val TagAssistant = "A"
     private const val TagUser = "U"
     private const val TagFileCard = "F"

@@ -24,7 +24,9 @@ data class AgentCreationSnapshot(
     val history: List<AgentCreationHistoryTurn> = emptyList(),
     val planner: AgentCreationPlannerState = AgentCreationPlannerState(),
     val docAnalysis: AgentCreationDocAnalysis? = null,
-    val entrySequence: Int = 0
+    val entrySequence: Int = 0,
+    /** R102：信息槽位确认状态（槽位名 → 条目）；空 = R102 前旧快照，按迁移规则降 Proposed。 */
+    val slots: Map<String, SlotEntry> = emptyMap()
 )
 
 /**

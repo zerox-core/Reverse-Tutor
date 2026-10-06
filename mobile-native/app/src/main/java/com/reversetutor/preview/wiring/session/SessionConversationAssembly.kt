@@ -108,7 +108,7 @@ class SessionConversationAssembly(
     }
 
     /** 1g 轻量装配口径：与重装配的 messageLimit/textCap 保持一致。 */
-    private val lightweightMessageLimit = 10
+    private val lightweightMessageLimit = 30
     private val lightweightTextCap = 200
 
     private val contextAssembler: ConversationContextAssembler = ConversationContextAssembler(

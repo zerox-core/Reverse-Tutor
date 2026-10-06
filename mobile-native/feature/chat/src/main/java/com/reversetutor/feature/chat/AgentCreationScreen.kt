@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -64,8 +65,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -95,14 +98,16 @@ fun AgentCreationRoute(
     onOpenPickerConsumed: () -> Unit = {},
     gateway: AgentCreationGateway? = null,
     stateStore: AgentCreationStateStore? = null,
+    /** R100 方案B 状态机灰度（App 端经 BuildConfig 下发）。 */
+    graphEnabled: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val activeGateway = remember(gateway) { gateway ?: FakeAgentCreationGateway() }
     // R85：注入 stateStore 后创建进度跨页面 / 跨进程持久化，回来自动续聊。
-    val coordinator = remember(activeGateway, stateStore) {
-        AgentCreationCoordinator(activeGateway, stateStore = stateStore)
+    val coordinator = remember(activeGateway, stateStore, graphEnabled) {
+        AgentCreationCoordinator(activeGateway, stateStore = stateStore, graphEnabled = graphEnabled)
     }
     val lifecycle = remember(createPort, persistence) {
         NewSessionLifecycleCoordinator(persistence = persistence, createPort = createPort)
@@ -255,37 +260,61 @@ fun AgentCreationRoute(
                 onCreate = ::handleCreateClick
             )
             UnderstandingBar(understanding = state.displayedUnderstanding)
-            // R98 滚动三规则（2026-09-28 用户拍板）：
-            // ① 停在最底 → 新条目自动跟随；② 向上翻看历史 → 原地不动，浮出「新消息」
-            //    胶囊，点了才滑到最底；③ 自己发出的消息一律回到底部。
-            // 键盘规则：弹起键盘前停在最新一条 → 键盘起来后仍驻留最新一条；
-            // 在上方翻历史 → 原位不动。
-            val atBottom by remember {
-                derivedStateOf {
+            // R99 滚动修复（2026-10-04 用户真机反馈「这两个你都没做」后的拍板规格）：
+            // ① 停在最底 → 新条目与流式生长都自动跟随并钉到最底（满偏移 scrollToItem）；
+            // ② 向上翻看历史 → 原地不动，浮出「新消息」胶囊，点了才滑到最底；
+            // ③ 自己发出的消息一律回到底部；
+            // ④ 弹起键盘前停在最新一条 → 键盘起来后仍钉住最新一条。
+            // 跟随态 followBottom 只在滚动进行中/刚结束时采样——键盘压缩视口、
+            // 追加条目这类纯重排不会改写它，从根上消除 R98 的「在底部」误判。
+            var followBottom by remember { mutableStateOf(true) }
+            LaunchedEffect(Unit) {
+                var wasScrolling = false
+                snapshotFlow {
                     val layout = feedState.layoutInfo
                     val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
-                    state.feed.isNotEmpty() && lastVisible >= state.feed.size - 1
+                    val near = layout.totalItemsCount > 0 && lastVisible >= layout.totalItemsCount - 1
+                    near to feedState.isScrollInProgress
+                }.collect { (near, scrolling) ->
+                    if (scrolling || wasScrolling) followBottom = near
+                    wasScrolling = scrolling
                 }
             }
             var showNewMessagePill by remember { mutableStateOf(false) }
-            LaunchedEffect(state.feed.size) {
-                if (state.feed.isNotEmpty()) {
-                    val mine = state.feed.lastOrNull() is AgentCreationFeedEntry.User
-                    if (atBottom || mine) {
-                        feedState.animateScrollToItem(state.feed.size - 1)
-                        showNewMessagePill = false
+            var prevFeedCount by remember { mutableStateOf(0) }
+            val lastAssistantLength = (state.feed.lastOrNull() as? AgentCreationFeedEntry.Assistant)
+                ?.text?.length ?: 0
+            LaunchedEffect(state.feed.size, lastAssistantLength) {
+                if (state.feed.isEmpty()) {
+                    prevFeedCount = 0
+                    return@LaunchedEffect
+                }
+                val appended = state.feed.size != prevFeedCount
+                prevFeedCount = state.feed.size
+                val mine = state.feed.lastOrNull() is AgentCreationFeedEntry.User
+                if (mine || followBottom) {
+                    if (appended) {
+                        feedState.animateScrollToItem(state.feed.size - 1, Int.MAX_VALUE)
                     } else {
-                        showNewMessagePill = true
+                        // 流式生长：条数不变也要钉底，长气泡最新文字始终可见
+                        feedState.scrollToItem(state.feed.size - 1, Int.MAX_VALUE)
                     }
+                    showNewMessagePill = false
+                } else if (appended) {
+                    showNewMessagePill = true
                 }
             }
-            LaunchedEffect(atBottom) {
-                if (atBottom) showNewMessagePill = false
+            LaunchedEffect(followBottom) {
+                if (followBottom) showNewMessagePill = false
             }
             val imeOpen = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
             LaunchedEffect(imeOpen) {
-                if (imeOpen && atBottom && state.feed.isNotEmpty()) {
-                    feedState.animateScrollToItem(state.feed.size - 1)
+                if (imeOpen && followBottom && state.feed.isNotEmpty()) {
+                    // adjustResize 压缩视口伴随键盘动画，重试三次顶住重排
+                    repeat(3) {
+                        feedState.scrollToItem(state.feed.size - 1, Int.MAX_VALUE)
+                        kotlinx.coroutines.delay(120)
+                    }
                 }
             }
             Box(
@@ -317,6 +346,16 @@ fun AgentCreationRoute(
                                 }
                             )
                             is AgentCreationFeedEntry.DraftCard -> DraftSummaryCard(entry.configuration)
+                            is AgentCreationFeedEntry.IncubationDraftCard -> IncubationDraftCardView(
+                                card = entry,
+                                onConfirm = {
+                                    scope.launch {
+                                        coordinator.confirmIncubation()
+                                        sync()
+                                    }
+                                }
+                            )
+                            is AgentCreationFeedEntry.LearningFlowCard -> LearningFlowCardView(entry.flow)
                         }
                     }
                 }
@@ -326,7 +365,8 @@ fun AgentCreationRoute(
                             showNewMessagePill = false
                             scope.launch {
                                 if (state.feed.isNotEmpty()) {
-                                    feedState.animateScrollToItem(state.feed.size - 1)
+                                    feedState.animateScrollToItem(state.feed.size - 1, Int.MAX_VALUE)
+                                    followBottom = true
                                 }
                             }
                         },
@@ -353,7 +393,19 @@ fun AgentCreationRoute(
                 onInputChange = { input = it },
                 onSend = ::send,
                 onAttach = ::launchPicker,
-                createError = createError
+                createError = createError,
+                onInputFocused = {
+                    // R101（2026-10-05 用户拍板）：聚焦输入框即钉底最新消息，
+                    // 不依赖 IME inset 送达。
+                    if (state.feed.isNotEmpty()) {
+                        scope.launch {
+                            repeat(3) {
+                                feedState.scrollToItem(state.feed.size - 1, Int.MAX_VALUE)
+                                kotlinx.coroutines.delay(120)
+                            }
+                        }
+                    }
+                }
             )
         }
     }
@@ -467,7 +519,7 @@ private fun UnderstandingBar(understanding: Int) {
                     style = type.style(15f, 20f, FontWeight.Bold, FormalColors.Primary)
                 )
                 Spacer(Modifier.weight(1f))
-                if (understanding >= 70) {
+                if (understanding >= 85) {
                     Surface(
                         color = FormalColors.SuccessSoft,
                         shape = RoundedCornerShape(FormalShapes.PillRadius)
@@ -498,7 +550,7 @@ private fun UnderstandingBar(understanding: Int) {
                     .fillMaxWidth()
                     .height(6.dp)
                     .testTag("agent_creation_understanding"),
-                color = if (understanding >= 70) FormalColors.Success else FormalColors.Primary,
+                color = if (understanding >= 85) FormalColors.Success else FormalColors.Primary,
                 trackColor = FormalColors.Divider
             )
             Spacer(Modifier.height(6.dp))
@@ -771,6 +823,157 @@ private fun DraftRow(label: String, value: String) {
 }
 
 /**
+ * R100 孵化草案卡（方案B）：待确认时给「确认草案」按钮；
+ * 批注打回走普通消息回复（协调器把待确认期间的非确认文字当批注）。
+ */
+@Composable
+private fun IncubationDraftCardView(
+    card: AgentCreationFeedEntry.IncubationDraftCard,
+    onConfirm: () -> Unit
+) {
+    val type = LocalFormalTypeScale.current
+    val status = card.status
+    Surface(
+        color = FormalColors.Surface,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(
+            1.dp,
+            when (status) {
+                AgentCreationFeedEntry.IncubationDraftCard.Status.PendingConfirm ->
+                    FormalColors.Primary.copy(alpha = 0.45f)
+                AgentCreationFeedEntry.IncubationDraftCard.Status.Confirmed ->
+                    FormalColors.Primary.copy(alpha = 0.25f)
+                AgentCreationFeedEntry.IncubationDraftCard.Status.Superseded ->
+                    FormalColors.Border
+            }
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("agent_creation_incubation_card")
+    ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        FormalColors.Primary.copy(alpha = 0.10f),
+                        RoundedCornerShape(
+                            topStart = FormalShapes.CardRadius,
+                            topEnd = FormalShapes.CardRadius
+                        )
+                    )
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+            ) {
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    tint = FormalColors.Primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = when (status) {
+                        AgentCreationFeedEntry.IncubationDraftCard.Status.PendingConfirm -> "养成草案 · 待你确认"
+                        AgentCreationFeedEntry.IncubationDraftCard.Status.Confirmed -> "养成草案 · 已确认"
+                        AgentCreationFeedEntry.IncubationDraftCard.Status.Superseded -> "养成草案 · 已按批注作废"
+                    },
+                    style = type.style(12f, 17f, FontWeight.SemiBold, FormalColors.Primary)
+                )
+            }
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                DraftRow("人物性格", card.incubation.personaHypothesis)
+                DraftRow("教学方式", card.incubation.teachingStyle)
+                card.incubation.stageGoals.forEachIndexed { index, goal ->
+                    DraftRow(if (index == 0) "阶段目标" else "", (index + 1).toString() + ". " + goal)
+                }
+                card.incubation.milestones.forEachIndexed { index, milestone ->
+                    DraftRow(if (index == 0) "里程碑" else "", (index + 1).toString() + ". " + milestone)
+                }
+                if (status == AgentCreationFeedEntry.IncubationDraftCard.Status.PendingConfirm) {
+                    Spacer(Modifier.height(6.dp))
+                    Surface(
+                        onClick = onConfirm,
+                        color = FormalColors.Primary,
+                        shape = RoundedCornerShape(FormalShapes.PillRadius),
+                        modifier = Modifier.testTag("agent_creation_incubation_confirm")
+                    ) {
+                        Text(
+                            text = "确认草案",
+                            style = type.style(12f, 17f, FontWeight.Bold, androidx.compose.ui.graphics.Color.White),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "有要改的？直接回复，我按你的批注改",
+                        style = type.style(10f, 15f, color = FormalColors.Muted)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** R100 学习流程图卡（方案B）：主题按序排列 + 依赖关系提示。 */
+@Composable
+private fun LearningFlowCardView(flow: AgentCreationLearningFlow) {
+    val type = LocalFormalTypeScale.current
+    Surface(
+        color = FormalColors.Surface,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, FormalColors.Primary.copy(alpha = 0.45f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("agent_creation_learning_flow_card")
+    ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        FormalColors.Primary.copy(alpha = 0.10f),
+                        RoundedCornerShape(
+                            topStart = FormalShapes.CardRadius,
+                            topEnd = FormalShapes.CardRadius
+                        )
+                    )
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+            ) {
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = null,
+                    tint = FormalColors.Primary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "学习流程图 · 先基础后提升",
+                    style = type.style(12f, 17f, FontWeight.SemiBold, FormalColors.Primary)
+                )
+            }
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                flow.topics.forEachIndexed { index, topic ->
+                    val deps = flow.edges.filter { it.toTitle == topic.title }.map { it.fromTitle }
+                    DraftRow(
+                        "阶段 " + (index + 1).toString(),
+                        topic.title + if (topic.subSkills.isNotEmpty()) {
+                            "（" + topic.subSkills.joinToString("、") + "）"
+                        } else {
+                            ""
+                        }
+                    )
+                    if (deps.isNotEmpty()) {
+                        DraftRow("", "需先完成：" + deps.joinToString("、"))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
  * R98 阶段化思考块（2026-09-28 用户拍板）：展示「产品在做什么」的阶段流——
  * 理解输入 → 连接模型 → 深度思考 → 生成回复 →（自检修正），各段带耗时、
  * 活动段高亮 + 三点呼吸；模型原始推理完整收进「查看完整思考过程」二级折叠
@@ -940,7 +1143,8 @@ private fun BottomComposer(
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onAttach: () -> Unit,
-    createError: String?
+    createError: String?,
+    onInputFocused: () -> Unit = {}
 ) {
     val type = LocalFormalTypeScale.current
     val attachHighlight by animateDpAsState(
@@ -993,6 +1197,7 @@ private fun BottomComposer(
                     onValueChange = onInputChange,
                     modifier = Modifier
                         .weight(1f)
+                        .onFocusChanged { if (it.isFocused) onInputFocused() }
                         .testTag("agent_creation_input"),
                     placeholder = { Text("说说你想学什么…", style = type.style(13f, 18f, color = FormalColors.Tertiary)) },
                     maxLines = 4,
@@ -1019,3 +1224,4 @@ private fun BottomComposer(
         }
     }
 }
+

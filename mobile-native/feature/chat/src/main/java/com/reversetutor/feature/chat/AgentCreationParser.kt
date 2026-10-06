@@ -47,6 +47,48 @@ object AgentCreationParser {
     }
 
     /**
+     * R100 孵化草案解析（方案B）：personaHypothesis / teachingStyle 必填，
+     * 缺一返回 null（协调器按生成失败重试）；列表字段缺失给空表。
+     */
+    fun parseIncubation(rawText: String): AgentCreationIncubation? {
+        val json = extractJsonObject(rawText) ?: return null
+        val root = StrictJson.parseObject(json) ?: return null
+        val persona = root.text("personaHypothesis") ?: return null
+        val teaching = root.text("teachingStyle") ?: return null
+        return AgentCreationIncubation(
+            personaHypothesis = persona,
+            teachingStyle = teaching,
+            stageGoals = root.textList("stageGoals", maxItems = 6),
+            milestones = root.textList("milestones", maxItems = 6)
+        )
+    }
+
+    /**
+     * R100 学习流程图解析（方案B）：topics 非空才成立；
+     * 边的 from/to 必须精确命中某个主题 title 且不自环，坏边丢弃（坏一条不拖垮整张图）。
+     */
+    fun parseLearningFlow(rawText: String): AgentCreationLearningFlow? {
+        val json = extractJsonObject(rawText) ?: return null
+        val root = StrictJson.parseObject(json) ?: return null
+        val topicsArray = (root["topics"] as? JsonValue.Array) ?: return null
+        val topics = topicsArray.values.mapNotNull { item ->
+            val obj = item as? JsonValue.Object ?: return@mapNotNull null
+            val title = obj.text("title") ?: return@mapNotNull null
+            AgentCreationFlowTopic(title = title, subSkills = obj.textList("subSkills", maxItems = 6))
+        }.distinctBy { it.title }
+        if (topics.isEmpty()) return null
+        val titles = topics.map { it.title }.toSet()
+        val edges = ((root["edges"] as? JsonValue.Array)?.values ?: emptyList()).mapNotNull { item ->
+            val obj = item as? JsonValue.Object ?: return@mapNotNull null
+            val from = obj.text("from") ?: return@mapNotNull null
+            val to = obj.text("to") ?: return@mapNotNull null
+            if (from !in titles || to !in titles || from == to) return@mapNotNull null
+            AgentCreationFlowEdge(fromTitle = from, toTitle = to)
+        }
+        return AgentCreationLearningFlow(topics = topics, edges = edges)
+    }
+
+    /**
      * R93：从「还没生成完的契约 JSON 前缀」宽容抽取当前可见口语文本——
      * 字符串未闭合、结构残缺都不报错。只认 assistantNote / followUpQuestion
      * 两个展示字段（草案补丁等不上屏），按 JSON 出现顺序换行拼接；

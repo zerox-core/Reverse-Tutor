@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 第十章算法纯函数测试：u_det 权重表、双源融合（封顶/单调）、
+ * 第十章算法纯函数测试：u_det 权重表、双源融合（R102 起无封顶/单调）、
  * 追问优先级 / 同字段 2 次降级 / 8 轮软上限 / 「别问了」立即收敛。
  */
 class AgentCreationUnderstandingTest {
@@ -72,26 +72,27 @@ class AgentCreationUnderstandingTest {
     @Test
     fun fuseBlendsHalfHalf() {
         // 0.5×80 + 0.5×60 = 70
-        assertEquals(70, AgentCreationUnderstanding.fuse(80, 60, 0, requiredFieldsReady = true))
+        assertEquals(70, AgentCreationUnderstanding.fuse(80, 60, 0))
     }
 
     @Test
-    fun fuseCapsAtSixtyWhenRequiredMissing() {
-        assertEquals(60, AgentCreationUnderstanding.fuse(100, 100, 0, requiredFieldsReady = false))
-        assertEquals(50, AgentCreationUnderstanding.fuse(85, 15, 0, requiredFieldsReady = false))
+    fun fuseNoLongerCapsAtSixty() {
+        // R102：封顶删除——分数只是展示值，不再驱动流程（推进改由槽位确认状态裁决）。
+        assertEquals(100, AgentCreationUnderstanding.fuse(100, 100, 0))
+        assertEquals(50, AgentCreationUnderstanding.fuse(85, 15, 0))
     }
 
     @Test
     fun fuseIsMonotonicNonDecreasing() {
         // 新一轮算出来更低时保持上一轮值
-        assertEquals(58, AgentCreationUnderstanding.fuse(10, 10, 58, requiredFieldsReady = true))
-        // 但不超过当前封顶
-        assertEquals(60, AgentCreationUnderstanding.fuse(10, 10, 85, requiredFieldsReady = false))
+        assertEquals(58, AgentCreationUnderstanding.fuse(10, 10, 58))
+        // R102：无封顶——上一轮 85 就保持 85
+        assertEquals(85, AgentCreationUnderstanding.fuse(10, 10, 85))
     }
 
     @Test
     fun fuseFallsBackToDeterministicWhenLlmScoreMissing() {
-        assertEquals(45, AgentCreationUnderstanding.fuse(null, 45, 0, requiredFieldsReady = true))
+        assertEquals(45, AgentCreationUnderstanding.fuse(null, 45, 0))
     }
 
     // ---------- title 兜底提案 ----------
@@ -116,24 +117,25 @@ class AgentCreationUnderstandingTest {
         val planner = AgentCreationFollowUpPlanner()
         val empty = NewSessionConfiguration()
 
-        // goal 空 → 先问学习目标
+        // R102：「已填」= 槽位用户已确认（草案里有值不算数）——全未确认 → 先问学习目标
         assertEquals("学习目标", planner.strategyFor(empty, 0, false).targetFollowUpField)
 
-        // goal 填了 → learnerRole
-        val withGoal = empty.copy(goal = "g")
-        assertEquals("学习者角色", planner.strategyFor(withGoal, 20, false).targetFollowUpField)
+        // goal 已确认 → learnerRole
+        val goalSlots = CreationSlots().confirm(CreationSlot.Goal, "g", 1)
+        assertEquals("学习者角色", planner.strategyFor(empty, 20, false, goalSlots).targetFollowUpField)
 
-        // goal+role 填了 → persona（R84：目标 → 人物性格 → 教学方式的中间环）
-        val withRole = withGoal.copy(learnerRole = "r")
-        assertEquals("人物性格", planner.strategyFor(withRole, 40, false).targetFollowUpField)
+        // goal+role 已确认 → persona（R84：目标 → 人物性格 → 教学方式的中间环）
+        val roleSlots = goalSlots.confirm(CreationSlot.LearnerRole, "r", 2)
+        assertEquals("人物性格", planner.strategyFor(empty, 40, false, roleSlots).targetFollowUpField)
 
-        // goal+role+persona+title 都填 → teachingStyle
-        val ready = withRole.copy(persona = "较真", title = "t")
-        assertEquals("教学风格偏好", planner.strategyFor(ready, 55, false).targetFollowUpField)
+        // goal+role+persona 已确认、title 已填 → teachingStyle
+        val readySlots = roleSlots.confirm(CreationSlot.Persona, "较真", 3)
+        val withTitle = empty.copy(title = "t")
+        assertEquals("教学风格偏好", planner.strategyFor(withTitle, 55, false, readySlots).targetFollowUpField)
     }
 
     @Test
-    fun plannerSkipsFieldAfterTwoUnansweredAsks() {
+    fun plannerSkipsFieldAfterThreeUnansweredAsks() {
         val planner = AgentCreationFollowUpPlanner()
         val empty = NewSessionConfiguration()
 
@@ -141,8 +143,10 @@ class AgentCreationUnderstandingTest {
         planner.recordRound("学习目标")
         assertEquals("学习目标", planner.strategyFor(empty, 0, false).targetFollowUpField)
         planner.recordRound("学习目标")
+        assertEquals("学习目标", planner.strategyFor(empty, 0, false).targetFollowUpField)
+        planner.recordRound("学习目标")
 
-        // 同字段问满 2 次 → 降级到下一字段
+        // R99：同字段问满 3 次 → 降级到下一字段
         assertEquals("学习者角色", planner.strategyFor(empty, 0, false).targetFollowUpField)
     }
 

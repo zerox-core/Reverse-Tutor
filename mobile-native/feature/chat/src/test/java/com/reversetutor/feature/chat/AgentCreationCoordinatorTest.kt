@@ -90,10 +90,11 @@ class AgentCreationCoordinatorTest {
 
         val state = coordinator.state
         assertFalse(state.busy)
-        // 融合分：0.5×30(u_llm) + 0.5×35(u_det=title15+role20) = 33
-        assertEquals(33, state.rawUnderstanding)
+        // R102：learnerRole 与用户文本无重合 → 只进 Proposed 不落草案；u_det 只剩 title15。
+        // 融合分：0.5×30(u_llm) + 0.5×15(u_det=title15) = 23
+        assertEquals(23, state.rawUnderstanding)
         assertEquals("浮力·讲学练会话", state.draft.title)
-        assertEquals("初二学生", state.draft.learnerRole)
+        assertTrue(state.draft.learnerRole.isBlank())
         // 开场 + user + note + followUp + draft 卡
         assertEquals(5, state.feed.size)
         assertTrue((state.feed[2] as AgentCreationFeedEntry.Assistant).text.contains("草案先起个头"))
@@ -119,8 +120,9 @@ class AgentCreationCoordinatorTest {
         val coordinator = AgentCreationCoordinator(gateway, clock())
         coordinator.start()
 
-        coordinator.sendUserText("第一句")
-        coordinator.sendUserText("第二句")
+        // R102：用户亲口给值（与提案重合）才落草案——两句分别坐实 learnerRole 与 persona。
+        coordinator.sendUserText("我是初二学生")
+        coordinator.sendUserText("他慢热较真")
 
         // R84：草案卡单卡化——feed 里永远只有一张，且沉在对话流末尾
         val cards = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.DraftCard>()
@@ -131,18 +133,14 @@ class AgentCreationCoordinatorTest {
     }
 
     @Test
-    fun displayedUnderstandingCappedWhileRequiredFieldsMissing() = runBlocking {
+    fun displayedUnderstandingNoLongerCapped() = runBlocking {
+        // R102：必填缺失封顶 60 删除——分数只是展示值，流程推进由槽位确认状态裁决。
         val gateway = ScriptedGateway(
             listOf(
                 AgentCreationTurnResult(
-                    understanding = 85,
-                    followUpQuestion = "再聊聊？",
-                    draft = AgentCreationDraftPatch(title = "只有标题")
-                ),
-                AgentCreationTurnResult(
-                    understanding = 85,
-                    followUpQuestion = "齐了吗？",
-                    draft = AgentCreationDraftPatch(learnerRole = "初二学生")
+                    understanding = 100,
+                    followUpQuestion = "基础怎么样？",
+                    draft = AgentCreationDraftPatch(title = "只有标题", feedbackIntensity = 4)
                 )
             )
         )
@@ -150,17 +148,13 @@ class AgentCreationCoordinatorTest {
         coordinator.start()
 
         coordinator.sendUserText("第一句")
-        // 融合分：0.5×85 + 0.5×15(u_det=title15) = 50，必填缺 learnerRole 封顶 60 不生效
-        assertEquals(50, coordinator.state.rawUnderstanding)
-        assertEquals(50, coordinator.state.displayedUnderstanding)
-        assertFalse(coordinator.state.understandingHigh)
-        assertFalse(coordinator.state.canCreate)
 
-        coordinator.sendUserText("第二句")
-        // 融合分：0.5×85 + 0.5×35(u_det=title15+role20) = 60
-        assertEquals(60, coordinator.state.displayedUnderstanding)
+        // 融合分：0.5×100 + 0.5×30(u_det=title15+teachingStyle15) = 65（旧规则下会被封顶 60）
+        assertEquals(65, coordinator.state.rawUnderstanding)
+        assertEquals(65, coordinator.state.displayedUnderstanding)
         assertFalse(coordinator.state.understandingHigh)
-        assertTrue(coordinator.state.canCreate)
+        // canCreate 仍按草案校验判定：learnerRole 空 → 不可创建
+        assertFalse(coordinator.state.canCreate)
     }
 
     @Test
@@ -182,8 +176,9 @@ class AgentCreationCoordinatorTest {
         val coordinator = AgentCreationCoordinator(gateway, clock())
         coordinator.start()
 
-        coordinator.sendUserText("第一句")
-        coordinator.sendUserText("第二句")
+        // R102：亲口给值才落草案——两句分别坐实 learnerRole 与 goal。
+        coordinator.sendUserText("我是初二学生")
+        coordinator.sendUserText("我要期末冲刺")
 
         val config = coordinator.configuration()
         assertEquals("旧标题", config.title)
@@ -200,7 +195,7 @@ class AgentCreationCoordinatorTest {
                 AgentCreationTurnResult(
                     understanding = 50,
                     followUpQuestion = "基础怎么样？",
-                    draft = AgentCreationDraftPatch(goal = "期末冲刺", title = "t", learnerRole = "r")
+                    draft = AgentCreationDraftPatch(goal = "期末冲刺", title = "t", learnerRole = "初二学生")
                 ),
                 AgentCreationTurnResult(
                     understanding = 70,
@@ -211,7 +206,8 @@ class AgentCreationCoordinatorTest {
         val coordinator = AgentCreationCoordinator(gateway, clock())
         coordinator.start()
 
-        coordinator.sendUserText("我要期末冲刺")
+        // R102：goal 与 learnerRole 都亲口给值 → 首轮即 Confirmed 落草案。
+        coordinator.sendUserText("我是初二学生，要期末冲刺")
         assertFalse(coordinator.state.requestDocumentActive)
 
         // 第 2 轮：goal+role 就绪、无文档、满 2 轮 → 放行请求资料
@@ -234,14 +230,14 @@ class AgentCreationCoordinatorTest {
 
         coordinator.sendUserText("别问了，直接生成吧")
 
-        // 收敛：策略快照带 converge，追问被剥离，改发收敛话术
+        // 收敛：策略快照带 converge；但 R102 起目标未确认不能出草案——LLM 追问被剥离，
+        // 改发强制目标追问（且目标缺失时不许说「不问了」）。
         assertEquals(true, gateway.lastStrategy?.converge)
-        val last = coordinator.state.feed.last() as AgentCreationFeedEntry.Assistant
-        assertTrue(last.text.contains("不问了"))
-        assertFalse(
-            coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
-                .any { it.text.contains("还聊吗") }
-        )
+        val assistants = coordinator.state.feed.filterIsInstance<AgentCreationFeedEntry.Assistant>()
+        val last = assistants.last()
+        assertTrue(last.text.contains("你想达到什么目标"))
+        assertFalse(last.text.contains("不问了"))
+        assertFalse(assistants.any { it.text.contains("还聊吗") })
     }
 
     @Test

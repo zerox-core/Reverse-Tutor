@@ -6,8 +6,12 @@ import com.reversetutor.feature.chat.AgentCreationHistoryTurn
 import com.reversetutor.feature.chat.AgentCreationPlannerState
 import com.reversetutor.feature.chat.AgentCreationSnapshot
 import com.reversetutor.feature.chat.NewSessionConfiguration
+import com.reversetutor.feature.chat.SlotEntry
+import com.reversetutor.feature.chat.SlotStatus
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** R85：创建会话快照编解码——往返无损、损坏安全、分析中文件卡降级。 */
@@ -91,5 +95,35 @@ class AgentCreationSnapshotCodecTest {
         val decoded = AgentCreationSnapshotCodec.decode(AgentCreationSnapshotCodec.encode(snapshot))!!
         val card = decoded.feed.single() as AgentCreationFeedEntry.FileCard
         assertEquals(AgentCreationFeedEntry.FileCard.FileStatus.Failed, card.status)
+    }
+
+    @Test
+    fun slotsRoundTripPreservesEntries() {
+        val snapshot = AgentCreationSnapshot(
+            slots = mapOf(
+                "Goal" to SlotEntry(SlotStatus.Confirmed, "把浮力讲明白", 3),
+                "Persona" to SlotEntry(SlotStatus.Proposed, "慢热但较真", 2)
+            )
+        )
+        val decoded = AgentCreationSnapshotCodec.decode(AgentCreationSnapshotCodec.encode(snapshot))
+        assertEquals(snapshot, decoded)
+    }
+
+    @Test
+    fun legacyThirteenFieldSnapshotDecodesWithEmptySlots() {
+        val snapshot = AgentCreationSnapshot(
+            planner = AgentCreationPlannerState(
+                rounds = 2,
+                documentAsked = true,
+                pathConfirmAsked = true
+            )
+        )
+        // 截掉末尾槽位字段（空槽位 = 2 字符 "0:"），回到 13 字段 V2 旧格式。
+        val legacy = AgentCreationSnapshotCodec.encode(snapshot).dropLast(2)
+        val decoded = AgentCreationSnapshotCodec.decode(legacy)
+        assertNotNull(decoded)
+        assertTrue(decoded!!.planner.documentAsked)
+        assertTrue(decoded.planner.pathConfirmAsked)
+        assertEquals(emptyMap<String, SlotEntry>(), decoded.slots)
     }
 }

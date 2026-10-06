@@ -60,7 +60,8 @@ class AgentCreationFollowUpPlanner {
     fun strategyFor(
         draft: NewSessionConfiguration,
         detScore: Int,
-        documentAvailable: Boolean
+        documentAvailable: Boolean,
+        slots: CreationSlots = CreationSlots()
     ): AgentCreationTurnStrategy {
         // R87：主动问优先于通用追问队列——先要资料（资料可能重塑路径），再确认路径。
         val wantDocument = !shouldConverge() && !documentAvailable && !documentAsked &&
@@ -75,7 +76,7 @@ class AgentCreationFollowUpPlanner {
             targetFollowUpField = if (shouldConverge() || wantDocument || wantPathConfirm) {
                 null
             } else {
-                nextField(draft)?.label
+                nextField(draft, slots)?.label
             },
             mustProposeTitle = draft.goal.isNotBlank() && draft.title.isBlank(),
             converge = shouldConverge(),
@@ -114,9 +115,9 @@ class AgentCreationFollowUpPlanner {
         append("会按这个顺序从基础到提升来教，你看行吗？要调整（增删、换顺序）直接说。")
     }
 
-    /** 下一个该追问的字段：优先级队列中「未填且未问满 2 次」的第一项。 */
-    fun nextField(draft: NewSessionConfiguration): Field? =
-        PRIORITY.firstOrNull { !isFilled(it, draft) && (askCounts[it] ?: 0) < MAX_ASKS_PER_FIELD }
+    /** 下一个该追问的字段：优先级队列中「未确认且未问满次数」的第一项（R102 读槽位）。 */
+    fun nextField(draft: NewSessionConfiguration, slots: CreationSlots): Field? =
+        PRIORITY.firstOrNull { !isFilled(it, draft, slots) && (askCounts[it] ?: 0) < MAX_ASKS_PER_FIELD }
 
     /** 用户明确说「别问了 / 直接生成」→ 立即收敛。 */
     fun forceConverge() {
@@ -147,18 +148,19 @@ class AgentCreationFollowUpPlanner {
         pathConfirmAsked = snapshot.pathConfirmAsked
     }
 
-    private fun isFilled(field: Field, draft: NewSessionConfiguration): Boolean = when (field) {
-        Field.Goal -> draft.goal.isNotBlank()
-        Field.LearnerRole -> draft.learnerRole.isNotBlank()
-        Field.Persona -> draft.persona.isNotBlank()
+    private fun isFilled(field: Field, draft: NewSessionConfiguration, slots: CreationSlots): Boolean = when (field) {
+        // R102：槽位字段「已填」= 用户已确认（Confirmed）；模型提案 / 未确认值一律视为未落定。
+        Field.Goal -> slots.statusOf(CreationSlot.Goal) == SlotStatus.Confirmed
+        Field.LearnerRole -> slots.statusOf(CreationSlot.LearnerRole) == SlotStatus.Confirmed
+        Field.Persona -> slots.statusOf(CreationSlot.Persona) == SlotStatus.Confirmed
         Field.Title -> draft.title.isNotBlank()
-        Field.TeachingStyle -> AgentCreationUnderstanding.hasTeachingStyle(draft)
-        Field.Constraints -> AgentCreationUnderstanding.hasConstraints(draft)
+        Field.TeachingStyle -> slots.statusOf(CreationSlot.TeachingStyle) == SlotStatus.Confirmed
+        Field.Constraints -> slots.statusOf(CreationSlot.Constraints) == SlotStatus.Confirmed
     }
 
     companion object {
-        const val SOFT_ROUND_CAP = 8
-        const val MAX_ASKS_PER_FIELD = 2
+        const val SOFT_ROUND_CAP = 12
+        const val MAX_ASKS_PER_FIELD = 3
 
         /** R87：主动要资料的最早轮数（与协调器 requestDocument 放行门槛一致）。 */
         const val MIN_ROUNDS_BEFORE_DOCUMENT_ASK = 2

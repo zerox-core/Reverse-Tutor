@@ -1435,7 +1435,8 @@ private fun DestinationContent(
                 openPickerOnStart = agentCreationImportRequested,
                 onOpenPickerConsumed = onAgentCreationImportConsumed,
                 gateway = hybridAppGraph.agentCreationGateway,
-                stateStore = hybridAppGraph.agentCreationStateStore
+                stateStore = hybridAppGraph.agentCreationStateStore,
+                graphEnabled = hybridAppGraph.agentCreationGraphEnabled
             )
             return@ReverseTutorScreenSurface
         }
@@ -1577,13 +1578,6 @@ private fun DestinationContent(
                     }
                 },
                 onComposerFocusChanged = onComposerFocusChanged,
-                webSearchEnabled = appPreferences.webSearchEnabled,
-                onWebSearchChange = { enabled ->
-                    scope.launch {
-                        hybridAppGraph.appPreferencesRepository
-                            .setWebSearchEnabled(enabled)
-                    }
-                },
                 onOpenContextHub = onOpenContextHub,
                 onOpenWindowBranches = {
                     onNavigateDestination(AppDestination.WindowBranches)

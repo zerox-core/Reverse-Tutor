@@ -17,8 +17,8 @@ class AppPreferencesPolicyTest {
         assertEquals("", defaults.scratchMemo)
         assertEquals(true, defaults.challengeReminderEnabled)
         assertEquals(true, defaults.hapticFeedbackEnabled)
-        // NEWMP-V1-018: web search defaults to off to protect token budgets.
-        assertEquals(false, defaults.webSearchEnabled)
+        // NEWMP-V1-018 + R100: web search defaults to on (2026-10-04 用户拍板）。
+        assertEquals(true, defaults.webSearchEnabled)
     }
 
     @Test
