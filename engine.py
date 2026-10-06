@@ -1101,9 +1101,9 @@ def create_session(
 
 # --- 压缩 / 摘要 -----------------------------------------------------------
 
-SUMMARY_THRESHOLD = 30     # user+assistant 条数超过此值才压缩
+SUMMARY_THRESHOLD = 72     # user+assistant 条数超过此值才压缩（配合 60 条窗口，约 36 轮才触发）
 SUMMARY_KEEP_RECENT = 12   # 最近多少条保留原文
-RECENT_PROMPT_MESSAGE_LIMIT = 12
+RECENT_PROMPT_MESSAGE_LIMIT = 60  # 最近 60 条（约 30 轮）全量进上下文，2026-10-06 用户拍板扩窗
 RUNTIME_MEMORY_HINT_MAX_CHARS = 1600
 RUNTIME_MEMORY_HINT_MAX_ITEMS = 16
 SUMMARY_SYSTEM = (

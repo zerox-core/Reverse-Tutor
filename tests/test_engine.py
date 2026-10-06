@@ -118,10 +118,10 @@ async def test_summarize_force_compresses_even_below_threshold(db_sess):
 
 async def test_summarize_auto_triggers_above_threshold(db_sess):
     s = engine.create_session(db_sess, title="", role="r", goal="g")
-    # SUMMARY_THRESHOLD = 30，每轮产生 2 条 (user+assistant)，跑 16 轮 = 32 条
-    for i in range(16):
+    # 阈值从引擎常量动态读取（2026-10-06 扩窗后 30 → 72），不再硬编码轮数
+    for i in range(engine.SUMMARY_THRESHOLD // 2 + 1):  # 每轮产生 2 条 (user+assistant)，超过阈值即应触发
         await engine.run_turn(db_sess, s.id, f"answer {i}")
-    msgs = db.list_messages(db_sess, s.id)
+    msgs = db.list_messages(db_sess, s.id, limit=1000)  # 默认 50 条只回最旧消息，摘要会落在窗口外
     summaries = [m for m in msgs if m.role == "system" and m.meta().get("kind") == "summary"]
     assert len(summaries) >= 1
 

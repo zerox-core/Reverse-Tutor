@@ -223,7 +223,7 @@ async def _openai_chat(
         "Authorization": f"Bearer {config['api_key']}",
         "Content-Type": "application/json",
     }
-    payload = _build_openai_payload(system, messages, temperature, max_tokens, json_mode=True, config=config)
+    payload = _build_openai_payload(system, messages, temperature, max_tokens, json_mode=True, prefill_json=True, config=config)
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             r = await client.post(url, json=payload, headers=headers)
@@ -247,6 +247,8 @@ async def _openai_chat(
             raise LLMError(f"LLM request failed: {e}") from e
     data = _response_json(r, "LLM")
     content = _content_from_openai_data(data)
+    if content.strip() and not content.lstrip().startswith("{"):
+        content = "{" + content.lstrip()  # some providers do not echo the prefilled {
     if content.strip():
         return content
 
@@ -255,7 +257,7 @@ async def _openai_chat(
         + "\n\nIMPORTANT: Return only one valid JSON object. Do not use markdown. "
         + "Do not output explanations before or after the JSON."
     )
-    retry_payload = _build_openai_payload(retry_system, messages, temperature, max_tokens, json_mode=False, config=config)
+    retry_payload = _build_openai_payload(retry_system, messages, temperature, max_tokens, json_mode=False, prefill_json=True, config=config)
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             r = await client.post(url, json=retry_payload, headers=headers)
@@ -264,6 +266,8 @@ async def _openai_chat(
             raise LLMError(f"LLM request failed after empty-content retry: {e}") from e
     retry_data = _response_json(r, "LLM retry")
     retry_content = _content_from_openai_data(retry_data)
+    if retry_content.strip() and not retry_content.lstrip().startswith("{"):
+        retry_content = "{" + retry_content.lstrip()
     if retry_content.strip():
         return retry_content
 
@@ -278,11 +282,16 @@ def _build_openai_payload(
     *,
     json_mode: bool,
     config: dict[str, str] | None = None,
+    prefill_json: bool = False,
 ) -> dict[str, Any]:
     config = config or _active_config() or {"model": LLM_MODEL}
+    msgs = [{"role": "system", "content": system}, *messages]
+    if prefill_json:
+        # DeepSeek json_object mode returns pure whitespace on the full engine prompt; assistant prefill { forces JSON start (probe 2026-10-06, 3/3 parseable)
+        msgs.append({"role": "assistant", "content": "{"})
     payload = {
         "model": config.get("model", LLM_MODEL),
-        "messages": [{"role": "system", "content": system}, *messages],
+        "messages": msgs,
         "temperature": _provider_temperature(temperature),
     }
     if _is_minimax_config(config):
