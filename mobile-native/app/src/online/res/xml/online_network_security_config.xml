@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 开发变体专用：开发机局域网 IP 随 DHCP 漂移，应用内置地址自恢复（DiscoveryOnlineHttpTransport）
+     会自动定位新的开发机地址，因此放开明文 HTTP（仅 online 变体打包此配置）。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

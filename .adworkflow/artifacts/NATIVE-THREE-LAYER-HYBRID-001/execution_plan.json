@@ -1,0 +1,46 @@
+{
+  "schema": "ADworkflo.execution_plan.v1",
+  "mvp_id": "native-three-layer-hybrid-foundation",
+  "source_docs": [
+    "docs/superpowers/specs/2026-07-11-native-three-layer-hybrid-architecture-design.md",
+    "docs/superpowers/plans/2026-07-11-native-three-layer-hybrid-implementation.md"
+  ],
+  "worker_policy": {
+    "worker_limit": 3,
+    "shared_contract_owner": "NATIVE-HYBRID-BACKEND-001",
+    "controller_owned_files": [
+      "mobile-native/settings.gradle.kts",
+      "mobile-native/app/build.gradle.kts",
+      "mobile-native/core/data/build.gradle.kts",
+      "mobile-native/core/llm/build.gradle.kts"
+    ],
+    "handoff_outputs": [
+      "changed_file_summary",
+      "worker_state",
+      "verification_result"
+    ]
+  },
+  "batches": [
+    {
+      "batch_id": "hybrid-contract-checkpoint",
+      "parallel": false,
+      "tasks": ["NATIVE-HYBRID-BACKEND-001"]
+    },
+    {
+      "batch_id": "hybrid-layer-parallel",
+      "parallel": true,
+      "depends_on": ["hybrid-contract-checkpoint"],
+      "tasks": [
+        "NATIVE-HYBRID-BACKEND-001-continuation",
+        "NATIVE-HYBRID-DATA-001",
+        "NATIVE-HYBRID-FRONTEND-001"
+      ]
+    },
+    {
+      "batch_id": "hybrid-controller-integration",
+      "parallel": false,
+      "depends_on": ["hybrid-layer-parallel"],
+      "tasks": ["controller-integration-and-review"]
+    }
+  ]
+}

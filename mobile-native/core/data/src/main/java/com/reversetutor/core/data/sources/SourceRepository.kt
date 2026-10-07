@@ -21,6 +21,23 @@ class SourceRepository(
             )
         }
 
+    /** NEWMP-V1-024: persists semantic embedding vectors for freshly indexed chunks. */
+    suspend fun updateChunkEmbeddings(chunkIds: List<String>, vectors: List<FloatArray>, modelKey: String) {
+        if (chunkIds.size != vectors.size) return
+        chunkIds.zip(vectors).forEach { (chunkId, vector) ->
+            sourceDao.updateChunkEmbedding(chunkId, SourceEmbeddingCodec.encode(vector), modelKey)
+        }
+    }
+
+    /** 1e: loads all stored chunk embeddings for a space (chunk id -> vector + model identity). */
+    suspend fun listChunkEmbeddings(spaceId: String = defaultSpaceId): Map<String, StoredChunkEmbedding> =
+        sourceDao.listChunkEmbeddingRows(spaceId)
+            .mapNotNull { row ->
+                SourceEmbeddingCodec.decode(row.embedding)
+                    ?.let { row.id to StoredChunkEmbedding(it, row.embeddingModel) }
+            }
+            .toMap()
+
     suspend fun importSource(
         input: SourceImportInput,
         nowEpochMillis: Long,
@@ -125,17 +142,11 @@ object LocalSourceParser {
                 chunks = emptyList(),
                 warnings = listOf("JSON exports belong to Import/export. The file stays visible here as a reference.")
             )
-            SourceType.Pdf,
-            SourceType.Docx,
-            SourceType.Pptx,
-            SourceType.Epub,
-            SourceType.Image -> SourceParseOutcome(
-                type = type,
-                status = SourceParserStatus.FutureAssisted,
-                extractedText = null,
-                chunks = emptyList(),
-                warnings = listOf("${type.name} parsing is queued for a later assisted or specialized parser path.")
-            )
+            SourceType.Pdf -> parsePdf(type, text)
+            SourceType.Image -> parseImage(type, text)
+            SourceType.Docx -> parseDocx(type, text)
+            SourceType.Pptx -> parsePptx(type, text)
+            SourceType.Epub -> parseEpub(type, text)
             SourceType.Other -> SourceParseOutcome(
                 type = type,
                 status = SourceParserStatus.Unsupported,
@@ -165,6 +176,166 @@ object LocalSourceParser {
             status = SourceParserStatus.FullyLocal,
             extractedText = normalized,
             chunks = chunkText(normalized)
+        )
+    }
+
+    private fun parsePdf(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this PDF (no text layer and on-device OCR found nothing); it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this PDF (no text layer and on-device OCR found nothing); it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("PDF text was extracted locally (text layer, or on-device OCR for scanned pages); handwriting and complex layouts may be inaccurate.")
+        )
+    }
+
+    private fun parseImage(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was recognized in this image; pure diagrams or handwriting wait for vision-assisted parsing.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was recognized in this image; pure diagrams or handwriting wait for vision-assisted parsing.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Image text was extracted with on-device OCR or cloud vision transcription; verify against the original image.")
+        )
+    }
+
+    private fun parseDocx(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this Word document; it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this Word document; it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Word text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex layouts against the original document.")
+        )
+    }
+
+    private fun parsePptx(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this presentation; it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this presentation; it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Slide text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex slide layouts against the original presentation.")
+        )
+    }
+
+    private fun parseEpub(
+        type: SourceType,
+        text: String
+    ): SourceParseOutcome {
+        if (text.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this ebook; it stays as a reference.")
+            )
+        }
+        val normalized = normalizeText(text)
+        if (normalized.isBlank()) {
+            return SourceParseOutcome(
+                type = type,
+                status = SourceParserStatus.FutureAssisted,
+                extractedText = null,
+                chunks = emptyList(),
+                warnings = listOf("No readable text was extracted from this ebook; it stays as a reference.")
+            )
+        }
+        return SourceParseOutcome(
+            type = type,
+            status = SourceParserStatus.PartiallyLocal,
+            extractedText = normalized,
+            chunks = chunkText(normalized),
+            warnings = listOf("Ebook text and embedded images were extracted locally (on-device OCR or cloud vision transcription for images); verify complex formatting against the original ebook.")
         )
     }
 
@@ -254,16 +425,7 @@ private fun normalizeText(text: String): String =
         .replace(Regex("\n{3,}"), "\n\n")
         .trim()
 
-private fun chunkText(text: String): List<String> {
-    val paragraphs = text.split(Regex("\n{2,}")).filter { it.isNotBlank() }
-    return paragraphs.flatMap { paragraph ->
-        if (paragraph.length <= 900) {
-            listOf(paragraph)
-        } else {
-            paragraph.chunked(900).map { it.trim() }.filter { it.isNotBlank() }
-        }
-    }.ifEmpty { listOf(text) }
-}
+private fun chunkText(text: String): List<String> = SourceChunker.chunk(text)
 
 private fun estimateTokens(text: String): Int =
     (text.length / 4).coerceAtLeast(1)

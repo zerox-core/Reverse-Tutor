@@ -1,0 +1,53 @@
+{
+  "task_id": "NATIVE-HYBRID-BACKEND-001",
+  "goal": "Implement the shared hybrid domain contracts, conversation/sync coordinators, provider runtime foundation, and Python online API without depending on Android Room or Compose.",
+  "non_goals": [
+    "Do not modify mobile-native/app or mobile-native/feature.",
+    "Do not modify Room entities, DAOs, migrations, or protocol parsers.",
+    "Do not upload local chat or source正文 by default.",
+    "Do not revert unrelated user or worker changes."
+  ],
+  "acceptance_criteria": [
+    "Shared model and Repository contracts compile and have invariant tests.",
+    "Independent TurnRuns can run concurrently while explicit dependent follow-ups wait.",
+    "Retry attempts cannot be overwritten by older late results.",
+    "Python activity and sync writes are idempotent.",
+    "Local execution does not require the Python service."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": ["read", "edit", "test", "commit"],
+  "required_outputs": ["patch", "changed_file_summary", "worker_state", "verification_result"],
+  "module": ":core:model/:core:domain/:core:llm/:core:remote/Python-online",
+  "branch": "work/native-hybrid-backend",
+  "dependencies": [],
+  "read_first": [
+    "AGENTS.md",
+    "docs/superpowers/specs/2026-07-11-native-complete-interaction-frontend-design.md",
+    "docs/superpowers/specs/2026-07-11-native-three-layer-hybrid-architecture-design.md",
+    "docs/superpowers/plans/2026-07-11-native-three-layer-hybrid-implementation.md"
+  ],
+  "write_scope": [
+    "mobile-native/core/model",
+    "mobile-native/core/domain",
+    "mobile-native/core/llm",
+    "mobile-native/core/remote",
+    "mobile-native/core/sync/contract",
+    "server.py",
+    "adapters/online",
+    "tests/test_online_hybrid_api.py"
+  ],
+  "do_not_touch": [
+    "mobile-native/app",
+    "mobile-native/feature",
+    "mobile-native/core/data",
+    "mobile-native/core/protocol",
+    "mobile",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run core:model, core:domain, and core:llm tests.",
+    "Run tests/test_online_hybrid_api.py.",
+    "Report any required shared Gradle changes without editing controller-owned settings files."
+  ]
+}

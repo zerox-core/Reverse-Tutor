@@ -1,0 +1,53 @@
+name: PostgreSQL Contract
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: reverse_tutor
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: reverse_tutor_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U reverse_tutor -d reverse_tutor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_POSTGRES_URL: postgresql+psycopg://reverse_tutor:test-password@127.0.0.1:5432/reverse_tutor_test
+      ONLINE_DATABASE_URL: postgresql+psycopg://reverse_tutor:test-password@127.0.0.1:5432/reverse_tutor_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Upgrade online database
+        run: python -m alembic upgrade head
+      - name: Check metadata drift
+        run: python -m alembic check
+      - name: Run PostgreSQL contracts without skips
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests/online_db tests/test_online_auth_store_contract.py tests/test_online_auth_postgres_integration.py tests/test_online_schema_check.py -v -W error -rs | tee postgres-pytest.log
+          if grep -Eiq 'SKIPPED|[[:space:]]skipped[[:space:]]' postgres-pytest.log; then
+            echo "PostgreSQL contract tests must not skip"
+            exit 1
+          fi

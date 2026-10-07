@@ -1,25 +1,55 @@
 package com.reversetutor.feature.sources
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.DataObject
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.PictureAsPdf
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Slideshow
+import androidx.compose.material.icons.rounded.TextSnippet
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -29,13 +59,27 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.data.sources.SourceImportInput
 import com.reversetutor.core.data.sources.SourceImportResult
 import com.reversetutor.core.data.sources.SourceRepository
 import com.reversetutor.core.data.sources.SourceWithChunks
+import com.reversetutor.core.design.FormalColors
+import com.reversetutor.core.design.FormalShapes
+import com.reversetutor.core.design.LocalFormalTypeScale
+import com.reversetutor.core.design.style
 import kotlinx.coroutines.launch
 
 @Composable
@@ -43,7 +87,14 @@ fun SourcesRoute(
     sourceRepository: SourceRepository,
     pendingImport: SourceImportInput?,
     highlightedSourceId: String? = null,
+    sessionTitle: String? = null,
+    sessionReferencedIds: Set<String> = emptySet(),
+    openInSessionFilter: Boolean = false,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onPickSource: () -> Unit,
+    onSourceIndexed: (SourceImportResult) -> Unit = {},
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -61,28 +112,101 @@ fun SourcesRoute(
 
     LaunchedEffect(pendingImport?.requestId) {
         val import = pendingImport ?: return@LaunchedEffect
-        lastImport = sourceRepository.importSource(
+        val imported = sourceRepository.importSource(
             input = import,
             nowEpochMillis = System.currentTimeMillis()
         )
+        lastImport = imported
+        // NEWMP-V1-024: kick off background semantic indexing.
+        onSourceIndexed(imported)
         reload()
     }
 
     SourcesScreen(
         state = SourcesUiState.from(sources = sources, lastImport = lastImport),
         highlightedSourceId = highlightedSourceId,
+        sessionTitle = sessionTitle,
+        sessionReferencedIds = sessionReferencedIds,
+        openInSessionFilter = openInSessionFilter,
+        searchQuery = searchQuery,
+        onSearchQueryChange = onSearchQueryChange,
         onPickSource = onPickSource,
         onReprocess = { sourceId ->
             scope.launch {
-                lastImport = sourceRepository.reprocessSource(
+                val reprocessed = sourceRepository.reprocessSource(
                     sourceId = sourceId,
                     nowEpochMillis = System.currentTimeMillis()
                 )
+                lastImport = reprocessed
+                // NEWMP-V1-024: re-index embeddings for the fresh chunks.
+                reprocessed?.let(onSourceIndexed)
                 reload()
             }
         },
+        onBack = onBack,
         modifier = modifier
     )
+}
+
+@Immutable
+private data class SourcesColors(
+    val background: Color,
+    val surface: Color,
+    val surfaceSubtle: Color,
+    val ink: Color,
+    val muted: Color,
+    val faint: Color,
+    val border: Color,
+    val borderStrong: Color,
+    val divider: Color,
+    val success: Color,
+    val successSoft: Color,
+    val warning: Color,
+    val warningSoft: Color,
+    val danger: Color,
+    val dangerSoft: Color
+)
+
+@Composable
+private fun sourcesColors(): SourcesColors {
+    val scheme = MaterialTheme.colorScheme
+    return if (isSystemInDarkTheme()) {
+        SourcesColors(
+            background = scheme.background,
+            surface = scheme.surface,
+            surfaceSubtle = scheme.surfaceVariant,
+            ink = scheme.onSurface,
+            muted = scheme.onSurfaceVariant,
+            faint = scheme.onSurfaceVariant.copy(alpha = 0.72f),
+            border = scheme.outlineVariant,
+            borderStrong = scheme.outline,
+            divider = scheme.outlineVariant,
+            success = FormalColors.Success,
+            successSoft = FormalColors.SuccessSoft.copy(alpha = 0.18f),
+            warning = FormalColors.Warning,
+            warningSoft = FormalColors.WarningSoft.copy(alpha = 0.18f),
+            danger = FormalColors.Danger,
+            dangerSoft = FormalColors.Danger.copy(alpha = 0.14f)
+        )
+    } else {
+        SourcesColors(
+            background = FormalColors.Background,
+            surface = FormalColors.Surface,
+            surfaceSubtle = FormalColors.SurfaceSubtle,
+            ink = FormalColors.Ink,
+            muted = FormalColors.Muted,
+            faint = FormalColors.Tertiary,
+            border = FormalColors.Border,
+            borderStrong = FormalColors.BorderStrong,
+            divider = FormalColors.Divider,
+            success = FormalColors.Success,
+            successSoft = FormalColors.SuccessSoft,
+            warning = FormalColors.Warning,
+            warningSoft = FormalColors.WarningSoft,
+            danger = FormalColors.Danger,
+            dangerSoft = FormalColors.Danger.copy(alpha = 0.12f)
+        )
+    }
 }
 
 @Composable
@@ -90,62 +214,542 @@ fun SourcesRoute(
 fun SourcesScreen(
     state: SourcesUiState,
     highlightedSourceId: String? = null,
+    sessionTitle: String? = null,
+    sessionReferencedIds: Set<String> = emptySet(),
+    openInSessionFilter: Boolean = false,
+    searchQuery: String = "",
+    onSearchQueryChange: (String) -> Unit = {},
     onPickSource: () -> Unit,
     onReprocess: (String) -> Unit,
+    onBack: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var helpExpanded by remember { mutableStateOf(false) }
+    var sessionFilter by remember { mutableStateOf(openInSessionFilter) }
+    var selectedType by remember { mutableStateOf<String?>(null) }
+    var selectedStatus by remember { mutableStateOf<String?>(null) }
+    var expandedId by remember(highlightedSourceId) { mutableStateOf(highlightedSourceId) }
+    val hasSessionScope = sessionReferencedIds.isNotEmpty()
+    val visibleItems = filterSourceItems(
+        items = state.items,
+        sessionScope = sessionFilter && hasSessionScope,
+        sessionReferencedIds = sessionReferencedIds,
+        typeLabel = selectedType,
+        statusLabel = selectedStatus,
+        searchQuery = searchQuery
+    )
+    val typeOptions = state.items.map { it.typeLabel }.distinct().sorted()
+    val statusOptions = listOf("已解析", "部分解析", "等待能力", "暂不支持", "失败")
+        .filter { label -> state.items.any { it.statusLabel == label } }
+    val filtersActive = visibleItems.size != state.items.size
+    val colors = sourcesColors()
+    val type = LocalFormalTypeScale.current
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.Start
+            .background(colors.background)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+        SourcesTopBar(
+            summary = if (filtersActive) {
+                "${visibleItems.size} / ${state.items.size} 份资料"
+            } else {
+                state.summary
+            },
+            colors = colors,
+            onBack = onBack,
+            onPickSource = onPickSource
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .padding(top = 14.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Sources",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+            if (hasSessionScope) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!sessionTitle.isNullOrBlank()) {
+                        Text(
+                            text = "当前会话：$sessionTitle",
+                            color = colors.faint,
+                            style = type.style(9f, 14f)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SourcesPillChip(
+                            label = "全部",
+                            selected = !sessionFilter,
+                            colors = colors,
+                            onClick = { sessionFilter = false },
+                            modifier = Modifier.testTag("sources-filter-all")
+                        )
+                        SourcesPillChip(
+                            label = "本会话",
+                            selected = sessionFilter,
+                            colors = colors,
+                            onClick = { sessionFilter = true },
+                            modifier = Modifier.testTag("sources-filter-session")
+                        )
+                    }
+                }
+            }
+            if (state.items.isNotEmpty()) {
+                SourcesSearchField(
+                    query = searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    colors = colors,
+                    modifier = Modifier.testTag("sources-search")
                 )
-                Text(
-                    text = state.summary,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium
+                if (typeOptions.size > 1) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SourcesPillChip(
+                            label = "全部类型",
+                            selected = selectedType == null,
+                            colors = colors,
+                            onClick = { selectedType = null },
+                            modifier = Modifier.testTag("sources-type-filter-all")
+                        )
+                        typeOptions.forEach { label ->
+                            SourcesPillChip(
+                                label = label,
+                                selected = selectedType == label,
+                                colors = colors,
+                                onClick = {
+                                    selectedType = if (selectedType == label) null else label
+                                },
+                                modifier = Modifier.testTag("sources-type-filter-$label")
+                            )
+                        }
+                    }
+                }
+                if (statusOptions.size > 1) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        SourcesPillChip(
+                            label = "全部状态",
+                            selected = selectedStatus == null,
+                            colors = colors,
+                            onClick = { selectedStatus = null },
+                            modifier = Modifier.testTag("sources-status-filter-all")
+                        )
+                        statusOptions.forEach { label ->
+                            SourcesPillChip(
+                                label = label,
+                                selected = selectedStatus == label,
+                                colors = colors,
+                                onClick = {
+                                    selectedStatus = if (selectedStatus == label) null else label
+                                },
+                                modifier = Modifier.testTag("sources-status-filter-$label")
+                            )
+                        }
+                    }
+                }
+            }
+            SourcesHelpCard(
+                expanded = helpExpanded,
+                onToggle = { helpExpanded = !helpExpanded },
+                colors = colors
+            )
+            val importStatus = state.importStatusLabel
+            if (importStatus != null) {
+                ImportStatusPanel(status = importStatus, lines = state.importDetailLines, colors = colors)
+            }
+            if (state.isEmpty) {
+                EmptySources(
+                    title = state.emptyTitle,
+                    onPickSource = onPickSource,
+                    colors = colors
                 )
-                if (!highlightedSourceId.isNullOrBlank()) {
+            } else if (visibleItems.isEmpty()) {
+                if (sessionFilter && hasSessionScope) {
+                    EmptyNotice(
+                        text = "当前会话还没有引用资料。切换到「全部」可查看所有资料。",
+                        colors = colors
+                    )
+                } else {
+                    EmptyNotice(
+                        text = "没有符合当前搜索或筛选条件的资料。",
+                        colors = colors
+                    )
+                }
+            } else {
+                SourcesBookshelf(
+                    items = visibleItems,
+                    highlightedSourceId = highlightedSourceId,
+                    expandedId = expandedId,
+                    onToggleExpanded = { id ->
+                        expandedId = if (expandedId == id) null else id
+                    },
+                    onReprocess = onReprocess,
+                    onPickSource = onPickSource,
+                    colors = colors
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourcesBookshelf(
+    items: List<SourceCardUiItem>,
+    highlightedSourceId: String?,
+    expandedId: String?,
+    onToggleExpanded: (String) -> Unit,
+    onReprocess: (String) -> Unit,
+    onPickSource: () -> Unit,
+    colors: SourcesColors
+) {
+    val rows = items.chunked(3)
+    Column {
+        rows.forEachIndexed { index, rowItems ->
+            val isLastRow = index == rows.lastIndex
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowItems.forEach { item ->
+                    BookCover(
+                        item = item,
+                        highlighted = item.id == highlightedSourceId,
+                        onToggle = { onToggleExpanded(item.id) },
+                        colors = colors,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                val emptySlots = 3 - rowItems.size
+                if (isLastRow && emptySlots > 0) {
+                    AddBookCover(
+                        onPickSource = onPickSource,
+                        colors = colors,
+                        modifier = Modifier.weight(1f)
+                    )
+                    repeat(emptySlots - 1) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                } else {
+                    repeat(emptySlots) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+            Spacer(Modifier.height(5.dp))
+            ShelfPlank(colors)
+            val expandedItem = rowItems.firstOrNull { it.id == expandedId }
+            if (expandedItem != null) {
+                Spacer(Modifier.height(10.dp))
+                SourceDetailPanel(
+                    item = expandedItem,
+                    onReprocess = { onReprocess(expandedItem.id) },
+                    colors = colors
+                )
+            }
+            Spacer(Modifier.height(18.dp))
+        }
+        if (rows.isNotEmpty() && rows.last().size == 3) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AddBookCover(
+                    onPickSource = onPickSource,
+                    colors = colors,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(5.dp))
+            ShelfPlank(colors)
+        }
+    }
+}
+
+@Composable
+private fun ShelfPlank(colors: SourcesColors) {
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(7.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(colors.surfaceSubtle, colors.border)
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(colors.divider)
+        )
+    }
+}
+
+private fun coverColor(typeLabel: String): Color = when (typeLabel) {
+    "PDF" -> Color(0xFF9E5B4F)
+    "DOCX" -> Color(0xFF5A6B57)
+    "TXT" -> Color(0xFF4A4A4E)
+    "Markdown" -> Color(0xFF8A6D4F)
+    "HTML" -> Color(0xFF6E7B76)
+    "PPTX" -> Color(0xFFB07A4A)
+    "EPUB" -> Color(0xFF6E5849)
+    "图片" -> Color(0xFF5B6068)
+    "JSON 导出" -> Color(0xFF4E5A52)
+    else -> Color(0xFF55555A)
+}
+
+@Composable
+private fun statusForeground(tone: SourceStatusTone, colors: SourcesColors): Color = when (tone) {
+    SourceStatusTone.Success -> colors.success
+    SourceStatusTone.Warning -> colors.warning
+    SourceStatusTone.Info -> colors.muted
+    SourceStatusTone.Disabled -> colors.faint
+    SourceStatusTone.Error -> colors.danger
+}
+
+@Composable
+private fun BookCover(
+    item: SourceCardUiItem,
+    highlighted: Boolean,
+    onToggle: () -> Unit,
+    colors: SourcesColors,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    val statusColor = statusForeground(item.statusTone, colors)
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.72f)
+                .testTag("source-card-${item.id}")
+                .semantics { selected = highlighted }
+                .clip(RoundedCornerShape(6.dp))
+                .background(coverColor(item.typeLabel))
+                .clickable(onClick = onToggle)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(7.dp)
+                    .background(Color.Black.copy(alpha = 0.18f))
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(7.dp)
+                    .size(8.dp)
+                    .background(statusColor, CircleShape)
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(start = 15.dp, end = 9.dp, top = 12.dp, bottom = 10.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Icon(
+                    imageVector = typeIcon(item.typeLabel),
+                    contentDescription = item.typeLabel,
+                    tint = Color.White.copy(alpha = 0.85f),
+                    modifier = Modifier.size(20.dp)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = "Evidence target: $highlightedSourceId",
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        text = item.title,
+                        color = Color.White,
+                        style = type.style(10f, 14f, FontWeight.SemiBold),
+                        maxLines = 4,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = item.typeLabel,
+                        color = Color.White.copy(alpha = 0.72f),
+                        style = type.style(7f, 11f)
                     )
                 }
             }
-            Button(onClick = onPickSource) {
-                Text("Add source")
+            if (highlighted) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(2.dp, colors.borderStrong, RoundedCornerShape(6.dp))
+                )
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        ParserStatusLegend()
-        val importStatus = state.importStatusLabel
-        if (importStatus != null) {
-            Spacer(modifier = Modifier.height(14.dp))
-            ImportStatusPanel(status = importStatus, lines = state.importDetailLines)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = item.statusLabel,
+            color = statusColor,
+            style = type.style(8f, 12f, FontWeight.Medium),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("source-status-${item.id}")
+        )
+    }
+}
+
+@Composable
+private fun AddBookCover(
+    onPickSource: () -> Unit,
+    colors: SourcesColors,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.72f)
+                .clip(RoundedCornerShape(6.dp))
+                .background(colors.surface)
+                .border(BorderStroke(1.dp, colors.borderStrong), RoundedCornerShape(6.dp))
+                .clickable(role = Role.Button, onClickLabel = "添加资料", onClick = onPickSource)
+                .testTag("sources-add-book"),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = null,
+                    tint = colors.muted,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "添加资料",
+                    color = colors.muted,
+                    style = type.style(8f, 12f, FontWeight.Medium)
+                )
+            }
         }
-        Spacer(modifier = Modifier.height(18.dp))
-        if (state.isEmpty) {
-            EmptySources(onPickSource = onPickSource, title = state.emptyTitle)
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                state.items.forEach { item ->
-                    SourceCard(item = item, onReprocess = { onReprocess(item.id) })
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = " ",
+            color = colors.faint,
+            style = type.style(8f, 12f)
+        )
+    }
+}
+
+@Composable
+private fun SourceDetailPanel(
+    item: SourceCardUiItem,
+    onReprocess: () -> Unit,
+    colors: SourcesColors
+) {
+    val type = LocalFormalTypeScale.current
+    val statusColor = statusForeground(item.statusTone, colors)
+    SourcesOutlinedCard(colors = colors, modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.title,
+                    color = colors.ink,
+                    style = type.style(11f, 16f, FontWeight.SemiBold),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = item.statusLabel,
+                    color = statusColor,
+                    style = type.style(8f, 12f, FontWeight.Medium)
+                )
+            }
+            Text(
+                text = item.impactMessage,
+                color = colors.muted,
+                style = type.style(9f, 14f)
+            )
+            Text(
+                text = item.chunkCountLabel,
+                color = colors.faint,
+                style = type.style(8f, 12f)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(colors.divider)
+            )
+            Text(
+                text = "片段",
+                color = colors.ink,
+                style = type.style(9f, 14f, FontWeight.SemiBold)
+            )
+            if (item.snippets.isNotEmpty()) {
+                item.snippets.forEach { snippet ->
+                    Text(
+                        text = snippet,
+                        color = colors.muted,
+                        style = type.style(9f, 14f)
+                    )
+                }
+            } else {
+                Text(
+                    text = "尚无可引用片段。",
+                    color = colors.faint,
+                    style = type.style(9f, 14f)
+                )
+            }
+            Text(
+                text = item.evidenceSummary,
+                color = colors.faint,
+                style = type.style(8f, 13f)
+            )
+            if (item.recoveryEnabled && item.recoveryLabel != null) {
+                Row {
+                    Surface(
+                        modifier = Modifier
+                            .heightIn(min = 36.dp)
+                            .testTag("source-action-${item.id}")
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = item.recoveryLabel,
+                                onClick = onReprocess
+                            ),
+                        color = colors.surface,
+                        shape = RoundedCornerShape(FormalShapes.PillRadius),
+                        border = BorderStroke(1.dp, colors.borderStrong)
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = item.recoveryLabel,
+                                color = colors.ink,
+                                style = type.style(9f, 13f, FontWeight.Medium)
+                            )
+                        }
+                    }
+                }
+            } else {
+                item.recoveryReason?.let { reason ->
+                    Text(
+                        text = reason,
+                        color = colors.faint,
+                        style = type.style(8f, 13f)
+                    )
                 }
             }
         }
@@ -153,22 +757,290 @@ fun SourcesScreen(
 }
 
 @Composable
-private fun ParserStatusLegend() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = RoundedCornerShape(8.dp)
+private fun SourcesTopBar(
+    summary: String,
+    colors: SourcesColors,
+    onBack: () -> Unit,
+    onPickSource: () -> Unit
+) {
+    val type = LocalFormalTypeScale.current
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .background(colors.surface)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 7.dp)
+                .size(44.dp)
+                .clickable(role = Role.Button, onClickLabel = "返回", onClick = onBack),
+            contentAlignment = Alignment.Center
         ) {
-            Text(text = "Parser status", style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "TXT and Markdown parse locally. HTML is sanitized as partial local extraction. PDF, DOCX, PPTX, EPUB, and image files stay visible as queued source material for assisted parsing or vision.",
-                style = MaterialTheme.typography.bodyMedium
+            Icon(
+                imageVector = Icons.Rounded.ArrowBackIosNew,
+                contentDescription = "返回",
+                tint = colors.ink,
+                modifier = Modifier.size(22.dp)
             )
+        }
+        Column(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 56.dp, end = 64.dp),
+            verticalArrangement = Arrangement.spacedBy(1.dp)
+        ) {
+            Text(
+                text = "资料中心",
+                color = colors.ink,
+                style = type.style(18f, 25f, FontWeight.SemiBold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = summary,
+                color = colors.faint,
+                style = type.style(9f, 14f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 12.dp)
+                .size(40.dp)
+                .background(colors.surfaceSubtle, RoundedCornerShape(FormalShapes.CardRadius))
+                .clickable(role = Role.Button, onClickLabel = "添加资料", onClick = onPickSource)
+                .testTag("sources-add"),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Add,
+                contentDescription = "添加资料",
+                tint = colors.ink,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(colors.divider)
+        )
+    }
+}
+
+@Composable
+private fun SourcesPillChip(
+    label: String,
+    selected: Boolean,
+    colors: SourcesColors,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    Surface(
+        modifier = modifier.clickable(role = Role.Button, onClickLabel = label, onClick = onClick),
+        color = if (selected) colors.ink else colors.surface,
+        shape = RoundedCornerShape(FormalShapes.PillRadius),
+        border = BorderStroke(1.dp, if (selected) colors.ink else colors.border)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            color = if (selected) colors.surface else colors.ink,
+            style = type.style(9f, 14f, FontWeight.Medium)
+        )
+    }
+}
+
+@Composable
+private fun SourcesSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    colors: SourcesColors,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(44.dp),
+        color = colors.surface,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, colors.border)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.Search,
+                contentDescription = null,
+                tint = colors.muted,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(Modifier.width(10.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = type.style(11f, 17f, FontWeight.Medium, colors.ink),
+                cursorBrush = SolidColor(colors.ink),
+                decorationBox = { inner ->
+                    Box(contentAlignment = Alignment.CenterStart) {
+                        if (query.isBlank()) {
+                            Text(
+                                text = "搜索资料标题",
+                                color = colors.faint,
+                                style = type.style(10f, 17f)
+                            )
+                        }
+                        inner()
+                    }
+                },
+                modifier = modifier.weight(1f)
+            )
+            if (query.isNotBlank()) {
+                Box(
+                    modifier = Modifier
+                        .size(25.dp)
+                        .background(colors.border, CircleShape)
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "清除搜索",
+                            onClick = { onQueryChange("") }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "清除搜索",
+                        tint = colors.surface,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourcesOutlinedCard(
+    colors: SourcesColors,
+    modifier: Modifier = Modifier,
+    background: Color? = null,
+    border: Color? = null,
+    padding: PaddingValues = PaddingValues(0.dp),
+    content: @Composable () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        color = background ?: colors.surface,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        border = BorderStroke(1.dp, border ?: colors.border)
+    ) {
+        Box(modifier = Modifier.padding(padding)) { content() }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun SourcesHelpCard(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    colors: SourcesColors
+) {
+    val type = LocalFormalTypeScale.current
+    SourcesOutlinedCard(colors = colors, modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable(role = Role.Button, onClickLabel = "解析状态说明", onClick = onToggle)
+                    .testTag("sources-help-toggle")
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(colors.surfaceSubtle, RoundedCornerShape(FormalShapes.CompactRadius)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = null,
+                        tint = colors.muted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "解析状态",
+                        color = colors.ink,
+                        style = type.style(11f, 17f, FontWeight.Medium)
+                    )
+                    Text(
+                        text = "各状态含义与当前解析能力",
+                        color = colors.faint,
+                        style = type.style(8f, 13f)
+                    )
+                }
+                Icon(
+                    imageVector = if (expanded) {
+                        Icons.Rounded.KeyboardArrowUp
+                    } else {
+                        Icons.Rounded.KeyboardArrowDown
+                    },
+                    contentDescription = if (expanded) "收起" else "展开",
+                    tint = colors.muted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp)
+                        .height(1.dp)
+                        .background(colors.divider)
+                )
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "TXT 和 Markdown 可本地解析，HTML 会做安全清洗后部分提取。PDF、Word、PPT、电子书和图片会就地抽取正文与插图文字，抽取不到的会保留为等待能力的资料，不会被隐藏。",
+                        color = colors.muted,
+                        style = type.style(9f, 15f)
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("已解析", "部分解析", "等待能力", "暂不支持", "失败").forEach { label ->
+                            Text(
+                                text = label,
+                                color = colors.faint,
+                                style = type.style(8f, 13f, FontWeight.Medium),
+                                modifier = Modifier
+                                    .background(
+                                        colors.surfaceSubtle,
+                                        RoundedCornerShape(FormalShapes.CompactRadius)
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -176,25 +1048,35 @@ private fun ParserStatusLegend() {
 @Composable
 private fun ImportStatusPanel(
     status: String,
-    lines: List<String>
+    lines: List<String>,
+    colors: SourcesColors
 ) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(8.dp)
-    ) {
-        Column(
+    val type = LocalFormalTypeScale.current
+    SourcesOutlinedCard(colors = colors, modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Last import: $status",
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium
+            Icon(
+                imageVector = Icons.Rounded.Info,
+                contentDescription = null,
+                tint = colors.muted,
+                modifier = Modifier.size(17.dp)
             )
-            lines.forEach { line ->
-                Text(text = line, style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.width(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    text = "最近导入：$status",
+                    color = colors.ink,
+                    style = type.style(10f, 15f, FontWeight.Medium)
+                )
+                lines.forEach { line ->
+                    Text(
+                        text = line,
+                        color = colors.faint,
+                        style = type.style(8f, 13f)
+                    )
+                }
             }
         }
     }
@@ -203,102 +1085,105 @@ private fun ImportStatusPanel(
 @Composable
 private fun EmptySources(
     title: String,
-    onPickSource: () -> Unit
+    onPickSource: () -> Unit,
+    colors: SourcesColors
 ) {
-    Surface(
+    val type = LocalFormalTypeScale.current
+    SourcesOutlinedCard(
+        colors = colors,
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(8.dp)
+        padding = PaddingValues(horizontal = 20.dp, vertical = 24.dp)
     ) {
         Column(
-            modifier = Modifier.padding(18.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(colors.surfaceSubtle, RoundedCornerShape(FormalShapes.IconRadius)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Description,
+                    contentDescription = null,
+                    tint = colors.faint,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
             Text(
                 text = title,
-                color = MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.titleMedium
+                color = colors.ink,
+                style = type.style(11f, 17f, FontWeight.SemiBold)
             )
             Text(
-                text = "Select TXT, Markdown, HTML, PDF, DOCX, PPTX, EPUB, image, or other files. Unsupported files remain visible with status.",
-                style = MaterialTheme.typography.bodyMedium
+                text = "选择 TXT、Markdown、HTML、PDF、DOCX、PPTX、EPUB、图片或其他文件。暂不支持的文件也会保留并显示状态。",
+                color = colors.muted,
+                style = type.style(9f, 15f),
+                textAlign = TextAlign.Center
             )
-            TextButton(onClick = onPickSource) {
-                Text("Choose file")
-            }
+            SourcesPrimaryPill(
+                label = "添加资料",
+                onClick = onPickSource,
+                colors = colors
+            )
         }
     }
 }
 
 @Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun SourceCard(
-    item: SourceCardUiItem,
-    onReprocess: () -> Unit
+private fun EmptyNotice(
+    text: String,
+    colors: SourcesColors
 ) {
-    Surface(
+    val type = LocalFormalTypeScale.current
+    SourcesOutlinedCard(
+        colors = colors,
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(8.dp)
+        padding = PaddingValues(18.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = item.title,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(text = item.typeLabel, style = MaterialTheme.typography.bodyMedium)
-                }
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = item.statusLabel,
-                        modifier = Modifier
-                            .heightIn(min = 32.dp)
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                }
-            }
-            Text(text = item.statusDetail, style = MaterialTheme.typography.bodyMedium)
-            Text(text = item.chunkCountLabel, style = MaterialTheme.typography.bodyMedium)
-            if (item.snippets.isNotEmpty()) {
-                Text(
-                    text = "Snippets",
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                item.snippets.forEach { snippet ->
-                    Text(text = snippet, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextButton(
-                    onClick = onReprocess,
-                    modifier = Modifier.testTag("source-action-${item.id}")
-                ) {
-                    Text(item.actionLabel)
-                }
-            }
-        }
+        Text(
+            text = text,
+            color = colors.muted,
+            style = type.style(9f, 15f)
+        )
     }
+}
+
+@Composable
+private fun SourcesPrimaryPill(
+    label: String,
+    onClick: () -> Unit,
+    colors: SourcesColors,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    Box(
+        modifier = modifier
+            .heightIn(min = 40.dp)
+            .background(colors.ink, RoundedCornerShape(FormalShapes.PillRadius))
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            color = colors.surface,
+            style = type.style(10f, 15f, FontWeight.Medium)
+        )
+    }
+}
+
+private fun typeIcon(typeLabel: String): ImageVector = when (typeLabel) {
+    "PDF" -> Icons.Rounded.PictureAsPdf
+    "DOCX" -> Icons.Rounded.Description
+    "TXT" -> Icons.Rounded.TextSnippet
+    "Markdown" -> Icons.Rounded.TextSnippet
+    "HTML" -> Icons.Rounded.Code
+    "PPTX" -> Icons.Rounded.Slideshow
+    "EPUB" -> Icons.Rounded.MenuBook
+    "图片" -> Icons.Rounded.Image
+    "JSON 导出" -> Icons.Rounded.DataObject
+    else -> Icons.Rounded.InsertDriveFile
 }

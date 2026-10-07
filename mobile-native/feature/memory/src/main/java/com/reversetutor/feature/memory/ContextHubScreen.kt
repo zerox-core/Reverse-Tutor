@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,10 +31,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.data.graph.GraphRepository
 import com.reversetutor.core.data.graph.GraphNodeEditInput
+import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.memory.MemoryRepository
 import kotlinx.coroutines.launch
 
@@ -48,6 +51,7 @@ fun ContextHubRoute(
     onOpenChatEvidence: (String) -> Unit = { onOpenChat() },
     onOpenSourceEvidence: (String) -> Unit = { onOpenSources() },
     onOpenSettings: () -> Unit,
+    onOpenGlobalGraph: () -> Unit = {},
     graphScope: GraphScope = GraphScope.Session,
     modifier: Modifier = Modifier
 ) {
@@ -131,6 +135,7 @@ fun ContextHubRoute(
         onOpenChat = onOpenChat,
         onOpenSources = onOpenSources,
         onOpenSettings = onOpenSettings,
+        onOpenGlobalGraph = onOpenGlobalGraph,
         onGraphNodeLabelSave = { node, label ->
             saveGraphNode(node = node, label = label)
         },
@@ -139,6 +144,9 @@ fun ContextHubRoute(
         },
         onOpenGraphChatEvidence = onOpenChatEvidence,
         onOpenGraphSourceEvidence = onOpenSourceEvidence,
+        onGraphRetry = { refreshKey += 1 },
+        onOpenChatEvidence = onOpenChatEvidence,
+        onOpenSourceEvidence = onOpenSourceEvidence,
         modifier = modifier
     )
 }
@@ -147,9 +155,17 @@ fun ContextHubRoute(
 @OptIn(ExperimentalLayoutApi::class)
 fun GlobalGraphRoute(
     graphRepository: GraphRepository,
-    onOpenChat: () -> Unit,
-    onOpenSources: () -> Unit,
+    memoryRepository: MemoryRepository,
+    learningLedgerRepository: LearningLedgerRepository,
+    onOpenGraphChatEvidence: (String) -> Unit = {},
+    onOpenGraphSourceEvidence: (String) -> Unit = {},
     onOpenSettings: () -> Unit,
+    onBack: () -> Unit = {},
+    canvasModeActive: Boolean = false,
+    onCanvasModeChange: (Boolean) -> Unit = {},
+    onGraphInteractionChanged: (Boolean) -> Unit = {},
+    onWorkspaceChromeObscuredChanged: (Boolean) -> Unit = {},
+    onPageLocalActionSurfaceChanged: (Boolean, () -> Unit) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val scope = rememberCoroutineScope()
@@ -158,6 +174,24 @@ fun GlobalGraphRoute(
     }
     var selectedNodeId by remember { mutableStateOf<String?>(null) }
     var refreshKey by remember { mutableIntStateOf(0) }
+    // R103 遗忘曲线：学习事实 -> 节点级档案（与 snapshot 同批加载，避免引擎空档案重建）
+    var forgetProfiles by remember {
+        mutableStateOf<Map<String, BlackHoleForgetProfile>>(emptyMap())
+    }
+
+    LaunchedEffect(selectedNodeId) {
+        onWorkspaceChromeObscuredChanged(selectedNodeId != null)
+        onPageLocalActionSurfaceChanged(
+            selectedNodeId != null,
+            { selectedNodeId = null }
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            onWorkspaceChromeObscuredChanged(false)
+            onPageLocalActionSurfaceChanged(false) {}
+        }
+    }
 
     fun saveGraphNode(
         node: GraphLayoutNode,
@@ -180,66 +214,49 @@ fun GlobalGraphRoute(
     }
 
     LaunchedEffect(refreshKey) {
-        val snapshot = graphRepository.snapshot()
-        state = KnowledgeGraphUiState.from(
-            nodes = snapshot.nodes,
-            edges = snapshot.edges,
-            selectedNodeId = selectedNodeId,
-            scope = GraphScope.Global
-        )
+        state = KnowledgeGraphUiState.loading(GraphScope.Global)
+        state = try {
+            val snapshot = graphRepository.snapshot()
+            val memorySnapshot = memoryRepository.snapshot()
+            val receipts = learningLedgerRepository.listLearningFacts()
+            forgetProfiles = GraphForgettingProjection.profiles(
+                nodes = snapshot.nodes,
+                receipts = receipts
+            )
+            KnowledgeGraphUiState.from(
+                nodes = snapshot.nodes,
+                edges = snapshot.edges,
+                memoryItems = memorySnapshot.items,
+                selectedNodeId = selectedNodeId,
+                scope = GraphScope.Global
+            )
+        } catch (_: Exception) {
+            KnowledgeGraphUiState.error(GraphScope.Global)
+        }
     }
 
     val selectedState = state.withSelection(selectedNodeId)
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.Start
-    ) {
-        Text(
-            text = "Global graph",
-            color = MaterialTheme.colorScheme.primary,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Cross-session graph view for the current native data space.",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        KnowledgeGraphPanel(
-            state = selectedState,
-            onSelectedNodeChange = { selectedNodeId = it },
-            editable = false,
-            onNodeLabelSave = { node, label ->
-                saveGraphNode(node = node, label = label)
-            },
-            onNodeReviewAction = { node, action ->
-                saveGraphNode(node = node, label = node.label, status = action.targetStatus)
-            },
-            onOpenChatEvidence = { node -> node.sourceMessageId?.let { onOpenChat() } },
-            onOpenSourceEvidence = { node -> node.sourceId?.let { onOpenSources() } }
-        )
-        Spacer(modifier = Modifier.height(18.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(onClick = onOpenChat) {
-                Text("Open chat")
-            }
-            TextButton(onClick = onOpenSources) {
-                Text("Sources")
-            }
-            TextButton(onClick = onOpenSettings) {
-                Text("Settings")
-            }
-        }
-    }
+    BlackHoleGraphScreen(
+        state = selectedState,
+        onSelectedNodeChange = { selectedNodeId = it },
+        modifier = modifier,
+        title = "知识图谱",
+        subtitle = "全局",
+        onBack = {
+            if (canvasModeActive) onCanvasModeChange(false) else onBack()
+        },
+        onMore = onOpenSettings,
+        onOpenChatEvidence = { node ->
+            node.sourceMessageId?.let(onOpenGraphChatEvidence)
+        },
+        onOpenSourceEvidence = { node ->
+            node.sourceId?.let(onOpenGraphSourceEvidence)
+        },
+        onRetry = { refreshKey += 1 },
+        onGraphInteractionChanged = onGraphInteractionChanged,
+        onCanvasModeChange = onCanvasModeChange,
+        forgetProfiles = forgetProfiles
+    )
 }
 
 @Composable
@@ -249,10 +266,14 @@ fun ContextHubScreen(
     onOpenChat: () -> Unit,
     onOpenSources: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenGlobalGraph: () -> Unit = {},
     onGraphNodeLabelSave: (GraphLayoutNode, String) -> Unit = { _, _ -> },
     onGraphNodeReviewAction: (GraphLayoutNode, GraphNodeReviewAction) -> Unit = { _, _ -> },
     onOpenGraphChatEvidence: (String) -> Unit = {},
     onOpenGraphSourceEvidence: (String) -> Unit = {},
+    onGraphRetry: () -> Unit = {},
+    onOpenChatEvidence: (String) -> Unit = {},
+    onOpenSourceEvidence: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedSection by remember(state.sessionId) {
@@ -274,14 +295,14 @@ fun ContextHubScreen(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "Context hub",
+            text = "学习脉络",
             color = MaterialTheme.colorScheme.primary,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Session: ${state.sessionTitle}",
+            text = "当前会话：${state.sessionTitle}",
             color = MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.titleMedium
         )
@@ -320,24 +341,47 @@ fun ContextHubScreen(
                 },
                 onOpenSourceEvidence = { node ->
                     node.sourceId?.let(onOpenGraphSourceEvidence)
-                }
+                },
+                onCreateEvidence = onOpenChat,
+                onRetry = onGraphRetry
             )
         } else {
-            ContextHubSectionPanel(state = selectedState)
+            ContextHubSectionPanel(
+                state = selectedState,
+                onOpenChatEvidence = onOpenChatEvidence,
+                onOpenSourceEvidence = onOpenSourceEvidence
+            )
         }
         Spacer(modifier = Modifier.height(18.dp))
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = onOpenChat) {
-                Text("Return to chat")
+            Button(
+                onClick = onOpenChat,
+                modifier = Modifier
+                    .testTag("context-return-chat")
+                    .heightIn(min = 48.dp)
+            ) {
+                Text("返回聊天")
             }
-            TextButton(onClick = onOpenSources) {
-                Text("Sources")
+            TextButton(
+                onClick = onOpenGlobalGraph,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text("全局图谱")
             }
-            TextButton(onClick = onOpenSettings) {
-                Text("Settings")
+            TextButton(
+                onClick = onOpenSources,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text("资料")
+            }
+            TextButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.heightIn(min = 48.dp)
+            ) {
+                Text("设置")
             }
         }
     }
@@ -363,9 +407,9 @@ private fun ContextHubNotice(hasActiveSession: Boolean) {
     ) {
         Text(
             text = if (hasActiveSession) {
-                "This shell is linked to the active chat session. Empty and deferred sections are intentional until Phase 5 data work lands."
+                "这个页面已连接到当前聊天会话。空状态和待启用区域会随着 Memory 与图谱数据逐步填充。"
             } else {
-                "No active session is attached. Open a session before using Graph, Anchors, Notes, Errors, or Session settings."
+                "请先打开一个会话，再查看图谱、锚点、随笔、错因和会话设置。"
             },
             modifier = Modifier.padding(14.dp),
             style = MaterialTheme.typography.bodyMedium
@@ -386,7 +430,7 @@ private fun ContextHubOverview(lines: List<String>) {
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
-                text = "Overview",
+                text = "概览",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleMedium
             )
@@ -398,9 +442,16 @@ private fun ContextHubOverview(lines: List<String>) {
 }
 
 @Composable
-private fun ContextHubSectionPanel(state: ContextHubSectionState) {
+@OptIn(ExperimentalLayoutApi::class)
+private fun ContextHubSectionPanel(
+    state: ContextHubSectionState,
+    onOpenChatEvidence: (String) -> Unit,
+    onOpenSourceEvidence: (String) -> Unit
+) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("context-section-${state.section.name.lowercase()}"),
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(8.dp)
@@ -442,14 +493,120 @@ private fun ContextHubSectionPanel(state: ContextHubSectionState) {
                 }
             }
             Text(text = state.body, style = MaterialTheme.typography.bodyMedium)
+            if (state.evidenceItems.isNotEmpty()) {
+                ContextHubEvidenceList(
+                    items = state.evidenceItems,
+                    onOpenChatEvidence = onOpenChatEvidence,
+                    onOpenSourceEvidence = onOpenSourceEvidence
+                )
+            }
             Text(
-                text = "Next actions",
+                text = "下一步",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold
             )
             state.nextActions.forEach { action ->
                 Text(text = action, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun ContextHubEvidenceList(
+    items: List<ContextHubEvidenceItem>,
+    onOpenChatEvidence: (String) -> Unit,
+    onOpenSourceEvidence: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        items.forEach { item ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = item.title,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        item.statusLabel?.let { label ->
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    modifier = Modifier
+                                        .heightIn(min = 32.dp)
+                                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+                    if (item.body.isNotBlank()) {
+                        Text(
+                            text = item.body,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    if (item.evidenceAvailabilityLabel.isNotBlank()) {
+                        Text(
+                            text = item.evidenceAvailabilityLabel,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.testTag(
+                                "context-evidence-availability-${item.id}"
+                            )
+                        )
+                    }
+                    if (item.actions.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item.actions.forEach { action ->
+                                val isChat =
+                                    action.destination == ContextEvidenceDestination.Chat
+                                val tag = if (isChat) {
+                                    "context-evidence-chat-${action.targetId}"
+                                } else {
+                                    "context-evidence-source-${action.targetId}"
+                                }
+                                TextButton(
+                                    onClick = {
+                                        if (isChat) {
+                                            onOpenChatEvidence(action.targetId)
+                                        } else {
+                                            onOpenSourceEvidence(action.targetId)
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .testTag(tag)
+                                        .heightIn(min = 48.dp)
+                                ) {
+                                    Text(action.label)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

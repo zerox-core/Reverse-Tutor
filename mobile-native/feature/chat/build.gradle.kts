@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        minSdk = 22
+        minSdk = 23
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -28,19 +28,30 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // R95: RealAgentCreationGateway 在流式路径打 Log.d 诊断日志（真机验证依赖），
+    // JVM 单测无 android.util.Log 实现，返回默认值即可。
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
+    implementation(project(":core:design"))
     implementation(project(":core:data"))
+    implementation(project(":core:domain"))
     implementation(project(":core:llm"))
     implementation(project(":core:model"))
     implementation(project(":core:protocol"))
 
+    implementation("androidx.activity:activity-compose:1.8.2")
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 }

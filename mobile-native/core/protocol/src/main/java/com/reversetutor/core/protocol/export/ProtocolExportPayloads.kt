@@ -60,6 +60,23 @@ data class ExportLlmProfileRecord(
     val extraFields: Map<String, ExportFieldValue> = emptyMap()
 )
 
+data class ExportProviderConnectionRecord(
+    val id: String,
+    val name: String,
+    val protocol: String,
+    val providerName: String? = null,
+    val baseUrl: String? = null,
+    val secretStatus: ExportSecretStatus = ExportSecretStatus.Excluded
+)
+
+data class ExportModelBindingRecord(
+    val id: String,
+    val connectionId: String,
+    val modelId: String,
+    val displayName: String,
+    val enabled: Boolean = true
+)
+
 enum class ExportSecretStatus(val wireValue: String) {
     Excluded("excluded"),
     Redacted("redacted"),
@@ -120,7 +137,9 @@ object ProtocolExportPayloadBuilder {
         createdAt: String,
         sessions: List<ExportSessionRecord>,
         llmProfiles: List<ExportLlmProfileRecord>,
-        graph: ExportGraphSnapshotPayload
+        graph: ExportGraphSnapshotPayload,
+        providerConnections: List<ExportProviderConnectionRecord> = emptyList(),
+        modelBindings: List<ExportModelBindingRecord> = emptyList()
     ): ProtocolExportPayload =
         ProtocolExportPayload(
             documentType = ProtocolDocumentType.FullBackup,
@@ -131,7 +150,33 @@ object ProtocolExportPayloadBuilder {
                     "type" to JsonString(ProtocolDocumentType.FullBackup.wireType),
                     "created_at" to safeString(createdAt),
                     "sessions" to JsonArray(sessions.map { it.toJsonObject() }),
-                    "llm_profiles" to JsonArray(llmProfiles.map { it.toJsonObject() }),
+                    "provider_connections" to JsonArray(
+                        (providerConnections.ifEmpty {
+                            llmProfiles.map { profile ->
+                                ExportProviderConnectionRecord(
+                                    id = "connection-${profile.id}",
+                                    name = profile.name,
+                                    protocol = profile.apiType,
+                                    providerName = profile.provider,
+                                    baseUrl = profile.baseUrl,
+                                    secretStatus = profile.secretStatus
+                                )
+                            }
+                        }).map { it.toJsonObject() }
+                    ),
+                    "model_bindings" to JsonArray(
+                        (modelBindings.ifEmpty {
+                            llmProfiles.map { profile ->
+                            ExportModelBindingRecord(
+                                id = profile.id,
+                                connectionId = "connection-${profile.id}",
+                                modelId = profile.model,
+                                displayName = profile.name,
+                                enabled = profile.capabilities["enabled"] ?: true
+                            )
+                            }
+                        }).map { it.toJsonObject() }
+                    ),
                     "graph" to graph.toJsonObject()
                 )
             ).toCanonicalJson()
@@ -172,7 +217,7 @@ object ProtocolExportPayloadValidator {
     }
 }
 
-private const val currentVersion = "1"
+private const val currentVersion = "2"
 private const val redactedValue = "[REDACTED]"
 private val jsonNumberPattern = Regex("-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?")
 private val safeSecretMetadataKeys = setOf("secret_status", "secretStatus")
@@ -224,6 +269,29 @@ private fun ExportLlmProfileRecord.toJsonObject(): JsonObject {
     fields.appendSafeExtras(extraFields)
     return JsonObject(fields)
 }
+
+private fun ExportProviderConnectionRecord.toJsonObject(): JsonObject {
+    val fields = linkedMapOf<String, JsonValue>(
+        "id" to safeString(id),
+        "name" to safeString(name),
+        "protocol" to safeString(protocol),
+        "secret_status" to JsonString(secretStatus.wireValue)
+    )
+    providerName?.let { fields["provider_name"] = safeString(it) }
+    baseUrl?.let { fields["base_url"] = safeString(it) }
+    return JsonObject(fields)
+}
+
+private fun ExportModelBindingRecord.toJsonObject(): JsonObject =
+    JsonObject(
+        linkedMapOf(
+            "id" to safeString(id),
+            "connection_id" to safeString(connectionId),
+            "model_id" to safeString(modelId),
+            "display_name" to safeString(displayName),
+            "enabled" to JsonBoolean(enabled)
+        )
+    )
 
 private fun ExportGraphSnapshotPayload.toJsonObject(): JsonObject =
     JsonObject(

@@ -1,0 +1,72 @@
+# 误解内容条目（喂给源码纠错机制，机制以 misconception-correction.md 为唯一准绳）
+# 每条：id / kp（阶段 S1-S3）/ false_rule（≤20 字）/ counter_example（最小反例素材）/ answer_points（标准答案要点）/ exposure_hint
+
+- id: H1
+  kp: S1
+  false_rule: 久坐的伤害周末补练就行
+  counter_example: 连续久坐超一小时下肢就水肿，代谢和循环的损伤是每天累积的；周末突击一次补不回五天的账，还符合「误区一：突击高强度」。
+  answer_points: 久坐伤害按天累积，对策也必须是按天的（每30分钟调整、碎片微运动），不能周末一次性偿还。
+  exposure_hint: D1 健康账本
+
+- id: H2
+  kp: S1
+  false_rule: 年轻扛得住，颈肩痛忍忍就好
+  counter_example: EDG 调研几乎 100% 电竞选手颈椎生理曲度消失；劳损缓慢持久，软骨损伤不可修复——职业选手正是最年轻的群体。
+  answer_points: 劳损不可逆但可管理；年轻不是免疫牌，恰是高危人群；出现持续疼痛/麻木要就医而非硬扛。
+  exposure_hint: D1 收尾或 D3 急救包
+
+- id: H3
+  kp: S1
+  false_rule: 坐着不动而已，又不算受伤
+  counter_example: 世卫组织对久坐有明确定义（清醒低能耗坐/躺/斜躺），坐着打游戏正中靶心；每天久坐 8 小时以上者每年可流失 2%-3% 肌肉量。
+  answer_points: 久坐是独立的健康风险因素，不以「没受伤」为豁免；肌肉流失、代谢放缓都在静默发生。
+  exposure_hint: D1 健康账本
+
+- id: H4
+  kp: S2
+  false_rule: 收藏教程等于练过
+  counter_example: 收藏夹里几十套教程，上称和体测一点没变——收藏不等于运动，看过不等于锻炼。
+  answer_points: 学习必须落到行动；先评估自身短板再选适配项目，然后真的做。
+  exposure_hint: D3 或 D6 开练日
+
+- id: H5
+  kp: S2
+  false_rule: 必须睡够 8 小时才算睡好
+  counter_example: 有人睡 5 小时精力充沛、有人要 9 小时——成人 7-8 小时只是平均值；盯着时长焦虑反而制造「我认为睡不着」的认知性失眠。
+  answer_points: 判据是日间功能而非机械时长；睡眠状态突然改变才值得关注；放下执念反而好入睡。
+  exposure_hint: D5 睡眠日
+
+- id: H6
+  kp: S2
+  false_rule: 褪黑素可以当日常助眠吃
+  counter_example: 长期外源补充褪黑素会抑制自身分泌、产生依赖，越吃越睡不着——它只适用于短期紊乱和倒时差。
+  answer_points: 褪黑素是短期工具不是日常保健品；失眠根源在压力和情绪，治本靠认知行为调整。
+  exposure_hint: D5 睡眠日
+
+- id: H7
+  kp: S2
+  false_rule: 熬一晚没事，补一觉就回来
+  counter_example: 研究显示只熬一宿，体内炎症水平就被激活、免疫细胞特征改变；补觉、热水澡、清淡早餐能减轻伤害，但「减轻」不等于「消除」。
+  answer_points: 一次熬夜也有真实代价；止损措施是减伤不是免伤；23 点到 6 点是最佳睡眠时段。
+  exposure_hint: D5 睡眠日
+
+- id: H8
+  kp: S2
+  false_rule: 外卖就不可能健康
+  counter_example: 八准则里有「会烹会选会看标签」——同样是外卖，蒸炖煮配青菜和炸鸡配快乐水是两个物种；备注少盐、加份蔬菜就是改进。
+  answer_points: 健康饮食管的是选择与搭配，不是烹饪地点；外卖可按准则优化（搭配/做法/饮料替换）。
+  exposure_hint: D4 饮食日
+
+- id: H9
+  kp: S3
+  false_rule: 减重就是体重秤数字往下掉
+  counter_example: 肌肉增、脂肪减时体重可能纹丝不动，但体脂率在降——两个 BMI 都是 35 的人，一个肥胖一个肌肉发达；体重管理看的是体成分。
+  answer_points: 关注体脂率和腰围而非单看体重；脂肪细胞有记忆效应，快速减重易反弹。
+  exposure_hint: D4 或 D6
+
+- id: H10
+  kp: S3
+  false_rule: 碎片运动要上就上高强度
+  counter_example: 突击波比跳冲刺跑，心率飙升难坚持还易拉伤——碎片化运动重在可持续而非短时爆发；每周 2-3 次 30-60 分钟系统训练才能补摄氧量和肌肉耐力。
+  answer_points: 碎片运动是补充不是替代；强度按时段和状态选，以身体舒适为宜；系统训练另算。
+  exposure_hint: D6 开练日

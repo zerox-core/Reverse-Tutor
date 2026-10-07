@@ -1,0 +1,25 @@
+{
+  "schema": "ADworkflo.execution_plan.v1",
+  "mvp_id": "native-hybrid-production-integration",
+  "source_docs": [
+    "docs/superpowers/specs/2026-07-11-native-three-layer-hybrid-architecture-design.md",
+    "docs/superpowers/plans/2026-07-12-native-hybrid-production-integration.md"
+  ],
+  "batches": [
+    {
+      "batch_id": "production-layer-parallel",
+      "parallel": true,
+      "tasks": [
+        "NATIVE-HYBRID-RUNTIME-002",
+        "NATIVE-HYBRID-REMOTE-002",
+        "NATIVE-HYBRID-APP-WIRING-002"
+      ]
+    },
+    {
+      "batch_id": "production-controller-integration",
+      "parallel": false,
+      "depends_on": ["production-layer-parallel"],
+      "tasks": ["controller-runtime-and-di-integration"]
+    }
+  ]
+}

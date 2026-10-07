@@ -1,0 +1,996 @@
+package com.reversetutor.feature.chat
+
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.ArrowBackIosNew
+import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Flag
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Park
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.reversetutor.core.design.FormalColors
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun SessionSettingsScreen(
+    coordinator: SessionSettingsCoordinator,
+    tagLibraryPersistence: TagLibraryPersistence,
+    initialSection: SessionSettingsSection? = null,
+    highlightedSourceId: String? = null,
+    onBack: () -> Unit,
+    onProfileBoundary: (SessionSettingsProfile) -> Unit = {},
+    onPickSource: (String?) -> Unit = {},
+    onRequestDeleteSession: () -> Unit = {},
+    pendingSessionDeleteTitle: String? = null,
+    externalErrorMessage: String? = null,
+    externalImportError: String? = null,
+    onRetryImport: () -> Unit = {},
+    onConfirmDeleteSession: () -> Unit = {},
+    onDismissDeleteSession: () -> Unit = {},
+    canUndoSessionDelete: Boolean = false,
+    onUndoSessionDelete: () -> Unit = {},
+    onOpenSourceCenter: (() -> Unit)? = null,
+    onExportShare: (SessionExportPayload) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val sourceOnly = initialSection == SessionSettingsSection.SourceManagement
+    val sections = if (sourceOnly) {
+        listOf(SessionSettingsSection.SourceManagement)
+    } else {
+        SessionSettingsSection.entries.filter { it != SessionSettingsSection.SourceManagement }
+    }
+    var revision by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(
+        initialPage = initialSection?.let { sections.indexOf(it).coerceAtLeast(0) } ?: 0
+    ) { sections.size }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(initialSection) {
+        initialSection?.let { pagerState.scrollToPage(sections.indexOf(it).coerceAtLeast(0)) }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val tagEditor = remember(tagLibraryPersistence) { TagLibraryEditor(tagLibraryPersistence) }
+    var tagState by remember(tagEditor) {
+        tagEditor.load()
+        mutableStateOf(tagEditor.state)
+    }
+    val refresh = { revision += 1 }
+    val commitBoundary = {
+        coordinator.commitTextBoundary()
+        onProfileBoundary(coordinator.state.applied.profile)
+        refresh()
+    }
+    val context = LocalContext.current
+    val learnerImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            coordinator.setLearnerImageRef(uri.toString())
+            refresh()
+        }
+    }
+    val handleBack = {
+        commitBoundary()
+        onBack()
+    }
+    BackHandler(onBack = handleBack)
+
+    DisposableEffect(lifecycleOwner, coordinator) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                coordinator.onApplicationBackgrounded()
+                onProfileBoundary(coordinator.state.applied.profile)
+                refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val undo = coordinator.state.sourceUndo
+    LaunchedEffect(undo?.expiresAtEpochMillis) {
+        val current = undo ?: return@LaunchedEffect
+        delay((current.expiresAtEpochMillis - System.currentTimeMillis()).coerceAtLeast(0L))
+        coordinator.finalizeExpiredSourceAction()
+        refresh()
+    }
+
+    Column(modifier.fillMaxSize().background(FormalColors.Background).testTag("session-settings-screen")) {
+        SessionSettingsHeader(
+            title = "窗口设置",
+            subtitle = coordinator.state.applied.profile.title,
+            onBack = handleBack
+        )
+        externalErrorMessage?.let {
+            Text(
+                it,
+                modifier = Modifier.fillMaxWidth().background(Color(0xFFFFEDEA)).padding(12.dp),
+                color = Color(0xFFB3261E)
+            )
+        }
+        (externalImportError ?: coordinator.state.errorMessage)?.let { message ->
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFFFFEDEA)).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(message, Modifier.weight(1f), color = Color(0xFFB3261E))
+                if (externalImportError != null) TextButton(onClick = onRetryImport) { Text("重试") }
+            }
+        }
+        if (!sourceOnly) {
+            SectionTabStrip(
+                document = coordinator.state.applied,
+                sections = sections,
+                selectedPage = pagerState.currentPage,
+                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } }
+            )
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            // R76：禁用左右滑动翻页——页内横向手势（里程碑拖动等）曾被误判成翻页；
+            // 切换页签只走顶部 tab 点击（animateScrollToPage 不受影响）。
+            userScrollEnabled = false
+        ) { page ->
+            when (sections[page]) {
+                SessionSettingsSection.Basic -> BasicProfilePage(
+                    coordinator,
+                    commitBoundary,
+                    onPickLearnerImage = { learnerImageLauncher.launch(arrayOf("image/*")) },
+                    refresh = refresh
+                )
+                SessionSettingsSection.GoalPlan -> GoalPlanPage(
+                    coordinator,
+                    refresh
+                )
+                SessionSettingsSection.ConversationStrategy -> StrategyPage(coordinator, refresh)
+                SessionSettingsSection.SourceManagement -> SourceManagementPage(
+                    coordinator,
+                    onPickSource,
+                    refresh,
+                    highlightedSourceId
+                )
+                SessionSettingsSection.Danger -> SystemOpsPage(
+                    coordinator = coordinator,
+                    onExportShare = onExportShare,
+                    onRequestDeleteSession = onRequestDeleteSession,
+                    canUndo = canUndoSessionDelete,
+                    onUndo = onUndoSessionDelete
+                )
+            }
+        }
+    }
+
+    coordinator.state.pendingConfirmation?.let { pending ->
+        AlertDialog(
+            onDismissRequest = {
+                coordinator.dismissProtectedChanges()
+                refresh()
+            },
+            title = { Text("确认影响后续行为") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("仅影响后续对话；历史、收藏模板和既有资料关系保持不变。")
+                    pending.differences.forEach {
+                        Text("${it.field}：${it.before.ifBlank { "空" }} → ${it.after.ifBlank { "空" }}")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    coordinator.confirmProtectedChanges()
+                    onProfileBoundary(coordinator.state.applied.profile)
+                    refresh()
+                }) { Text("确认修改") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    coordinator.dismissProtectedChanges()
+                    refresh()
+                }) { Text("保留原值") }
+            }
+        )
+    }
+
+    pendingSessionDeleteTitle?.let { title ->
+        AlertDialog(
+            onDismissRequest = onDismissDeleteSession,
+            title = { Text("删除当前会话？") },
+            text = { Text("将删除“$title”的消息、设置、输入草稿和会话图谱状态；共享资料文件不会被删除。") },
+            confirmButton = {
+                FilledActionButton(
+                    text = "删除并提供 5 秒撤销",
+                    onClick = onConfirmDeleteSession,
+                    danger = true,
+                    onClickLabel = "确认删除"
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissDeleteSession) { Text("取消", color = FormalColors.Muted) }
+            }
+        )
+    }
+}
+
+@Composable
+private fun SessionSettingsHeader(title: String, subtitle: String, onBack: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(FormalColors.Surface)) {
+        Box(Modifier.fillMaxWidth().height(64.dp)) {
+            Box(
+                Modifier.align(Alignment.CenterStart).padding(start = 6.dp).size(44.dp)
+                    .clickable(onClickLabel = "返回", role = Role.Button, onClick = onBack),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Rounded.ArrowBackIosNew,
+                    contentDescription = "返回",
+                    tint = FormalColors.Ink,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(Modifier.align(Alignment.CenterStart).padding(start = 56.dp, end = 16.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = FormalColors.Ink)
+                Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = FormalColors.Muted)
+            }
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(FormalColors.Divider))
+    }
+}
+
+@Composable
+private fun SectionTabStrip(
+    document: SessionSettingsDocument,
+    sections: List<SessionSettingsSection>,
+    selectedPage: Int,
+    onSelect: (Int) -> Unit
+) {
+    val summaries = mapOf(
+        SessionSettingsSection.Basic to document.profile.learnerDisplayName,
+        SessionSettingsSection.GoalPlan to document.goalPlan.primaryGoal.ifBlank { "尚未设置主要目标" },
+        SessionSettingsSection.ConversationStrategy to "反馈 ${document.strategy.feedbackIntensity}/5 · ${document.strategy.speakingTone}",
+        SessionSettingsSection.SourceManagement to "已引用 ${document.snapshot.sourceSelections.size} 份资料",
+        SessionSettingsSection.Danger to "导出记忆库/配置 · 删除会话"
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp).testTag("session-settings-index"),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        sections.forEachIndexed { index, section ->
+            SettingsTabCard(
+                section = section,
+                summary = summaries.getValue(section),
+                selected = index == selectedPage,
+                onClick = { onSelect(index) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsTabCard(
+    section: SessionSettingsSection,
+    summary: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val (icon, iconColor) = sessionSectionIcon(section)
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) FormalColors.Success.copy(alpha = 0.08f) else FormalColors.Surface,
+        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) FormalColors.Success else FormalColors.Divider)
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SessionGlossyIcon(icon, null, iconColor, size = 40.dp, glyphSize = 21.dp, radius = 11.dp)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                section.label,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (selected) FormalColors.Success else FormalColors.Ink,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                summary,
+                style = MaterialTheme.typography.labelSmall,
+                color = FormalColors.Muted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private fun sessionSectionIcon(section: SessionSettingsSection): Pair<ImageVector, Color> = when (section) {
+    SessionSettingsSection.Basic -> Icons.Rounded.Person to Color(0xFF2E66C7)
+    SessionSettingsSection.GoalPlan -> Icons.Rounded.Flag to Color(0xFFC96E26)
+    SessionSettingsSection.ConversationStrategy -> Icons.Rounded.Tune to Color(0xFF5C6B8A)
+    SessionSettingsSection.SourceManagement -> Icons.Rounded.Folder to Color(0xFF6170B8)
+    SessionSettingsSection.Danger -> Icons.Rounded.Settings to Color(0xFF45506B)
+}
+
+@Composable
+private fun SessionGlossyIcon(
+    imageVector: ImageVector,
+    contentDescription: String?,
+    color: Color,
+    size: Dp = 30.dp,
+    glyphSize: Dp = 17.dp,
+    radius: Dp = 8.dp
+) {
+    val shape = RoundedCornerShape(radius)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .shadow(
+                elevation = 4.dp,
+                shape = shape,
+                ambientColor = Color(0x261F3861),
+                spotColor = Color(0x261F3861)
+            )
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(color.copy(red = (color.red + 0.18f).coerceAtMost(1f)), color)
+                ),
+                shape = shape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = Color.White,
+            modifier = Modifier.size(glyphSize)
+        )
+    }
+}
+
+@Composable
+private fun BasicProfilePage(
+    coordinator: SessionSettingsCoordinator,
+    commitBoundary: () -> Unit,
+    onPickLearnerImage: () -> Unit,
+    refresh: () -> Unit
+) = SettingsPage {
+    val profile = coordinator.state.form.profile
+    val presetMatch = PersonalityPresets.firstOrNull { it.title == profile.personality.trim() }
+    var customPersonaExpanded by remember {
+        mutableStateOf(
+            profile.personality.isNotBlank() && presetMatch == null &&
+                composeRecipeText(parseRecipeSelection(profile.personality)) == null
+        )
+    }
+    if (ProfilePageVariant == 1) {
+        // 版式E · 聊天建档：组件库 06 ChatField，标题/显示名全走对话式填写（角色轮已砍：AI 永远是学生，无角色字段意义）；mock 模板本地替换 {answer}（不接 LLM）
+        SettingsGroup {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("和学习者打个招呼", fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                Text(
+                    "用对话的方式填资料，回答会直接写进基本资料。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FormalColors.Muted
+                )
+                ChatFieldQA(
+                    rounds = listOf(
+                        ChatFieldRound(
+                            id = "title",
+                            question = "这节课叫个什么名字呀？",
+                            value = profile.title,
+                            ackTemplate = "收到！这节课就叫「{answer}」啦。",
+                            reAskTemplate = "嘿嘿这个我也想知道～不过先给这节课起个名字嘛，比如「高三数学」？",
+                            placeholder = "比如：高三数学、英语启蒙…",
+                            onCommit = { answer ->
+                                coordinator.editProfile { p -> p.copy(title = answer) }
+                                refresh()
+                            }
+                        ),
+                        ChatFieldRound(
+                            id = "name",
+                            question = "老师，我该怎么称呼你？",
+                            value = profile.learnerDisplayName,
+                            ackTemplate = "好，那我以后就叫你「{answer}」啦。",
+                            reAskTemplate = "唔……你问倒我啦。老师先告诉我该怎么称呼你嘛～",
+                            placeholder = "比如：曦策、小朱…",
+                            onCommit = { answer ->
+                                coordinator.editProfile { p -> p.copy(learnerDisplayName = answer) }
+                                refresh()
+                            }
+                        ),
+                    )
+                )
+            }
+        }
+    } else {
+        SettingsTextField("会话标题", profile.title, { coordinator.editProfile { p -> p.copy(title = it) }; refresh() }, commitBoundary, singleLine = true, testTag = "session-settings-title")
+        SettingsTextField("学习者显示名", profile.learnerDisplayName, { coordinator.editProfile { p -> p.copy(learnerDisplayName = it) }; refresh() }, commitBoundary, singleLine = true)
+        SettingsTextField("学习者角色", profile.learnerRole, { coordinator.editProfile { p -> p.copy(learnerRole = it) }; refresh() }, commitBoundary, singleLine = true)
+    }
+    if (ProfilePageVariant == 2) {
+        // 版式F · 配方工坊：组件库 04 RecipePicker（底子×怪癖×口头禅 + 08 骰子）组合人格
+        var recipeSel by remember(profile.personality) {
+            mutableStateOf(parseRecipeSelection(profile.personality))
+        }
+        SettingsGroup {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                RecipePickerPanel(
+                    selection = recipeSel,
+                    onSelect = { next ->
+                        recipeSel = next
+                        composeRecipeText(next)?.let { text ->
+                            coordinator.editProfile { p -> p.copy(personality = text) }
+                            refresh()
+                        }
+                    }
+                )
+            }
+        }
+    } else {
+        // 人格配方（组件库 16 EmojiRecipePicker）：四列横向（底子/怪癖/口头禅/互动），
+        // 点某一列只在该列下方弹出表情库选项条，选中自动收起；表情常驻轻摇摆动效
+        var recipeSel by remember(profile.personality) {
+            mutableStateOf(parseRecipeSelection(profile.personality))
+        }
+        SettingsGroup {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                EmojiRecipePicker(
+                    selection = recipeSel,
+                    onSelect = { next ->
+                        recipeSel = next
+                        composeRecipeText(next)?.let { text ->
+                            coordinator.editProfile { p -> p.copy(personality = text) }
+                            customPersonaExpanded = false
+                            refresh()
+                        }
+                    },
+                    habitId = HabitOptions.firstOrNull { it.title == profile.interactionHabits.trim() }?.id,
+                    onHabitSelect = { optionId ->
+                        HabitOptions.firstOrNull { it.id == optionId }?.let { option ->
+                            coordinator.editProfile { p -> p.copy(interactionHabits = option.title) }
+                            refresh()
+                        }
+                    }
+                )
+            }
+        }
+    }
+    SettingsGroup {
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().clickable(
+                    onClickLabel = if (customPersonaExpanded) "收起自定义人设" else "展开自定义人设",
+                    role = Role.Button,
+                    onClick = { customPersonaExpanded = !customPersonaExpanded }
+                ).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("自己写人设与互动习惯（可选）", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, color = FormalColors.Ink)
+                Icon(
+                    if (customPersonaExpanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = FormalColors.Muted
+                )
+            }
+            if (customPersonaExpanded) {
+                Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SettingsTextField("人格", profile.personality, { coordinator.editProfile { p -> p.copy(personality = it) }; refresh() }, commitBoundary)
+                    // 互动习惯 · 拼句式填写（组件库 17 HabitSlotComposer）：点词槽选词拼句，也可切换成整段手写
+                    var habitsFreeWrite by remember(profile.interactionHabits) {
+                        mutableStateOf(
+                            profile.interactionHabits.isNotBlank() &&
+                                parseHabitSlotsText(profile.interactionHabits) == null
+                        )
+                    }
+                    HabitSlotComposer(
+                        slots = parseHabitSlotsText(profile.interactionHabits) ?: HabitSlots(null, null, null),
+                        onSlots = { next ->
+                            composeHabitSlotsText(next)?.let { text ->
+                                coordinator.editProfile { p -> p.copy(interactionHabits = text) }
+                                refresh()
+                            }
+                        },
+                        freeText = profile.interactionHabits,
+                        onFreeText = {
+                            coordinator.editProfile { p -> p.copy(interactionHabits = it) }
+                            refresh()
+                        },
+                        freeWrite = habitsFreeWrite,
+                        onFreeWriteChange = { habitsFreeWrite = it }
+                    )
+                }
+            }
+        }
+    }
+    SettingsGroup {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Person, null, tint = FormalColors.Muted)
+            Spacer(Modifier.width(12.dp))
+            Text("显示当前会话头像", Modifier.weight(1f), color = FormalColors.Ink)
+            Switch(
+                profile.avatarVisible,
+                onCheckedChange = { coordinator.setAvatarVisible(it); refresh() },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = FormalColors.Success,
+                    checkedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFFE4E4E9),
+                    uncheckedThumbColor = Color.White,
+                    uncheckedBorderColor = Color(0xFFE4E4E9)
+                )
+            )
+        }
+    }
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val learnerImageRef = coordinator.state.form.snapshot.learnerImageRef
+            val avatarContext = LocalContext.current
+            val avatarBitmap = remember(learnerImageRef) {
+                learnerImageRef?.let { ref ->
+                    runCatching {
+                        avatarContext.contentResolver.openInputStream(Uri.parse(ref))?.use { stream ->
+                            BitmapFactory.decodeStream(stream)
+                        }
+                    }.getOrNull()?.asImageBitmap()
+                }
+            }
+            if (avatarBitmap != null) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Image(
+                        bitmap = avatarBitmap,
+                        contentDescription = "当前头像",
+                        modifier = Modifier.size(44.dp).clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                    Text("已设置头像（来自图库）", color = FormalColors.Ink)
+                }
+            } else {
+                Text("当前头像：未设置，点下方按钮从图库选择", color = FormalColors.Muted)
+            }
+            SecondaryActionButton(
+                text = "选择或修改头像",
+                onClick = onPickLearnerImage,
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "pick-learner-image"
+            )
+            if (coordinator.state.form.snapshot.learnerImageRef != null) {
+                TextButton(
+                    onClick = { coordinator.setLearnerImageRef(null); refresh() },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("移除当前会话头像", color = FormalColors.Danger) }
+            }
+        }
+    }
+    Text("已经发送的开场消息属于历史记录，不在此处提供编辑。", style = MaterialTheme.typography.bodySmall, color = Color(0xFF687386))
+}
+
+@Composable
+private fun GoalPlanPage(
+    coordinator: SessionSettingsCoordinator,
+    refresh: () -> Unit
+) = SettingsPage {
+    val value = coordinator.state.form.goalPlan
+    // R68 目标看板（方向A）：主目标英雄卡 + 倒计时圆环；
+    // 里程碑 / 每周计划升级为可勾选清单（勾选态编码进文本，数据结构不变）。
+    // R76：英雄卡移除「当前状态」区（表情动效整体重制，见 docs/specs/
+    // animated-emoji-redesign-plan.md）；currentState 数据与生成链路保持不变。
+    GoalDashboardHero(
+        goal = value.primaryGoal,
+        deadline = value.deadline,
+        onGoalCommit = { next ->
+            // R77 微调主目标：主目标在 protectedDifferences 保护清单里，走 editGoalPlan+commitBoundary
+            // 会弹「确认修改」卡片、不点确认就被 safe 分支丢弃（重启回未设置）。
+            // 用户拍板目标调整必须零摩擦——与截止时间/里程碑同语义：即时应用+落盘，无弹窗。
+            coordinator.applyGoalPlanImmediate { it.copy(primaryGoal = next.trim().ifBlank { "未设置" }) }
+            refresh()
+        },
+        onDeadlineCommit = { next ->
+            coordinator.applyGoalPlanImmediate { it.copy(deadline = next.trim().ifBlank { "未设置" }) }
+            refresh()
+        },
+    )
+    // R69：拆解卡 = 阶段里程碑（横向站点旅程，可左右拖动）→ 本周聚焦（寄托其下）。
+    GoalBreakdownCard(
+        milestonesRaw = value.stageMilestones,
+        weeklyRaw = value.weeklyPlan,
+        onMilestonesChange = { items ->
+            coordinator.applyGoalPlanImmediate { it.copy(stageMilestones = encodeGoalChecklist(items).ifBlank { "未设置" }) }
+            refresh()
+        },
+        onWeeklyChange = { items ->
+            coordinator.applyGoalPlanImmediate { it.copy(weeklyPlan = encodeGoalChecklist(items).ifBlank { "未设置" }) }
+            refresh()
+        },
+        testTag = "goal-breakdown"
+    )
+}
+
+@Composable
+private fun StrategyPage(coordinator: SessionSettingsCoordinator, refresh: () -> Unit) = SettingsPage {
+    val strategy = coordinator.state.applied.strategy
+    MoodSettingGroup("反馈强度", strategy.feedbackIntensity, FeedbackMoodLevels) { value ->
+        coordinator.setStrategy { current -> current.copy(feedbackIntensity = value) }
+        refresh()
+    }
+    MoodSettingGroup("追问强度", strategy.probingIntensity, ProbingMoodLevels) { value ->
+        coordinator.setStrategy { it.copy(probingIntensity = value) }; refresh()
+    }
+    MoodSettingGroup("脚手架强度", strategy.scaffoldingIntensity, ScaffoldingMoodLevels) { value ->
+        coordinator.setStrategy { it.copy(scaffoldingIntensity = value) }; refresh()
+    }
+    SegmentedSettingGroup("纠错坚持度", strategy.correctionPersistence, listOf("宽松", "适中", "严格")) {
+        coordinator.setStrategy { current -> current.copy(correctionPersistence = it) }; refresh()
+    }
+    SegmentedSettingGroup("复习频率", strategy.reviewFrequency, listOf("低", "每周", "高")) {
+        coordinator.setStrategy { current -> current.copy(reviewFrequency = it) }; refresh()
+    }
+    SegmentedSettingGroup("说话语气", strategy.speakingTone, listOf("温和", "自然", "直接")) {
+        coordinator.setSpeakingTone(it); refresh()
+    }
+    // v1 死循环干预（2026-09-28 拍板）：自动为默认带升降档，手动档位可覆盖。
+    SegmentedSettingGroup("死循环干预", strategy.stagnationIntervention, listOf("自动", "关闭", "低", "标准", "高")) {
+        coordinator.setStrategy { current -> current.copy(stagnationIntervention = it) }; refresh()
+    }
+}
+
+@Composable
+private fun MoodSettingGroup(label: String, value: Int, levels: List<MoodLevel>, onChange: (Int) -> Unit) {
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, fontWeight = FontWeight.SemiBold)
+            MoodSliderRow(value = value, levels = levels, onChange = onChange)
+        }
+    }
+}
+
+@Composable
+private fun SegmentedSettingGroup(label: String, selected: String, values: List<String>, onSelect: (String) -> Unit) {
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(label, fontWeight = FontWeight.SemiBold)
+            SegmentedPillsRow(values = values, selected = selected, onSelect = onSelect)
+        }
+    }
+}
+
+@Composable
+private fun SourceManagementPage(
+    coordinator: SessionSettingsCoordinator,
+    onPickSource: (String?) -> Unit,
+    refresh: () -> Unit,
+    highlightedSourceId: String? = null
+) {
+    var filter by remember { mutableStateOf(SourceFilter.All) }
+    var query by remember { mutableStateOf("") }
+    var detailId by remember(highlightedSourceId) { mutableStateOf(highlightedSourceId) }
+    var aliasSource by remember { mutableStateOf<SessionSource?>(null) }
+    val detail = detailId?.let(coordinator::source)
+    if (detail != null) {
+        SettingsPage {
+            Text("内容预览", fontWeight = FontWeight.SemiBold)
+            SettingsGroup { Text(detail.preview.ifBlank { "暂无可预览内容；可查看文件元数据和解析状态。" }, Modifier.padding(16.dp)) }
+            Text("${detail.typeLabel} · ${detail.readState.label} · 本会话${if (detail.currentSessionReferenced) "已引用" else "未引用"}")
+            Text("共 ${detail.referenceOwnerIds.size} 个会话/模板引用 · 最近使用 ${formatSourceTime(detail.lastUsedAtEpochMillis)}（无使用记录时回退创建时间）")
+            SettingsGroup {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { onPickSource(detail.id) }, Modifier.fillMaxWidth()) { Text("重新选择文件") }
+                    OutlinedButton(
+                        onClick = { coordinator.unlinkCurrentSession(detail.id); refresh() },
+                        enabled = detail.currentSessionReferenced,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (detail.currentSessionReferenced) "取消本会话引用" else "本会话未引用") }
+                    Button(onClick = { coordinator.requestDeleteSource(detail.id); refresh() }, Modifier.fillMaxWidth()) {
+                        Icon(Icons.Filled.Delete, null)
+                        Text("删除资料文件")
+                    }
+                    TextButton(onClick = { aliasSource = detail }, Modifier.fillMaxWidth()) { Text("编辑本会话显示别名") }
+                }
+            }
+            coordinator.state.sourceUndo?.let {
+                SettingsGroup {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (it.kind == SourceUndoKind.Unlink) "已取消本会话引用" else "资料文件待删除", Modifier.weight(1f))
+                        TextButton(onClick = { coordinator.undoSourceAction(); refresh() }) { Text("撤销（5 秒）") }
+                    }
+                }
+            }
+            TextButton(onClick = { detailId = null }) { Text("返回资料列表") }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                OutlinedTextField(
+                    query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("按名称搜索") },
+                    leadingIcon = { Icon(Icons.Filled.Search, null) }
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SourceFilter.entries.forEach { item ->
+                        FilterChip(filter == item, onClick = { filter = item }, label = { Text(item.label) })
+                    }
+                }
+            }
+            item { OutlinedButton(onClick = { onPickSource(null) }, Modifier.fillMaxWidth()) { Text("添加资料") } }
+            val sources = coordinator.visibleSources(filter, query)
+            if (sources.isEmpty()) {
+                item { Text("没有符合条件的资料。可调整筛选或添加文件。", color = Color(0xFF687386)) }
+            } else {
+                items(sources, key = SessionSource::id) { source ->
+                    SettingsGroup {
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                coordinator.markSourceUsed(source.id)
+                                detailId = source.id
+                                refresh()
+                            }.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.Folder, null)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(source.displayName, fontWeight = FontWeight.SemiBold)
+                                Text("${source.typeLabel} · ${source.readState.label} · 本会话${if (source.currentSessionReferenced) "已引用" else "未引用"}")
+                                Text("共 ${source.referenceOwnerIds.size} 个会话/模板 · 最近使用 ${formatSourceTime(source.lastUsedAtEpochMillis)}", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(Icons.Filled.ChevronRight, null)
+                        }
+                    }
+                }
+            }
+            coordinator.state.sourceUndo?.let {
+                item {
+                    SettingsGroup {
+                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (it.kind == SourceUndoKind.Unlink) "已取消本会话引用" else "资料文件待删除", Modifier.weight(1f))
+                            TextButton(onClick = { coordinator.undoSourceAction(); refresh() }) { Text("撤销（5 秒）") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    aliasSource?.let { source ->
+        var alias by remember(source.id) { mutableStateOf(source.displayName) }
+        AlertDialog(
+            onDismissRequest = { aliasSource = null },
+            title = { Text("本会话显示别名") },
+            text = { OutlinedTextField(alias, onValueChange = { alias = it }) },
+            confirmButton = {
+                Button(onClick = { if (coordinator.setSourceAlias(source.id, alias)) aliasSource = null; refresh() }) { Text("保存别名") }
+            },
+            dismissButton = { TextButton(onClick = { aliasSource = null }) { Text("取消") } }
+        )
+    }
+
+    coordinator.state.pendingSourceDelete?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { coordinator.dismissSourceDelete(); refresh() },
+            title = { Text("删除资料文件") },
+            text = {
+                Column {
+                    Text("受影响的完整会话/模板列表：")
+                    pending.impactedOwnerIds.forEach { Text("· $it") }
+                    if (pending.requiresImpactConfirmation) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                pending.deleteEnabled,
+                                enabled = coordinator.deleteCapability.available,
+                                onCheckedChange = { coordinator.acknowledgeDeleteImpact(it); refresh() }
+                            )
+                            Text("确认使这些引用失效")
+                        }
+                    }
+                    Text(
+                        if (coordinator.deleteCapability.available) "删除和取消引用不同：文件将由真实仓储能力删除。"
+                        else "当前版本暂不支持删除资料文件；引用、文件内容与读取状态都会保留。"
+                    )
+                }
+            },
+            confirmButton = {
+                Button(enabled = pending.deleteEnabled, onClick = { coordinator.confirmDeleteSource(); refresh() }) { Text("删除资料文件") }
+            },
+            dismissButton = { TextButton(onClick = { coordinator.dismissSourceDelete(); refresh() }) { Text("取消") } }
+        )
+    }
+}
+
+// 导出面版式：1 = 版式C 大图标卡单选+装箱单+主按钮；2 = 版式D 胶囊分段+装箱单+主按钮（拍板后收敛为一版）
+private const val ExportPanelVariant = 1
+
+/** 基本资料页版式开关：1 = 版式E 聊天建档（ChatField），2 = 版式F 配方工坊（RecipePicker）。 */
+private const val ProfilePageVariant = 1
+
+@Composable
+private fun SystemOpsPage(
+    coordinator: SessionSettingsCoordinator,
+    onExportShare: (SessionExportPayload) -> Unit,
+    onRequestDeleteSession: () -> Unit,
+    canUndo: Boolean,
+    onUndo: () -> Unit
+) = SettingsPage {
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("导出", fontWeight = FontWeight.Bold, color = FormalColors.Ink)
+            Text(
+                "记忆库是当前会话的结构化记录（基本资料、目标计划、对话策略、快照与快捷标签）；分层记忆接入后会自动并入下载包。",
+                color = FormalColors.Muted
+            )
+            val shareExport: (Boolean) -> Unit = { memory ->
+                onExportShare(
+                    if (memory) SessionSettingsExport.buildMemoryPayload(coordinator.state.applied)
+                    else SessionSettingsExport.buildConfigPayload(coordinator.state.applied)
+                )
+            }
+            if (ExportPanelVariant == 1) {
+                ExportPickSharePanel(onShare = shareExport)
+            } else {
+                ExportSegmentsSharePanel(onShare = shareExport)
+            }
+            Text(
+                "通过系统分享面板发出，可存到文件或发给好友。",
+                color = FormalColors.Muted,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
+    SettingsGroup {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("删除当前会话", color = FormalColors.Danger, fontWeight = FontWeight.Bold)
+            Text("复用首页会话删除确认、durable 清理、5 秒撤销及幂等竞态处理。", color = FormalColors.Muted)
+            HoldToConfirmButton(
+                text = "按住不放，删除当前会话",
+                holdingText = "继续按住…",
+                onConfirm = onRequestDeleteSession,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (canUndo) SecondaryActionButton(
+                text = "撤销删除（5 秒）",
+                onClick = onUndo,
+                danger = true,
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "undo-delete-session"
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun SettingsTextField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    onBoundary: () -> Unit,
+    testTag: String? = null,
+    singleLine: Boolean = false
+) {
+    SessionConfigurationTextField(
+        label = label,
+        value = value,
+        testTag = testTag,
+        singleLine = singleLine,
+        onBoundary = onBoundary,
+        onValueChange = onValueChange
+    )
+}
+
+@Composable
+private fun SettingsPage(content: @Composable ColumnScope.() -> Unit) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) { item { Column(verticalArrangement = Arrangement.spacedBy(14.dp), content = content) } }
+}
+
+@Composable
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = FormalColors.Surface,
+        border = BorderStroke(1.dp, FormalColors.Divider)
+    ) { Column(content = content) }
+}
+
+internal fun formatSourceTime(epochMillis: Long): String =
+    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(epochMillis))

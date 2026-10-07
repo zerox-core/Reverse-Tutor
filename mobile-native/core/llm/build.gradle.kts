@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        minSdk = 22
+        minSdk = 23
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -25,6 +25,8 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:protocol"))
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 }

@@ -1,0 +1,87 @@
+{
+  "task_id": "NATIVE-P3-001",
+  "commands": [
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\prepare_context.py --project F:\\xw\\reverse-tutor --task F:\\xw\\reverse-tutor\\.adworkflow\\task_spec.json",
+    ".\\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.background.BackgroundGenerationRepositoryTest --tests com.reversetutor.core.data.SchemaPolicyTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :app:testDebugUnitTest --tests com.reversetutor.preview.background.BackgroundGenerationWorkerTest --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:data:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :core:model:testDebugUnitTest :core:data:testDebugUnitTest :core:llm:testDebugUnitTest :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "C:\\Users\\Lenovo\\AppData\\Local\\Android\\Sdk\\build-tools\\35.0.0\\aapt.exe dump badging mobile-native\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+    "adb devices",
+    "ConvertFrom-Json validation for ADworkflo JSON artifacts and .codegraph/index.json",
+    "py -3 F:\\CodexHome\\skills\\ADworkflo\\scripts\\build_codegraph.py --project F:\\xw\\reverse-tutor"
+  ],
+  "red_first": [
+    {
+      "command": "core:data focused background/schema test before implementation",
+      "notes": "Failed as expected at compile time because BackgroundGenerationRepository, BackgroundGenerationOutcome, extended BackgroundJobEntity fields, DAO generation queries, and Discarded status did not exist."
+    },
+    {
+      "command": "app BackgroundGenerationWorkerTest before implementation",
+      "notes": "Failed as expected at compile time because BackgroundGenerationWorker did not exist."
+    }
+  ],
+  "passed": [
+    {
+      "command": "prepare_context.py for NATIVE-P3-001",
+      "notes": "Passed. Context generated from codegraph-index at L1-index with warning_count 0."
+    },
+    {
+      "command": "core:data focused background/schema test after implementation",
+      "notes": "Passed. Covers enqueue-before-execution, complete, provider failure, recovery, cancellation, archived-session discard, stale-token late-result discard, and schema v2 migration policy."
+    },
+    {
+      "command": "app BackgroundGenerationWorkerTest after implementation",
+      "notes": "Passed. WorkManager request carries persisted jobId and uses stable unique work name."
+    },
+    {
+      "command": ":core:data:compileDebugAndroidTestKotlin",
+      "notes": "Passed. ReverseTutorDatabaseMigrationTest compiles with Room migration test helper and schema v2."
+    },
+    {
+      "command": "affected module JVM tests and app compile",
+      "notes": "Passed for core:model, core:data, core:llm, feature:chat, app unit tests, app Kotlin compile, and app Android test compile."
+    },
+    {
+      "command": ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+      "notes": "Passed after ChatRoute->WorkManager job enqueue integration. Project-level native JVM tests, Android lint, and internal debug APK build passed."
+    },
+    {
+      "command": "aapt dump badging app-debug.apk",
+      "notes": "Passed. Package remains com.reversetutor.preview, versionCode 1, versionName 0.1.0-native-preview."
+    },
+    {
+      "command": "coverage registry status count check",
+      "notes": "Passed. Registry counts are verified=4, in_progress=38, not_started=2; P0 unverified blockers remain 28."
+    },
+    {
+      "command": "ConvertFrom-Json validation",
+      "notes": "Passed for active ADworkflo JSON artifacts, NATIVE-P3-001 archived JSON artifacts, and .codegraph/index.json."
+    },
+    {
+      "command": "build_codegraph.py",
+      "notes": "Passed after P3-001. Index reports 181 files, 35257 source lines, 878 symbols, 315 imports, and 42 test files."
+    }
+  ],
+  "failed": [],
+  "not_run": [
+    "No signed/release APK build was run.",
+    "No official package id switch was made.",
+    "No real LLM provider/network call was run.",
+    "connectedDebugAndroidTest was not run because adb devices returned no attached devices.",
+    "No notification device validation was run; notification behavior belongs to NATIVE-P3-002."
+  ],
+  "evidence": [
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/background/BackgroundGenerationRepositoryTest.kt",
+    "mobile-native/app/src/test/java/com/reversetutor/preview/background/BackgroundGenerationWorkerTest.kt",
+    "mobile-native/core/data/src/androidTest/java/com/reversetutor/core/data/ReverseTutorDatabaseMigrationTest.kt",
+    "mobile-native/core/data/schemas/com.reversetutor.core.data.local.ReverseTutorDatabase/2.json",
+    "mobile-native/app/src/main/java/com/reversetutor/preview/background/BackgroundGenerationWorker.kt",
+    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatScreen.kt",
+    "tasks/native-legacy-coverage-registry.md"
+  ],
+  "summary": "NATIVE-P3-001 is verified for the local native preview. Generation jobs are persisted before execution, can recover/cancel/fail/discard, reject archived-session and stale-token late results, and are executed through a WorkManager worker from the app chat path.",
+  "residual_risk": "This does not complete notifications, live provider readiness, diagnostics, signed/release packaging, official package replacement, or PWA exit. Device migration test execution was unavailable because no device was attached."
+}

@@ -5,6 +5,8 @@ import com.reversetutor.core.data.local.ReverseTutorDatabase
 import com.reversetutor.core.data.local.entity.ImportBatchEntity
 import com.reversetutor.core.data.local.entity.LlmProfileEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
+import com.reversetutor.core.data.local.entity.ModelBindingEntity
+import com.reversetutor.core.data.local.entity.ProviderConnectionEntity
 import com.reversetutor.core.data.local.entity.SessionEntity
 import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
@@ -15,6 +17,8 @@ import com.reversetutor.core.protocol.ProtocolDocumentType
 import com.reversetutor.core.protocol.ProtocolImportDocument
 import com.reversetutor.core.protocol.ProtocolImportLlmProfileRecord
 import com.reversetutor.core.protocol.ProtocolImportMessageRecord
+import com.reversetutor.core.protocol.ProtocolImportModelBindingRecord
+import com.reversetutor.core.protocol.ProtocolImportProviderConnectionRecord
 import com.reversetutor.core.protocol.ProtocolImportReader
 import com.reversetutor.core.protocol.ProtocolImportSessionRecord
 import com.reversetutor.core.protocol.ProtocolModule
@@ -145,6 +149,8 @@ class RoomNativeImportStore(
             writeSet.sessionSettings.forEach { database.sessionSettingsDao().upsert(it) }
             writeSet.messages.forEach { database.messageDao().insert(it) }
             writeSet.llmProfiles.forEach { database.llmProfileDao().upsert(it) }
+            writeSet.providerConnections.forEach { database.modelConnectionDao().upsertConnection(it) }
+            writeSet.modelBindings.forEach { database.modelConnectionDao().upsertBinding(it) }
             database.importBatchDao().insert(writeSet.batch)
         }
     }
@@ -197,6 +203,8 @@ data class NativeImportWriteSet(
     val sessionSettings: List<SessionSettingsEntity>,
     val messages: List<MessageEntity>,
     val llmProfiles: List<LlmProfileEntity>,
+    val providerConnections: List<ProviderConnectionEntity>,
+    val modelBindings: List<ModelBindingEntity>,
     val replaceExistingSpace: Boolean
 )
 
@@ -263,6 +271,8 @@ private data class NativeImportPlan(
             sessionSettings = records.sessionSettings,
             messages = records.messages,
             llmProfiles = records.llmProfiles,
+            providerConnections = records.providerConnections,
+            modelBindings = records.modelBindings,
             replaceExistingSpace = mode == NativeImportMode.Overwrite
         )
 }
@@ -272,12 +282,15 @@ private data class NativeImportRecords(
     val sessionSettings: List<SessionSettingsEntity> = emptyList(),
     val messages: List<MessageEntity> = emptyList(),
     val llmProfiles: List<LlmProfileEntity> = emptyList(),
+    val providerConnections: List<ProviderConnectionEntity> = emptyList(),
+    val modelBindings: List<ModelBindingEntity> = emptyList(),
     val skippedSessions: Int = 0,
     val skippedMessages: Int = 0,
     val skippedProfiles: Int = 0
 ) {
     val hasWritableRecords: Boolean =
-        sessions.isNotEmpty() || messages.isNotEmpty() || llmProfiles.isNotEmpty()
+        sessions.isNotEmpty() || messages.isNotEmpty() || llmProfiles.isNotEmpty() ||
+            providerConnections.isNotEmpty() || modelBindings.isNotEmpty()
 
     fun insertedCounts(): Map<String, Int> =
         linkedMapOf(
@@ -304,6 +317,8 @@ private fun ProtocolImportDocument.toRecords(
     val sessionEntities = mutableListOf<SessionEntity>()
     val settingsEntities = mutableListOf<SessionSettingsEntity>()
     val profileEntities = mutableListOf<LlmProfileEntity>()
+    val connectionEntities = mutableListOf<ProviderConnectionEntity>()
+    val bindingEntities = mutableListOf<ModelBindingEntity>()
     val messageEntities = mutableListOf<MessageEntity>()
     val sessionIdMap = mutableMapOf<String, String>()
     var skippedSessions = 0
@@ -327,6 +342,7 @@ private fun ProtocolImportDocument.toRecords(
                     id = "settings-${entity.id}",
                     spaceId = spaceId,
                     sessionId = entity.id,
+                    modelBindingId = entity.modelBindingId,
                     systemPrompt = session.systemPrompt
                 )
             }
@@ -361,7 +377,18 @@ private fun ProtocolImportDocument.toRecords(
             errors += "Skipped LLM profile with missing id, name, provider, or model."
         } else {
             profileEntities += entity
+            connectionEntities += entity.toProviderConnectionEntity()
+            bindingEntities += entity.toModelBindingEntity()
         }
+    }
+
+    providerConnections.mapNotNullTo(connectionEntities) {
+        it.toEntityOrNull(spaceId, nowEpochMillis)
+            ?.withImportIdPrefix(idPrefix)
+    }
+    modelBindings.mapNotNullTo(bindingEntities) {
+        it.toEntityOrNull(spaceId, nowEpochMillis)
+            ?.withImportIdPrefix(idPrefix)
     }
 
     return NativeImportRecords(
@@ -369,6 +396,8 @@ private fun ProtocolImportDocument.toRecords(
         sessionSettings = settingsEntities,
         messages = messageEntities,
         llmProfiles = profileEntities,
+        providerConnections = connectionEntities.distinctBy { it.id },
+        modelBindings = bindingEntities.distinctBy { it.id },
         skippedSessions = skippedSessions,
         skippedMessages = skippedMessages,
         skippedProfiles = skippedProfiles
@@ -389,6 +418,7 @@ private fun ProtocolImportSessionRecord.toEntityOrNull(
         title = normalizedTitle,
         createdAtEpochMillis = nowEpochMillis,
         updatedAtEpochMillis = nowEpochMillis,
+        modelBindingId = modelBindingId,
         sourceImportId = batchId
     )
 }
@@ -419,10 +449,31 @@ private fun ProtocolImportMessageRecord.toEntityOrNull(
 }
 
 private fun SessionEntity.withImportIdPrefix(idPrefix: String): SessionEntity =
-    if (idPrefix.isEmpty()) this else copy(id = id.withImportIdPrefix(idPrefix))
+    if (idPrefix.isEmpty()) {
+        this
+    } else {
+        copy(
+            id = id.withImportIdPrefix(idPrefix),
+            llmProfileId = llmProfileId?.withImportIdPrefix(idPrefix),
+            modelBindingId = modelBindingId?.withImportIdPrefix(idPrefix)
+        )
+    }
 
 private fun LlmProfileEntity.withImportIdPrefix(idPrefix: String): LlmProfileEntity =
     if (idPrefix.isEmpty()) this else copy(id = id.withImportIdPrefix(idPrefix))
+
+private fun ProviderConnectionEntity.withImportIdPrefix(idPrefix: String): ProviderConnectionEntity =
+    if (idPrefix.isEmpty()) this else copy(id = id.withImportIdPrefix(idPrefix))
+
+private fun ModelBindingEntity.withImportIdPrefix(idPrefix: String): ModelBindingEntity =
+    if (idPrefix.isEmpty()) {
+        this
+    } else {
+        copy(
+            id = id.withImportIdPrefix(idPrefix),
+            connectionId = connectionId.withImportIdPrefix(idPrefix)
+        )
+    }
 
 private fun String.withImportIdPrefix(idPrefix: String): String =
     if (idPrefix.isEmpty()) this else "$idPrefix$this"
@@ -435,6 +486,8 @@ private fun ProtocolImportDocument.toStableImportSpaceId(sourceFileName: String)
         sessions.mapTo(this) { "session:${it.id.trim()}" }
         messages.mapTo(this) { "message:${it.id.trim()}:${it.sessionId?.trim().orEmpty()}" }
         llmProfiles.mapTo(this) { "profile:${it.id.trim()}" }
+        providerConnections.mapTo(this) { "connection:${it.id.trim()}" }
+        modelBindings.mapTo(this) { "binding:${it.id.trim()}:${it.connectionId.trim()}" }
     }.joinToString("|")
     return "import-space-${identity.sha256Prefix(16)}"
 }
@@ -456,11 +509,24 @@ private fun ReverseTutorDatabase.clearImportTargetSpace(spaceId: String) {
     val database = openHelper.writableDatabase
     val args = arrayOf<Any>(spaceId)
     listOf(
+        "DELETE FROM sync_outbox WHERE spaceId = ?",
+        "DELETE FROM sync_cursors WHERE spaceId = ?",
+        "DELETE FROM sync_conflicts WHERE spaceId = ?",
+        "DELETE FROM entity_tombstones WHERE spaceId = ?",
+        "DELETE FROM search_documents WHERE spaceId = ?",
+        "DELETE FROM widget_layout_preferences WHERE spaceId = ?",
+        "DELETE FROM token_usage_records WHERE spaceId = ?",
+        "DELETE FROM weekly_summaries WHERE spaceId = ?",
+        "DELETE FROM study_plan_tasks WHERE spaceId = ?",
+        "DELETE FROM turn_runs WHERE spaceId = ?",
+        "DELETE FROM context_snapshots WHERE spaceId = ?",
         "DELETE FROM message_quotes WHERE spaceId = ?",
         "DELETE FROM message_attachments WHERE spaceId = ?",
         "DELETE FROM messages WHERE spaceId = ?",
         "DELETE FROM session_settings WHERE spaceId = ?",
         "DELETE FROM sessions WHERE spaceId = ?",
+        "DELETE FROM model_bindings WHERE spaceId = ?",
+        "DELETE FROM provider_connections WHERE spaceId = ?",
         "DELETE FROM llm_profiles WHERE spaceId = ?",
         "DELETE FROM background_jobs WHERE spaceId = ?",
         "DELETE FROM source_chunks WHERE spaceId = ?",
@@ -498,6 +564,76 @@ private fun ProtocolImportLlmProfileRecord.toEntityOrNull(
         enabled = false
     )
 }
+
+private fun LlmProfileEntity.toProviderConnectionEntity(): ProviderConnectionEntity =
+    ProviderConnectionEntity(
+        id = "connection-$id",
+        spaceId = spaceId,
+        name = name,
+        protocol = provider.toModelProtocol(),
+        providerName = provider,
+        baseUrl = baseUrl,
+        secretRef = null,
+        enabled = enabled,
+        createdAtEpochMillis = createdAtEpochMillis,
+        updatedAtEpochMillis = updatedAtEpochMillis
+    )
+
+private fun LlmProfileEntity.toModelBindingEntity(): ModelBindingEntity =
+    ModelBindingEntity(
+        id = id,
+        spaceId = spaceId,
+        connectionId = "connection-$id",
+        modelId = model,
+        displayName = name,
+        isDefault = enabled,
+        enabled = enabled,
+        createdAtEpochMillis = createdAtEpochMillis,
+        updatedAtEpochMillis = updatedAtEpochMillis
+    )
+
+private fun ProtocolImportProviderConnectionRecord.toEntityOrNull(
+    spaceId: String,
+    nowEpochMillis: Long
+): ProviderConnectionEntity? {
+    if (id.isBlank() || name.isBlank() || protocol.isBlank()) return null
+    return ProviderConnectionEntity(
+        id = id,
+        spaceId = spaceId,
+        name = name,
+        protocol = protocol.toModelProtocol(),
+        providerName = providerName,
+        baseUrl = baseUrl,
+        secretRef = null,
+        enabled = true,
+        createdAtEpochMillis = nowEpochMillis,
+        updatedAtEpochMillis = nowEpochMillis
+    )
+}
+
+private fun ProtocolImportModelBindingRecord.toEntityOrNull(
+    spaceId: String,
+    nowEpochMillis: Long
+): ModelBindingEntity? {
+    if (id.isBlank() || connectionId.isBlank() || modelId.isBlank()) return null
+    return ModelBindingEntity(
+        id = id,
+        spaceId = spaceId,
+        connectionId = connectionId,
+        modelId = modelId,
+        displayName = displayName?.ifBlank { modelId } ?: modelId,
+        enabled = enabled,
+        createdAtEpochMillis = nowEpochMillis,
+        updatedAtEpochMillis = nowEpochMillis
+    )
+}
+
+private fun String.toModelProtocol(): String =
+    when (trim().lowercase()) {
+        "anthropiccompatible", "anthropic_compatible", "anthropic-compatible" -> "AnthropicCompatible"
+        "gemininative", "gemini_native", "gemini-native" -> "GeminiNative"
+        else -> "OpenAiCompatible"
+    }
 
 private fun String.toMessageRole(): MessageRole? =
     when (trim().lowercase()) {

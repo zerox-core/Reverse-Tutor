@@ -1,6 +1,7 @@
 package com.reversetutor.preview
 
 import android.content.Intent
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -9,75 +10,108 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.reversetutor.core.data.DataModule
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import com.reversetutor.core.data.preferences.AppPreferences
+import com.reversetutor.preview.background.AndroidBackgroundGenerationNotifier
+import com.reversetutor.preview.background.BackgroundGenerationStartupRecovery
+import com.reversetutor.preview.background.BackgroundGenerationWorker
 import com.reversetutor.preview.shell.AppShell
 import com.reversetutor.preview.theme.ReverseTutorTheme
+import com.reversetutor.preview.wiring.DebugLlmBootstrapConfig
+import com.reversetutor.preview.wiring.DebugLlmProfileBootstrapper
+import com.reversetutor.preview.wiring.DebugGraphScenarioSeeder
+import com.reversetutor.preview.wiring.HybridAppGraph
+import com.reversetutor.preview.wiring.HybridOnlineConfiguration
+import com.reversetutor.preview.wiring.RepositoryDebugLlmProfileStore
+import com.reversetutor.preview.wiring.runtimeMode
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var receivedImportPayload by mutableStateOf<ReceivedImportPayload?>(null)
+    private var pendingOpenSessionId by mutableStateOf<String?>(null)
 
-    private val appPreferencesRepository by lazy {
-        DataModule.appPreferencesRepository(this)
+    private val debugLlmConfig by lazy {
+        DebugLlmBootstrapConfig.from(
+            apiKey = BuildConfig.DEBUG_LLM_API_KEY,
+            baseUrl = BuildConfig.DEBUG_LLM_BASE_URL,
+            defaultModel = BuildConfig.DEBUG_LLM_DEFAULT_MODEL,
+            fallbackModels = BuildConfig.DEBUG_LLM_FALLBACK_MODELS
+        )
     }
-    private val sessionRepository by lazy {
-        DataModule.sessionRepository(this)
-    }
-    private val messageRepository by lazy {
-        DataModule.messageRepository(this)
-    }
-    private val llmProfileRepository by lazy {
-        DataModule.llmProfileRepository(this)
-    }
-    private val chatGenerationRepository by lazy {
-        DataModule.chatGenerationRepository(this)
-    }
-    private val sourceRepository by lazy {
-        DataModule.sourceRepository(this)
-    }
-    private val memoryRepository by lazy {
-        DataModule.memoryRepository(this)
-    }
-    private val graphRepository by lazy {
-        DataModule.graphRepository(this)
-    }
-    private val localDataWipeRepository by lazy {
-        DataModule.localDataWipeRepository(this)
-    }
-    private val nativeImportRepository by lazy {
-        DataModule.nativeImportRepository(this)
-    }
-    private val nativeExportRepository by lazy {
-        DataModule.nativeExportRepository(this)
+
+    private val appGraph by lazy {
+        HybridAppGraph.create(
+            context = this,
+            onlineConfiguration = HybridOnlineConfiguration.fromBaseUrl(
+                BuildConfig.ONLINE_API_BASE_URL
+            ),
+            llmRuntimeMode = debugLlmConfig.runtimeMode()
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        configureSystemBars()
         receivedImportPayload = readImportPayload(intent)
+        pendingOpenSessionId = readOpenSessionId(intent)
+        if (BuildConfig.DEBUG) {
+            lifecycleScope.launch {
+                DebugGraphScenarioSeeder(appGraph).ensureSeeded(System.currentTimeMillis())
+            }
+        }
+        lifecycleScope.launch {
+            DebugLlmProfileBootstrapper(
+                store = RepositoryDebugLlmProfileStore(appGraph.llmProfileRepository)
+            ).ensureProfiles(debugLlmConfig)
+        }
+        lifecycleScope.launch {
+            val backgroundGenerationRepository = appGraph.backgroundGenerationRepository
+            BackgroundGenerationStartupRecovery(
+                recoverJobIds = { nowEpochMillis ->
+                    backgroundGenerationRepository
+                        .recoverInterruptedGenerationJobs(nowEpochMillis)
+                        .map { it.id }
+                },
+                enqueue = { jobId -> BackgroundGenerationWorker.enqueue(this@MainActivity, jobId) }
+            ).recoverAndSchedule(System.currentTimeMillis())
+        }
         setContent {
-            val appPreferences by appPreferencesRepository.preferences.collectAsState(
+            val appPreferences by appGraph.appPreferencesRepository.preferences.collectAsState(
                 initial = AppPreferences.defaults
             )
             val receivedImport = receivedImportPayload
 
             ReverseTutorTheme {
                 AppShell(
+                    hybridAppGraph = appGraph,
                     appPreferences = appPreferences,
-                    sessionRepository = sessionRepository,
-                    messageRepository = messageRepository,
-                    llmProfileRepository = llmProfileRepository,
-                    chatGenerationRepository = chatGenerationRepository,
-                    sourceRepository = sourceRepository,
-                    memoryRepository = memoryRepository,
-                    graphRepository = graphRepository,
-                    localDataWipeRepository = localDataWipeRepository,
-                    nativeImportRepository = nativeImportRepository,
-                    nativeExportRepository = nativeExportRepository,
+                    sessionRepository = appGraph.sessionRepository,
+                    messageRepository = appGraph.messageRepository,
+                    llmProfileRepository = appGraph.llmProfileRepository,
+                    chatGenerationRepository = appGraph.chatGenerationRepository,
+                    backgroundGenerationRepository = appGraph.backgroundGenerationRepository,
+                    sourceRepository = appGraph.sourceRepository,
+                    memoryRepository = appGraph.memoryRepository,
+                    graphRepository = appGraph.graphRepository,
                     initialImportText = receivedImport?.text,
                     initialImportFileName = receivedImport?.fileName,
+                    pendingOpenSessionId = pendingOpenSessionId,
+                    onOpenSessionConsumed = { pendingOpenSessionId = null },
                     onExitRequested = ::finish
                 )
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun configureSystemBars() {
+        val background = AndroidColor.rgb(244, 247, 253)
+        window.statusBarColor = background
+        window.navigationBarColor = background
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
         }
     }
 
@@ -85,6 +119,13 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         receivedImportPayload = readImportPayload(intent)
+        pendingOpenSessionId = readOpenSessionId(intent)
+    }
+
+    private fun readOpenSessionId(intent: Intent?): String? {
+        if (intent == null) return null
+        return intent.getStringExtra(AndroidBackgroundGenerationNotifier.EXTRA_OPEN_SESSION_ID)
+            ?.takeIf { it.isNotBlank() }
     }
 
     private fun readImportPayload(intent: Intent?): ReceivedImportPayload? {

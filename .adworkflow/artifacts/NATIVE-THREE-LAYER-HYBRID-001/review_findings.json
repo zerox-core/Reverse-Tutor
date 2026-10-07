@@ -1,0 +1,42 @@
+{
+  "task_id": "NATIVE-THREE-LAYER-HYBRID-001",
+  "status": "blocking_findings_resolved",
+  "resolved_findings": [
+    {
+      "severity": "critical",
+      "finding": "Room REPLACE could cascade-delete model bindings or fail against TurnRun RESTRICT references.",
+      "resolution": "ProviderConnection and ModelBinding writes now use Room Upsert semantics with regression coverage."
+    },
+    {
+      "severity": "important",
+      "finding": "TurnRun sequence allocation and state transitions were split across non-atomic repository calls.",
+      "resolution": "Domain and data contracts now expose transactional create, retry, and conditional completion operations."
+    },
+    {
+      "severity": "important",
+      "finding": "Legacy Gemini profiles were mapped to OpenAI-compatible during migration.",
+      "resolution": "Migration recognizes both Gemini and GeminiNative and maps them to GeminiNative."
+    },
+    {
+      "severity": "important",
+      "finding": "Sync cursor reads were not scoped by spaceId.",
+      "resolution": "Cursor contracts and Room queries are scoped by spaceId and entityType."
+    },
+    {
+      "severity": "important",
+      "finding": "Session model binding had no domain persistence path.",
+      "resolution": "SessionRepository now provides setModelBinding and the Room implementation updates session and settings transactionally."
+    },
+    {
+      "severity": "important",
+      "finding": "Frontend ports were synchronous while domain and data boundaries were suspendable.",
+      "resolution": "Frontend ports and actions are asynchronous, expose loading/error states, and avoid production runBlocking."
+    }
+  ],
+  "residual_risks": [
+    "Production provider HTTP calls remain disabled; the committed provider runtime is a request-description foundation.",
+    "Python online service currently uses process-local foundation storage and does not yet provide production authentication or durable persistence.",
+    "The committed workspace pager host still requires final clean integration with the existing dirty AppShell/UI work.",
+    "Connected Room migration behavior has not been executed on an Android device or emulator."
+  ]
+}

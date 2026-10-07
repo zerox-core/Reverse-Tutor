@@ -370,6 +370,35 @@ def test_mobile_kg_gate_and_rule_extractor_are_mounted_on_turns():
     assert "kg extraction failed" in html
 
 
+def test_mobile_kg_extraction_is_not_hard_gated_by_preset_learning_mode():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    extract_fn = html.split(
+        "async function maybe_extract_kg_from_turn(session, sid, userInput, evaluation, action, episodeId)",
+        1,
+    )[1].split("function kgPushUnique", 1)[0]
+    prompt_fn = html.split("async function buildKgContextTextForPrompt", 1)[1].split("function clipMemoryText", 1)[0]
+
+    assert "inferConversationMode(session) !== 'learning'" not in extract_fn
+    assert "should_extract(session?.settings || {}, userInput || '', evaluation || {}, action || {})" in extract_fn
+    assert "inferConversationMode(session) !== 'learning'" not in prompt_fn
+
+
+def test_mobile_graph_backfills_existing_mastery_into_global_kg_nodes():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    render_fn = html.split("async function renderInsights()", 1)[1].split("// --- Settings ---", 1)[0]
+    engine_return = html.split("return { create_session", 1)[1].split("};", 1)[0]
+
+    assert "async function backfill_kg_from_mastery" in html
+    assert "await ENGINE.backfill_kg_from_mastery(session.id)" in render_fn
+    assert "backfill_kg_from_mastery" in engine_return
+    assert "await backfill_kg_from_mastery(session.id)" not in render_fn
+    assert "await DB.bySid('messages', sid)" in html
+    assert "(m.meta || {}).action?.knowledge_point" in html
+    assert "await upsert_mastery(sid, kp" in html
+    assert "await upsert_kg_node(sid, KIND_CONCEPT, kp" in html
+    assert "await upsert_kg_edge(sid, userNode.id, concept.id, REL_LEARNING" in html
+
+
 def test_mobile_kg_context_retrieval_is_injected_into_system_prompt():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 
@@ -504,7 +533,7 @@ def test_mobile_service_worker_cache_key_tracks_release_version():
     sw = (ROOT / "static" / "app" / "sw.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 
-    assert "rt-mobile-v0.19.7-46-knowledge-node-release" in sw
+    assert "rt-mobile-v0.19.8-50-challenge02-final" in sw
     assert "'./index.html'," not in sw.split("const SHELL =", 1)[1].split("];", 1)[0]
     assert "fetch(e.request, { cache: 'no-store' })" in sw
     assert "url.pathname.endsWith('/index.html')" in sw
@@ -904,6 +933,21 @@ def test_mobile_chat_input_preserves_caret_and_handles_keyboard_layout():
     assert "overscroll-behavior: contain;" in html
 
 
+def test_mobile_session_list_clears_stale_keyboard_state_so_bottom_nav_returns():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    clear_fn = html.split("function clearKeyboardLayoutState", 1)[1].split("function syncKeyboardLayout", 1)[0]
+    show_home_fn = html.split("async function showSessionHome", 1)[1].split("function switchTab", 1)[0]
+    switch_tab_fn = html.split("function switchTab", 1)[1].split("$$('.tab-btn')", 1)[0]
+
+    assert "document.body.classList.remove('keyboard-open')" in clear_fn
+    assert "document.documentElement.style.setProperty('--keyboard-bottom', '0px')" in clear_fn
+    assert "syncKeyboardLayout.focusedAt = 0" in clear_fn
+    assert "document.activeElement.blur()" in clear_fn
+    assert "clearKeyboardLayoutState({ blur: true });" in show_home_fn
+    assert "if (name !== 'chat' || state.chatScreen !== 'thread')" in switch_tab_fn
+    assert "clearKeyboardLayoutState({ blur: true });" in switch_tab_fn
+
+
 def test_mobile_chat_handles_topic_drift_fuzzy_retrieval_and_visible_thinking_status():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 
@@ -1285,6 +1329,41 @@ def test_mobile_turn_route_uses_context_before_source_hits_for_ambiguous_short_t
     assert "const routeReason = routeDecision.reason || '';" in run_turn_fn
     assert "turnRouteReason: routeReason" in run_turn_fn
     assert "turn_route_reason: turnRouteReason" in html
+
+
+def test_mobile_teacher_teaching_short_text_routes_to_study_full():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    route_fn = html.split("function inferTurnRoute", 1)[1].split("function buildLightChatSystemPrompt", 1)[0]
+
+    assert "const teacherTeachingPattern" in route_fn
+    assert "我要教你" in route_fn
+    assert "给你讲" in route_fn
+    assert "教你什么是" in route_fn
+    assert "turnRouteDecision(TURN_ROUTE_STUDY_FULL, 'teacher_teaching_action')" in route_fn
+    assert route_fn.index("teacherTeachingPattern.test(compact)") < route_fn.index("compact.length <= 18")
+
+
+def test_mobile_mock_response_uses_current_user_topic_before_math_presets():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    mock_fn = html.split("function mock_response", 1)[1].split("async function* mock_stream_response", 1)[0]
+
+    assert "function inferMockKnowledgePoint" in html
+    assert "decodeURIComponent" in html
+    assert "inferMockKnowledgePoint(last_user, messages, kp_idx)" in mock_fn
+    assert "Python list comprehension" in html
+    assert "return KP_SEQ[fallbackIndex]" in html
+
+
+def test_mobile_prompts_preserve_user_teacher_role_when_user_teaches_ai():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    full_prompt_fn = html.split("function build_system_prompt", 1)[1].split("function finalReplyInstruction", 1)[0]
+    final_instruction_fn = html.split("function finalReplyInstruction", 1)[1].split("function normalizeSourceAnchorText", 1)[0]
+    light_prompt_fn = html.split("function buildLightChatSystemPrompt", 1)[1].split("function runLightChatTurn", 1)[0]
+
+    for prompt in (full_prompt_fn, final_instruction_fn, light_prompt_fn):
+        assert "用户始终是老师" in prompt
+        assert "我要教你/给你讲/接下来教你" in prompt
+        assert "不能反问“怎么变成你教我了”" in prompt
 
 
 def test_mobile_generation_callbacks_are_scoped_to_original_session():

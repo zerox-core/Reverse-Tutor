@@ -1,0 +1,173 @@
+package com.reversetutor.feature.chat
+
+import android.util.Log
+import com.reversetutor.core.llm.LlmGenerationPlan
+import com.reversetutor.core.llm.LlmGenerationPlanner
+import com.reversetutor.core.llm.LlmGenerationResult
+import com.reversetutor.core.llm.LlmGenerationRuntime
+import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.llm.LlmProfileCapabilityResolver
+import com.reversetutor.core.model.LlmProfile
+
+/** 未配置可用模型：协调器按「生成失败」降级（对话与草案保留，可改手动填写）。 */
+class AgentCreationNoModelException : IllegalStateException("no llm profile configured")
+
+/**
+ * 生成或契约解析失败（协调器会原样重试 1 次）。
+ * 消息只进降级文案判断，不进 UI。
+ */
+class AgentCreationGenerationException(message: String) : IllegalStateException(message)
+
+/**
+ * R-B 生产网关：P2' 契约提示词 → core/llm transport（复用 LlmProfile）→ 契约解析。
+ *
+ * 设计约束（设计方案 v3 · 第十章）：
+ * - 不经教学轮 envelope / sessionPolicy——纯 prompt→文本生成；
+ * - R93 起流式（streaming=true）：边生成边把口语字段抽取上屏，解析失败由协调器重试；
+ * - 确定性推进逻辑（追问策略、了解度融合、收敛）全在协调器，
+ *   本类只负责把策略快照译成提示词、把返回文本译回契约对象。
+ */
+class RealAgentCreationGateway(
+    private val runtime: LlmGenerationRuntime,
+    private val activeProfile: suspend () -> LlmProfile?
+) : AgentCreationGateway {
+
+    private var turnSequence = 0
+
+    override suspend fun converse(
+        history: List<AgentCreationHistoryTurn>,
+        userText: String,
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?,
+        strategy: AgentCreationTurnStrategy
+    ): AgentCreationTurnResult = converseStreaming(history, userText, currentDraft, docAnalysis, strategy)
+
+    /**
+     * R93 流式主链路：onStreamChunk 逐段累计契约 JSON 前缀，
+     * 从中宽容抽取口语字段（assistantNote / followUpQuestion），
+     * 以「全量快照、去重后」回调上屏；最终仍以整段契约解析为准。
+     */
+    override suspend fun converseStreaming(
+        history: List<AgentCreationHistoryTurn>,
+        userText: String,
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?,
+        strategy: AgentCreationTurnStrategy,
+        onPartialSpoken: (String) -> Unit,
+        onReasoning: (String) -> Unit,
+        onThinkingDecision: (ThinkingBudgetDecider.Decision) -> Unit
+    ): AgentCreationTurnResult {
+        val profile = activeProfile()
+            ?.takeIf { it.enabled && it.model.isNotBlank() }
+            ?: throw AgentCreationNoModelException()
+        // 协调器在调用前已把本轮用户输入追加进 history，提示词里历史与本轮输入分开装。
+        val trimmed = userText.trim()
+        val priorHistory = if (history.lastOrNull()?.isUser == true && history.last().text == trimmed) {
+            history.dropLast(1)
+        } else {
+            history
+        }
+        val prompt = AgentCreationPrompts.buildTurnPrompt(
+            history = priorHistory,
+            userText = trimmed,
+            currentDraft = currentDraft,
+            docAnalysis = docAnalysis,
+            strategy = strategy
+        )
+        val turn = turnSequence++
+        // R96：按轮决策是否请求思考——资料/复材输入开（保质量，思考期有「思考中」
+        // 气泡可见），短答复承接轮关（时延从 ~32s 回到秒级）。
+        val thinkingDecision = ThinkingBudgetDecider.decide(
+            userText = trimmed,
+            hasDocAnalysis = docAnalysis != null,
+            isFirstTurn = turn == 0
+        )
+        Log.d(
+            STREAM_LOG_TAG,
+            "thinking decision=" + (if (thinkingDecision.enabled) "ON" else "OFF") +
+                " reason=" + thinkingDecision.reason
+        )
+        // R98：决策结果透传给协调器——「开启深度思考 / 直接回答」是产品流程的一部分，要上屏。
+        onThinkingDecision(thinkingDecision)
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = SESSION_ID,
+            userMessageId = "agent-creation-user-$turn",
+            userText = prompt,
+            profile = profile,
+            capabilities = LlmProfileCapabilityResolver.infer(profile),
+            token = LlmGenerationToken("agent-creation-turn-$turn")
+        )
+        val streamed = StringBuilder()
+        var lastEmitted: String? = null
+        // R95 思考流：reasoning_content 逐段累计并透传，静默推理期也有内容上屏。
+        val reasoning = StringBuilder()
+        var reasonCount = 0
+        // R94 流式时序诊断（2026-09-27 用户反馈「还是没流式」）：逐 chunk 记录
+        // 到达时刻与累计长度，用来区分「模型/中继整坨返回」与「App 端没及时上屏」。
+        val streamStartedAt = System.currentTimeMillis()
+        var chunkCount = 0
+        val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(
+            streaming = true,
+            thinkingEnabled = thinkingDecision.enabled,
+            onStreamChunk = { chunk ->
+                streamed.append(chunk)
+                chunkCount += 1
+                Log.d(
+                    STREAM_LOG_TAG,
+                    "chunk #$chunkCount +${chunk.length}ch total=${streamed.length} " +
+                        "elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
+                )
+                val partial = AgentCreationParser.extractPartialSpoken(streamed.toString())
+                if (partial != null && partial != lastEmitted) {
+                    lastEmitted = partial
+                    Log.d(
+                        STREAM_LOG_TAG,
+                        "partial len=${partial.length} " +
+                            "elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
+                    )
+                    onPartialSpoken(partial)
+                }
+            },
+            onReasoningChunk = { chunk ->
+                reasoning.append(chunk)
+                reasonCount += 1
+                Log.d(
+                    STREAM_LOG_TAG,
+                    "reason #" + reasonCount + " +" + chunk.length + "ch total=" + reasoning.length + " " +
+                        "elapsed=" + (System.currentTimeMillis() - streamStartedAt) + "ms"
+                )
+                onReasoning(chunk)
+            }
+        ) ?: throw AgentCreationNoModelException()
+        val result = runtime.generate(request)
+        Log.d(
+            STREAM_LOG_TAG,
+            "stream done type=${result::class.simpleName} chunks=$chunkCount reasons=$reasonCount " +
+                "total=${streamed.length} elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
+        )
+        return when (result) {
+            is LlmGenerationResult.Success ->
+                AgentCreationParser.parseTurnResult(result.text)
+                    ?: throw AgentCreationGenerationException("contract parse failed")
+            is LlmGenerationResult.Streamed ->
+                AgentCreationParser.parseTurnResult(result.visibleText)
+                    ?: throw AgentCreationGenerationException("contract parse failed")
+            is LlmGenerationResult.Failure ->
+                throw AgentCreationGenerationException(result.message)
+            LlmGenerationResult.Timeout ->
+                throw AgentCreationGenerationException("timeout")
+        }
+    }
+
+    /**
+     * P1 文档分析：R-C 接真实解析文本；
+     * R-B 沿用脚本化结构，保持文件卡链路可走通。
+     */
+    override suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis =
+        scriptedAgentCreationAnalysis(fileName)
+
+    private companion object {
+        const val SESSION_ID = "agent-creation"
+        const val STREAM_LOG_TAG = "RtCreationStream"
+    }
+}

@@ -10,7 +10,7 @@ This project uses ADworkflo for AI-assisted engineering execution.
 - Execution mode: orchestrator-with-workers-and-reviewers
 - Expected complexity score: 34
 - Current implementation target: `mobile-native/`
-- Current task: `NATIVE-P1-001`
+- Current task: native frontend redesign is pending user design input; backend/protocol/data contracts are frozen first.
 - Existing source files scanned: 72
 - Approx source lines: 16763
 - Languages detected now: java, javascript, python
@@ -27,6 +27,36 @@ This project uses ADworkflo for AI-assisted engineering execution.
 7. Do not use WebView/PWA carry-over as the native replacement UI.
 8. Do not make Python mandatory for first-phase Android runtime.
 9. Do not use direct IndexedDB scraping as the primary migration path.
+
+## Active Architecture Freeze
+
+Read `tasks/native-backend-protocol-data-contract-freeze.md` before any native frontend redesign or feature implementation that touches app shell, feature UI, chat, context, graph, sources, settings, import/export, generation, or storage.
+
+Frozen backend/protocol/data layers:
+
+- `mobile-native/core/model`
+- `mobile-native/core/protocol`
+- `mobile-native/core/llm`
+- `mobile-native/core/data/*Repository`
+- `mobile-native/core/data/local`
+- `mobile-native/core/data/preferences`
+- `mobile-native/core/data/llm/SecretStore.kt`
+- Room schema exports and migrations
+
+Allowed native frontend redesign surface:
+
+- `mobile-native/app/src/main/java/com/reversetutor/preview/theme`
+- `mobile-native/app/src/main/java/com/reversetutor/preview/ui`
+- `mobile-native/app/src/main/java/com/reversetutor/preview/shell`
+- `mobile-native/feature/*`
+
+Contract rules:
+
+1. UI and feature modules must call business capability through repositories, domain models, and protocol facades.
+2. UI and feature modules must not directly call Room DAOs, Room entities, `ReverseTutorDatabase`, `DatabaseSchema`, store implementations, SQL, schema JSON, or Keystore secrets.
+3. Do not change `DatabaseSchema.version`, Room entities, DAO queries, exported schema JSON, protocol schemas, import/export payloads, background-generation persistence, or secret-storage behavior as part of UI work.
+4. Do not change `BackgroundGenerationRepository` token/session isolation, `NativeImportRepository` overwrite/new-space semantics, `NativeExportRepository` secret redaction, or `SecretStore` encryption/storage policy without a separate backend/data change plan and tests.
+5. Keep visible UI copy Chinese-first for native frontend redesign, but map Chinese labels in the UI layer; do not rename domain enums or protocol wire values for display text.
 
 ## Execution Rules
 

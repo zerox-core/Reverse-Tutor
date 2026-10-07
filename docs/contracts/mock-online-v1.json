@@ -1,0 +1,179 @@
+{
+  "_meta": {
+    "fixtureOnly": true,
+    "description": "Deterministic contract values only; never load as production credentials."
+  },
+  "authTokens": {
+    "accountId": "00000000-0000-4000-8000-000000000001",
+    "deviceId": "device-fixture-0123456789",
+    "sessionId": "00000000-0000-4000-8000-000000000002",
+    "tokenType": "Bearer",
+    "accessToken": "fixture-access-token",
+    "accessTokenExpiresAtEpochMillis": 1783857900000,
+    "refreshToken": "fixture-refresh-token",
+    "refreshTokenExpiresAtEpochMillis": 1786449000000
+  },
+  "authMe": {
+    "accountId": "00000000-0000-4000-8000-000000000001",
+    "deviceId": "device-fixture-0123456789",
+    "sessionId": "00000000-0000-4000-8000-000000000002",
+    "accountType": "anonymous",
+    "sessionExpiresAtEpochMillis": 1786449000000
+  },
+  "authSessions": {
+    "items": [
+      {
+        "sessionId": "00000000-0000-4000-8000-000000000002",
+        "deviceId": "device-fixture-0123456789",
+        "status": "active",
+        "createdAtEpochMillis": 1783857000000,
+        "expiresAtEpochMillis": 1786449000000,
+        "current": true
+      }
+    ]
+  },
+  "contentFeed": {
+    "version": 28,
+    "updatedAtEpochMillis": 1783857000000,
+    "items": [
+      {
+        "id": "public-028",
+        "slug": "verify-before-opening-links",
+        "type": "public_interest",
+        "title": "别让陌生链接替你做决定",
+        "summary": "三个对话，识别常见网络诈骗",
+        "illustrationTemplate": "dialogue-security-01",
+        "illustrationConfig": {
+          "dialogues": [
+            "这个链接安全吗？",
+            "先核对来源，再决定是否打开。"
+          ],
+          "palette": "cool-blue-amber"
+        },
+        "cover": null,
+        "publisherName": "Reverse Tutor 公益编辑部",
+        "publishedAtEpochMillis": 1783814400000,
+        "contentVersion": 2
+      }
+    ],
+    "nextCursor": null
+  },
+  "contentDetail": {
+    "id": "public-028",
+    "slug": "verify-before-opening-links",
+    "type": "public_interest",
+    "title": "别让陌生链接替你做决定",
+    "summary": "三个对话，识别常见网络诈骗",
+    "illustrationTemplate": "dialogue-security-01",
+    "illustrationConfig": {
+      "dialogues": [
+        "这个链接安全吗？",
+        "先核对来源，再决定是否打开。"
+      ],
+      "palette": "cool-blue-amber"
+    },
+    "cover": null,
+    "publisherName": "Reverse Tutor 公益编辑部",
+    "publishedAtEpochMillis": 1783814400000,
+    "contentVersion": 2,
+    "bodyMarkdown": "## 先停一下\n\n核对发送者、域名和页面索取的信息。",
+    "bodyAssets": []
+  },
+  "activityList": {
+    "items": [
+      {
+        "id": "focus-week-2026-07",
+        "title": "七天专注讲解挑战",
+        "description": "连续七天完成一次反向讲解并留下复盘。",
+        "revision": 3,
+        "startsAtEpochMillis": 1783785600000,
+        "endsAtEpochMillis": 1784390400000,
+        "requiresOnlineConfirmation": false,
+        "allowsDeferredProgress": true,
+        "state": "active",
+        "sessionTemplateId": "challenge-focus-week-v1"
+      }
+    ],
+    "nextCursor": null,
+    "updatedAtEpochMillis": 1783857000000
+  },
+  "joinedActivity": {
+    "activityId": "focus-week-2026-07",
+    "userId": "user_demo",
+    "joined": true,
+    "progress": 0,
+    "revision": 1,
+    "state": "joined",
+    "idempotencyKey": "join_focus_week_user_demo"
+  },
+  "syncPush": {
+    "cursor": "42",
+    "items": [
+      {
+        "envelopeId": "env_01JZTEST0001",
+        "entityId": "plan_01JZTEST0001",
+        "accepted": true,
+        "remoteRevision": 4,
+        "errorCode": null,
+        "retryable": false
+      },
+      {
+        "envelopeId": "env_01JZTEST0002",
+        "entityId": "session_private_01",
+        "accepted": false,
+        "remoteRevision": null,
+        "errorCode": "entity_type_not_syncable",
+        "retryable": false
+      }
+    ]
+  },
+  "syncPull": {
+    "cursor": "43",
+    "items": [
+      {
+        "envelopeId": "remote_user_setting_4",
+        "spaceId": "default-space",
+        "entityId": "setting_reduce_motion",
+        "entityType": "user_setting",
+        "ownerId": "user_demo",
+        "deviceId": "device_remote",
+        "revision": 4,
+        "idempotencyKey": "setting_reduce_motion_4",
+        "operation": "upsert",
+        "payload": {
+          "key": "reduceMotion",
+          "value": true
+        },
+        "updatedAtEpochMillis": 1783857000000,
+        "deletedAtEpochMillis": null
+      }
+    ]
+  },
+  "weeklyInsight": {
+    "spaceId": "default-space",
+    "weekStartEpochMillis": 1783353600000,
+    "sourceRevision": 19,
+    "generatorVersion": "online-summary-v1",
+    "summary": "本周完成了 4 次反向讲解，函数与图像分支最活跃。"
+  },
+  "latestRelease": {
+    "versionName": "1.0.0",
+    "versionCode": 100,
+    "minimumSupportedVersionCode": 90,
+    "downloadUrl": "https://cdn.example.com/reverse-tutor-1.0.0.apk",
+    "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  },
+  "error": {
+    "error": {
+      "code": "revision_conflict",
+      "message": "The remote revision is newer.",
+      "retryable": false,
+      "userAction": "resolve_conflict",
+      "requestId": "req_01JZTESTERROR",
+      "details": {
+        "entityId": "plan_01JZTEST0001",
+        "remoteRevision": 5
+      }
+    }
+  }
+}

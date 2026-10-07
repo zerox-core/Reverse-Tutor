@@ -19,20 +19,26 @@ import com.reversetutor.core.data.local.entity.SessionSettingsEntity
 import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
 import com.reversetutor.core.data.local.entity.SpaceEntity
+import com.reversetutor.core.data.local.entity.WorldTreeDraftEntity
+import com.reversetutor.core.data.local.entity.WorldTreeSectionEntity
+import com.reversetutor.core.data.local.entity.WorldTreeSourceCrossRef
 import com.reversetutor.core.data.local.entity.toDomain
 import com.reversetutor.core.data.local.entity.toEntity
 import com.reversetutor.core.model.Space
 import com.reversetutor.core.model.SpaceKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SchemaPolicyTest {
     @Test
-    fun databaseSchemaStartsAtVersionOneAndExportsSchema() {
-        assertEquals(1, DatabaseSchema.version)
+    fun databaseSchemaExportsVersionNineteenWithCompleteMigrationChain() {
+        assertEquals(19, DatabaseSchema.version)
         assertTrue(DatabaseSchema.exportSchema)
-        assertTrue(DatabaseSchema.migrations.isEmpty())
+        assertEquals(18, DatabaseSchema.migrations.size)
+        assertEquals(listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18), DatabaseSchema.migrations.map { it.startVersion })
+        assertEquals(listOf(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19), DatabaseSchema.migrations.map { it.endVersion })
     }
 
     @Test
@@ -54,7 +60,8 @@ class SchemaPolicyTest {
             SourceChunkEntity::class.java,
             BackgroundJobEntity::class.java,
             ImportBatchEntity::class.java,
-            ExportRecordEntity::class.java
+            ExportRecordEntity::class.java,
+            WorldTreeDraftEntity::class.java
         )
 
         entityTypes.forEach { entityType ->
@@ -63,6 +70,24 @@ class SchemaPolicyTest {
                 entityType.declaredFields.any { it.name == "spaceId" }
             )
         }
+    }
+
+    @Test
+    fun backgroundJobPolicySnapshotRemainsOptionalForLegacyRows() {
+        val policyPayload = BackgroundJobEntity::class.java.declaredFields
+            .firstOrNull { it.name == "sessionPolicyPayload" }
+        assertTrue(policyPayload != null)
+        assertTrue(policyPayload?.type == String::class.java)
+    }
+
+    @Test
+    fun worldTreeChildrenDeriveSpaceOwnershipFromDraft() {
+        assertFalse(
+            WorldTreeSectionEntity::class.java.declaredFields.any { it.name == "spaceId" }
+        )
+        assertFalse(
+            WorldTreeSourceCrossRef::class.java.declaredFields.any { it.name == "spaceId" }
+        )
     }
 
     @Test

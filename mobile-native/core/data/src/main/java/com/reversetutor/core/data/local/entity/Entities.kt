@@ -9,6 +9,7 @@ import com.reversetutor.core.model.MessageQuote
 import com.reversetutor.core.model.MessageRole
 import com.reversetutor.core.model.Anchor
 import com.reversetutor.core.model.ErrorLog
+import com.reversetutor.core.model.ErrorLogOrigin
 import com.reversetutor.core.model.GraphEdge
 import com.reversetutor.core.model.GraphNode
 import com.reversetutor.core.model.GraphNodeKind
@@ -33,7 +34,10 @@ data class SpaceEntity(
     val sourceImportId: String? = null
 )
 
-@Entity(tableName = "sessions", indices = [Index("spaceId"), Index("updatedAtEpochMillis")])
+@Entity(
+    tableName = "sessions",
+    indices = [Index("spaceId"), Index("updatedAtEpochMillis"), Index("modelBindingId")]
+)
 data class SessionEntity(
     @PrimaryKey val id: String,
     val spaceId: String,
@@ -43,6 +47,7 @@ data class SessionEntity(
     val pinned: Boolean = false,
     val archived: Boolean = false,
     val llmProfileId: String? = null,
+    val modelBindingId: String? = llmProfileId,
     val settingsId: String? = null,
     val sourceImportId: String? = null
 )
@@ -56,7 +61,9 @@ data class MessageEntity(
     val text: String,
     val createdAtEpochMillis: Long,
     val parentMessageId: String? = null,
-    val sourceImportId: String? = null
+    val sourceImportId: String? = null,
+    /** Expression-loop slice 4: leading first-person monologue (thinking drawer). */
+    val monologue: String? = null
 )
 
 @Entity(tableName = "message_attachments", indices = [Index("spaceId"), Index("messageId")])
@@ -93,12 +100,16 @@ data class LlmProfileEntity(
     val enabled: Boolean = true
 )
 
-@Entity(tableName = "session_settings", indices = [Index("spaceId"), Index("sessionId")])
+@Entity(
+    tableName = "session_settings",
+    indices = [Index("spaceId"), Index("sessionId"), Index("modelBindingId")]
+)
 data class SessionSettingsEntity(
     @PrimaryKey val id: String,
     val spaceId: String,
     val sessionId: String,
     val llmProfileId: String? = null,
+    val modelBindingId: String? = llmProfileId,
     val systemPrompt: String? = null
 )
 
@@ -123,7 +134,10 @@ data class NoteEntity(
     val sourceMessageId: String? = null
 )
 
-@Entity(tableName = "error_logs", indices = [Index("spaceId")])
+@Entity(
+    tableName = "error_logs",
+    indices = [Index("spaceId"), Index(value = ["spaceId", "origin", "createdAtEpochMillis"])]
+)
 data class ErrorLogEntity(
     @PrimaryKey val id: String,
     val spaceId: String,
@@ -131,7 +145,9 @@ data class ErrorLogEntity(
     val detail: String,
     val createdAtEpochMillis: Long,
     val sourceMessageId: String? = null,
-    val resolved: Boolean = false
+    val resolved: Boolean = false,
+    val origin: String = ErrorLogOrigin.Learning.name,
+    val code: String? = null
 )
 
 @Entity(tableName = "memory_items", indices = [Index("spaceId")])
@@ -188,7 +204,11 @@ data class SourceChunkEntity(
     val sourceId: String,
     val chunkIndex: Int,
     val text: String,
-    val tokenEstimate: Int? = null
+    val tokenEstimate: Int? = null,
+    /** NEWMP-V1-024: optional local embedding vector for semantic retrieval. */
+    val embedding: ByteArray? = null,
+    /** 1e: which model produced [embedding]; null = legacy rows (pre-v19). */
+    val embeddingModel: String? = null
 )
 
 @Entity(tableName = "background_jobs", indices = [Index("spaceId"), Index("sessionId"), Index("status")])
@@ -199,8 +219,92 @@ data class BackgroundJobEntity(
     val status: String,
     val createdAtEpochMillis: Long,
     val sessionId: String? = null,
+    val startedAtEpochMillis: Long? = null,
     val completedAtEpochMillis: Long? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val userMessageId: String? = null,
+    val userText: String? = null,
+    val generationToken: String? = null,
+    val modelBindingId: String? = null,
+    val quoteExcerpt: String? = null,
+    val imageAttachmentsPayload: String? = null,
+    val contextEvidencePayload: String? = null,
+    val sessionPolicyPayload: String? = null,
+    val assistantTurnEnvelopePayload: String? = null
+)
+
+// ---------------------------------------------------------------------------
+// Session document / rich-reply artifacts (P6 10 -> 11).
+// These rows store validated user-visible content and opaque handles only.
+// ---------------------------------------------------------------------------
+
+@Entity(tableName = "assistant_reply_artifacts", indices = [Index("sessionId")])
+data class AssistantReplyArtifactEntity(
+    @PrimaryKey val assistantMessageId: String,
+    val sessionId: String,
+    val blocksPayload: String,
+    val evidenceReferencesPayload: String,
+    val toolResultsPayload: String,
+    val checkPlanPayload: String? = null,
+    val createdAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_documents", indices = [Index("spaceId"), Index("sessionId")])
+data class SessionDocumentEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val sessionId: String,
+    val title: String,
+    val kind: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_document_blocks", indices = [Index("documentId")])
+data class SessionDocumentBlockEntity(
+    @PrimaryKey val id: String,
+    val documentId: String,
+    val ordinal: Int,
+    val kind: String,
+    val payload: String,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_tables", indices = [Index("documentId")])
+data class SessionTableEntity(
+    @PrimaryKey val id: String,
+    val documentId: String,
+    val title: String,
+    val createdAtEpochMillis: Long,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "session_table_columns", indices = [Index("tableId")])
+data class SessionTableColumnEntity(
+    @PrimaryKey val id: String,
+    val tableId: String,
+    val ordinal: Int,
+    val name: String,
+    val valueType: String
+)
+
+@Entity(tableName = "session_table_rows", indices = [Index("tableId")])
+data class SessionTableRowEntity(
+    @PrimaryKey val id: String,
+    val tableId: String,
+    val rowKey: String,
+    val cellsPayload: String,
+    val updatedAtEpochMillis: Long
+)
+
+@Entity(tableName = "tool_call_receipts", indices = [Index("sessionId"), Index("toolName")])
+data class ToolCallReceiptEntity(
+    @PrimaryKey val callId: String,
+    val sessionId: String,
+    val toolName: String,
+    val status: String,
+    val safeResultPayload: String,
+    val completedAtEpochMillis: Long
 )
 
 @Entity(tableName = "import_batches", indices = [Index("spaceId"), Index("status")])
@@ -258,6 +362,7 @@ fun TutorSession.toEntity(): SessionEntity = SessionEntity(
     pinned = pinned,
     archived = archived,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     settingsId = settingsId,
     sourceImportId = sourceImportId
 )
@@ -271,6 +376,7 @@ fun SessionEntity.toDomain(): TutorSession = TutorSession(
     pinned = pinned,
     archived = archived,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     settingsId = settingsId,
     sourceImportId = sourceImportId
 )
@@ -283,7 +389,8 @@ fun Message.toEntity(): MessageEntity = MessageEntity(
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
     parentMessageId = parentMessageId,
-    sourceImportId = sourceImportId
+    sourceImportId = sourceImportId,
+    monologue = monologue
 )
 
 fun MessageEntity.toDomain(): Message = Message(
@@ -294,7 +401,8 @@ fun MessageEntity.toDomain(): Message = Message(
     text = text,
     createdAtEpochMillis = createdAtEpochMillis,
     parentMessageId = parentMessageId,
-    sourceImportId = sourceImportId
+    sourceImportId = sourceImportId,
+    monologue = monologue
 )
 
 fun MessageAttachment.toEntity(): MessageAttachmentEntity = MessageAttachmentEntity(
@@ -364,6 +472,7 @@ fun SessionSettings.toEntity(): SessionSettingsEntity = SessionSettingsEntity(
     spaceId = spaceId,
     sessionId = sessionId,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     systemPrompt = systemPrompt
 )
 
@@ -372,6 +481,7 @@ fun SessionSettingsEntity.toDomain(): SessionSettings = SessionSettings(
     spaceId = spaceId,
     sessionId = sessionId,
     llmProfileId = llmProfileId,
+    modelBindingId = modelBindingId,
     systemPrompt = systemPrompt
 )
 
@@ -420,7 +530,9 @@ fun ErrorLog.toEntity(): ErrorLogEntity = ErrorLogEntity(
     detail = detail,
     createdAtEpochMillis = createdAtEpochMillis,
     sourceMessageId = sourceMessageId,
-    resolved = resolved
+    resolved = resolved,
+    origin = origin.name,
+    code = code
 )
 
 fun ErrorLogEntity.toDomain(): ErrorLog = ErrorLog(
@@ -430,7 +542,9 @@ fun ErrorLogEntity.toDomain(): ErrorLog = ErrorLog(
     detail = detail,
     createdAtEpochMillis = createdAtEpochMillis,
     sourceMessageId = sourceMessageId,
-    resolved = resolved
+    resolved = resolved,
+    origin = runCatching { ErrorLogOrigin.valueOf(origin) }.getOrDefault(ErrorLogOrigin.Learning),
+    code = code
 )
 
 fun MemoryItem.toEntity(): MemoryItemEntity = MemoryItemEntity(
@@ -494,3 +608,268 @@ fun GraphEdgeEntity.toDomain(): GraphEdge = GraphEdge(
     createdAtEpochMillis = createdAtEpochMillis,
     sourceMemoryId = sourceMemoryId
 )
+
+// ---------------------------------------------------------------------------
+// Window topology (P6 6 -> 7). Window identity == session identity.
+// ---------------------------------------------------------------------------
+
+@Entity(
+    tableName = "windows",
+    indices = [Index("spaceId"), Index("rootId"), Index("parentId")]
+)
+data class WindowEntity(
+    @PrimaryKey val sessionId: String,
+    val spaceId: String,
+    val rootId: String,
+    val parentId: String?,
+    val kind: String,
+    val createdAtEpochMillis: Long
+)
+
+@Entity(tableName = "window_snapshots", indices = [Index("windowId")])
+data class WindowSnapshotEntity(
+    @PrimaryKey val windowId: String,
+    val ancestorRevision: Long,
+    val forkedAtEpochMillis: Long
+)
+
+@Entity(tableName = "window_deltas", indices = [Index("windowId")])
+data class WindowDeltaEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val deltaId: String,
+    val payloadHandle: String,
+    val sourceRevision: Long
+)
+
+@Entity(
+    tableName = "merge_commits",
+    indices = [Index("childId"), Index("parentId"), Index("spaceId")]
+)
+data class MergeCommitEntity(
+    @PrimaryKey val id: String,
+    val childId: String,
+    val parentId: String,
+    val deltaId: String,
+    val sourceRevision: Long,
+    val spaceId: String
+)
+
+// ---------------------------------------------------------------------------
+// Global learning ledger + scope signals (P6 7 -> 8). No raw transcript.
+// ---------------------------------------------------------------------------
+
+@Entity(
+    tableName = "learning_fact_receipts",
+    indices = [Index("spaceId"), Index("knowledgePoint"), Index("sourceWindowId")]
+)
+data class LearningFactReceiptEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val knowledgePoint: String,
+    val evidenceType: String,
+    val result: String,
+    val confidence: Float,
+    val sourceWindowId: String,
+    val sourceTurnId: String,
+    val occurredAtEpochMillis: Long
+) {
+    companion object {
+        /** Only these columns may be persisted; no raw transcript / provider / secret. */
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "spaceId", "knowledgePoint", "evidenceType", "result",
+            "confidence", "sourceWindowId", "sourceTurnId", "occurredAtEpochMillis"
+        )
+    }
+}
+
+@Entity(
+    tableName = "scope_signals",
+    indices = [Index("windowId"), Index("spaceId")]
+)
+data class ScopeSignalEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val spaceId: String,
+    val category: String,
+    val count: Int,
+    val sourceTurnId: String,
+    val occurredAtEpochMillis: Long
+) {
+    companion object {
+        /** Only minimal provenance columns may be persisted; no raw user text. */
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "windowId", "spaceId", "category", "count", "sourceTurnId", "occurredAtEpochMillis"
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Companion memory versions + heartbeat (P6 8 -> 9).
+// Companion memory is root-only; heartbeats are window-keyed (root enabled,
+// child disabled until an explicit enable command). No raw transcript.
+// ---------------------------------------------------------------------------
+
+@Entity(
+    tableName = "companion_memory_versions",
+    indices = [Index("windowId"), Index("spaceId")]
+)
+data class CompanionMemoryVersionEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val spaceId: String,
+    val partition: String,
+    val value: String,
+    val origin: String,
+    val promotedAtEpochMillis: Long,
+    val revision: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "windowId", "spaceId", "partition", "value", "origin",
+            "promotedAtEpochMillis", "revision"
+        )
+    }
+}
+
+@Entity(
+    tableName = "memory_observations",
+    indices = [Index("windowId"), Index("spaceId")]
+)
+data class MemoryObservationEntity(
+    @PrimaryKey val id: String,
+    val windowId: String,
+    val spaceId: String,
+    val domain: String,
+    val partition: String?,
+    val normalizedValue: String,
+    val sourceClass: String,
+    val observedAtEpochMillis: Long,
+    val confidence: Float,
+    val provenanceHandle: String
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "windowId", "spaceId", "domain", "partition", "normalizedValue",
+            "sourceClass", "observedAtEpochMillis", "confidence", "provenanceHandle"
+        )
+    }
+}
+
+@Entity(
+    tableName = "window_heartbeats",
+    indices = [Index("spaceId")]
+)
+data class WindowHeartbeatEntity(
+    @PrimaryKey val windowId: String,
+    val spaceId: String,
+    val enabled: Boolean,
+    val minCooldownMillis: Long,
+    val cooldownUntilEpochMillis: Long = 0L,
+    val pendingJobId: String? = null,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "windowId", "spaceId", "enabled", "minCooldownMillis",
+            "cooldownUntilEpochMillis", "pendingJobId", "updatedAtEpochMillis"
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Window-local memory (V2-004, schema 13 -> 14). Session-scoped structured
+// memory only: observations, evolved active values, intake watermark, and
+// the rolling summary of evicted raw turns. No raw transcript rows.
+// ---------------------------------------------------------------------------
+
+@Entity(tableName = "window_memory_observations", indices = [Index("sessionId")])
+data class WindowMemoryObservationEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val category: String,
+    val slotKey: String,
+    val value: String,
+    val sourceClass: String,
+    val confidence: Double,
+    val salience: String,
+    val occurredAtEpochMillis: Long,
+    val provenanceHandle: String
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "sessionId", "category", "slotKey", "value", "sourceClass",
+            "confidence", "salience", "occurredAtEpochMillis", "provenanceHandle"
+        )
+    }
+}
+
+@Entity(
+    tableName = "window_memory_active_values",
+    primaryKeys = ["sessionId", "category", "slotKey"]
+)
+data class WindowMemoryActiveValueEntity(
+    val sessionId: String,
+    val category: String,
+    val slotKey: String,
+    val value: String,
+    val revision: Long,
+    val weight: Double,
+    val sourceClass: String,
+    val provenanceHandle: String,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "category", "slotKey", "value", "revision", "weight",
+            "sourceClass", "provenanceHandle", "updatedAtEpochMillis"
+        )
+    }
+}
+
+@Entity(tableName = "window_memory_intake_watermarks")
+data class WindowIntakeWatermarkEntity(
+    @PrimaryKey val sessionId: String,
+    val lastProcessedMessageId: String,
+    val lastProcessedEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "lastProcessedMessageId", "lastProcessedEpochMillis"
+        )
+    }
+}
+
+@Entity(tableName = "window_memory_rolling_summaries")
+data class WindowRollingSummaryEntity(
+    @PrimaryKey val sessionId: String,
+    val summary: String,
+    val coversUntilMessageId: String,
+    val updatedAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "sessionId", "summary", "coversUntilMessageId", "updatedAtEpochMillis"
+        )
+    }
+}
+
+// Window-memory token metering (V2-006, schema 14 -> 15). Budget-tuning
+// telemetry for the memory subsystem itself (kept-window size, injected
+// context size); distinct from token_usage_records, which meters individual
+// LLM calls per turn attempt.
+@Entity(tableName = "window_memory_token_meters", indices = [Index("sessionId")])
+data class WindowMemoryTokenMeterEntity(
+    @PrimaryKey val id: String,
+    val sessionId: String,
+    val kind: String,
+    val estimatedTokens: Int,
+    val detail: String,
+    val createdAtEpochMillis: Long
+) {
+    companion object {
+        val ALLOWED_PERSISTED_FIELDS: Set<String> = setOf(
+            "id", "sessionId", "kind", "estimatedTokens", "detail", "createdAtEpochMillis"
+        )
+    }
+}

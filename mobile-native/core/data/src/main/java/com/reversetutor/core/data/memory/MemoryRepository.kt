@@ -6,6 +6,7 @@ import com.reversetutor.core.data.local.entity.toEntity
 import com.reversetutor.core.data.session.SessionRepository
 import com.reversetutor.core.model.Anchor
 import com.reversetutor.core.model.ErrorLog
+import com.reversetutor.core.model.ErrorLogOrigin
 import com.reversetutor.core.model.MemoryItem
 import com.reversetutor.core.model.MemoryItemKind
 import com.reversetutor.core.model.Note
@@ -68,7 +69,9 @@ class MemoryRepository(
         input: ErrorLogInput,
         nowEpochMillis: Long,
         spaceId: String = defaultSpaceId,
-        errorId: String = "error-${UUID.randomUUID()}"
+        errorId: String = "error-${UUID.randomUUID()}",
+        origin: ErrorLogOrigin = ErrorLogOrigin.Learning,
+        code: String? = null
     ): ErrorLog? {
         val normalized = input.normalized() ?: return null
         val error = ErrorLog(
@@ -78,10 +81,15 @@ class MemoryRepository(
             detail = normalized.detail,
             createdAtEpochMillis = nowEpochMillis,
             sourceMessageId = normalized.sourceMessageId,
-            resolved = false
+            resolved = false,
+            origin = origin,
+            code = code?.trim()?.takeIf { it.isNotEmpty() }
         )
         memoryDao.insertError(error.toEntity())
         memoryDao.insertMemoryItem(error.toMemoryItem().toEntity())
+        if (origin == ErrorLogOrigin.Generation) {
+            retainRecentGenerationDiagnostics(spaceId)
+        }
         return error
     }
 
@@ -105,6 +113,22 @@ class MemoryRepository(
         resolved: Boolean
     ): Boolean =
         memoryDao.setErrorResolved(id, resolved) > 0
+
+    private suspend fun retainRecentGenerationDiagnostics(spaceId: String) {
+        memoryDao.listErrorsBySpace(spaceId)
+            .asSequence()
+            .map { it.toDomain() }
+            .filter { it.origin == ErrorLogOrigin.Generation }
+            .drop(MaxGenerationDiagnosticsPerSpace)
+            .forEach { error ->
+                memoryDao.deleteError(error.id)
+                memoryDao.deleteMemoryItem("memory-${error.id}")
+            }
+    }
+
+    private companion object {
+        const val MaxGenerationDiagnosticsPerSpace = 50
+    }
 }
 
 data class MemorySnapshot(

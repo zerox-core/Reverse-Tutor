@@ -165,6 +165,36 @@ class NativeImportRepositoryTest {
     }
 
     @Test
+    fun importedConnectionsAndLegacyProfilesNeverRestoreSecretReferences() = runBlocking {
+        val directStore = FakeNativeImportStore()
+        NativeImportRepository(directStore).importJson(
+            json = connectionBackupJson,
+            sourceFileName = "connections.json",
+            nowEpochMillis = 100L,
+            batchId = "import-connections"
+        )
+
+        assertEquals(
+            null,
+            directStore.writeSet?.providerConnections?.single()?.secretRef
+        )
+
+        val legacyStore = FakeNativeImportStore()
+        NativeImportRepository(legacyStore).importJson(
+            json = legacyProfileBackupJson,
+            sourceFileName = "legacy-profile.json",
+            nowEpochMillis = 100L,
+            batchId = "import-legacy"
+        )
+
+        assertEquals(null, legacyStore.writeSet?.llmProfiles?.single()?.secretRef)
+        assertEquals(
+            null,
+            legacyStore.writeSet?.providerConnections?.single()?.secretRef
+        )
+    }
+
+    @Test
     fun unsafeRecordIsSkippedAndReportedAsPartial() = runBlocking {
         val store = FakeNativeImportStore()
         val repository = NativeImportRepository(store)
@@ -191,6 +221,51 @@ class NativeImportRepositoryTest {
           "created_at":"2026-07-01T00:00:00Z",
           "session":{"id":"session-1","title":"Imported session"},
           "messages":[{"id":"message-1","role":"user","text":"Hello"}]
+        }
+    """.trimIndent()
+
+    private val connectionBackupJson = """
+        {
+          "schema":"reverse_tutor_full_backup_v1",
+          "version":2,
+          "type":"full_backup",
+          "created_at":"2026-07-11T00:00:00Z",
+          "sessions":[],
+          "provider_connections":[{
+            "id":"connection-1",
+            "name":"Provider",
+            "protocol":"OpenAiCompatible",
+            "secret_status":"excluded"
+          }],
+          "model_bindings":[{
+            "id":"binding-1",
+            "connection_id":"connection-1",
+            "model_id":"model-1",
+            "display_name":"Model"
+          }],
+          "graph":{}
+        }
+    """.trimIndent()
+
+    private val legacyProfileBackupJson = """
+        {
+          "schema":"reverse_tutor_full_backup_v1",
+          "version":1,
+          "type":"full_backup",
+          "created_at":"2026-07-01T00:00:00Z",
+          "sessions":[],
+          "llm_profiles":[{
+            "schema":"native_llm_profile_v1",
+            "version":1,
+            "type":"llm_profile",
+            "id":"profile-1",
+            "name":"Legacy profile",
+            "provider":"local",
+            "api_type":"local",
+            "model":"fixture-model",
+            "secret_status":"excluded"
+          }],
+          "graph":{}
         }
     """.trimIndent()
 }

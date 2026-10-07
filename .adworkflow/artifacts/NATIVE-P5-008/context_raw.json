@@ -1,0 +1,320 @@
+{
+  "schema": "ADworkflo.context_raw.v1",
+  "task_id": "NATIVE-P5-008",
+  "source": "codegraph-index",
+  "matched_files": [
+    {
+      "score": 8,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5GraphDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 133,
+      "is_test": false
+    },
+    {
+      "score": 8,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5SourcesDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 79,
+      "is_test": false
+    },
+    {
+      "score": 7,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5ContextHubDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 67,
+      "is_test": false
+    },
+    {
+      "score": 7,
+      "path": "mobile-native/feature/memory/src/test/java/com/reversetutor/feature/memory/KnowledgeGraphUiStateTest.kt",
+      "language": "kotlin",
+      "loc": 161,
+      "is_test": false
+    },
+    {
+      "score": 6,
+      "path": "mobile-native/app/src/main/java/com/reversetutor/preview/shell/SourceImportInputFactory.kt",
+      "language": "kotlin",
+      "loc": 58,
+      "is_test": false
+    },
+    {
+      "score": 6,
+      "path": "mobile-native/app/src/test/java/com/reversetutor/preview/shell/SourceImportInputFactoryTest.kt",
+      "language": "kotlin",
+      "loc": 101,
+      "is_test": false
+    },
+    {
+      "score": 6,
+      "path": "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/KnowledgeGraphModels.kt",
+      "language": "kotlin",
+      "loc": 305,
+      "is_test": false
+    },
+    {
+      "score": 6,
+      "path": "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/KnowledgeGraphPanel.kt",
+      "language": "kotlin",
+      "loc": 465,
+      "is_test": false
+    },
+    {
+      "score": 6,
+      "path": "mobile-native/feature/sources/src/test/java/com/reversetutor/feature/sources/SourcesUiStateTest.kt",
+      "language": "kotlin",
+      "loc": 157,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase4ImportExportDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 145,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/app/src/androidTest/java/com/reversetutor/preview/Phase5MemoryDeviceTest.kt",
+      "language": "kotlin",
+      "loc": 64,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/graph/GraphRepository.kt",
+      "language": "kotlin",
+      "loc": 147,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/main/java/com/reversetutor/core/data/sources/SourceRepository.kt",
+      "language": "kotlin",
+      "loc": 331,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/graph/GraphRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 167,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/data/src/test/java/com/reversetutor/core/data/sources/SourceRepositoryTest.kt",
+      "language": "kotlin",
+      "loc": 194,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/core/model/src/main/java/com/reversetutor/core/model/GraphModels.kt",
+      "language": "kotlin",
+      "loc": 39,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatContextEvidence.kt",
+      "language": "kotlin",
+      "loc": 88,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatContextEvidenceTest.kt",
+      "language": "kotlin",
+      "loc": 143,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubModels.kt",
+      "language": "kotlin",
+      "loc": 269,
+      "is_test": false
+    },
+    {
+      "score": 5,
+      "path": "mobile-native/feature/memory/src/main/java/com/reversetutor/feature/memory/ContextHubScreen.kt",
+      "language": "kotlin",
+      "loc": 457,
+      "is_test": false
+    }
+  ],
+  "matched_symbols": [
+    {
+      "score": 10,
+      "type": "function",
+      "name": "test_mobile_graph_sheet_source_jumps_open_context_anchors",
+      "line": 738,
+      "end_line": 750,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 8,
+      "type": "function",
+      "name": "test_mobile_graph_sheet_can_jump_to_chat_and_edit_source_node",
+      "line": 604,
+      "end_line": 613,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 7,
+      "type": "function",
+      "name": "test_mobile_insights_graph_includes_source_grounded_locked_nodes",
+      "line": 106,
+      "end_line": 114,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 7,
+      "type": "function",
+      "name": "test_mobile_insights_graph_builds_document_outline_branches_from_full_source_text",
+      "line": 130,
+      "end_line": 138,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 7,
+      "type": "function",
+      "name": "test_mobile_source_memory_is_updated_lazily_when_chat_hits_a_node",
+      "line": 215,
+      "end_line": 223,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 6,
+      "type": "function",
+      "name": "test_pwa_context_images_are_imported_through_anchors",
+      "line": 238,
+      "end_line": 247,
+      "file": "tests/test_image_memory.py"
+    },
+    {
+      "score": 6,
+      "type": "function",
+      "name": "test_retrieve_empty_context_without_graph_data",
+      "line": 24,
+      "end_line": 29,
+      "file": "tests/test_kg_retrieval.py"
+    },
+    {
+      "score": 6,
+      "type": "function",
+      "name": "test_mobile_graph_nodes_show_human_readable_analysis_status",
+      "line": 550,
+      "end_line": 557,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 6,
+      "type": "function",
+      "name": "test_mobile_context_anchor_import_accepts_images_as_source_material",
+      "line": 247,
+      "end_line": 259,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 6,
+      "type": "function",
+      "name": "test_mobile_context_image_import_creates_source_anchor",
+      "line": 331,
+      "end_line": 343,
+      "file": "tests/test_mobile_product_experience.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_android_background_llm_plugin_sources_exist_and_are_registered",
+      "line": 24,
+      "end_line": 124,
+      "file": "tests/test_android_background_llm.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_insights_graph_keeps_minimum_canvas_and_slower_gestures",
+      "line": 56,
+      "end_line": 68,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_pdf_sources_are_retrieved_for_each_llm_turn",
+      "line": 117,
+      "end_line": 127,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_insights_graph_summarizes_branch_nodes_when_document_has_no_outline",
+      "line": 160,
+      "end_line": 168,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_partial_visual_documents_still_build_text_graph",
+      "line": 191,
+      "end_line": 200,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_document_import_persists_temporal_source_memory",
+      "line": 203,
+      "end_line": 212,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_graph_organizes_chat_turns_into_learning_digest_nodes",
+      "line": 247,
+      "end_line": 257,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_graph_falls_back_to_chat_fragments_for_light_chat_only_sessions",
+      "line": 260,
+      "end_line": 277,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_graph_sheet_opens_chat_fragment_nodes_without_changing_sheet_layout",
+      "line": 280,
+      "end_line": 293,
+      "file": "tests/test_mobile_persistence.py"
+    },
+    {
+      "score": 5,
+      "type": "function",
+      "name": "test_mobile_graph_topic_labels_are_cleaned_for_display",
+      "line": 583,
+      "end_line": 589,
+      "file": "tests/test_mobile_persistence.py"
+    }
+  ],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "warnings": []
+}

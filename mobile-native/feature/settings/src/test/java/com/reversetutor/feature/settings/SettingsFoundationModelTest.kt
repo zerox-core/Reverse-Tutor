@@ -33,10 +33,10 @@ class SettingsFoundationModelTest {
             )
         )
 
-        assertEquals("Focus", state.themeLabel)
-        assertEquals("Hidden", state.avatarVisibilityLabel)
+        assertEquals("专注", state.themeLabel)
+        assertEquals("隐藏", state.avatarVisibilityLabel)
         assertEquals(
-            listOf("Review weak concepts", "Empty memo slot", "Draft question"),
+            listOf("Review weak concepts", "空白备忘", "Draft question"),
             state.memoPreviewLines
         )
     }
@@ -49,9 +49,9 @@ class SettingsFoundationModelTest {
             versionCode = 1
         )
 
-        assertEquals("Reverse Tutor Native Preview", diagnostics.appName)
+        assertEquals("Reverse Tutor Native 预览", diagnostics.appName)
         assertEquals("com.reversetutor.preview", diagnostics.packageName)
-        assertTrue(diagnostics.lines.any { it.contains("Local-first Android data") })
+        assertTrue(diagnostics.lines.any { it.contains("本地优先 Android 数据") })
         assertFalse(diagnostics.containsPwaInstallHints())
     }
 
@@ -63,6 +63,18 @@ class SettingsFoundationModelTest {
         assertFalse(state.canConfirm("wipe"))
         assertFalse(state.canConfirm(" WIPE all "))
         assertTrue(state.canConfirm(" WIPE "))
+    }
+
+    @Test
+    fun localDataWipeUsesDangerCopyForA2Confirmation() {
+        val state = LocalDataWipeUiState()
+
+        assertEquals("擦除本地数据？", state.confirmationTitle)
+        assertEquals("确认擦除", state.confirmLabel)
+        assertEquals("取消", state.dismissLabel)
+        assertTrue(state.confirmationBody.contains("会话"))
+        assertTrue(state.confirmationBody.contains("Memory"))
+        assertTrue(state.confirmationBody.contains("不可撤销"))
     }
 
     @Test
@@ -86,20 +98,20 @@ class SettingsFoundationModelTest {
 
         assertEquals("session.json", state.selectedFileName)
         assertEquals(NativeImportMode.NewSpace, state.selectedMode)
-        assertEquals("New space", state.modeLabel)
+        assertEquals("导入到新空间", state.modeLabel)
         assertEquals("reverse_tutor_session_export_v1", state.schemaLabel)
-        assertEquals("Dry run", state.statusLabel)
-        assertEquals("Source file: session.json", state.sourceFileLabel)
-        assertEquals("Document: Session export", state.documentTypeLabel)
-        assertEquals("Detect: reverse_tutor_session_export_v1", state.detectStepLabel)
-        assertEquals("Validate: ready", state.validationStepLabel)
-        assertEquals("Target space: new imported space", state.targetSpaceLabel)
+        assertEquals("试运行完成", state.statusLabel)
+        assertEquals("来源文件：session.json", state.sourceFileLabel)
+        assertEquals("文档：会话导出", state.documentTypeLabel)
+        assertEquals("识别：reverse_tutor_session_export_v1", state.detectStepLabel)
+        assertEquals("校验：可导入", state.validationStepLabel)
+        assertEquals("目标空间：新导入空间", state.targetSpaceLabel)
         assertTrue(state.canImport)
-        assertTrue(state.insertedLines.contains("sessions: 1"))
-        assertTrue(state.skippedLines.contains("messages: 0"))
-        assertTrue(state.failedLines.contains("records: 0"))
-        assertTrue(state.apiKeyHandlingLabel.contains("API keys"))
-        assertTrue(state.nextActionLines.any { it.contains("write") })
+        assertTrue(state.insertedLines.contains("sessions：1"))
+        assertTrue(state.skippedLines.contains("messages：0"))
+        assertTrue(state.failedLines.contains("记录：0"))
+        assertTrue(state.apiKeyHandlingLabel.contains("API Key"))
+        assertTrue(state.nextActionLines.any { it.contains("写入") })
         assertTrue(state.protocolJson?.contains("native_import_result_v1") == true)
     }
 
@@ -108,7 +120,7 @@ class SettingsFoundationModelTest {
         val state = ImportPipelineUiState.idle(NativeImportMode.Overwrite)
 
         assertEquals(NativeImportMode.Overwrite, state.selectedMode)
-        assertEquals("Overwrite", state.modeLabel)
+        assertEquals("覆盖当前空间", state.modeLabel)
         assertEquals("OVERWRITE", ImportPipelineUiState.overwriteConfirmationPhrase)
         assertFalse(state.canImport)
     }
@@ -135,18 +147,18 @@ class SettingsFoundationModelTest {
             )
         )
 
-        assertEquals("Full backup", ready.kindLabel)
-        assertEquals("Document: Full backup", ready.documentLabel)
+        assertEquals("完整备份", ready.kindLabel)
+        assertEquals("文档：完整备份", ready.documentLabel)
         assertEquals("backup.json", ready.targetFileName)
-        assertEquals("Export ready", ready.statusLabel)
-        assertTrue(ready.keyHandlingLabel.contains("excluded"))
-        assertTrue(ready.summaryLines.contains("sessions: 0"))
-        assertTrue(ready.nextActionLines.contains("Share export"))
+        assertEquals("导出已准备", ready.statusLabel)
+        assertTrue(ready.keyHandlingLabel.contains("脱敏"))
+        assertTrue(ready.summaryLines.contains("会话：0"))
+        assertTrue(ready.nextActionLines.contains("共享导出"))
         assertTrue(ready.canShareOrSave)
 
         val unavailable = ExportPipelineUiState.unavailable("Open a session first.")
 
-        assertEquals("Export unavailable", unavailable.statusLabel)
+        assertEquals("导出不可用", unavailable.statusLabel)
         assertFalse(unavailable.canShareOrSave)
         assertTrue(unavailable.errors.single().contains("Open a session"))
     }
@@ -160,9 +172,9 @@ class SettingsFoundationModelTest {
         assertFalse(preview.shouldShow)
         assertTrue(unseenReplacement.shouldShow)
         assertFalse(seenReplacement.shouldShow)
-        assertTrue(unseenReplacement.body.contains("export JSON"))
-        assertTrue(unseenReplacement.body.contains("Direct IndexedDB migration is not used"))
-        assertTrue(unseenReplacement.body.contains("API keys are not imported"))
-        assertTrue(unseenReplacement.body.contains("append, overwrite, or new space"))
+        assertTrue(unseenReplacement.body.contains("JSON"))
+        assertTrue(unseenReplacement.body.contains("不会直接迁移 IndexedDB"))
+        assertTrue(unseenReplacement.body.contains("不会导入 API Key"))
+        assertTrue(unseenReplacement.body.contains("追加、覆盖或新空间"))
     }
 }

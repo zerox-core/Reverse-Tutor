@@ -1,0 +1,32 @@
+{
+  "task_id": "NATIVE-HYBRID-PROD-001",
+  "status": "passed",
+  "commands": [
+    ".\\gradlew.bat :core:llm:testDebugUnitTest :core:remote:testDebugUnitTest :core:data:testDebugUnitTest :app:testDebugUnitTest --no-daemon --stacktrace",
+    ".\\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace",
+    "py -m pytest tests/test_online_hybrid_api.py -q",
+    "py -m pytest -q --ignore=tests/test_project_homepage.py",
+    "git diff --check",
+    "static architecture boundary rg checks"
+  ],
+  "passed": [
+    "Targeted native production integration tests passed.",
+    "331 JVM tests passed with 0 failures and 0 errors.",
+    "Lint reports for 11 native modules contained 0 errors.",
+    "Debug APK assembled at mobile-native/app/build/outputs/apk/debug/app-debug.apk.",
+    "Online hybrid API tests passed: 7 passed.",
+    "Python regression passed: 429 passed.",
+    "No production FakeLlmGenerationRuntime use was found in app or core data main source.",
+    "No Compose shell or feature main source imported Room entities, DAOs, or HTTP transports.",
+    "Export and import paths explicitly exclude secretRef values."
+  ],
+  "failed": [],
+  "not_run": [
+    "Real provider calls, because automated verification must not use user credentials or external paid endpoints.",
+    "Connected Android instrumentation, because the production integration acceptance checks were covered by JVM, lint, assemble, and prior focused device verification."
+  ],
+  "notes": [
+    "The combined Gradle command exceeded the shell timeout during finalization, but test XML, lint XML, process completion, and the APK timestamp confirmed successful completion.",
+    "A clean-worktree build check was attempted and correctly identified the pre-existing uncommitted Figma UI baseline dependency."
+  ]
+}

@@ -2,6 +2,7 @@ package com.reversetutor.feature.chat
 
 import com.reversetutor.core.data.message.MessageQuoteDraft
 import com.reversetutor.core.data.message.MessageRecord
+import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.Message
 import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageQuote
@@ -58,10 +59,42 @@ class ChatUiStateTest {
         )
 
         assertEquals("Algebra", state.sessionTitle)
-        assertEquals(listOf("Assistant", "You"), state.messages.map { it.roleLabel })
-        assertEquals("Replying to: Factor x^2 - 4", state.messages.last().quoteLabel)
-        assertEquals(listOf("Image: question.png"), state.messages.last().attachmentLabels)
+        assertEquals("林澈", state.learnerName)
+        assertEquals("正在理解函数", state.learnerStatus)
+        assertEquals("基础语法 / 函数 / 参数与返回值", state.contextPath)
+        assertEquals(listOf("林澈", "我"), state.messages.map { it.roleLabel })
+        assertEquals("正在回复：Factor x^2 - 4", state.messages.last().quoteLabel)
+        assertEquals(listOf("图片：question.png"), state.messages.last().attachmentLabels)
+        assertEquals("content://images/question.png", state.messages.last().attachments.single().uri)
+        assertTrue(state.messages.last().attachments.single().isImage)
         assertEquals(listOf("space-1", "space-1"), state.messages.map { it.spaceId })
+    }
+
+    @Test
+    fun inherited_timeline_item_is_marked_read_only() {
+        val state = ChatUiState.fromTimeline(
+            sessionTitle = "Algebra",
+            entries = listOf(
+                WindowVisibleTimelineEntry(
+                    id = "parent-message",
+                    spaceId = "space-1",
+                    role = MessageRole.Assistant,
+                    text = "Inherited",
+                    createdAtEpochMillis = 10L,
+                    attachmentLabels = emptyList(),
+                    attachments = emptyList(),
+                    quoteLabel = null,
+                    origin = WindowTimelineOrigin.INHERITED_READ_ONLY
+                )
+            ),
+            composer = ChatComposerState(text = "")
+        )
+
+        val item = state.messages.single()
+        assertTrue(item.inheritedReadOnly)
+        assertFalse(ChatMessageActionPolicy.actionsFor(item).contains(ChatMessageAction.Delete))
+        assertFalse(ChatMessageActionPolicy.actionsFor(item).contains(ChatMessageAction.Remember))
+        assertFalse(ChatMessageActionPolicy.actionsFor(item).contains(ChatMessageAction.Quote))
     }
 
     @Test
@@ -104,23 +137,19 @@ class ChatUiStateTest {
     }
 
     @Test
-    fun actionModelKeepsOnlyRegenerateDeferredAfterNotePersistenceLands() {
+    fun actionModelMatchesTask3BLongPressContract() {
         assertEquals(
-            listOf("Quote", "Note", "Regenerate", "Delete"),
+            listOf("复制", "引用回复", "记住这条", "定位关联资料", "删除消息"),
             ChatMessageAction.entries.map { it.label }
-        )
-        assertEquals(
-            listOf(ChatMessageAction.Regenerate),
-            ChatMessageAction.entries.filter { it.deferred }
         )
     }
 
     @Test
     fun generationStateSummarizesNoModelPendingAndFailureStates() {
-        assertEquals("No model configured", ChatGenerationUiState.NoModel.statusLabel)
-        assertEquals("Generating reply...", ChatGenerationUiState.Pending.statusLabel)
+        assertEquals("未配置模型", ChatGenerationUiState.NoModel.statusLabel)
+        assertEquals("正在生成回复...", ChatGenerationUiState.Pending.statusLabel)
         assertEquals(
-            "Provider failed: Timeout",
+            "生成失败：Timeout",
             ChatGenerationUiState.Failure("Timeout").statusLabel
         )
 
@@ -132,7 +161,187 @@ class ChatUiStateTest {
         )
 
         assertEquals(ChatGenerationUiState.NoModel, state.generation)
-        assertEquals("No model configured", state.generationStatusLabel)
+        assertEquals("未配置模型", state.generationStatusLabel)
+    }
+
+    @Test
+    fun productionUiStateConsumesCurrentSessionLearnerIdentityAndAvatarLayout() {
+        val snapshot = NewSessionConfiguration(
+            learnerRole = "会追问的学生",
+            learnerDisplayName = "小概",
+            learnerImageRef = "content://avatar/current",
+            avatarVisible = false
+        )
+
+        val state = buildChatRouteUiState(
+            sessionTitle = "概率论",
+            records = listOf(MessageRecord(message("assistant-1", MessageRole.Assistant, "为什么？", 1L), quote = null)),
+            composer = ChatComposerState(""),
+            generation = ChatGenerationUiState.Idle,
+            learnerRoleFallback = "fallback",
+            sessionSnapshot = snapshot
+        )
+
+        assertEquals("小概", state.learnerName)
+        assertEquals("content://avatar/current", state.learnerImageRef)
+        assertFalse(state.avatarVisible)
+        assertFalse(state.reserveAvatarSpace)
+        assertEquals("小概", state.messages.single().roleLabel)
+    }
+
+    @Test
+    fun avatarReferenceParserAcceptsContentUrisAndRejectsBareResourceNumbers() {
+        val contentState = buildChatRouteUiState(
+            sessionTitle = "会话",
+            records = emptyList(),
+            composer = ChatComposerState(""),
+            generation = ChatGenerationUiState.Idle,
+            learnerRoleFallback = "fallback",
+            sessionSnapshot = NewSessionConfiguration(learnerImageRef = "content://avatar/current")
+        )
+        val bareNumberState = contentState.copy(learnerImageRef = "2131230890")
+
+        assertEquals(
+            LearnerAvatarReference.ContentUri("content://avatar/current"),
+            contentState.learnerAvatarReference
+        )
+        assertNull(bareNumberState.learnerAvatarReference)
+    }
+
+    @Test
+    fun recoveredRecordsRenderInChronologicalOrderWithSnapshotAssistantName() {
+        val snapshot = NewSessionConfiguration(learnerDisplayName = "小概", learnerRole = "会追问的学生")
+        val state = ChatUiState.from(
+            sessionTitle = "Algebra",
+            records = listOf(
+                MessageRecord(message("user-2", MessageRole.User, "second", 40L), quote = null),
+                MessageRecord(message("assistant-1", MessageRole.Assistant, "first", 10L), quote = null),
+                MessageRecord(message("user-1", MessageRole.User, "third", 60L), quote = null)
+            ),
+            composer = ChatComposerState(text = ""),
+            sessionSnapshot = snapshot
+        )
+
+        assertEquals(listOf("assistant-1", "user-2", "user-1"), state.messages.map { it.id })
+        assertEquals(listOf("小概", "我", "我"), state.messages.map { it.roleLabel })
+    }
+
+    @Test
+    fun queuedAndRunningJobsMapToPendingGenerationState() {
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Queued, errorMessage = null)
+        )
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Running, errorMessage = null)
+        )
+    }
+
+    @Test
+    fun runningJobWithPreviewMapsToStreamingGenerationState() {
+        assertEquals(
+            ChatGenerationUiState.Streaming("我们一起看看这道题"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                preview = "我们一起看看这道题"
+            )
+        )
+        // 空白预览 = 还没有增量文本，退回等待态
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Running, errorMessage = null, preview = "  ")
+        )
+        // Queued 与终态不透出预览：完整回复只由持久化消息发布一次
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Queued, errorMessage = null, preview = "部分文本")
+        )
+        assertEquals(
+            ChatGenerationUiState.Idle,
+            backgroundGenerationUiState(BackgroundJobStatus.Completed, errorMessage = null, preview = "部分文本")
+        )
+    }
+
+    @Test
+    fun runningJobWithMonologueOnlyStreamsDrawerBeforeBody() {
+        // 2026-09-21 思考链流式透出：独白先于正文到达也进 Streaming，抽屉先上屏。
+        assertEquals(
+            ChatGenerationUiState.Streaming("", "我卡在货币乘数这"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                monologue = "我卡在货币乘数这"
+            )
+        )
+    }
+
+    @Test
+    fun runningJobWithBodyAndMonologueCarriesBoth() {
+        assertEquals(
+            ChatGenerationUiState.Streaming("我们一起看看这道题", "我卡在货币乘数这"),
+            backgroundGenerationUiState(
+                BackgroundJobStatus.Running,
+                errorMessage = null,
+                preview = "我们一起看看这道题",
+                monologue = "我卡在货币乘数这"
+            )
+        )
+        // 空白独白等价于没有独白。
+        assertEquals(
+            ChatGenerationUiState.Pending,
+            backgroundGenerationUiState(BackgroundJobStatus.Running, errorMessage = null, monologue = "  ")
+        )
+    }
+
+    @Test
+    fun noModelFailureMapsToNoModelGenerationState() {
+        assertEquals(
+            ChatGenerationUiState.NoModel,
+            backgroundGenerationUiState(BackgroundJobStatus.Failed, errorMessage = "No model configured")
+        )
+    }
+
+    @Test
+    fun otherFailuresOnlyShowWhiteListedSafeLabels() {
+        val sensitive = "java.net.SocketTimeoutException: connect timed out " +
+            "GET https://api.example.test/v1/chat Authorization: Bearer sk-live-9f8e7d6c"
+        val label = backgroundGenerationUiState(BackgroundJobStatus.Failed, errorMessage = sensitive)
+            .statusLabel.orEmpty()
+
+        assertEquals("生成失败：后台生成失败", label)
+        assertFalse(label.contains("https://"))
+        assertFalse(label.contains("Authorization"))
+        assertFalse(label.contains("sk-"))
+        assertFalse(label.contains("Exception"))
+
+        assertEquals(
+            "生成失败：生成失败，请稍后重试",
+            backgroundGenerationUiState(BackgroundJobStatus.Failed, errorMessage = "background_generation_failed").statusLabel
+        )
+        assertEquals(
+            "生成失败：会话不可用，生成已取消",
+            backgroundGenerationUiState(BackgroundJobStatus.Failed, errorMessage = "Session is unavailable").statusLabel
+        )
+    }
+
+    @Test
+    fun reenteringASessionCarriesOnlyThatSessionsMessages() {
+        val previousSessionState = ChatUiState.from(
+            sessionTitle = "旧会话",
+            records = listOf(MessageRecord(message("old-1", MessageRole.User, "上一会话消息", 10L), quote = null)),
+            composer = ChatComposerState(text = "")
+        )
+
+        val reenteredState = ChatUiState.from(
+            sessionTitle = "新会话",
+            records = listOf(MessageRecord(message("new-1", MessageRole.User, "本会话消息", 20L), quote = null)),
+            composer = ChatComposerState(text = "")
+        )
+
+        assertTrue(reenteredState.messages.none { it.id in previousSessionState.messages.map { item -> item.id } })
+        assertEquals(listOf("new-1"), reenteredState.messages.map { it.id })
     }
 
     private fun message(

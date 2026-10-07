@@ -130,7 +130,7 @@ async def ping() -> dict[str, Any]:
         raw = await _provider_chat(
             "You are a connectivity check. Respond with JSON {\"ok\":true}.",
             [{"role": "user", "content": "ping"}],
-            temperature=0.0, max_tokens=20,
+            temperature=0.0, max_tokens=600 if _is_reasoning_deepseek(active) else 20,
         )
         parsed = _extract_json(raw)
         return {"ok": True, "mode": active["mode"], "model": active["model"], "sample": parsed}
@@ -151,6 +151,8 @@ async def chat_json(
     active = _active_config()
     if not active:
         return _mock_response(system, messages)
+    if _is_reasoning_deepseek(active):
+        max_tokens = max(max_tokens, 4096)  # reasoning models burn budget on CoT; small caps truncate the JSON
     try:
         raw = await _provider_chat(system, messages, temperature, max_tokens)
     except Exception:
@@ -223,7 +225,7 @@ async def _openai_chat(
         "Authorization": f"Bearer {config['api_key']}",
         "Content-Type": "application/json",
     }
-    payload = _build_openai_payload(system, messages, temperature, max_tokens, json_mode=True, config=config)
+    payload = _build_openai_payload(system, messages, temperature, max_tokens, json_mode=True, prefill_json=True, config=config)
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             r = await client.post(url, json=payload, headers=headers)
@@ -247,6 +249,8 @@ async def _openai_chat(
             raise LLMError(f"LLM request failed: {e}") from e
     data = _response_json(r, "LLM")
     content = _content_from_openai_data(data)
+    if content.strip() and not content.lstrip().startswith("{"):
+        content = "{" + content.lstrip()  # some providers do not echo the prefilled {
     if content.strip():
         return content
 
@@ -255,7 +259,7 @@ async def _openai_chat(
         + "\n\nIMPORTANT: Return only one valid JSON object. Do not use markdown. "
         + "Do not output explanations before or after the JSON."
     )
-    retry_payload = _build_openai_payload(retry_system, messages, temperature, max_tokens, json_mode=False, config=config)
+    retry_payload = _build_openai_payload(retry_system, messages, temperature, max_tokens, json_mode=False, prefill_json=True, config=config)
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             r = await client.post(url, json=retry_payload, headers=headers)
@@ -264,10 +268,17 @@ async def _openai_chat(
             raise LLMError(f"LLM request failed after empty-content retry: {e}") from e
     retry_data = _response_json(r, "LLM retry")
     retry_content = _content_from_openai_data(retry_data)
+    if retry_content.strip() and not retry_content.lstrip().startswith("{"):
+        retry_content = "{" + retry_content.lstrip()
     if retry_content.strip():
         return retry_content
 
     return _raise_empty_content(retry_data)
+
+
+def _is_reasoning_deepseek(config: dict[str, str] | None = None) -> bool:
+    name = ((config or {}).get("model") or "").lower()
+    return "deepseek" in name and any(k in name for k in ("flash", "v4", "reasoner", "r1"))
 
 
 def _build_openai_payload(
@@ -278,11 +289,16 @@ def _build_openai_payload(
     *,
     json_mode: bool,
     config: dict[str, str] | None = None,
+    prefill_json: bool = False,
 ) -> dict[str, Any]:
     config = config or _active_config() or {"model": LLM_MODEL}
+    msgs = [{"role": "system", "content": system}, *messages]
+    if prefill_json and not _is_reasoning_deepseek(config):  # 推理系 DeepSeek（V4/flash/reasoner）带 prefill 会把英文思考链写进 content 致 JSON 解析失败；不带 prefill 推理进 reasoning_content（probe 2026-10-07）
+        # DeepSeek json_object mode returns pure whitespace on the full engine prompt; assistant prefill { forces JSON start (probe 2026-10-06, 3/3 parseable)
+        msgs.append({"role": "assistant", "content": "{"})
     payload = {
         "model": config.get("model", LLM_MODEL),
-        "messages": [{"role": "system", "content": system}, *messages],
+        "messages": msgs,
         "temperature": _provider_temperature(temperature),
     }
     if _is_minimax_config(config):

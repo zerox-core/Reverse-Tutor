@@ -2,15 +2,15 @@
 
 ## Current Phase
 
-Phase 4 import/export/prompt foundations are implemented for the internal native preview and `NATIVE-P4-007` has HMA-AL00 / Android 10 device validation evidence. `NATIVE-UX-004` productized the Phase 4 import/export/wipe/prompt UI. `NATIVE-P5-001` adds the Phase 5 Context Hub shell. `NATIVE-P5-005` adds the Source Library foundation. `NATIVE-P5-002` adds memory persistence foundations. `NATIVE-P5-003` adds the native knowledge graph engine. `NATIVE-P5-006` adds image source/chat attachment wiring and complex parser status coverage. `NATIVE-P5-004` adds graph edit/review foundations. `NATIVE-P5-007` now adds memory/source context injection into chat turn planning and visible source references. Replacement readiness is still blocked by Phase 3, graph schema richness/session projection, exact citation/highlight parity, final UI QA, real multimodal provider execution, and Phase 6 parity/device-matrix work.
+Phase 4 import/export/prompt foundations are implemented for the internal native preview and `NATIVE-P4-007` has HMA-AL00 / Android 10 device validation evidence. `NATIVE-UX-004` productized the Phase 4 import/export/wipe/prompt UI. `NATIVE-P5-001` adds the Phase 5 Context Hub shell. `NATIVE-P5-005` adds the Source Library foundation. `NATIVE-P5-002` adds memory persistence foundations. `NATIVE-P5-003` adds the native knowledge graph engine. `NATIVE-P5-006` adds image source/chat attachment wiring and complex parser status coverage. `NATIVE-P5-004` adds graph edit/review foundations. `NATIVE-P5-007` adds memory/source context injection into chat turn planning and visible source references. `NATIVE-UX-005` polishes Phase 5 Context Hub, graph, source, parser-status, and evidence-reference UI patterns. `NATIVE-P5-008` validates the Phase 5 preview slice and updates the graph/source validation matrices. `NATIVE-P3-001` adds Room-backed WorkManager generation jobs with recovery/cancel/fail/discard states, v1-to-v2 schema migration, archived-session isolation, and stale-token late-result rejection. Replacement readiness is still blocked by notifications, diagnostics, graph schema richness/session projection, exact citation/highlight parity, final UI QA, real provider/multimodal execution, and Phase 6 parity/device-matrix work.
 
 ## Current Task
 
-- Task ID: `NATIVE-P5-007`
-- Goal: Integrate memory and source context into chat turn protocol.
+- Task ID: `NATIVE-P3-001`
+- Goal: Implement WorkManager generation jobs with stale/deleted-session isolation.
 - Risk: high
 - Status: completed
-- Next task: Start `NATIVE-UX-005` Phase 5 UI polish, then `NATIVE-P5-008` validation.
+- Next task: Continue with `NATIVE-P3-002` notifications and background settings, then `NATIVE-P3-003` diagnostics/reliability.
 - Mode: orchestrator-with-workers-and-reviewers
 - Project size: large
 - Classification source: product docs explicit native Android migration
@@ -103,6 +103,9 @@ Phase 4 import/export/prompt foundations are implemented for the internal native
 | 2026-07-02 | P5-006 implements image attachment/source status foundations without claiming full multimodal parity. | Chat image selection stores URI/mime/sourceId attachments and creates visible image sources; LLM turns are gated on vision capability; complex formats stay visible as queued parser material. Real provider image bytes, dedicated chat image device smoke, complex parser libraries, and source/memory context injection remain follow-up work. |
 | 2026-07-02 | P5-004 implements graph edit/review foundations without claiming full graph parity. | Session graph can edit node labels/status, mark needs-review/approve/archive/hide/restore, resolve memory-backed review cards, and hand off concrete evidence targets to Chat/Sources labels; Global graph remains read-only. Schema richness, exact target highlighting, semantic deck parity, and true session/global projection remain follow-up work. |
 | 2026-07-02 | P5-007 implements memory/source context injection without claiming full citation parity. | Chat turns now include bounded relevant memory/source evidence, provider payloads carry Context evidence, assistant messages show a visible Sources footer, and missing/partial evidence degrades gracefully. Strict cited_chunk_ids, clickable citations, exact row highlighting, and richer retrieval remain follow-up work. |
+| 2026-07-02 | UX-005 improves Phase 5 UI clarity without closing graph/source parity. | Context Hub now names chat/source evidence references, graph copy names pan/zoom/select/detail/node-list fallback and exposes Reset view, and parser status copy keeps deferred/unsupported/failed files visible and recoverable. |
+| 2026-07-02 | P5-008 validates Phase 5 preview integration without approving replacement readiness. | Source Type Status Matrix and Graph Parity Checklist are updated with current native preview evidence and explicit remaining risks; related P0 blockers stay open for Phase 6. |
+| 2026-07-02 | P3-001 routes chat generation through persisted WorkManager jobs without claiming notification or live-provider readiness. | Generation jobs are stored before execution, Room schema v2 preserves job input/token fields, app chat enqueues unique WorkManager work by persisted job id, and tests reject archived-session and stale-token late writes. Notifications, diagnostics, device migration execution, and live providers remain follow-up work. |
 
 ## Verification Log
 
@@ -310,6 +313,20 @@ Phase 4 import/export/prompt foundations are implemented for the internal native
 | 2026-07-02 | `.\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace` | Passed | Project-level native JVM tests, Android lint, and internal debug APK build passed after P5-004. |
 | 2026-07-02 | `.\gradlew.bat '-Pandroid.testInstrumentationRunnerArguments.class=com.reversetutor.preview.Phase5GraphDeviceTest' :app:connectedDebugAndroidTest --no-daemon --stacktrace` | Passed | `Phase5GraphDeviceTest` passed on HMA-AL00 / Android 10 after graph edit/review and evidence handoff changes. |
 | 2026-07-02 | `aapt dump badging app-debug.apk` | Passed | Confirmed package id remains `com.reversetutor.preview`, versionCode `1`, versionName `0.1.0-native-preview`; no signed/release APK was built. |
+| 2026-07-02 | Focused UX-005 JVM test command | Failed as expected then passed | RED captured missing Context Hub evidence-reference copy and graph interaction/fallback copy; green passed after UX-005 implementation. |
+| 2026-07-02 | `.\gradlew.bat :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace` | Passed | Updated `Phase5GraphDeviceTest` compiled after adding Reset view coverage and extended graph summary matching. |
+| 2026-07-02 | `.\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace` | Passed | Project-level native JVM tests, Android lint, and internal debug APK build passed after UX-005/P5-008. |
+| 2026-07-02 | `aapt dump badging app-debug.apk` | Passed | Confirmed package id remains `com.reversetutor.preview`, versionCode `1`, versionName `0.1.0-native-preview`; no signed/release APK was built. |
+| 2026-07-02 | `ConvertFrom-Json` validation for ADworkflo artifacts and codegraph | Passed | Validated active task/context/worker/verification/review artifacts, UX-005/P5-008 archived artifacts, and `.codegraph/index.json`. |
+| 2026-07-02 | `py -3 F:\CodexHome\skills\ADworkflo\scripts\build_codegraph.py --project F:\xw\reverse-tutor` | Passed | Rebuilt codegraph after UX-005/P5-008; index has 176 files and 34243 source lines. |
+| 2026-07-02 | NATIVE-P3-001 red-first focused tests | Failed as expected | Missing BackgroundGenerationRepository/Outcome, extended job fields, DAO generation queries, Discarded status, and BackgroundGenerationWorker were captured before implementation. |
+| 2026-07-02 | `.\gradlew.bat :core:data:testDebugUnitTest --tests com.reversetutor.core.data.background.BackgroundGenerationRepositoryTest --tests com.reversetutor.core.data.SchemaPolicyTest :core:data:compileDebugAndroidTestKotlin --no-daemon --stacktrace` | Passed | Covers background job enqueue/complete/fail/recover/cancel/discard, archived-session isolation, stale-token late rejection, schema v2 policy, and migration test source compilation. |
+| 2026-07-02 | `.\gradlew.bat :feature:chat:testDebugUnitTest :app:testDebugUnitTest :app:compileDebugKotlin :app:compileDebugAndroidTestKotlin --no-daemon --stacktrace` | Passed | ChatRoute app path compiles after persisted background job enqueue and WorkManager worker wiring. |
+| 2026-07-02 | `.\gradlew.bat test lint :app:assembleDebug --no-daemon --stacktrace` | Passed | Project-level native JVM tests, Android lint, and internal debug APK build passed after P3-001. |
+| 2026-07-02 | `aapt dump badging app-debug.apk` | Passed | Confirmed package id remains `com.reversetutor.preview`, versionCode `1`, versionName `0.1.0-native-preview`; no signed/release APK was built. |
+| 2026-07-02 | `adb devices` | Not run on device | No attached devices were listed; connected migration/background smoke was not run. |
+| 2026-07-02 | `ConvertFrom-Json` validation for ADworkflo artifacts and codegraph | Passed | Validated active task/context/worker/verification/review artifacts, NATIVE-P3-001 archived artifacts, and `.codegraph/index.json`. |
+| 2026-07-02 | `py -3 F:\CodexHome\skills\ADworkflo\scripts\build_codegraph.py --project F:\xw\reverse-tutor` | Passed | Rebuilt codegraph after P3-001; index has 181 files and 35257 source lines. |
 
 ## Risks
 
@@ -351,7 +368,9 @@ Phase 4 import/export/prompt foundations are implemented for the internal native
 | P4-007 instrumentation mistaken for final replacement approval | High | Device validation is single-device internal preview evidence. It closes `LEG-033` only; PWA/Capacitor remains the migration/export source until Phase 6 and explicit user approval. |
 | P5-003 native graph mistaken for full legacy graph parity | High | Keep `LEG-020` and `LEG-025` open until graph edit/review, true session/global scoping, source/memory/chat context integration, gesture QA, and Phase 6 parity/device matrix are complete. |
 | P5-006 image attachment mistaken for full multimodal parity | High | Keep `LEG-018`, `LEG-034`, `LEG-035`, and `LEG-036` open until real provider image byte/base64 handling, dedicated chat image device smoke, persisted URI re-read, complex parser matrix, and source/memory context injection are complete. |
+| P5-008 validation matrix mistaken for replacement approval | High | Matrices now show current Phase 5 evidence and remaining gaps; P0 blockers remain open until Phase 6 parity, device matrix, and explicit approval. |
+| P3-001 background job foundation mistaken for full background parity | High | WorkManager generation jobs and stale/deleted-session isolation are implemented, but notifications, notification settings, diagnostics, live-provider retries, and connected device validation remain open. |
 
 ## Next Action
 
-Continue with `NATIVE-UX-005` Phase 5 UI polish, then `NATIVE-P5-008` validation. Keep PWA/Capacitor as migration/export source until Phase 6 evidence and explicit approval.
+Continue with `NATIVE-P3-002` notifications and background settings, then `NATIVE-P3-003` diagnostics/reliability. Keep PWA/Capacitor as migration/export source until Phase 6 evidence and explicit approval.

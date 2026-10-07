@@ -67,6 +67,9 @@ class ProtocolExportPayloadBuilderTest {
         )
 
         assertEquals(ProtocolDocumentType.FullBackup, payload.documentType)
+        assertTrue(payload.json.contains("\"version\":2"))
+        assertTrue(payload.json.contains("\"provider_connections\""))
+        assertTrue(payload.json.contains("\"model_bindings\""))
         assertFalse(payload.json.contains("secretRef"))
         assertFalse(payload.json.contains("secretRef-123"))
         assertFalse(payload.json.contains("apiKey"))

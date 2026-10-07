@@ -1,0 +1,13 @@
+{
+  "task_id": "NATIVE-P5-008",
+  "status": "approved_with_followups",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "area": "phase6_parity",
+      "finding": "The matrices now identify remaining graph/source gaps, but those gaps remain open.",
+      "recommendation": "Use the updated matrices as Phase 6 audit inputs and keep P0 blockers open."
+    }
+  ]
+}

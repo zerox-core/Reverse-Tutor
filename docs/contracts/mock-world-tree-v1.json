@@ -1,0 +1,134 @@
+{
+  "id": "tree_math_001",
+  "spaceId": "default-space",
+  "sessionId": null,
+  "templateId": null,
+  "title": "高三数学讲题冲刺",
+  "mode": "learning",
+  "schemaVersion": 1,
+  "sections": [
+    {
+      "id": "section_student",
+      "type": "student_role",
+      "title": "学生角色",
+      "order": 0,
+      "required": true,
+      "completed": true,
+      "payload": {
+        "avatarRef": "asset://learner/xiaolan-01",
+        "name": "小岚",
+        "personality": "愿意追问，但在没有把握时会先用自己的话复述。",
+        "currentUnderstanding": "熟悉函数基本概念，容易忽略定义域边界。",
+        "interactionHabits": "先听用户讲解，再用错题提出反例。"
+      }
+    },
+    {
+      "id": "section_goal",
+      "type": "learning_goal",
+      "title": "学习目标",
+      "order": 1,
+      "required": true,
+      "completed": true,
+      "payload": {
+        "description": "通过给小岚讲题，建立函数与图像的完整知识结构。",
+        "acceptanceCriteria": [
+          "能够先判断定义域再进行运算",
+          "能够解释图像变换背后的变量关系"
+        ]
+      }
+    },
+    {
+      "id": "section_schedule",
+      "type": "study_schedule",
+      "title": "学习计划时间",
+      "order": 2,
+      "required": false,
+      "completed": false,
+      "payload": {
+        "startAtEpochMillis": null,
+        "endAtEpochMillis": null,
+        "weeklyRhythm": "",
+        "milestones": []
+      }
+    },
+    {
+      "id": "section_portrait",
+      "type": "portrait_system",
+      "title": "画像系统",
+      "order": 3,
+      "required": false,
+      "completed": true,
+      "payload": {
+        "dimensions": [
+          {
+            "id": "portrait_confidence",
+            "title": "表达信心",
+            "content": "遇到综合题时容易跳过推理过程，需要被追问依据。",
+            "order": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "section_story",
+      "type": "story_plot",
+      "title": "故事剧情",
+      "order": 4,
+      "required": false,
+      "completed": true,
+      "payload": {
+        "background": "小岚在学校的错题诊所整理月考试卷。窗外下雨，社团活动临时取消。",
+        "relationships": "用户负责讲解，小岚负责追问、复述和指出不一致。",
+        "stages": [
+          {
+            "id": "story_act_1",
+            "title": "错题诊所",
+            "description": "从一道定义域错误开始，小岚先复述用户的判断依据。",
+            "illustrationRef": "asset://story/math-clinic-act-1",
+            "order": 0
+          },
+          {
+            "id": "story_act_2",
+            "title": "雨天数列",
+            "description": "回家路上遇到新的变式，小岚尝试用同一判断方法解释。",
+            "illustrationRef": "asset://story/math-rain-act-2",
+            "order": 1
+          },
+          {
+            "id": "story_act_3",
+            "title": "公开检验",
+            "description": "小岚把方法讲给同学听，用户检查边界条件是否完整。",
+            "illustrationRef": "asset://story/math-review-act-3",
+            "order": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "section_sources",
+      "type": "source_library",
+      "title": "资料文档",
+      "order": 5,
+      "required": false,
+      "completed": true,
+      "payload": {
+        "sourceIds": ["source_mistakes_001", "source_exam_001"]
+      }
+    },
+    {
+      "id": "section_custom_exam_habit",
+      "type": "custom",
+      "title": "考试习惯",
+      "order": 6,
+      "required": false,
+      "completed": true,
+      "payload": {
+        "content": "每次讲解结束后，用两分钟检查是否遗漏定义域、单位和特殊值。"
+      }
+    }
+  ],
+  "sourceIds": ["source_mistakes_001", "source_exam_001"],
+  "state": "draft",
+  "createdAtEpochMillis": 1783857000000,
+  "updatedAtEpochMillis": 1783857600000
+}

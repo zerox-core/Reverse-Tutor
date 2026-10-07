@@ -1,0 +1,50 @@
+{
+  "task_id": "NATIVE-HYBRID-FRONTEND-001",
+  "goal": "Implement the hybrid frontend workspace foundation, ViewModel boundaries, and independent TurnRun/model/sync UI states against frozen contracts and fakes.",
+  "non_goals": [
+    "Do not modify Room, DAO, Entity, protocol parser, SecretStore, HTTP client, or Python service code.",
+    "Do not duplicate domain concurrency or conflict resolution rules in ViewModels.",
+    "Do not revert unrelated user or worker changes."
+  ],
+  "acceptance_criteria": [
+    "The four-page workspace defaults to Session home and preserves interaction locks.",
+    "New screens use StateFlow UiState and explicit UiAction boundaries.",
+    "Independent TurnRuns render and retry separately.",
+    "Offline mode retains local session and dashboard content.",
+    "No frontend source imports DAO, Entity, SecretStore, or HTTP types."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": ["read", "edit", "test", "commit"],
+  "required_outputs": ["patch", "changed_file_summary", "worker_state", "verification_result"],
+  "module": ":app/:feature:*",
+  "branch": "work/native-hybrid-frontend",
+  "dependencies": ["NATIVE-HYBRID-BACKEND-001-contract-checkpoint"],
+  "read_first": [
+    "AGENTS.md",
+    "docs/superpowers/specs/2026-07-11-native-complete-interaction-frontend-design.md",
+    "docs/superpowers/specs/2026-07-11-native-three-layer-hybrid-architecture-design.md",
+    "docs/superpowers/plans/2026-07-11-native-three-layer-hybrid-implementation.md",
+    "mobile-native/core/model/src/main/java"
+  ],
+  "write_scope": [
+    "mobile-native/app",
+    "mobile-native/feature"
+  ],
+  "do_not_touch": [
+    "mobile-native/core/data",
+    "mobile-native/core/protocol",
+    "mobile-native/core/model",
+    "mobile-native/core/domain",
+    "mobile-native/core/llm",
+    "server.py",
+    "adapters/online",
+    "mobile",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run app and feature JVM tests.",
+    "Run app lint and assembleDebug.",
+    "Report any required shared Gradle changes without editing controller-owned settings files."
+  ]
+}

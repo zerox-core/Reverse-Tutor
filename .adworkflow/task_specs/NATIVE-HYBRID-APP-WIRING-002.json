@@ -1,0 +1,36 @@
+{
+  "task_id": "NATIVE-HYBRID-APP-WIRING-002",
+  "goal": "Create the production application graph and real async frontend port adapters, then wire them into MainActivity and AppShell without reverting existing UI work.",
+  "non_goals": [
+    "Do not modify Room schema, provider protocol parsers, or Python APIs.",
+    "Do not rewrite existing visual screens.",
+    "Do not use GlobalScope or production runBlocking.",
+    "Do not commit unrelated pre-existing UI changes."
+  ],
+  "acceptance_criteria": [
+    "Production factories use real repository/coordinator adapters instead of Fake ports.",
+    "Session model changes persist through the domain repository.",
+    "Workspace gesture locks receive actual UI events.",
+    "Coroutines are lifecycle-owned or explicitly closed.",
+    "App and feature tests, lint, and debug build pass."
+  ],
+  "risk_level": "medium",
+  "execution_mode": "worker_plus_reviewer",
+  "write_scope": [
+    "mobile-native/app",
+    "mobile-native/feature"
+  ],
+  "do_not_touch": [
+    "mobile-native/core/data",
+    "mobile-native/core/domain",
+    "mobile-native/core/llm",
+    "mobile-native/core/remote",
+    "server.py",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run app and feature JVM tests.",
+    "Run app lint and assembleDebug.",
+    "List any mixed dirty files that cannot be committed independently."
+  ]
+}

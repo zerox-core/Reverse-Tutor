@@ -9,19 +9,139 @@ import com.reversetutor.core.data.local.entity.MessageAttachmentEntity
 import com.reversetutor.core.data.local.entity.MessageEntity
 import com.reversetutor.core.data.local.entity.MessageQuoteEntity
 import com.reversetutor.core.data.message.MessageRepository
+import com.reversetutor.core.data.model.ExecutionModelConfiguration
+import com.reversetutor.core.data.model.ExecutionModelResolver
+import com.reversetutor.core.llm.BuiltInEmbeddingChannel
+import com.reversetutor.core.llm.EmbeddingChannelKind
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
+import com.reversetutor.core.llm.LlmSecretResolver
+import com.reversetutor.core.llm.OpenAiCompatibleEmbeddingRuntime
+import com.reversetutor.core.llm.ProviderHttpRequest
+import com.reversetutor.core.llm.ProviderHttpResult
+import com.reversetutor.core.llm.ProviderHttpTransport
 import com.reversetutor.core.llm.LlmCapabilities
 import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmGenerationResult
+import com.reversetutor.core.llm.LlmGenerationRequest
+import com.reversetutor.core.llm.LlmGenerationRuntime
 import com.reversetutor.core.llm.LlmGenerationToken
+import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.core.model.MessageAttachment
 import com.reversetutor.core.model.MessageRole
+import com.reversetutor.core.model.ModelBinding
+import com.reversetutor.core.model.ModelProtocol
+import com.reversetutor.core.model.ProviderConnection
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatGenerationRepositoryTest {
+    @Test
+    fun requestedBindingBuildsExecutionProfileBeforeLegacyFallback() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val resolver = FixedExecutionModelResolver(
+            ExecutionModelConfiguration(
+                connection = ProviderConnection(
+                    id = "connection-1",
+                    spaceId = "space-1",
+                    name = "Anthropic",
+                    protocol = ModelProtocol.AnthropicCompatible,
+                    baseUrl = "https://anthropic.example/v1",
+                    secretRef = "secret-1"
+                ),
+                binding = ModelBinding(
+                    id = "binding-1",
+                    spaceId = "space-1",
+                    connectionId = "connection-1",
+                    modelId = "claude-test",
+                    displayName = "Claude"
+                )
+            )
+        )
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(
+                FakeMessageDao(),
+                FakeMessageAttachmentDao(),
+                FakeMessageQuoteDao()
+            ),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime,
+            modelConnectionRepository = resolver
+        )
+
+        val outcome = repository.generateReply(
+            input = input("token-binding").copy(modelBindingId = "binding-1"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        assertEquals(ChatGenerationOutcome.Generated("assistant-token-binding"), outcome)
+        assertEquals("binding-1", resolver.requestedBindingIds.single())
+        assertEquals("claude-test", runtime.requests.single().model)
+        assertEquals("https://anthropic.example/v1", runtime.requests.single().baseUrl)
+        assertEquals("secret-1", runtime.requests.single().secretRef)
+    }
+
+    @Test
+    fun legacyProfileFallbackOnlyRunsWhenNoNewConfigurationExists() = runBlocking {
+        val fallbackRuntime = RecordingGenerationRuntime()
+        val fallbackRepository = ChatGenerationRepository(
+            messageRepository = MessageRepository(
+                FakeMessageDao(),
+                FakeMessageAttachmentDao(),
+                FakeMessageQuoteDao()
+            ),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = fallbackRuntime,
+            modelConnectionRepository = FixedExecutionModelResolver(
+                configuration = null,
+                hasNewConfiguration = false
+            )
+        )
+        val blockedRuntime = RecordingGenerationRuntime()
+        val blockedRepository = ChatGenerationRepository(
+            messageRepository = MessageRepository(
+                FakeMessageDao(),
+                FakeMessageAttachmentDao(),
+                FakeMessageQuoteDao()
+            ),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = blockedRuntime,
+            modelConnectionRepository = FixedExecutionModelResolver(
+                configuration = null,
+                hasNewConfiguration = true
+            )
+        )
+
+        val fallback = fallbackRepository.generateReply(
+            input = input("token-legacy-fallback"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+        val blocked = blockedRepository.generateReply(
+            input = input("token-new-config-invalid"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        assertEquals(ChatGenerationOutcome.Generated("assistant-token-legacy-fallback"), fallback)
+        assertEquals("gpt-4o-mini", fallbackRuntime.requests.single().model)
+        assertEquals(ChatGenerationOutcome.NoModelConfigured, blocked)
+        assertTrue(blockedRuntime.requests.isEmpty())
+    }
+
     @Test
     fun generateReplyPersistsAssistantMessageForCurrentToken() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
@@ -58,6 +178,37 @@ class ChatGenerationRepositoryTest {
     }
 
     @Test
+    fun generateReplyForwardsOptionalSessionPolicyToRuntime() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+        val policy = LlmSessionPolicyContext(
+            actionType = "probe",
+            studentRole = "probing_student",
+            knowledgePoint = "factoring",
+            difficulty = 0.7f,
+            processSummary = "ask for a justification",
+            evaluationCorrectness = 0.4f,
+            userEmotion = "engaged",
+            correctionTiming = "summary_only"
+        )
+
+        repository.generateReply(
+            input = input("token-policy").copy(sessionPolicy = policy),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        assertEquals(policy, runtime.requests.single().sessionPolicy)
+    }
+
+    @Test
     fun streamedReplyPersistsAggregatedAssistantText() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
         val repository = ChatGenerationRepository(
@@ -87,6 +238,68 @@ class ChatGenerationRepositoryTest {
 
         assertEquals(ChatGenerationOutcome.Generated("assistant-token-stream"), outcome)
         assertEquals("Step 1: factor first.", messageRepository.listMessages("session-1").single().text)
+    }
+
+    @Test
+    fun streamedReplyReportsChunksInOrderButPersistsOneAssistantMessage() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val previews = mutableListOf<String>()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = FakeLlmGenerationRuntime(
+                defaultResult = LlmGenerationResult.Streamed(listOf("先看", "第一步。"))
+            )
+        )
+
+        repository.generateReply(
+            input = input("token-preview"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true },
+            onChunk = previews::add
+        )
+
+        assertEquals(listOf("先看", "第一步。"), previews)
+        assertEquals(1, messageRepository.listMessages("session-1").size)
+        assertEquals("先看第一步。", messageRepository.listMessages("session-1").single().text)
+    }
+
+    @Test
+    fun streamedEnvelopeReplyEmitsMonologueSnapshotsButOnlyBodyChunks() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val previews = mutableListOf<String>()
+        val monologues = mutableListOf<String?>()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = FakeLlmGenerationRuntime(
+                defaultResult = LlmGenerationResult.Streamed(
+                    listOf("<thinking>我卡在", "货币乘数这</thinking>老师，", "那负数呢？")
+                )
+            )
+        )
+
+        val outcome = repository.generateReply(
+            input = input("token-monologue"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true },
+            onChunk = previews::add,
+            onMonologueUpdate = { monologues += it }
+        )
+
+        assertEquals(ChatGenerationOutcome.Generated("assistant-token-monologue"), outcome)
+        // 2026-09-21 思考链流式透出：正文预览只有 body，独白快照单调增长并冻在闭合值。
+        assertEquals(listOf("老师，", "那负数呢？"), previews)
+        assertEquals(listOf("我卡在", "我卡在货币乘数这"), monologues)
+        val saved = messageRepository.listMessages("session-1").single()
+        assertEquals("我卡在货币乘数这", saved.monologue)
+        assertEquals("老师，那负数呢？", saved.text)
     }
 
     @Test
@@ -179,8 +392,8 @@ class ChatGenerationRepositoryTest {
             isTokenCurrent = { true }
         )
 
-        assertEquals(ChatGenerationOutcome.ProviderFailed("Rate limited"), failure)
-        assertEquals(ChatGenerationOutcome.ProviderFailed("Timeout"), timeout)
+        assertEquals(ChatGenerationOutcome.ProviderFailed("llm_provider_request_failed"), failure)
+        assertEquals(ChatGenerationOutcome.ProviderFailed("llm_provider_timeout"), timeout)
     }
 
     @Test
@@ -212,7 +425,7 @@ class ChatGenerationRepositoryTest {
     }
 
     @Test
-    fun generatedReplyIncludesVisibleCitationFooterWhenEvidenceExists() = runBlocking {
+    fun generatedReplyKeepsContextEvidenceOutOfVisibleTimelineText() = runBlocking {
         val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
         val repository = ChatGenerationRepository(
             messageRepository = messageRepository,
@@ -233,9 +446,39 @@ class ChatGenerationRepositoryTest {
 
         assertEquals(ChatGenerationOutcome.Generated("assistant-token-context"), outcome)
         val text = messageRepository.listMessages("session-1").single().text
-        assertTrue(text.contains("Use factoring."))
-        assertTrue(text.contains("Sources:"))
-        assertTrue(text.contains("[1] Algebra note (message-1, source-1)"))
+        assertEquals("Use factoring.", text)
+        assertFalse(text.contains("Sources:"))
+        assertFalse(text.contains("message-1"))
+        assertFalse(text.contains("source-1"))
+    }
+
+    @Test
+    fun plainProviderReplyIsSanitizedBeforeVisiblePersistence() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = FakeLlmGenerationRuntime(
+                defaultResult = LlmGenerationResult.Success(
+                    "Teaching policy:\nAction: probe\nKnowledge point: factoring\n" + "y".repeat(2_000)
+                )
+            )
+        )
+
+        repository.generateReply(
+            input = input("token-visible-sanitize"),
+            nowEpochMillis = 20L,
+            isTokenCurrent = { true }
+        )
+
+        val visible = messageRepository.listMessages("session-1").single().text
+        assertFalse(visible.contains("Teaching policy:"))
+        assertFalse(visible.contains("Action: probe"))
+        assertFalse(visible.contains("Knowledge point: factoring"))
+        assertTrue(visible.length <= 1_200)
     }
 
     @Test
@@ -291,6 +534,148 @@ class ChatGenerationRepositoryTest {
         )
 
         assertEquals(ChatGenerationOutcome.NoModelConfigured, outcome)
+    }
+
+    @Test
+    fun sessionSummaryGeneratesWithoutPersistingAnAssistantMessage() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        val outcome = repository.generateSessionSummary(
+            sessionId = "session-1",
+            promptText = "  总结这段对话  "
+        )
+
+        assertEquals(SessionSummaryOutcome.Generated("Bound model reply"), outcome)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+        val request = runtime.requests.single()
+        assertEquals("总结这段对话", request.userText)
+        assertNull(request.sessionPolicy)
+        assertTrue(request.contextEvidence.isEmpty())
+        assertFalse(request.streaming)
+    }
+
+    @Test
+    fun sessionSummaryWithoutActiveProfileIsNoModelConfigured() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        assertEquals(
+            SessionSummaryOutcome.NoModelConfigured,
+            repository.generateSessionSummary("session-1", "总结")
+        )
+        assertTrue(runtime.requests.isEmpty())
+    }
+
+    @Test
+    fun blankSummaryPromptIsRejected() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        assertEquals(
+            SessionSummaryOutcome.BlankPrompt,
+            repository.generateSessionSummary("session-1", "   ")
+        )
+        assertTrue(runtime.requests.isEmpty())
+    }
+
+    @Test
+    fun visionDescriptionGeneratesWithoutPersistingAnAssistantMessage() = runBlocking {
+        val messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao())
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = messageRepository,
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+        val image = imageAttachment()
+
+        val outcome = repository.describeImageForSource(
+            sessionId = "session-1",
+            image = image,
+            visionModelName = "qwen-vl-plus"
+        )
+
+        assertEquals(SourceVisionOutcome.Generated("Bound model reply"), outcome)
+        assertTrue(messageRepository.listMessages("session-1").isEmpty())
+        val request = runtime.requests.single()
+        assertEquals("qwen-vl-plus", request.model)
+        assertEquals(image, request.imageAttachments.single())
+        assertTrue(request.capabilities.supportsVision)
+        assertFalse(request.streaming)
+        assertFalse(request.userText.isNullOrBlank())
+        assertNull(request.sessionPolicy)
+        assertTrue(request.contextEvidence.isEmpty())
+    }
+
+    @Test
+    fun visionWithoutModelOverrideUsesActiveProfileModel() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        val outcome = repository.describeImageForSource(
+            sessionId = "session-1",
+            image = imageAttachment(),
+            visionModelName = "   "
+        )
+
+        assertEquals(SourceVisionOutcome.Generated("Bound model reply"), outcome)
+        assertEquals("gpt-4o-mini", runtime.requests.single().model)
+    }
+
+    @Test
+    fun visionWithoutActiveProfileIsNoModelConfigured() = runBlocking {
+        val runtime = RecordingGenerationRuntime()
+        val repository = ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = runtime
+        )
+
+        assertEquals(
+            SourceVisionOutcome.NoModelConfigured,
+            repository.describeImageForSource(
+                sessionId = "session-1",
+                image = imageAttachment(),
+                visionModelName = "qwen-vl-plus"
+            )
+        )
+        assertTrue(runtime.requests.isEmpty())
     }
 
     private fun input(token: String): ChatGenerationInput =
@@ -412,4 +797,106 @@ private class ChatGenerationFakeSecretStore : SecretStore {
     override suspend fun put(ref: String, secret: String) = Unit
     override suspend fun get(ref: String): String? = null
     override suspend fun delete(ref: String) = Unit
+}
+
+private class FixedExecutionModelResolver(
+    private val configuration: ExecutionModelConfiguration?,
+    private val hasNewConfiguration: Boolean = true
+) : ExecutionModelResolver {
+    val requestedBindingIds = mutableListOf<String?>()
+
+    override suspend fun resolveForExecution(
+        sessionId: String,
+        requestedBindingId: String?
+    ): ExecutionModelConfiguration? {
+        requestedBindingIds += requestedBindingId
+        return configuration
+    }
+
+    override suspend fun hasNewConfigurationForSession(sessionId: String): Boolean =
+        hasNewConfiguration
+}
+
+private class RecordingGenerationRuntime : LlmGenerationRuntime {
+    val requests = mutableListOf<LlmGenerationRequest>()
+
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+        requests += request
+        return LlmGenerationResult.Success("Bound model reply")
+    }
+}
+
+
+/** 1e: embedding fallback chain — user channel -> built-in bge-m3 relay (anonymous) -> null. */
+class ChatGenerationEmbeddingFallbackTest {
+
+    private class RecordingEmbeddingTransport(vararg responses: ProviderHttpResult) : ProviderHttpTransport {
+        val requests = mutableListOf<ProviderHttpRequest>()
+        private val queue = responses.toMutableList()
+        override suspend fun execute(request: ProviderHttpRequest): ProviderHttpResult {
+            requests += request
+            return queue.removeFirstOrNull() ?: ProviderHttpResult.Failure
+        }
+    }
+
+    private fun embeddingBody(vararg values: Float): String {
+        val vec = values.joinToString(",", prefix = "[", postfix = "]")
+        return "{\"data\":[{\"index\":0,\"embedding\":$vec}]}"
+    }
+
+    private fun repository(transport: ProviderHttpTransport): ChatGenerationRepository =
+        ChatGenerationRepository(
+            messageRepository = MessageRepository(FakeMessageDao(), FakeMessageAttachmentDao(), FakeMessageQuoteDao()),
+            llmProfileRepository = LlmProfileRepository(
+                ChatGenerationFakeLlmProfileDao.withActiveProfile(),
+                ChatGenerationFakeSecretStore()
+            ),
+            runtime = RecordingGenerationRuntime(),
+            embeddingRuntime = OpenAiCompatibleEmbeddingRuntime(
+                transport = transport,
+                secretResolver = LlmSecretResolver { "secret-1" }
+            )
+        )
+
+    @Test
+    fun userChannelSuccessSkipsBuiltInChannel() = runBlocking {
+        val transport = RecordingEmbeddingTransport(
+            ProviderHttpResult.Response(200, embeddingBody(0.1f, 0.2f))
+        )
+
+        val result = repository(transport).embedSourceTexts(listOf("函数的单调性"))
+
+        assertEquals(EmbeddingChannelKind.UserConfigured, result?.channelKind)
+        assertEquals(1, transport.requests.size)
+        assertEquals("https://api.example.test/v1/embeddings", transport.requests[0].url)
+        assertEquals("Bearer secret-1", transport.requests[0].headers["Authorization"])
+    }
+
+    @Test
+    fun userChannelFailureFallsBackToBuiltInChannelAnonymously() = runBlocking {
+        val transport = RecordingEmbeddingTransport(
+            ProviderHttpResult.Response(401, "{}"),
+            ProviderHttpResult.Response(200, embeddingBody(0.3f, 0.4f))
+        )
+
+        val result = repository(transport).embedSourceTexts(listOf("导数"))
+
+        assertEquals(EmbeddingChannelKind.BuiltIn, result?.channelKind)
+        assertEquals(BuiltInEmbeddingChannel.Model, result?.modelKey)
+        assertEquals(2, transport.requests.size)
+        val builtInRequest = transport.requests[1]
+        assertEquals("https://hub.zeroxcore.tech/v1/embeddings", builtInRequest.url)
+        assertFalse(builtInRequest.headers.containsKey("Authorization"))
+    }
+
+    @Test
+    fun bothChannelsFailingReturnsNull() = runBlocking {
+        val transport = RecordingEmbeddingTransport(
+            ProviderHttpResult.Response(500, "{}"),
+            ProviderHttpResult.Response(500, "{}")
+        )
+
+        assertNull(repository(transport).embedSourceTexts(listOf("x")))
+        assertEquals(2, transport.requests.size)
+    }
 }

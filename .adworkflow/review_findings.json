@@ -1,33 +1,25 @@
 {
-  "task_id": "NATIVE-P5-007",
-  "status": "approved_with_followups",
+  "task_id": "ANDROID-BASELINE-CLOSEOUT-001",
+  "status": "passed_with_non_blocking_followups",
   "blocking_findings": [],
   "non_blocking_findings": [
-    {
-      "severity": "medium",
-      "area": "citation_semantics",
-      "finding": "The visible Sources footer represents evidence provided to the model, not strict model-emitted citations or resolved cited_chunk_ids.",
-      "recommendation": "Before closing citation parity, add structured cited source output, cited_chunk_ids resolution, clickable citations, and missing-id skip behavior."
-    },
-    {
-      "severity": "medium",
-      "area": "retrieval_quality",
-      "finding": "Context evidence uses lightweight keyword relevance instead of the legacy retrieval/routing pipeline.",
-      "recommendation": "Add better retrieval ranking after source parser extraction and session graph projection mature."
-    },
-    {
-      "severity": "medium",
-      "area": "complex_sources",
-      "finding": "Queued/unsupported/no-chunk sources are skipped gracefully, so PDF/DOCX/PPTX/EPUB/Image evidence is not available until extraction exists.",
-      "recommendation": "Keep LEG-034 and LEG-036 open until parser/vision extraction and source context fixtures are complete."
-    }
+    "Huawei Mate 60 physical-device acceptance remains pending.",
+    "Existing Kotlin deprecation and unused-parameter warnings remain outside this closeout scope.",
+    "The AppPreferences extension changes a frozen interface but is backward-compatible, isolated in its own commit and covered by default/key/persistence tests."
+  ],
+  "closed_findings": [
+    "The unused NewSessionLaunchRequest path has been removed; challenge creation uses NewSessionPrefillRequest.",
+    "ChatComposerLayout values now drive the real composer.",
+    "ChatOverflowAction now drives the real overflow menu and existing callbacks.",
+    "Design-only assets are excluded from Android commits and reserved for the Feishu branch."
   ],
   "review_basis": [
-    ".adworkflow/task_spec.json",
-    ".adworkflow/verification_result.json",
-    "mobile-native/core/llm/src/main/java/com/reversetutor/core/llm/LlmGenerationLifecycle.kt",
-    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt",
-    "mobile-native/feature/chat/src/main/java/com/reversetutor/feature/chat/ChatContextEvidence.kt",
-    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/ChatContextEvidenceTest.kt"
+    "task spec",
+    "source diff",
+    "targeted unit tests",
+    "451-test Android JVM gate",
+    "app lintDebug",
+    "app assembleDebug",
+    "backend protocol and data freeze contract"
   ]
 }

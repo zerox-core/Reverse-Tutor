@@ -1,0 +1,27 @@
+{
+  "task_id": "NATIVE-BACKEND-PROTOCOL-STABILIZE-001",
+  "status": "approved_with_non_blocking_risks",
+  "blocking_findings": [],
+  "resolved_findings": [
+    {
+      "severity": "high",
+      "area": "widget_layout_sync_isolation",
+      "finding": "The pre-existing LearningRepositoryImpl exposed a single-widget save method that accepted a SyncEnvelope and could write widget layout data to Sync Outbox.",
+      "resolution": "Removed the legacy single-widget layout methods and added a regression assertion that WidgetLayoutRepositoryImpl is the only layout repository surface."
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "low",
+      "area": "android_runtime_verification",
+      "finding": "The Room provenance and layout transaction instrumentation tests compiled but were not run on a connected device.",
+      "recommendation": "Run the core:data connected Android tests when a device or emulator is available."
+    },
+    {
+      "severity": "low",
+      "area": "provider_runtime_verification",
+      "finding": "No real model provider request was issued during this backend protocol task.",
+      "recommendation": "Keep provider verification in a separate credentialed integration task."
+    }
+  ]
+}

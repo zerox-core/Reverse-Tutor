@@ -55,6 +55,17 @@ def test_manual_update_check_disables_button_until_finished():
     assert "await checkUpdate(false)" in html
 
 
+def test_update_check_does_not_prompt_same_baseline_official_over_higher_code_test_build():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    update_fn = html.split("function isNewerUpdate(info)", 1)[1].split("function setUpdateStatus", 1)[0]
+
+    assert "const currentIsPrerelease" in update_fn
+    assert "const remoteIsPrerelease" in update_fn
+    assert "const cmp = compareVersionName(info.versionName, APP_VERSION_NAME)" in update_fn
+    assert "if (cmp === 0) return false" in update_fn
+    assert "currentIsPrerelease && !remoteIsPrerelease" not in update_fn.split("if (!info.versionCode && info.versionName)", 1)[1]
+
+
 def test_update_check_continues_to_fallback_when_primary_feed_is_stale():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 

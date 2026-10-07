@@ -18,3 +18,12 @@ Thumbs.db
 *.apk
 *.jks
 *.keystore
+dump_*.py
+local.properties.bak
+.tmp/
+rm_s1.png
+.aily_tmp*
+r88_read*
+.worktrees/
+.superpowers/
+*.aily_bak

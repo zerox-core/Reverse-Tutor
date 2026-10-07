@@ -1,22 +1,41 @@
 package com.reversetutor.preview
 
 import android.content.Context
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.filterToOne
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.reversetutor.core.data.DataModule
 import com.reversetutor.core.data.graph.GraphEdgeInput
 import com.reversetutor.core.data.graph.GraphNodeInput
-import com.reversetutor.core.data.memory.AnchorInput
+import com.reversetutor.core.model.GraphEdge
+import com.reversetutor.core.model.GraphNode
 import com.reversetutor.core.model.GraphNodeKind
+import com.reversetutor.feature.memory.ContextHubRoute
+import com.reversetutor.feature.memory.GraphNodeReviewAction
+import com.reversetutor.feature.memory.KnowledgeGraphPanel
+import com.reversetutor.feature.memory.KnowledgeGraphUiState
+import com.reversetutor.preview.theme.ReverseTutorTheme
 import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,105 +43,249 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class Phase5GraphDeviceTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createComposeRule()
 
-    @Test
-    fun nativeGraphCanvasShowsSeededNodesSelectionAndGlobalMode() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        resetAndSeedGraph(context)
+    private val context = ApplicationProvider.getApplicationContext<Context>()
 
-        waitForText("Sessions")
-        composeRule.onNodeWithText("New session").performClick()
-        composeRule.onNodeWithText("Exam sprint").performClick()
-        composeRule.onNodeWithText("Create").performClick()
-        dismissOkIfPresent()
-        waitForText("Exam sprint")
-
-        composeRule.onAllNodesWithText("Open").onLast().performClick()
-        waitForText("No messages yet")
-        composeRule.onNodeWithText("Open context hub").performClick()
-        waitForText("Context hub")
-        composeRule.onNodeWithText("Graph").performScrollTo().performClick()
-
-        waitForText("Session graph")
-        composeRule.onNodeWithText("Nodes: 2").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Edges: 1").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithTag("knowledge-graph-canvas").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Alpha").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Beta").performScrollTo().performClick()
-        waitForText("Node detail")
-        composeRule.onNodeWithText("node-a supports node-b").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Mark needs review").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Open chat evidence").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Open source evidence").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Mark needs review").performScrollTo().performClick()
-        waitForText("Status: Needs review")
-        composeRule.onNodeWithText("Open chat evidence").performScrollTo().performClick()
-        waitForText("Evidence target: message-beta")
-
-        composeRule.onNodeWithText("Global graph").performScrollTo().performClick()
-        waitForText("Cross-session graph view")
-        composeRule.onNodeWithText("Global graph: 2 nodes and 1 relations rendered with native Canvas.")
-            .performScrollTo()
-            .assertIsDisplayed()
-    }
-
-    private fun resetAndSeedGraph(context: Context) {
+    @Before
+    fun seedGraph() {
         runBlocking {
             DataModule.localDataWipeRepository(context).wipeLocalData(System.currentTimeMillis())
-            DataModule.memoryRepository(context).createAnchor(
-                input = AnchorInput(
-                    title = "Beta evidence",
-                    body = "Imported source evidence for Beta.",
-                    sourceMessageId = "message-beta",
-                    sourceId = "source-beta"
-                ),
-                nowEpochMillis = 90L,
-                anchorId = "anchor-1"
-            )
             val repository = DataModule.graphRepository(context)
             repository.saveNode(
-                input = GraphNodeInput(
-                    id = "node-a",
-                    label = "Alpha",
-                    kind = GraphNodeKind.Concept,
-                    sourceMemoryId = "memory-alpha"
-                ),
+                input = GraphNodeInput("node-a", "Alpha", GraphNodeKind.Concept),
                 nowEpochMillis = 100L
             )
             repository.saveNode(
-                input = GraphNodeInput(
-                    id = "node-b",
-                    label = "Beta",
-                    kind = GraphNodeKind.Requirement,
-                    sourceMemoryId = "memory-anchor-1"
-                ),
+                input = GraphNodeInput("node-b", "Beta", GraphNodeKind.Requirement),
                 nowEpochMillis = 110L
             )
             repository.saveEdge(
-                input = GraphEdgeInput(
-                    id = "edge-a-b",
-                    fromNodeId = "node-a",
-                    toNodeId = "node-b",
-                    relation = "supports",
-                    sourceMemoryId = "memory-alpha"
-                ),
+                input = GraphEdgeInput("edge-a-b", "node-a", "node-b", "supports"),
                 nowEpochMillis = 120L
             )
         }
-        composeRule.activityRule.scenario.recreate()
     }
 
-    private fun waitForText(text: String, timeoutMillis: Long = 5_000) {
-        composeRule.waitUntil(timeoutMillis) {
-            composeRule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty()
+    @After
+    fun cleanUpLocalData() {
+        runBlocking {
+            DataModule.localDataWipeRepository(context).wipeLocalData(System.currentTimeMillis())
         }
     }
 
-    private fun dismissOkIfPresent() {
-        val okNodes = composeRule.onAllNodesWithText("OK", useUnmergedTree = true)
-        if (okNodes.fetchSemanticsNodes().isNotEmpty()) {
-            okNodes.onLast().performClick()
+    @Test
+    fun contextHubRendersSeededNativeGraphCanvas() {
+        composeRule.setContent {
+            ReverseTutorTheme {
+                ContextHubRoute(
+                    memoryRepository = DataModule.memoryRepository(context),
+                    graphRepository = DataModule.graphRepository(context),
+                    sessionId = "session-graph",
+                    sessionTitle = "函数训练",
+                    onOpenChat = {},
+                    onOpenSources = {},
+                    onOpenSettings = {}
+                )
+            }
+        }
+
+        composeRule.waitUntil(5_000) {
+            composeRule.onAllNodesWithText("图谱节点：2")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeRule.onAllNodesWithText("图谱")
+            .filterToOne(
+                SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox)
+            )
+            .performClick()
+        composeRule.onNodeWithTag("knowledge-graph-canvas").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun graphEmptyAndErrorStatesExposeHonestRecoveryActions() {
+        var openChatCount = 0
+        var retryCount = 0
+        val graphState = mutableStateOf(KnowledgeGraphUiState.from(emptyList(), emptyList()))
+        composeRule.setContent {
+            ReverseTutorTheme {
+                KnowledgeGraphPanel(
+                    state = graphState.value,
+                    onSelectedNodeChange = {},
+                    onCreateEvidence = { openChatCount += 1 },
+                    onRetry = { retryCount += 1 }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("graph-status-empty").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-recovery-createevidence").performClick()
+        composeRule.runOnIdle { assertEquals(1, openChatCount) }
+
+        composeRule.runOnIdle {
+            graphState.value = KnowledgeGraphUiState.error()
+        }
+
+        composeRule.onNodeWithTag("graph-status-error").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-recovery-retry").performClick()
+        composeRule.runOnIdle { assertEquals(1, retryCount) }
+    }
+
+    @Test
+    fun invalidAndLargeGraphsProvideAccessibleNodeListAndDetail() {
+        val invalidState = KnowledgeGraphUiState.from(
+            nodes = listOf(graphNode("invalid-node", "待审核节点")),
+            edges = listOf(
+                GraphEdge(
+                    id = "invalid-edge",
+                    spaceId = "space-1",
+                    fromNodeId = "invalid-node",
+                    toNodeId = "missing-node",
+                    relation = "supports",
+                    createdAtEpochMillis = 2L
+                )
+            )
+        )
+        val graphState = mutableStateOf(invalidState)
+        composeRule.setContent {
+            var selectedNodeId by remember { mutableStateOf<String?>(null) }
+            ReverseTutorTheme {
+                KnowledgeGraphPanel(
+                    state = graphState.value.withSelection(selectedNodeId),
+                    onSelectedNodeChange = { selectedNodeId = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("graph-status-invalid").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-node-list").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-node-invalid-node")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        // The detail card is composed below the node-list content on the tall Android 12 viewport.
+        // Presence is the contract here; forcing an inner scroll would regress RT-2026-003.
+        composeRule.onNodeWithTag("graph-node-detail").assertExists()
+
+        val largeState = KnowledgeGraphUiState.from(
+            nodes = (1..61).map { graphNode("large-$it", "节点 $it") },
+            edges = emptyList()
+        )
+        composeRule.runOnIdle {
+            graphState.value = largeState
+        }
+        composeRule.onNodeWithTag("graph-status-large").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-node-list").assertIsDisplayed()
+    }
+
+    @Test
+    fun nativeCanvasKeepsFitControlAndOnlyShowsAvailableEvidenceActions() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(
+                GraphNode(
+                    id = "evidence-node",
+                    spaceId = "space-1",
+                    label = "带证据节点",
+                    kind = GraphNodeKind.Concept,
+                    createdAtEpochMillis = 1L,
+                    sourceMemoryId = "memory-1"
+                )
+            ),
+            edges = emptyList(),
+            memoryItems = listOf(
+                com.reversetutor.core.model.MemoryItem(
+                    id = "memory-1",
+                    spaceId = "space-1",
+                    kind = com.reversetutor.core.model.MemoryItemKind.Note,
+                    title = "证据",
+                    body = "来自聊天",
+                    createdAtEpochMillis = 1L,
+                    sourceMessageId = "message-evidence"
+                )
+            )
+        )
+        var selectedNodeId: String? = null
+        var chatTarget: String? = null
+        composeRule.setContent {
+            var selected by remember { mutableStateOf<String?>(null) }
+            ReverseTutorTheme {
+                KnowledgeGraphPanel(
+                    state = state.withSelection(selected),
+                    onSelectedNodeChange = {
+                        selected = it
+                        selectedNodeId = it
+                    },
+                    onOpenChatEvidence = { chatTarget = it.sourceMessageId }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("knowledge-graph-canvas").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-fit").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-zoom-in").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-zoom-out").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-filter").assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-node-list")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("graph-node-evidence-node")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { assertEquals("evidence-node", selectedNodeId) }
+        composeRule.onNodeWithTag("graph-evidence-chat-message-evidence")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { assertEquals("message-evidence", chatTarget) }
+        assertTrue(
+            composeRule.onAllNodesWithText("查看资料引用", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty()
+        )
+    }
+
+    @Test
+    fun archiveAndHideRequireConfirmationWhileApproveIsImmediate() {
+        val state = KnowledgeGraphUiState.from(
+            nodes = listOf(graphNode("review-node", "审核节点")),
+            edges = emptyList()
+        )
+        val calls = mutableListOf<GraphNodeReviewAction>()
+        composeRule.setContent {
+            var selected by remember { mutableStateOf<String?>("review-node") }
+            ReverseTutorTheme {
+                KnowledgeGraphPanel(
+                    state = state.withSelection(selected),
+                    onSelectedNodeChange = { selected = it },
+                    onNodeReviewAction = { _, action -> calls += action }
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("graph-review-archive")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("graph-review-confirm-archive").assertIsDisplayed()
+        composeRule.onNodeWithText("节点：审核节点", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("graph-review-cancel")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { assertTrue(calls.isEmpty()) }
+
+        composeRule.onNodeWithTag("graph-review-hide")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.onNodeWithTag("graph-review-confirm-hide")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle { assertEquals(listOf(GraphNodeReviewAction.Hide), calls) }
+
+        composeRule.onNodeWithTag("graph-review-approve")
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf(GraphNodeReviewAction.Hide, GraphNodeReviewAction.Approve),
+                calls
+            )
         }
     }
+
+    private fun graphNode(id: String, label: String): GraphNode = GraphNode(
+        id = id,
+        spaceId = "space-1",
+        label = label,
+        kind = GraphNodeKind.Concept,
+        createdAtEpochMillis = 1L
+    )
 }

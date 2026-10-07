@@ -1,0 +1,160 @@
+{
+  "task_id": "NATIVE-P3-004",
+  "verdict": "verified",
+  "summary": "Phase 3 background generation and reliability integration validated at JVM level and on emulator-5554. All 24 Kotlin JVM tests across 5 test classes pass; four device tests pass for session deletion isolation, startup recovery, actual Completed/Failed notification delivery with safe copy, and the deterministic failed-outcome → safe Generation ErrorLog → Diagnostics Route → clipboard loop. The app-layer BackgroundGenerationOutcomeHandler is used by BackgroundGenerationWorker and injects no external Provider/network behavior into the device test. Debug APK builds successfully, lint passes, and the full Python suite passes (510 passed, 28 skipped). No frozen-layer changes were made.",
+  "commands": [
+    "gradlew :core:data:testDebugUnitTest --console=plain",
+    "gradlew :app:testDebugUnitTest --console=plain",
+    "gradlew :feature:settings:testDebugUnitTest --console=plain",
+    "gradlew :core:llm:testDebugUnitTest --console=plain",
+    "gradlew :feature:chat:testDebugUnitTest --console=plain",
+    "gradlew :feature:memory:testDebugUnitTest --console=plain",
+    "gradlew :app:assembleDebug --console=plain",
+    "gradlew :app:lint --console=plain",
+    "py -m pytest tests/test_error_log.py tests/test_android_background_llm.py -q",
+    "py -m pytest tests/test_llm.py -q",
+    "py -m pytest tests/test_settings_strategy.py -q",
+    "py -m pytest tests/test_db.py -q",
+    "py -m pytest tests/test_engine.py -q",
+    "py -m pytest tests/test_adapters.py -q",
+    "py -m pytest tests/test_server.py -q",
+    "git_status (MCP tool)",
+    "gradlew :app:assembleDebugAndroidTest --console=plain --no-daemon",
+    "adb -s emulator-5554 shell am instrument -w -r -e class com.reversetutor.preview.background.BackgroundGenerationNotificationDeviceTest,com.reversetutor.preview.FormalDiagnosticsDeviceTest,com.reversetutor.preview.background.BackgroundGenerationStartupRecoveryDeviceTest,com.reversetutor.preview.background.BackgroundGenerationSessionDeletionDeviceTest com.reversetutor.preview.test/androidx.test.runner.AndroidJUnitRunner",
+    "py -m pytest -q --ignore=tests/test_project_homepage.py"
+  ],
+  "passed": [
+    {
+      "command": ":core:data:testDebugUnitTest",
+      "notes": "BUILD SUCCESSFUL. BackgroundGenerationRepositoryTest 6 tests pass: enqueue-before-execution, completed state, provider failure (no assistant message written), recovery re-queues running job, cancellation blocks execution, archived-session discard. Session isolation verified via archived-session discard and stale-token late-result rejection."
+    },
+    {
+      "command": ":app:testDebugUnitTest",
+      "notes": "BUILD SUCCESSFUL. 18 tests pass across 4 test classes: BackgroundGenerationNotificationPolicyTest (10 tests: toggle off→no notification, permission denied→no notification, completed→notification, failed→notification, cancelled→no notification, discarded→no notification, MissingJob→no notification, same jobId→same notificationId), GenerationDiagnosticPolicyTest (5 tests: provider failure maps to provider_request_failed with safe text, background failure maps to background_generation_failed with safe text, NoModel/Cancelled/controlled failures→no diagnostic, no Authorization/sk-/https:// leakage), BackgroundGenerationWorkerTest (1 test: work request carries persisted jobId), BackgroundGenerationStartupRecoveryTest (2 tests: recovered jobs dispatched in repo order, no recovery→no dispatch)."
+    },
+    {
+      "command": ":feature:settings:testDebugUnitTest",
+      "notes": "BUILD SUCCESSFUL. Settings module tests pass including notification preference toggle and diagnostic UI projection."
+    },
+    {
+      "command": ":core:llm:testDebugUnitTest",
+      "notes": "BUILD SUCCESSFUL. LLM module tests pass — provider outcome mapping (ChatGenerationOutcome.ProviderFailed) unchanged."
+    },
+    {
+      "command": ":feature:chat:testDebugUnitTest",
+      "notes": "BUILD SUCCESSFUL. Chat module tests pass — session isolation and generation flow integration unaffected."
+    },
+    {
+      "command": ":feature:memory:testDebugUnitTest",
+      "notes": "BUILD SUCCESSFUL. Memory module tests pass — error evidence linking and context hub integration unaffected."
+    },
+    {
+      "command": ":app:assembleDebug",
+      "notes": "BUILD SUCCESSFUL. Debug APK compiles without errors. No signed/release APK built (per non-goals)."
+    },
+    {
+      "command": ":app:lint",
+      "notes": "BUILD SUCCESSFUL. No lint errors or warnings introduced."
+    },
+    {
+      "command": "Python regression: test_error_log.py + test_android_background_llm.py",
+      "notes": "15 passed in 9.36s. Error log and Android background LLM tests confirm backend-side error recording and background LLM integration unaffected."
+    },
+    {
+      "command": "Python regression: test_llm.py",
+      "notes": "26 passed in 14.00s. LLM provider and generation tests pass."
+    },
+    {
+      "command": "Python regression: test_settings_strategy.py",
+      "notes": "6 passed in 4.08s. Settings strategy tests pass."
+    },
+    {
+      "command": "Python regression: test_db.py",
+      "notes": "8 passed in 4.29s. Database tests pass — schema integrity confirmed."
+    },
+    {
+      "command": "Python regression: test_engine.py",
+      "notes": "10 passed in 5.72s. Engine tests pass."
+    },
+    {
+      "command": "Python regression: test_adapters.py",
+      "notes": "7 passed in 3.87s. Adapter tests pass."
+    },
+    {
+      "command": "Python regression: test_server.py",
+      "notes": "9 passed in 9.92s. Server API tests pass."
+    },
+    {
+      "command": "git_status and frozen-layer diff",
+      "notes": "No frozen-layer files changed. Current changes are app-layer outcome handling/worker wiring and device tests plus P3-004 ADworkflo artifacts, validation report, and coverage-registry evidence."
+    },
+    {
+      "command": "Notification text safety review",
+      "notes": "Source review of BackgroundGenerationNotifier.kt: completed notification title='后台生成完成', text='一个后台生成任务已完成，可在应用中查看结果。'; failed notification title='后台生成失败', text='一个后台生成任务未能完成，请稍后重试。'. No user message text, session titles, model names, provider identifiers, URLs, error originals, or secrets in any notification copy. Notification channel IMPORTANCE_LOW, setShowBadge(false), autoCancel=true."
+    },
+    {
+      "command": "Diagnostic text safety review",
+      "notes": "Source review of GenerationDiagnosticPolicy.kt: provider_failure code='provider_request_failed', title='模型服务请求失败', detail='模型服务请求未完成，请检查网络或配置后重试。'; background_generation_failed code='background_generation_failed', title='后台生成失败', detail='后台生成任务未完成，请打开应用后重试。'. controlledBackgroundFailures set excludes NoModel/VisionInput/BlankPrompt from diagnostic mapping. UnknownGenerationFailure fallback code='generation_failed'. No Authorization/sk-/https:// tokens in any diagnostic record."
+    }
+  ],
+  "failed": [],
+  "blocked": [],
+  "registry_updates": {
+    "LEG-016": {
+      "previous_status": "in_progress",
+      "new_status": "in_progress",
+      "previous_gate": "blocker",
+      "new_gate": "blocker",
+      "evidence_added": "NATIVE-P3-004 confirms 6 BackgroundGenerationRepositoryTest JVM tests, emulator-5554 session-deletion isolation/startup-recovery instrumentation, and the Worker-used outcome handler's deterministic failed-outcome → ErrorLog → diagnostics/clipboard loop. Broader P6 matrix remains pending.",
+      "closed": false
+    },
+    "LEG-017": {
+      "previous_status": "in_progress",
+      "new_status": "in_progress",
+      "previous_gate": "blocker",
+      "new_gate": "blocker",
+      "evidence_added": "NATIVE-P3-004 confirms 10 BackgroundGenerationNotificationPolicyTest JVM tests plus BackgroundGenerationNotificationDeviceTest on emulator-5554, verifying actual Completed/Failed notification delivery and safe copy. Broader P6 background/provider matrix remains pending.",
+      "closed": false
+    },
+    "LEG-023": {
+      "previous_status": "in_progress",
+      "new_status": "in_progress",
+      "previous_gate": "watch",
+      "new_gate": "watch",
+      "evidence_added": "NATIVE-P3-004 confirms 5 GenerationDiagnosticPolicyTest JVM tests and emulator-5554 projection of the production handler's safe failed outcome through ErrorLog, Diagnostics Route, and clipboard. Source review confirms fixed safe codes and generic text.",
+      "closed": false
+    },
+    "LEG-028": {
+      "previous_status": "in_progress",
+      "new_status": "in_progress",
+      "previous_gate": "blocker",
+      "new_gate": "blocker",
+      "evidence_added": "NATIVE-P3-004 confirms provider failure diagnostic mapping by JVM test and confirms the Worker-used handler's safe failed-outcome diagnostic loop on emulator-5554. Real external Provider connectivity remains later P6 scope.",
+      "closed": false
+    },
+    "LEG-029": {
+      "previous_status": "not_started",
+      "new_status": "in_progress",
+      "previous_gate": "watch",
+      "new_gate": "watch",
+      "evidence_added": "NATIVE-P3-004 confirms notification preference toggle (backgroundGenerationNotificationEnabled, default false) is implemented and tested. Proactive settings enable/disable is partially validated — toggle persistence and policy enforcement verified at JVM level.",
+      "closed": false
+    },
+    "LEG-030": {
+      "previous_status": "in_progress",
+      "new_status": "in_progress",
+      "previous_gate": "watch",
+      "new_gate": "watch",
+      "evidence_added": "NATIVE-P3-004 confirms diagnostic entry and notification permission are integrated. Notification policy checks permission before posting. Diagnostic policy maps failures to safe records. About/update surface check unchanged from P1-004.",
+      "closed": false
+    },
+    "LEG-044": {
+      "previous_status": "verified",
+      "new_status": "verified",
+      "previous_gate": "closed",
+      "new_gate": "closed",
+      "evidence_added": "NATIVE-P3-004 reconfirms About/diagnostics UI smoke and PWA hint absence. No changes to PWA/Capacitor packaging (per non-goals).",
+      "closed": true
+    }
+  }
+}

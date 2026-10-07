@@ -4,6 +4,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class AppPreferencesRepository(
@@ -14,10 +15,23 @@ class AppPreferencesRepository(
             theme = stored[AppPreferenceKeys.theme]?.let(::parseTheme) ?: AppPreferences.defaults.theme,
             globalAvatarVisible = stored[AppPreferenceKeys.globalAvatarVisible]
                 ?: AppPreferences.defaults.globalAvatarVisible,
+            challengeReminderEnabled = stored[AppPreferenceKeys.challengeReminderEnabled]
+                ?: AppPreferences.defaults.challengeReminderEnabled,
+            hapticFeedbackEnabled = stored[AppPreferenceKeys.hapticFeedbackEnabled]
+                ?: AppPreferences.defaults.hapticFeedbackEnabled,
             primaryMemo = stored[AppPreferenceKeys.primaryMemo] ?: AppPreferences.defaults.primaryMemo,
             secondaryMemo = stored[AppPreferenceKeys.secondaryMemo]
                 ?: AppPreferences.defaults.secondaryMemo,
-            scratchMemo = stored[AppPreferenceKeys.scratchMemo] ?: AppPreferences.defaults.scratchMemo
+            scratchMemo = stored[AppPreferenceKeys.scratchMemo] ?: AppPreferences.defaults.scratchMemo,
+            backgroundGenerationNotificationEnabled =
+                stored[AppPreferenceKeys.backgroundGenerationNotificationEnabled]
+                    ?: AppPreferences.defaults.backgroundGenerationNotificationEnabled,
+            webSearchEnabled = stored[AppPreferenceKeys.webSearchEnabled]
+                ?: AppPreferences.defaults.webSearchEnabled,
+            visionAssistEnabled = stored[AppPreferenceKeys.visionAssistEnabled]
+                ?: AppPreferences.defaults.visionAssistEnabled,
+            visionModelName = stored[AppPreferenceKeys.visionModelName]
+                ?: AppPreferences.defaults.visionModelName
         )
     }
 
@@ -30,6 +44,53 @@ class AppPreferencesRepository(
     suspend fun setGlobalAvatarVisible(visible: Boolean) {
         dataStore.edit { preferences ->
             preferences[AppPreferenceKeys.globalAvatarVisible] = visible
+        }
+    }
+
+    suspend fun setChallengeReminderEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.challengeReminderEnabled] = enabled
+        }
+    }
+
+    /** NEWMP-V1-018: one-shot read used by ChatGenerationRepository per reply. */
+    suspend fun currentWebSearchEnabled(): Boolean =
+        preferences.map { it.webSearchEnabled }.first()
+
+    suspend fun setWebSearchEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.webSearchEnabled] = enabled
+        }
+    }
+
+    /** NEWMP-V1-020: one-shot reads used by source import before each vision transcription. */
+    suspend fun currentVisionAssistEnabled(): Boolean =
+        preferences.map { it.visionAssistEnabled }.first()
+
+    suspend fun currentVisionModelName(): String =
+        preferences.map { it.visionModelName }.first()
+
+    suspend fun setVisionAssistEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.visionAssistEnabled] = enabled
+        }
+    }
+
+    suspend fun setVisionModelName(name: String) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.visionModelName] = name
+        }
+    }
+
+    suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.hapticFeedbackEnabled] = enabled
+        }
+    }
+
+    suspend fun setBackgroundGenerationNotificationEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[AppPreferenceKeys.backgroundGenerationNotificationEnabled] = enabled
         }
     }
 

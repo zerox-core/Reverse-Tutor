@@ -30,11 +30,11 @@ class LlmProfileSettingsModelTest {
             connectionResult = LlmConnectionResult.Success("Mock connection ready")
         )
 
-        assertEquals("1 profile", state.summary)
+        assertEquals("1 个模型配置", state.summary)
         assertEquals(listOf("OpenAI-compatible", "Anthropic-compatible", "Custom/local"), state.presetLabels)
         assertEquals("Work model", state.profileItems.single().name)
-        assertEquals("OpenAiCompatible | gpt-4o-mini", state.profileItems.single().providerModelLabel)
-        assertEquals("Key saved", state.profileItems.single().keyStatusLabel)
+        assertEquals("OpenAiCompatible · gpt-4o-mini", state.profileItems.single().providerModelLabel)
+        assertEquals("已保存 API Key", state.profileItems.single().keyStatusLabel)
         assertTrue(state.profileItems.single().active)
         assertEquals("Mock connection ready", state.connectionStatusLabel)
     }

@@ -1,0 +1,77 @@
+package com.reversetutor.preview.shell
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ChallengePresentationTest {
+    @Test
+    fun unjoinedChallengeShowsRecruitmentInsteadOfPersonalProgress() {
+        val presentation = ChallengePresentation.from(
+            joined = false,
+            progress = 12,
+            total = 21
+        )
+
+        assertEquals("可加入", presentation.statusLabel)
+        assertEquals("招募中", presentation.syncLabel)
+        assertEquals("长期开放加入", presentation.metaLabel)
+        assertEquals("挑战任务", presentation.metricTitle)
+        assertEquals("21", presentation.metricValue)
+        assertEquals(" 个任务", presentation.metricSuffix)
+        assertFalse(presentation.showPersonalProgress)
+        assertFalse(presentation.showFeedback)
+    }
+
+    @Test
+    fun joinedChallengeShowsStablePersonalProgress() {
+        val presentation = ChallengePresentation.from(
+            joined = true,
+            progress = 12,
+            total = 21
+        )
+
+        assertEquals("进行中", presentation.statusLabel)
+        assertEquals("已同步", presentation.syncLabel)
+        assertEquals("已加入本挑战", presentation.metaLabel)
+        assertEquals("学习进度", presentation.metricTitle)
+        assertEquals("12", presentation.metricValue)
+        assertEquals(" / 21 个任务", presentation.metricSuffix)
+        assertEquals(12f / 21f, presentation.progressFraction)
+        assertTrue(presentation.showPersonalProgress)
+        assertTrue(presentation.showFeedback)
+    }
+
+    @Test
+    fun detailSheetReservesFooterSpaceAndKeepsApprovedPastelHero() {
+        assertTrue(
+            ChallengeDetailLayout.ContentBottomPadding >=
+                ChallengeDetailLayout.FooterHeight + ChallengeDetailLayout.FooterClearance
+        )
+        assertTrue(ChallengeDetailLayout.ContentBottomPadding >= 128.dp)
+        assertEquals(
+            listOf(Color(0xFFE7F8FF), Color(0xFFF1ECFF)),
+            ChallengeDetailLayout.HeroColors
+        )
+    }
+
+    @Test
+    fun detailSheetUsesFlatMaterialSurfacesWithoutShadowFrames() {
+        assertEquals(0.dp, ChallengeDetailLayout.SheetElevation)
+        assertEquals(0.dp, ChallengeDetailLayout.HeroElevation)
+        assertEquals(0.dp, ChallengeDetailLayout.RuleElevation)
+        assertEquals(0.dp, ChallengeDetailLayout.FooterElevation)
+        assertFalse(ChallengeDetailLayout.UsesOutlinedContentCards)
+    }
+
+    @Test
+    fun challengeReturnRequiresActivePageWithAllContentVisible() {
+        assertFalse(challengeExitBoundaryAllowed(false, false, 8, false))
+        assertFalse(challengeExitBoundaryAllowed(true, true, 8, false))
+        assertFalse(challengeExitBoundaryAllowed(true, false, 8, true))
+        assertTrue(challengeExitBoundaryAllowed(true, false, 8, false))
+    }
+}

@@ -1,6 +1,7 @@
 package com.reversetutor.feature.chat
 
 import com.reversetutor.core.data.local.dao.MemoryDao
+import com.reversetutor.core.data.local.dao.SourceChunkEmbeddingRow
 import com.reversetutor.core.data.local.dao.SourceDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
 import com.reversetutor.core.data.local.entity.ErrorLogEntity
@@ -72,6 +73,72 @@ class ChatContextEvidenceTest {
 
         assertTrue(evidence.isEmpty())
     }
+
+    @Test
+    fun chatRouteEvidenceUsesLatestSnapshotAndOnlyItsSelectedSources() = runBlocking {
+        val sourceRepository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+        listOf("selected" to "selected body", "unselected" to "unselected body").forEachIndexed { index, (id, body) ->
+            sourceRepository.importSource(
+                SourceImportInput(index.toLong(), "$id.md", text = body, sourceId = id),
+                nowEpochMillis = index.toLong()
+            )
+        }
+        val snapshot = NewSessionConfiguration(
+            learnerDisplayName = "小概",
+            sourceSelections = listOf("selected")
+        )
+
+        val evidence = buildChatContextEvidence(
+            userText = "body",
+            memoryRepository = null,
+            sourceRepository = sourceRepository,
+            sessionSnapshot = snapshot,
+            sessionId = "session-a"
+        )
+
+        assertEquals("session-settings-session-a", evidence.first().id)
+        assertTrue(evidence.first().body.contains("小概"))
+        assertTrue(evidence.any { it.id == "selected" })
+        assertTrue(evidence.none { it.id == "unselected" })
+    }
+
+    @Test
+    fun generationEvidenceRecordsOnlySelectedSourcesThatActuallyEnterContext() = runBlocking {
+        val sourceRepository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+        listOf("used" to "matching lesson", "not-used" to "other lesson").forEachIndexed { index, (id, body) ->
+            sourceRepository.importSource(
+                SourceImportInput(index.toLong(), "$id.md", text = body, sourceId = id),
+                nowEpochMillis = index.toLong()
+            )
+        }
+        val calls = mutableListOf<Triple<String, Set<String>, Long>>()
+        val usagePort = ChatSourceUsagePort { sessionId, sourceIds, usedAt ->
+            calls += Triple(sessionId, sourceIds, usedAt)
+        }
+        val snapshot = NewSessionConfiguration(sourceSelections = listOf("used", "not-used"))
+
+        val pureEvidence = buildChatContextEvidence(
+            userText = "matching",
+            memoryRepository = null,
+            sourceRepository = sourceRepository,
+            sessionSnapshot = snapshot,
+            sessionId = "session-a"
+        )
+        assertTrue(calls.isEmpty())
+
+        val generationEvidence = buildGenerationChatContextEvidence(
+            userText = "matching",
+            memoryRepository = null,
+            sourceRepository = sourceRepository,
+            sessionSnapshot = snapshot,
+            sessionId = "session-a",
+            sourceUsagePort = usagePort,
+            usedAtEpochMillis = 123L
+        )
+
+        assertEquals(pureEvidence, generationEvidence)
+        assertEquals(listOf(Triple("session-a", setOf("used"), 123L)), calls)
+    }
 }
 
 private class FakeMemoryDao : MemoryDao {
@@ -112,6 +179,8 @@ private class FakeMemoryDao : MemoryDao {
     override suspend fun deleteNote(id: String): Int = 0
     override suspend fun deleteAnchor(id: String): Int = 0
     override suspend fun setErrorResolved(id: String, resolved: Boolean): Int = 0
+    override suspend fun deleteError(id: String): Int = if (errors.remove(id) == null) 0 else 1
+    override suspend fun deleteMemoryItem(id: String): Int = if (memoryItems.remove(id) == null) 0 else 1
 }
 
 private class FakeSourceDao : SourceDao {
@@ -139,4 +208,13 @@ private class FakeSourceDao : SourceDao {
         ids.forEach { chunks.remove(it) }
         return ids.size
     }
+
+    override suspend fun updateChunkEmbedding(chunkId: String, embedding: ByteArray, embeddingModel: String?) {
+        chunks[chunkId]?.let { chunks[chunkId] = it.copy(embedding = embedding, embeddingModel = embeddingModel) }
+    }
+
+    override suspend fun listChunkEmbeddingRows(spaceId: String): List<SourceChunkEmbeddingRow> =
+        chunks.values
+            .filter { it.spaceId == spaceId && it.embedding != null }
+            .map { SourceChunkEmbeddingRow(it.id, it.embedding!!, it.embeddingModel) }
 }

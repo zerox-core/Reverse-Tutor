@@ -6,6 +6,7 @@ import com.reversetutor.core.data.local.entity.ErrorLogEntity
 import com.reversetutor.core.data.local.entity.MemoryItemEntity
 import com.reversetutor.core.data.local.entity.NoteEntity
 import com.reversetutor.core.model.MemoryItemKind
+import com.reversetutor.core.model.ErrorLogOrigin
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -80,6 +81,34 @@ class MemoryRepositoryTest {
         assertEquals("Updated note", snapshot.notes.single().title)
         assertTrue(snapshot.errors.single().resolved)
     }
+
+    @Test
+    fun retainsOnlyFiftyGenerationDiagnosticsWithoutDeletingLearningErrors() = runBlocking {
+        val dao = FakeMemoryDao()
+        val repository = MemoryRepository(dao, defaultSpaceId = "space-1")
+        repository.logError(
+            input = ErrorLogInput("学习记录", "保留的学习错误"),
+            nowEpochMillis = 1L,
+            errorId = "learning-error"
+        )
+
+        repeat(51) { index ->
+            repository.logError(
+                input = ErrorLogInput("生成失败", "模型服务请求未完成，请稍后重试。"),
+                nowEpochMillis = (index + 2).toLong(),
+                errorId = "generation-$index",
+                origin = ErrorLogOrigin.Generation,
+                code = "provider_request_failed"
+            )
+        }
+
+        val errors = repository.snapshot().errors
+
+        assertEquals(51, errors.size)
+        assertTrue(errors.any { it.id == "learning-error" && it.origin == ErrorLogOrigin.Learning })
+        assertFalse(errors.any { it.id == "generation-0" })
+        assertTrue(errors.all { it.origin == ErrorLogOrigin.Learning || it.code == "provider_request_failed" })
+    }
 }
 
 private class FakeMemoryDao : MemoryDao {
@@ -133,4 +162,10 @@ private class FakeMemoryDao : MemoryDao {
         errors[id] = existing.copy(resolved = resolved)
         return 1
     }
+
+    override suspend fun deleteError(id: String): Int =
+        if (errors.remove(id) == null) 0 else 1
+
+    override suspend fun deleteMemoryItem(id: String): Int =
+        if (items.remove(id) == null) 0 else 1
 }

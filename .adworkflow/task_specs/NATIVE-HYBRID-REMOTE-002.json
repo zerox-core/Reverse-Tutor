@@ -1,0 +1,37 @@
+{
+  "task_id": "NATIVE-HYBRID-REMOTE-002",
+  "goal": "Implement suspend Android OnlineApi transport and domain repository adapters for activities, sync, weekly insight, and releases.",
+  "non_goals": [
+    "Do not modify Compose screens or provider generation runtime.",
+    "Do not upload local-only chat or source正文.",
+    "Do not hardcode production tokens or server credentials.",
+    "Do not revert unrelated changes."
+  ],
+  "acceptance_criteria": [
+    "OnlineApi is suspendable and has an injected transport.",
+    "Activity, SyncTransport, and UpdateRepository adapters expose domain types only.",
+    "Retryable failures preserve Outbox entries.",
+    "Only allowed shared entity types are transmitted.",
+    "Tests perform zero real network calls."
+  ],
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "write_scope": [
+    "mobile-native/core/remote",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/online",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/online"
+  ],
+  "do_not_touch": [
+    "mobile-native/app",
+    "mobile-native/feature",
+    "mobile-native/core/llm",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/local",
+    "server.py",
+    "static/app/index.html"
+  ],
+  "verification_expectations": [
+    "Run core:remote and focused core:data tests.",
+    "Verify no real network access.",
+    "Report required Gradle dependencies to the controller."
+  ]
+}

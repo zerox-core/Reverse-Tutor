@@ -52,4 +52,14 @@ object ReverseTutorDesign {
         @Composable
         @ReadOnlyComposable
         get() = tokens.semanticColors
+
+    val surfaces: ReverseTutorSurfaceTokens
+        @Composable
+        @ReadOnlyComposable
+        get() = tokens.surfaces
+
+    val text: ReverseTutorTextTokens
+        @Composable
+        @ReadOnlyComposable
+        get() = tokens.text
 }

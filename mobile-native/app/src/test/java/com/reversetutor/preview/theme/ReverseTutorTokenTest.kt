@@ -17,17 +17,17 @@ class ReverseTutorTokenTest {
         assertEquals(20f, spacing.space5.value, 0f)
         assertEquals(24f, spacing.space6.value, 0f)
         assertEquals(32f, spacing.space8.value, 0f)
-        assertEquals(48f, spacing.minTouchTarget.value, 0f)
+        assertEquals(44f, spacing.minTouchTarget.value, 0f)
     }
 
     @Test
-    fun shapeTokensKeepCardsAtEightDpOrLess() {
+    fun shapeTokensMatchApprovedFigmaRadii() {
         val shapes = ReverseTutorThemeTokens.shapes
 
-        assertEquals(4f, shapes.radiusSmall.value, 0f)
-        assertEquals(6f, shapes.radiusMedium.value, 0f)
-        assertEquals(8f, shapes.radiusCard.value, 0f)
-        assertEquals(16f, shapes.radiusSheet.value, 0f)
+        assertEquals(12f, shapes.radiusSmall.value, 0f)
+        assertEquals(16f, shapes.radiusMedium.value, 0f)
+        assertEquals(18f, shapes.radiusCard.value, 0f)
+        assertEquals(24f, shapes.radiusSheet.value, 0f)
     }
 
     @Test
@@ -35,10 +35,10 @@ class ReverseTutorTokenTest {
         val light = ReverseTutorThemeTokens.lightColorScheme
         val dark = ReverseTutorThemeTokens.darkColorScheme
 
-        assertEquals(Color(0xFF1E6B5E), light.primary)
-        assertEquals(Color(0xFFF7FAF8), light.surface)
-        assertEquals(Color(0xFF9FD8CC), dark.primary)
-        assertEquals(Color(0xFF101513), dark.surface)
+        assertEquals(Color(0xFF575CE6), light.primary)
+        assertEquals(Color(0xFFFCFCFF), light.surface)
+        assertEquals(Color(0xFFBFC3FF), dark.primary)
+        assertEquals(Color(0xFF1D1F2C), dark.surface)
         assertNotEquals(light.surface, dark.surface)
         assertNotEquals(light.primaryContainer, dark.primaryContainer)
     }

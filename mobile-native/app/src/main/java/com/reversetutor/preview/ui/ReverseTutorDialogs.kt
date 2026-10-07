@@ -58,7 +58,7 @@ fun ReverseTutorDestructiveConfirmationDialog(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    dismissLabel: String = "Cancel"
+    dismissLabel: String = "取消"
 ) {
     ReverseTutorConfirmationDialog(
         title = title,

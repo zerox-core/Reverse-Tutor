@@ -65,6 +65,49 @@ STUDENT_ROLES = {
 }
 EVIDENCE_TYPES = {"none", "explanation", "retrieval", "transfer", "delayed_retrieval", "correction"}
 VERIFICATION_STATUSES = {"none", "passed", "partial", "failed"}
+
+# --- 活动会话接线（挑战活动：探针计划注入 + 会话内证据写回） -------------------
+#
+# 会话 settings 里带 "activity": {"slug": ..., "accountId": ...} 时，run_turn
+# 会把该参与者的定稿探针计划注入系统提示，并在 LLM 判定某条阶段证据达成时
+# 写回活动证据事件。hook 由服务装配层（server.py lifespan）注册；未注册或
+# 会话无 activity 链接时整条链路不生效（安全默认、纯增量）。
+
+ACTIVITY_EVIDENCE_INSTRUCTION = (
+    "# 什么时候算我真懂了\n"
+    "这一轮聊完，如果老师的讲解让你对上面某条想搞懂的东西真的懂了"
+    "（达到「我就算真懂了」那一档），就在输出 JSON 顶层加一个字段 "
+    "\"activity_evidence\": {\"stage_index\": 阶段号, "
+    "\"evidence_key\": \"那条的名字\"}。名字只能照抄上面清单里「」中的词，"
+    "一轮最多写一条；只是懂了一半、或者拿不准，就不要写这个字段。"
+)
+
+_ACTIVITY_HOOK = None
+
+
+def set_activity_hook(hook) -> None:
+    """注册活动会话 hook（鸭子类型：render_block / record_turn_evidence）。"""
+    global _ACTIVITY_HOOK
+    _ACTIVITY_HOOK = hook
+
+
+def reset_activity_hook() -> None:
+    global _ACTIVITY_HOOK
+    _ACTIVITY_HOOK = None
+
+
+def _activity_link(session: db.Session) -> dict[str, str] | None:
+    """从会话 settings 里读活动链接；无或不完整返回 None。"""
+    raw = session.settings().get("activity") if hasattr(session, "settings") else None
+    if not isinstance(raw, dict):
+        return None
+    slug = str(raw.get("slug") or "").strip()
+    account_id = str(raw.get("accountId") or raw.get("account_id") or "").strip()
+    if not slug or not account_id:
+        return None
+    return {"slug": slug, "account_id": account_id}
+
+
 CLUE_STUDENT_OPENERS = ("老师，据说", "老师，我听说")
 CLUE_STUDENT_FORBIDDEN_PHRASES = ("我来教你", "步骤如下", "根据定义")
 CHALLENGE_FORBIDDEN_PHRASES = ("你错了", "不对", "正确答案是", "我来纠正你")
@@ -444,6 +487,7 @@ def build_system_prompt(
     due_reviews: list[db.Mastery] | None = None,
     error_logs: list[db.ErrorLog] | None = None,
     kg_context_text: str = "",
+    activity_block: str = "",
 ) -> str:
     mode = _session_mode(session)
     template = {
@@ -500,6 +544,8 @@ def build_system_prompt(
         )
     if kg_context_text:
         base += "\n\n" + kg_context_text
+    if activity_block:
+        base += "\n\n" + activity_block
     return base
 
 
@@ -1055,9 +1101,9 @@ def create_session(
 
 # --- 压缩 / 摘要 -----------------------------------------------------------
 
-SUMMARY_THRESHOLD = 30     # user+assistant 条数超过此值才压缩
+SUMMARY_THRESHOLD = 72     # user+assistant 条数超过此值才压缩（配合 60 条窗口，约 36 轮才触发）
 SUMMARY_KEEP_RECENT = 12   # 最近多少条保留原文
-RECENT_PROMPT_MESSAGE_LIMIT = 12
+RECENT_PROMPT_MESSAGE_LIMIT = 60  # 最近 60 条（约 30 轮）全量进上下文，2026-10-06 用户拍板扩窗
 RUNTIME_MEMORY_HINT_MAX_CHARS = 1600
 RUNTIME_MEMORY_HINT_MAX_ITEMS = 16
 SUMMARY_SYSTEM = (
@@ -1293,6 +1339,21 @@ async def run_turn(
         kg_ctx=kg_ctx,
     )
 
+    activity_link = _activity_link(session)
+    activity_block = ""
+    activity_plan_unavailable = False
+    if activity_link is not None and _ACTIVITY_HOOK is not None:
+        try:
+            block = _ACTIVITY_HOOK.render_block(
+                activity_slug=activity_link["slug"],
+                account_id=activity_link["account_id"],
+            )
+            if block and block.strip():
+                activity_block = (
+                    block.strip() + "\n\n" + ACTIVITY_EVIDENCE_INSTRUCTION
+                )
+        except Exception:
+            activity_plan_unavailable = True
     system = build_system_prompt(
         session,
         anchors,
@@ -1301,6 +1362,7 @@ async def run_turn(
         due_reviews=due_reviews,
         error_logs=error_logs,
         kg_context_text=kg_context_text,
+        activity_block=activity_block,
     )
     if runtime_memory_hint:
         system += "\n\n" + runtime_memory_hint
@@ -1373,6 +1435,8 @@ async def run_turn(
             f" 系统检测到 {len(due_reviews)} 个旧知识点到期，"
             "是否带回视用户回复决定。"
         )
+    if activity_plan_unavailable:
+        process_summary += " [warn] activity_probe_plan_unavailable"
     citation_meta: dict[str, Any] = {}
     cited_chunk_ids: list[int] = []
     if action.get("student_role") in {"clue_student", "scaffold_student"}:
@@ -1408,6 +1472,38 @@ async def run_turn(
     }
     assistant_msg = db.add_message(db_sess, sid, "assistant", reply, meta=assistant_meta)
     db_sess.flush()
+
+    # 活动证据写回（挑战活动会话）：LLM 判定的阶段证据落进活动证据事件，
+    # 由 hook 对照存档探针计划校验（kind 取自计划）；失败不阻塞本轮。
+    if (
+        activity_link is not None
+        and _ACTIVITY_HOOK is not None
+        and isinstance(raw.get("activity_evidence"), dict)
+    ):
+        raw_activity_evidence = raw["activity_evidence"]
+        try:
+            note = _ACTIVITY_HOOK.record_turn_evidence(
+                activity_slug=activity_link["slug"],
+                account_id=activity_link["account_id"],
+                session_id=sid,
+                message_id=assistant_msg.id,
+                stage_index=int(raw_activity_evidence.get("stage_index")),
+                evidence_key=str(
+                    raw_activity_evidence.get("evidence_key") or ""
+                ).strip(),
+            )
+            if note:
+                process_summary += f" [activity] {note}"
+                assistant_meta["process_summary"] = process_summary
+                assistant_msg.meta_json = json.dumps(
+                    assistant_meta, ensure_ascii=False
+                )
+        except Exception:
+            process_summary += " [warn] activity_evidence_not_recorded"
+            assistant_meta["process_summary"] = process_summary
+            assistant_msg.meta_json = json.dumps(
+                assistant_meta, ensure_ascii=False
+            )
 
     # 更新掌握度
     kp = (action.get("knowledge_point") or "").strip()

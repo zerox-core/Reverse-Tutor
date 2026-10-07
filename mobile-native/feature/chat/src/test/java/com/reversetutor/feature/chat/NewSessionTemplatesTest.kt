@@ -13,11 +13,12 @@ class NewSessionTemplatesTest {
             BuiltInSessionTemplates.all.map { it.id }
         )
         BuiltInSessionTemplates.all.forEach { template ->
-            assertTrue(template.title.length >= 4)
-            assertTrue(template.role.length >= 8)
-            assertTrue(template.goal.length >= 8)
-            assertTrue(template.profileText.length >= 16)
+            assertTrue(template.title.isNotBlank())
+            assertTrue(template.role.isNotBlank())
+            assertTrue(template.goal.isNotBlank())
+            assertTrue(template.profileText.isNotBlank())
         }
+        assertTrue(BuiltInSessionTemplates.all.map { it.title }.contains("校内学习"))
     }
 
     @Test

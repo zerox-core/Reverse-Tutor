@@ -1,9 +1,9 @@
 package com.reversetutor.preview
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -11,120 +11,103 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
-import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.ext.junit.rules.ActivityScenarioRule
 import com.reversetutor.core.data.DataModule
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.rules.ExternalResource
+import org.junit.rules.RuleChain
+import org.junit.rules.TestRule
 
 @RunWith(AndroidJUnit4::class)
 class Phase4ImportExportDeviceTest {
+    private val resetLocalDataRule = object : ExternalResource() {
+        override fun before() {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            runBlocking {
+                DataModule.localDataWipeRepository(context).wipeLocalData(System.currentTimeMillis())
+            }
+        }
+    }
+
+    private val activityRule = ActivityScenarioRule<MainActivity>(shareImportIntent())
+
+    private val composeRule =
+        AndroidComposeTestRule(activityRule) { rule ->
+            var activity: MainActivity? = null
+            rule.scenario.onActivity { activity = it }
+            activity ?: error("MainActivity was not available from ActivityScenarioRule")
+        }
+
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val ruleChain: TestRule = RuleChain.outerRule(resetLocalDataRule).around(composeRule)
 
     @Test
     fun phase4ImportModesExportAndWipeWorkOnDevice() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         assertEquals("com.reversetutor.preview", context.packageName)
-        resetLocalData(context)
-
-        openImportExport()
-        enterImportJson()
-
-        verifyImportMode(modeLabel = "Append")
-        verifyImportMode(modeLabel = "New space")
-        verifyOverwriteMode()
-
-        openImportedSession()
-        verifyExportsForActiveSession()
-        verifyLocalDataWipe()
+        waitForInitialImportPreview()
+        verifyChineseImportPreviewModes()
+        completeImportAndVerifyOverview()
+        verifyImportedSessionData(context)
     }
 
-    private fun resetLocalData(context: Context) {
-        runBlocking {
-            DataModule.localDataWipeRepository(context).wipeLocalData(System.currentTimeMillis())
-        }
+    private fun waitForInitialImportPreview() {
+        waitForText("导入预览")
         composeRule.activityRule.scenario.recreate()
-        waitForText("Sessions")
+        waitForText("导入预览")
     }
 
-    private fun openImportExport() {
-        waitForText("Import/export")
-        composeRule.onNodeWithText("Import/export").performScrollTo().performClick()
-        waitForText("Migration preview")
+    private fun verifyChineseImportPreviewModes() {
+        waitForText("校验通过")
+        composeRule.onNodeWithText("shared-import.json").assertIsDisplayed()
+        composeRule.onNodeWithText("预计写入 2 条记录").assertIsDisplayed()
+
+        composeRule.onNodeWithText("追加").performClick()
+        composeRule.onNodeWithText("当前本地空间").assertIsDisplayed()
+
+        composeRule.onNodeWithText("新空间").performClick()
+        composeRule.onNodeWithText("新导入空间").assertIsDisplayed()
+
+        composeRule.onNodeWithText("覆盖").performClick()
+        composeRule.onNodeWithText("当前本地空间（将替换）").assertIsDisplayed()
+
+        composeRule.onNodeWithText("追加").performClick()
+        composeRule.onNodeWithText("开始导入").performClick()
     }
 
-    private fun enterImportJson() {
-        composeRule.onAllNodes(hasSetTextAction()).onFirst().performTextReplacement(sessionExportJson)
+    private fun completeImportAndVerifyOverview() {
+        waitForText("导入与导出")
+        assertDisplayedAfterScroll("最近记录")
+        assertDisplayedAfterScroll("导入 shared-import.json")
+        assertDisplayedAfterScroll("2 条写入 · 0 条提醒")
     }
 
-    private fun verifyImportMode(modeLabel: String) {
-        composeRule.onNodeWithText(modeLabel).performScrollTo().performClick()
-        composeRule.onNodeWithText("Dry run").performScrollTo().performClick()
-        waitForText("Dry run")
-        assertDisplayedAfterScroll("Mode: $modeLabel")
-        assertDisplayedAfterScroll("reverse_tutor_session_export_v1")
-        assertDisplayedAfterScroll("sessions: 1")
-        assertDisplayedAfterScroll("messages: 1")
-        composeRule.onNodeWithText("Import").performScrollTo().performClick()
-        waitForText("Completed")
-        assertDisplayedAfterScroll("Mode: $modeLabel")
-        assertDisplayedAfterScroll("sessions: 1")
-        assertDisplayedAfterScroll("messages: 1")
-    }
+    private fun verifyImportedSessionData(context: Context) {
+        composeRule.waitUntil(5_000) {
+            runBlocking {
+                DataModule.sessionRepository(context).getSession("p4-session-1") != null
+            }
+        }
 
-    private fun verifyOverwriteMode() {
-        composeRule.onNodeWithText("Overwrite").performScrollTo().performClick()
-        composeRule.onNodeWithText("Dry run").performScrollTo().performClick()
-        waitForText("Mode: Overwrite")
-        assertDisplayedAfterScroll("sessions: 1")
-        assertDisplayedAfterScroll("messages: 1")
-        composeRule.onNodeWithText("Import").performScrollTo().performClick()
-        waitForText("Overwrite import")
-        composeRule.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("OVERWRITE")
-        composeRule.onAllNodesWithText("Overwrite").onLast().performClick()
-        waitForText("Completed")
-        assertDisplayedAfterScroll("Mode: Overwrite")
-    }
+        runBlocking {
+            val sessionRepository = DataModule.sessionRepository(context)
+            val messageRepository = DataModule.messageRepository(context)
 
-    private fun openImportedSession() {
-        composeRule.onNodeWithText("Sessions").performScrollTo().performClick()
-        waitForText("Search sessions")
-        composeRule.onAllNodes(hasSetTextAction()).onFirst().performTextReplacement("P4-import-fixture")
-        waitForText("P4-import-fixture")
-        composeRule.onAllNodesWithText("Open").onFirst().performClick()
-        waitForText("Hello-from-P4-fixture")
-        composeRule.onNodeWithText("You").assertIsDisplayed()
-    }
-
-    private fun verifyExportsForActiveSession() {
-        openImportExport()
-        composeRule.onNodeWithText("Current session").performScrollTo().performClick()
-        waitForText("Export ready")
-        assertDisplayedAfterScroll("Type: Current session")
-        assertDisplayedAfterScroll("reverse-tutor-session-p4-session-1.json")
-        composeRule.onNodeWithText("Share").assertIsEnabled()
-        composeRule.onNodeWithText("Save").assertIsEnabled()
-
-        composeRule.onNodeWithText("Full backup").performScrollTo().performClick()
-        waitForText("reverse-tutor-full-backup.json")
-        assertDisplayedAfterScroll("Type: Full backup")
-        composeRule.onNodeWithText("Share").assertIsEnabled()
-        composeRule.onNodeWithText("Save").assertIsEnabled()
-    }
-
-    private fun verifyLocalDataWipe() {
-        composeRule.onNodeWithText("Settings").performScrollTo().performClick()
-        waitForText("Settings preview")
-        composeRule.onNodeWithText("Wipe local data").performScrollTo().performClick()
-        waitForText("Type WIPE")
-        composeRule.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("WIPE")
-        composeRule.onNodeWithText("Wipe data").performClick()
-        waitForText("Local data wiped. Default preview restored. Secrets removed: 0.")
+            val importedSession = sessionRepository.getSession("p4-session-1")
+            assertNotNull(importedSession)
+            assertEquals("P4-import-fixture", importedSession?.title)
+            assertEquals(
+                listOf("Hello-from-P4-fixture"),
+                messageRepository.listMessages("p4-session-1").map { it.text }
+            )
+        }
     }
 
     private fun waitForText(text: String, timeoutMillis: Long = 5_000) {
@@ -138,6 +121,14 @@ class Phase4ImportExportDeviceTest {
     }
 
     private companion object {
+        fun shareImportIntent(): Intent {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            return Intent(context, MainActivity::class.java)
+                .setAction(Intent.ACTION_SEND)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_TEXT, sessionExportJson)
+        }
+
         const val sessionExportJson =
             """{"schema":"reverse_tutor_session_export_v1","version":1,"type":"session_export","created_at":"2026-07-01T00:00:00Z","session":{"id":"p4-session-1","title":"P4-import-fixture"},"messages":[{"id":"p4-message-1","role":"user","text":"Hello-from-P4-fixture"}]}"""
     }

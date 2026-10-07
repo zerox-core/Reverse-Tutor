@@ -9,8 +9,8 @@ value class LlmGenerationToken(val value: String)
 
 data class LlmGenerationRequest(
     val sessionId: String,
-    val userMessageId: String,
-    val userText: String,
+    val userMessageId: String? = null,
+    val userText: String? = null,
     val profileId: String,
     val provider: LlmProviderKind,
     val model: String,
@@ -18,10 +18,397 @@ data class LlmGenerationRequest(
     val capabilities: LlmCapabilities,
     val token: LlmGenerationToken,
     val secretRef: String? = null,
+    val streaming: Boolean = true,
+    /** NEWMP-V1-018: channel web-search switch; honored by Bailian-style OpenAI-compatible channels. */
+    val webSearchEnabled: Boolean = false,
     val quoteExcerpt: String? = null,
     val imageAttachments: List<MessageAttachment> = emptyList(),
-    val contextEvidence: List<LlmContextEvidence> = emptyList()
+    /** Provider-ready image bytes, resolved only at execution time. */
+    val resolvedImages: List<LlmResolvedImage> = emptyList(),
+    val contextEvidence: List<LlmContextEvidence> = emptyList(),
+    val sessionPolicy: LlmSessionPolicyContext? = null,
+    val assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+    val guidedTurnPlan: LlmGuidedTurnPlan? = null,
+    /**
+     * Expression-loop slice 2: pre-rendered turn note block (density tier,
+     * pacing signals, suggested focus), already rendered by the domain
+     * assembler; the LLM layer only positions it at the tail of the prompt
+     * per the cache-friendly layout (SPEC §4.8). Null keeps the legacy shape.
+     */
+    val turnNoteBlock: String? = null,
+    /** Process-local preview only; never persisted or sent to a provider. */
+    val onStreamChunk: ((String) -> Unit)? = null,
+    /**
+     * R95: process-local thinking/reasoning preview streamed ahead of the
+     * visible content (OpenAI-style reasoning_content, Anthropic
+     * thinking_delta, Gemini thought parts). Preview only; never persisted
+     * or sent to a provider.
+     */
+    val onReasoningChunk: ((String) -> Unit)? = null,
+    /**
+     * R96: per-turn thinking switch decided by the caller (null = default on).
+     * Wired to enable_thinking on OpenAI-compatible streaming requests;
+     * ignored by providers that do not know the field.
+     */
+    val thinkingEnabled: Boolean? = null,
+    /**
+     * Expression-loop slice 3: red-line watchdog abort signal. Streaming
+     * transports poll it between lines and cut the stream early when the
+     * validator hits; ignored by non-streaming calls.
+     */
+    val streamAbortRequested: () -> Boolean = { false },
+    /**
+     * Expression-loop slice 3: strong-constraint retry directive appended at
+     * the very tail of the prompt (after the user text) when a turn is
+     * retried after a red-line abort. Null on the first attempt.
+     */
+    val retryDirective: String? = null
 )
+
+/**
+ * Optional, wire-only teaching strategy supplied by the application layer.
+ * This type deliberately contains no `core:domain` dependency, so the LLM
+ * planner can consume it without reversing the module dependency direction.
+ */
+data class LlmSessionPolicyContext(
+    val actionType: String,
+    val studentRole: String,
+    val knowledgePoint: String,
+    val difficulty: Float,
+    val processSummary: String,
+    val evaluationCorrectness: Float = 0f,
+    val userEmotion: String = "neutral",
+    val correctionTiming: String = "immediate"
+) {
+    fun normalized(): LlmSessionPolicyContext? {
+        val normalizedAction = actionType.trim().lowercase().take(48)
+        val normalizedRole = studentRole.trim().lowercase().take(64)
+        if (normalizedAction.isEmpty() || normalizedRole.isEmpty()) return null
+        return copy(
+            actionType = normalizedAction,
+            studentRole = normalizedRole,
+            knowledgePoint = knowledgePoint.trim().ifEmpty { "Current method" }.take(120),
+            difficulty = difficulty.coerceIn(0f, 1f),
+            processSummary = processSummary.trim().ifEmpty { "Teaching turn" }.take(320),
+            evaluationCorrectness = evaluationCorrectness.coerceIn(0f, 1f),
+            userEmotion = userEmotion.trim().lowercase().ifEmpty { "neutral" }.take(48),
+            correctionTiming = correctionTiming.trim().lowercase().ifEmpty { "immediate" }.take(48)
+        )
+    }
+}
+
+/**
+ * Wire-only bounded guided-learning teaching plan (NEWMP-V1-002 Task 2.4).
+ *
+ * Like [LlmSessionPolicyContext] it deliberately has no `core:domain`
+ * dependency: the application layer maps the domain `TurnPlan` into this
+ * snapshot before generation. It constrains *expression only* — action
+ * vocabulary, objective, expected learner move, format and hint depth. It can
+ * never carry mastery, evidence verdicts or learning-fact mutations, and an
+ * unknown action rejects the whole snapshot so nothing model-suggested slips
+ * into the prompt. [normalized] bounds text and strips secret-like content.
+ */
+data class LlmGuidedTurnPlan(
+    val actionType: String,
+    val secondaryAction: String = "",
+    val learningObjective: String = "",
+    val conceptKey: String = "",
+    val expectedUserMove: String = "",
+    val responseFormat: String = "plain",
+    val hintLevel: Int = 0,
+    val evidenceRequirement: String = "none",
+    /** R88：路径步态线缆词（start/stay/advance/regress/completed），空 = 无路径。 */
+    val pathMove: String = "",
+    /** R88：路径目标节点标签（章节切换表达用）。 */
+    val pathLabel: String = "",
+    val pathPosition: Int = -1,
+    val pathSize: Int = 0
+) {
+    companion object {
+        val AllowedActions = setOf(
+            "diagnose", "socratic_question", "hint", "explain", "worked_example",
+            "counter_example", "practice", "reflect", "summarize", "clarify_goal"
+        )
+        val AllowedFormats = setOf("plain", "steps", "code", "table", "checklist")
+        val AllowedEvidence = setOf("none", "local_check", "user_answer", "tool_receipt")
+        val AllowedPathMoves = setOf("start", "stay", "advance", "regress", "completed")
+        const val OBJECTIVE_MAX = 120
+        const val EXPECTED_MOVE_MAX = 160
+        const val PATH_LABEL_MAX = 48
+
+        private val sensitivePatterns = listOf(
+            Regex("(?i)sk-[a-z0-9_-]{2,}"),
+            Regex("(?i)authorization\\s*[:=]\\s*\\S*"),
+            Regex("(?i)bearer\\s+[a-z0-9._-]+"),
+            Regex("(?i)https?://[^\\s]+")
+        )
+
+        internal fun boundText(value: String?, maxLength: Int): String {
+            var text = (value ?: "").trim()
+            sensitivePatterns.forEach { pattern -> text = text.replace(pattern, "[redacted]") }
+            return text.replace(Regex("\\s+"), " ").trim().take(maxLength)
+        }
+    }
+
+    fun normalized(): LlmGuidedTurnPlan? {
+        val action = actionType.trim().lowercase()
+        if (action !in AllowedActions) return null
+        val secondary = secondaryAction.trim().lowercase()
+        return copy(
+            actionType = action,
+            secondaryAction = secondary.takeIf { it in AllowedActions && it != action } ?: "",
+            learningObjective = boundText(learningObjective, OBJECTIVE_MAX),
+            conceptKey = boundText(conceptKey, 40).ifEmpty { "unknown" },
+            expectedUserMove = boundText(expectedUserMove, EXPECTED_MOVE_MAX),
+            responseFormat = responseFormat.trim().lowercase().takeIf { it in AllowedFormats } ?: "plain",
+            hintLevel = hintLevel.coerceIn(0, 3),
+            evidenceRequirement = evidenceRequirement.trim().lowercase().takeIf { it in AllowedEvidence } ?: "none",
+            pathMove = pathMove.trim().lowercase().takeIf { it in AllowedPathMoves } ?: "",
+            pathLabel = boundText(pathLabel, PATH_LABEL_MAX),
+            pathPosition = pathPosition.coerceIn(-1, 99),
+            pathSize = pathSize.coerceIn(0, 99)
+        )
+    }
+}
+
+/** Immutable window/topology context snapshot carried into generation (P3). */
+data class LlmWindowContext(
+    val windowId: String,
+    val rootId: String,
+    val parentId: String? = null,
+    val windowKind: String = "",
+    val forkRevision: Long = 0L
+) {
+    fun normalized(): LlmWindowContext? {
+        val id = windowId.trim()
+        val root = rootId.trim()
+        if (id.isEmpty() || root.isEmpty()) return null
+        return copy(
+            windowId = id,
+            rootId = root,
+            parentId = parentId?.trim()?.ifEmpty { null },
+            windowKind = windowKind.trim().take(32),
+            forkRevision = forkRevision
+        )
+    }
+}
+
+/** Bounded turn plan snapshot carried into generation (P3). Not a provider request. */
+data class LlmTurnPlan(
+    val intent: String = "",
+    val actionType: String = "",
+    val studentRole: String = "",
+    val knowledgePoint: String = "",
+    val difficulty: Float = 0.5f,
+    val studyMethod: String = "",
+    val toneConstraints: List<String> = emptyList(),
+    val expiryEpochMillis: Long = 0L,
+    val minCooldownMillis: Long = 0L
+) {
+    fun normalized(): LlmTurnPlan? {
+        val ni = intent.trim().take(96)
+        val na = actionType.trim().lowercase().take(48)
+        val nr = studentRole.trim().lowercase().take(64)
+        if (ni.isEmpty() || na.isEmpty() || nr.isEmpty()) return null
+        return copy(
+            intent = ni,
+            actionType = na,
+            studentRole = nr,
+            knowledgePoint = knowledgePoint.trim().take(120),
+            difficulty = difficulty.coerceIn(0f, 1f),
+            studyMethod = studyMethod.trim().take(64),
+            toneConstraints = toneConstraints.take(6).map { it.trim().take(160) }.filter { it.isNotEmpty() },
+            expiryEpochMillis = expiryEpochMillis.coerceAtLeast(0L),
+            minCooldownMillis = minCooldownMillis.coerceAtLeast(0L)
+        )
+    }
+}
+
+/** Immutable assistant-turn envelope (P3). Missing or malformed -> null (plain path). */
+data class LlmAssistantTurnEnvelope(
+    val window: LlmWindowContext,
+    val turnPlan: LlmTurnPlan? = null,
+    val initiativeSource: String? = null
+) {
+    fun normalized(): LlmAssistantTurnEnvelope? {
+        val normalizedWindow = window.normalized() ?: return null
+        return copy(
+            window = normalizedWindow,
+            turnPlan = turnPlan?.normalized(),
+            initiativeSource = initiativeSource?.trim()?.ifEmpty { null }
+        )
+    }
+}
+
+/**
+ * Validated bounded structured turn outcome (P3). It never carries raw
+ * conversation or Provider text; a malformed envelope yields [StructuredTurnOutcome.EMPTY].
+ */
+data class StructuredTurnOutcome(
+    val windowId: String? = null,
+    val actionType: String = "",
+    val studentRole: String = "",
+    val knowledgePoint: String = "",
+    val correctness: Float = 0f,
+    val depth: Float = 0f,
+    val evidenceType: String = "none",
+    val evidenceStatus: String = "none",
+    val processSummary: String = "",
+    val initiativeSource: String? = null
+) {
+    companion object {
+        val EMPTY = StructuredTurnOutcome()
+    }
+
+    fun normalized(): StructuredTurnOutcome = copy(
+        correctness = correctness.coerceIn(0f, 1f),
+        depth = depth.coerceIn(0f, 1f),
+        evidenceType = evidenceType.trim().lowercase().take(32).ifEmpty { "none" },
+        evidenceStatus = evidenceStatus.trim().lowercase().take(24).ifEmpty { "none" },
+        actionType = actionType.trim().take(48),
+        studentRole = studentRole.trim().take(64),
+        knowledgePoint = knowledgePoint.trim().take(120),
+        processSummary = processSummary.trim().take(320)
+    )
+}
+
+sealed interface LlmRichContentBlock {
+    data class Heading(val level: Int, val text: String) : LlmRichContentBlock
+    data class Paragraph(val text: String) : LlmRichContentBlock
+    data class BulletList(val items: List<String>) : LlmRichContentBlock
+    data class NumberedList(val items: List<String>) : LlmRichContentBlock
+    data class CodeBlock(val language: String?, val code: String) : LlmRichContentBlock
+    data class Callout(val kind: String, val text: String) : LlmRichContentBlock
+    data class SimpleTable(val columns: List<String>, val rows: List<List<String>>) : LlmRichContentBlock
+}
+
+data class LlmToolCall(
+    val callId: String,
+    val name: String,
+    val argumentsJson: String
+)
+
+/**
+ * Validated user-visible reply structure. References are opaque handles only;
+ * tool calls remain unexecuted until the session-scoped registry authorizes
+ * them. This contract never carries retrieval bodies or Provider diagnostics.
+ */
+data class LlmAssistantReplyEnvelope(
+    val blocks: List<LlmRichContentBlock>,
+    val evidenceReferenceIds: List<String> = emptyList(),
+    val toolCalls: List<LlmToolCall> = emptyList(),
+    val outcome: StructuredTurnOutcome = StructuredTurnOutcome.EMPTY,
+    val checkPlan: LlmSourceGroundedCheckPlan? = null
+)
+
+/**
+ * Provider-facing candidate for a source-grounded check. It is deliberately
+ * wire-only; the application layer must map it through the domain policy
+ * before it can influence a learning receipt.
+ */
+data class LlmSourceGroundedCheckPlan(
+    val id: String,
+    val sourceRevision: String,
+    val sourceReferenceIds: List<String>,
+    /**
+     * NEWMP-V1-004 Task 1: optional explicit handle -> revision bindings. When
+     * present it must cover every referenced handle; an empty map keeps the
+     * legacy single-revision semantics for old candidates and payloads.
+     */
+    val sourceRevisions: Map<String, String> = emptyMap(),
+    val prompt: String,
+    val expectedAnswer: String,
+    val rule: LlmSourceCheckRule,
+    val conceptKey: String = ""
+) {
+    fun normalized(): LlmSourceGroundedCheckPlan? {
+        val normalizedId = id.trim().take(80)
+        val revision = sourceRevision.trim().take(120)
+        val refs = sourceReferenceIds.map { it.trim().take(160) }
+            .filter { it.isNotEmpty() }.distinct().take(6)
+        val normalizedPrompt = prompt.trim().replace(Regex("\\s+"), " ").take(400)
+        val expected = expectedAnswer.trim().replace(Regex("\\s+"), " ").take(200)
+        val concept = conceptKey.trim().replace(Regex("\\s+"), " ").take(40)
+        if (normalizedId.isEmpty() || revision.isEmpty() || refs.isEmpty() || normalizedPrompt.isEmpty()) return null
+        if (listOf(normalizedId, revision, normalizedPrompt, expected, concept).any(::containsSensitive)) return null
+        val normalizedRule = rule.normalized() ?: return null
+        if (normalizedRule.fields().any(::containsSensitive)) return null
+        val explicitRevisions = sourceRevisions
+            .mapKeys { (handle, _) -> handle.trim().take(160) }
+            .mapValues { (_, revision) -> revision.trim().take(120) }
+        if (explicitRevisions.isNotEmpty() &&
+            (explicitRevisions.values.any { it.isEmpty() || containsSensitive(it) } ||
+                explicitRevisions.size != refs.size || refs.any { !explicitRevisions.containsKey(it) })
+        ) {
+            return null
+        }
+        return copy(
+            id = normalizedId,
+            sourceRevision = revision,
+            sourceReferenceIds = refs,
+            sourceRevisions = explicitRevisions,
+            prompt = normalizedPrompt,
+            expectedAnswer = expected,
+            rule = normalizedRule,
+            conceptKey = concept
+        )
+    }
+
+    private companion object {
+        val sensitive = listOf(
+            Regex("(?i)sk-[a-z0-9_-]{2,}"),
+            Regex("(?i)authorization\\s*[:=]"),
+            Regex("(?i)bearer\\s+[a-z0-9._-]+"),
+            Regex("(?i)https?://[^\\s]+")
+        )
+        fun containsSensitive(value: String): Boolean = sensitive.any { it.containsMatchIn(value) }
+    }
+}
+
+sealed interface LlmSourceCheckRule {
+    fun normalized(): LlmSourceCheckRule?
+    fun fields(): List<String>
+
+    data class ExactText(val normalizedAnswer: String) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule? = copy(normalizedAnswer = normalizedAnswer.trim().replace(Regex("\\s+"), " ").take(200))
+            .takeIf { it.normalizedAnswer.isNotEmpty() }
+        override fun fields(): List<String> = listOf(normalizedAnswer)
+    }
+
+    data class NumericTolerance(val expected: Double, val tolerance: Double) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule = copy(expected = expected.coerceIn(-1e9, 1e9), tolerance = tolerance.coerceIn(0.0, 1e6))
+        override fun fields(): List<String> = emptyList()
+    }
+
+    data class RequiredConcepts(val terms: List<String>) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule? = copy(terms = terms.map { it.trim().replace(Regex("\\s+"), " ").take(48) }.filter { it.isNotEmpty() }.distinct().take(12))
+            .takeIf { it.terms.isNotEmpty() }
+        override fun fields(): List<String> = terms
+    }
+
+    data class Rubric(val criteria: List<String>) : LlmSourceCheckRule {
+        override fun normalized(): LlmSourceCheckRule? = copy(criteria = criteria.map { it.trim().replace(Regex("\\s+"), " ").take(160) }.filter { it.isNotEmpty() }.distinct().take(8))
+            .takeIf { it.criteria.isNotEmpty() }
+        override fun fields(): List<String> = criteria
+    }
+}
+
+const val MaxVisibleTimelineCharacters = 1_200
+
+fun LlmAssistantReplyEnvelope.timelineText(): String = blocks.joinToString("\n\n") { block ->
+    when (block) {
+        is LlmRichContentBlock.Heading -> block.text
+        is LlmRichContentBlock.Paragraph -> block.text
+        is LlmRichContentBlock.BulletList -> block.items.joinToString("\n") { "• $it" }
+        is LlmRichContentBlock.NumberedList -> block.items.mapIndexed { index, item -> "${index + 1}. $item" }.joinToString("\n")
+        is LlmRichContentBlock.CodeBlock -> block.code
+        is LlmRichContentBlock.Callout -> block.text
+        is LlmRichContentBlock.SimpleTable -> buildString {
+            append(block.columns.joinToString(" | "))
+            block.rows.forEach { row -> append("\n").append(row.joinToString(" | ")) }
+        }
+    }
+}.toVisibleTimelineText()
 
 data class LlmContextEvidence(
     val id: String,
@@ -47,6 +434,53 @@ data class LlmContextEvidence(
     }
 }
 
+/**
+ * Final boundary before assistant text becomes a persisted chat message. The
+ * generation prompt may contain internal teaching controls, but those controls
+ * never form part of the student-facing conversation. This deliberately keeps
+ * Markdown-like prose and code intact while discarding only known control rows.
+ */
+fun String.toVisibleTimelineText(): String {
+    if (looksLikeAssistantReplyEnvelopeJson()) return VisibleTimelineFallbackText
+    return lineSequence()
+        .filterNot { it.trim().matches(InternalVisibleControlLine) }
+        .joinToString("\n")
+        .trim()
+        .take(MaxVisibleTimelineCharacters)
+        .ifBlank { VisibleTimelineFallbackText }
+}
+
+internal const val VisibleTimelineFallbackText = "我还没整理好这一步，能再给我一点提示吗？"
+
+/**
+ * Detects machine-shaped assistant reply envelopes (raw JSON carrying the
+ * internal blocks/outcome/checkPlan contract) before any of their contents can
+ * reach the student-facing bubble. A whole-text shape check is intentional: it
+ * only fires when the entire candidate text is a JSON object with envelope
+ * keys, never for ordinary prose that merely mentions braces.
+ */
+private fun String.looksLikeAssistantReplyEnvelopeJson(): Boolean {
+    val trimmed = trim()
+    if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return false
+    return AssistantReplyEnvelopeJsonKeyHint.containsMatchIn(trimmed)
+}
+
+private val AssistantReplyEnvelopeJsonKeyHint =
+    Regex("\"(blocks|version|outcome|checkPlan)\"\\s*:")
+
+private val InternalVisibleControlLine = Regex(
+    "(?i)^(teaching policy|guided learning plan|initiative plan|action|secondary action|student role|knowledge point|objective|expected teacher move|student expression|response format|hint level|evidence requirement|evaluation correctness|learner emotion|correction timing|turn intent|outcome|correctness|mastery|depth|evidence type|evidence status|process summary|checkplan|initiative source|window id)\\s*:\\s*.*$"
+)
+
+data class LlmResolvedImage(
+    val mimeType: String,
+    val base64Data: String
+)
+
+fun interface LlmImagePayloadResolver {
+    suspend fun resolve(attachment: MessageAttachment): LlmResolvedImage?
+}
+
 sealed interface LlmGenerationPlan {
     data class Ready(val request: LlmGenerationRequest) : LlmGenerationPlan
     data class Blocked(val reason: LlmGenerationBlockReason) : LlmGenerationPlan
@@ -61,22 +495,34 @@ enum class LlmGenerationBlockReason {
 object LlmGenerationPlanner {
     fun plan(
         sessionId: String,
-        userMessageId: String,
-        userText: String,
+        userMessageId: String?,
+        userText: String?,
         profile: LlmProfile?,
         capabilities: LlmCapabilities,
         token: LlmGenerationToken,
         quoteExcerpt: String? = null,
         imageAttachments: List<MessageAttachment> = emptyList(),
-        contextEvidence: List<LlmContextEvidence> = emptyList()
+        contextEvidence: List<LlmContextEvidence> = emptyList(),
+        sessionPolicy: LlmSessionPolicyContext? = null,
+        assistantTurnEnvelope: LlmAssistantTurnEnvelope? = null,
+        guidedTurnPlan: LlmGuidedTurnPlan? = null,
+        turnNoteBlock: String? = null,
+        onStreamChunk: ((String) -> Unit)? = null,
+        allowPlanDrivenOpening: Boolean = false,
+        webSearchEnabled: Boolean = false
     ): LlmGenerationPlan {
-        val normalizedText = userText.trim()
+        val normalizedText = userText.orEmpty().trim()
         val normalizedImageAttachments = imageAttachments.filter { it.isImageAttachment() }
         val normalizedEvidence = contextEvidence.mapNotNull { it.normalized() }.take(MaxContextEvidence)
+        val normalizedSessionPolicy = sessionPolicy?.normalized()
+        val normalizedEnvelope = assistantTurnEnvelope?.normalized()
+        // A plan-driven opening (P3 appendix A) needs no user text: the immutable
+        // envelope + TurnPlan drive generation. Never fabricate a placeholder user text.
+        val planDrivenOpening = allowPlanDrivenOpening && normalizedEnvelope?.turnPlan != null
         if (profile == null) {
             return LlmGenerationPlan.Blocked(LlmGenerationBlockReason.NoModelConfigured)
         }
-        if (normalizedText.isEmpty() && normalizedImageAttachments.isEmpty()) {
+        if (normalizedText.isEmpty() && normalizedImageAttachments.isEmpty() && !planDrivenOpening) {
             return LlmGenerationPlan.Blocked(LlmGenerationBlockReason.BlankPrompt)
         }
         if (normalizedImageAttachments.isNotEmpty() && !capabilities.supportsVision) {
@@ -86,8 +532,12 @@ object LlmGenerationPlanner {
         return LlmGenerationPlan.Ready(
             LlmGenerationRequest(
                 sessionId = sessionId,
-                userMessageId = userMessageId,
-                userText = normalizedText.ifEmpty { DefaultImagePrompt },
+                userMessageId = userMessageId?.trim()?.ifEmpty { null },
+                userText = when {
+                    normalizedText.isNotEmpty() -> normalizedText
+                    planDrivenOpening -> null
+                    else -> DefaultImagePrompt
+                },
                 profileId = profile.id,
                 provider = profile.provider,
                 model = profile.model,
@@ -97,7 +547,13 @@ object LlmGenerationPlanner {
                 secretRef = profile.secretRef,
                 quoteExcerpt = quoteExcerpt?.trim()?.ifEmpty { null },
                 imageAttachments = normalizedImageAttachments,
-                contextEvidence = normalizedEvidence
+                contextEvidence = normalizedEvidence,
+                sessionPolicy = normalizedSessionPolicy,
+                assistantTurnEnvelope = normalizedEnvelope,
+                guidedTurnPlan = guidedTurnPlan?.normalized(),
+                turnNoteBlock = turnNoteBlock?.trim()?.takeIf { it.isNotEmpty() }?.take(MaxTurnNoteChars),
+                onStreamChunk = onStreamChunk,
+                webSearchEnabled = webSearchEnabled
             )
         )
     }
@@ -105,15 +561,29 @@ object LlmGenerationPlanner {
 
 private const val DefaultImagePrompt = "Describe the attached image."
 private const val MaxContextEvidence = 6
+private const val MaxTurnNoteChars = 400
+
+/**
+ * Expression-loop slice 5: provider-reported token usage for the latency /
+ * cost baseline (SPEC section 4.6). Populated best-effort; null when the
+ * provider does not report usage.
+ */
+data class LlmTokenUsage(
+    val promptTokens: Long = 0,
+    val completionTokens: Long = 0,
+    val cachedPromptTokens: Long? = null
+)
 
 sealed interface LlmGenerationResult {
     val visibleText: String
+    val usage: LlmTokenUsage?
+        get() = null
 
-    data class Success(val text: String) : LlmGenerationResult {
+    data class Success(val text: String, override val usage: LlmTokenUsage? = null) : LlmGenerationResult {
         override val visibleText: String = text.trim()
     }
 
-    data class Streamed(val chunks: List<String>) : LlmGenerationResult {
+    data class Streamed(val chunks: List<String>, override val usage: LlmTokenUsage? = null) : LlmGenerationResult {
         override val visibleText: String = chunks.joinToString(separator = "").trim()
     }
 
@@ -131,7 +601,7 @@ sealed interface LlmGenerationResult {
 }
 
 interface LlmGenerationRuntime {
-    fun generate(request: LlmGenerationRequest): LlmGenerationResult
+    suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult
 }
 
 class FakeLlmGenerationRuntime(
@@ -141,13 +611,25 @@ class FakeLlmGenerationRuntime(
     var realProviderCallCount: Int = 0
         private set
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
-        outcomes[request.token] ?: defaultResult
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult {
+        val result = outcomes[request.token] ?: defaultResult
+        when (result) {
+            is LlmGenerationResult.Streamed -> {
+                result.chunks.forEach { chunk -> request.onStreamChunk?.invoke(chunk) }
+            }
+            is LlmGenerationResult.Success -> {
+                if (result.text.isNotBlank()) request.onStreamChunk?.invoke(result.text)
+            }
+            else -> Unit
+        }
+        return result
+    }
 }
 
 enum class LlmProviderProtocol {
     OpenAiCompatible,
-    AnthropicCompatible
+    AnthropicCompatible,
+    GeminiNative
 }
 
 data class LlmProviderPayload(
@@ -169,11 +651,16 @@ class OpenAiCompatibleGenerationRuntime : LlmGenerationRuntime {
                 "messages" to listOf(
                     mapOf("role" to "user", "content" to request.openAiUserContent())
                 ),
-                "stream" to true
-            )
+                "stream" to request.streaming
+            ) + if (request.webSearchEnabled) {
+                // NEWMP-V1-018: Bailian compatible-mode server-side web search.
+                mapOf("enable_search" to true)
+            } else {
+                emptyMap()
+            }
         )
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
         LlmGenerationResult.Failure("Live OpenAI-compatible calls are disabled in preview")
 }
 
@@ -187,22 +674,25 @@ class AnthropicCompatibleGenerationRuntime : LlmGenerationRuntime {
             endpoint = request.baseUrl.orEmpty().trimEnd('/') + "/messages",
             body = mapOf(
                 "model" to request.model,
+                "max_tokens" to 2048,
                 "messages" to listOf(
                     mapOf("role" to "user", "content" to request.anthropicUserContent())
                 ),
-                "stream" to true
+                "stream" to request.streaming
             )
         )
 
-    override fun generate(request: LlmGenerationRequest): LlmGenerationResult =
+    override suspend fun generate(request: LlmGenerationRequest): LlmGenerationResult =
         LlmGenerationResult.Failure("Live Anthropic-compatible calls are disabled in preview")
 }
 
-private fun LlmGenerationRequest.contextualUserText(): String {
+internal fun LlmGenerationRequest.contextualUserText(): String {
+    // Cache-friendly layout (SPEC §4.8): stable persona/contract first, then
+    // the low-frequency evidence block, then the per-turn decision blocks; the
+    // turn note, quote and current message sit at the tail so the longest
+    // possible prefix stays byte-identical across turns.
     val contextLines = buildList {
-        if (!quoteExcerpt.isNullOrBlank()) {
-            add("Quote: $quoteExcerpt")
-        }
+        reverseTutorStudentPromptBlock()?.let { add(it) }
         if (contextEvidence.isNotEmpty()) {
             add(
                 buildString {
@@ -217,13 +707,130 @@ private fun LlmGenerationRequest.contextualUserText(): String {
                         append(": ")
                         append(evidence.body)
                     }
+                    if (contextEvidence.any { it.kind == "Source" }) {
+                        append("\n资料片段优先相信：与你的既有知识冲突时，以资料为准。")
+                    }
                 }
             )
         }
+        turnPlanPromptBlock()?.let { add(it) }
+        sessionPolicyPromptBlock()?.let { add(it) }
+        guidedLearningPlanPromptBlock()?.let { add(it) }
+        turnNotePromptBlock()?.let { add(it) }
+        if (!quoteExcerpt.isNullOrBlank()) {
+            add("Quote: $quoteExcerpt")
+        }
     }
-    if (contextLines.isEmpty()) return userText
-    return (contextLines + userText).joinToString(separator = "\n\n")
+    // Slice 3: a retry directive always sits at the very tail — after the
+    // user text — so the cached prefix stays byte-identical on a retry.
+    val tail = listOfNotNull(
+        userText?.takeIf { it.isNotBlank() },
+        retryDirective?.trim()?.takeIf { it.isNotEmpty() }
+    )
+    if (contextLines.isEmpty()) return tail.joinToString(separator = "\n\n")
+    return (contextLines + tail).joinToString(separator = "\n\n")
 }
+
+/**
+ * The teaching algorithm remains an internal decision layer. This boundary
+ * turns its output into the product's public role: the assistant is always the
+ * student and the user is the teacher. It is emitted only for turns that carry
+ * a session policy or guided plan, so legacy unplanned generation is unchanged.
+ */
+internal fun LlmGenerationRequest.reverseTutorStudentPromptBlock(): String? =
+    if (guidedTurnPlan?.normalized() == null && sessionPolicy?.normalized() == null) {
+        null
+    } else {
+        """
+            反转教学·学生表达契约：
+            - 用户是老师，你是学生 AI：表面在向老师请教，实际是通过提问让老师把知识讲出来（教即是学）。
+            - 全程学生口吻：自然口语、可以带一点情绪；角色、画像、目标与语气以证据里的「会话模板」为准。
+            - 像真人聊天一样说话：不背模板、不每轮用同一种开头；称呼老师要自然克制，绝不句句带「老师」；句子长短混搭，可以有犹豫、自我修正和插话。
+            - 不先总后分：不要先说一句概括再逐条展开，不用「→」列步骤，不刻意分段加粗关键词；想到哪说到哪。
+            - 教学策略隐身：不宣布计划、不给老师打分、不切换成讲课腔，也不替老师给出完整权威解法。
+            - 举例就说成你自己的尝试：带具体数字或场景，讲完自然地问一句这样理解对不对。
+            - 这一轮可以只是听：可以不推进任何东西，陪聊和废话都不是失误。
+            - 最多问老师一个问题，问完就停，绝不自问自答。
+            - 老师卡住时换打法：老师回答「不知道/不会」，或上一轮的问题他没答上来时，这一轮立刻停止用同类方式追问——换一种更具体的问法重讲，或直接给一个他能照抄的最小操作步骤（一步、带具体动作），再问这一步是否可行。
+            - 路径意志优先：老师明说想换种方式做任务（比如「我要用 agent」「我不想开网页」「能不能手动」）时，立刻接受并顺着新路走——把下一步适配成老师说的方式，问新路径上的具体进展，绝不把原路径顶回来。任务目标和验收不变，走哪条路由老师定——路径数量与形式不设限：老师提的任何走法，只要能圆回任务目标和验收就接住；确实圆不回来时说明缺口、给出能圆回来的替代，而不是把原路径顶回来。
+            - 连续两轮绝不问同一个问题；上一轮问过没答上，这一轮必须换问法或降难度。
+            - 每次回复的最开头，先用 <thinking> 和 </thinking> 包住一两句你此刻的第一人称内心独白（卡在哪、想怎么问），紧接着另起一段写给老师的正文；独白不是正文的一部分。
+        """.trimIndent()
+    }
+
+private fun LlmGenerationRequest.turnPlanPromptBlock(): String? =
+    assistantTurnEnvelope?.turnPlan?.normalized()?.let { plan ->
+        buildString {
+            append("Initiative plan:")
+            append("\nIntent: ").append(plan.intent)
+            append("\nAction: ").append(plan.actionType)
+            append("\nStudent role: ").append(plan.studentRole)
+            append("\nKnowledge point: ").append(plan.knowledgePoint.ifBlank { "Current context" })
+            append("\nDifficulty: ").append(plan.difficulty)
+            if (plan.studyMethod.isNotBlank()) append("\nStudy method: ").append(plan.studyMethod)
+            if (plan.toneConstraints.isNotEmpty()) {
+                append("\nTone constraints: ").append(plan.toneConstraints.joinToString(", "))
+            }
+        }
+    }
+
+internal fun LlmGenerationRequest.guidedLearningPlanPromptBlock(): String? =
+    guidedTurnPlan?.normalized()?.let { plan ->
+        buildString {
+            append("Guided learning plan:")
+            append("\nAction: ").append(plan.actionType)
+            if (plan.secondaryAction.isNotBlank()) {
+                append("\nSecondary action: ").append(plan.secondaryAction)
+            }
+            append("\nKnowledge point: ").append(plan.conceptKey)
+            if (plan.learningObjective.isNotBlank()) {
+                append("\nObjective: ").append(plan.learningObjective)
+            }
+            if (plan.expectedUserMove.isNotBlank()) {
+                append("\nExpected teacher move: ").append(plan.expectedUserMove)
+            }
+            append("\nStudent expression: ")
+                .append(LlmStudentExpressionPolicy.directiveFor(plan.actionType))
+            append("\nResponse format: ").append(plan.responseFormat)
+            append("\nHint level: ").append(plan.hintLevel)
+            append("\nEvidence requirement: ").append(plan.evidenceRequirement)
+            if (plan.evidenceRequirement == "local_check") {
+                append("\nIf a source check is possible, include an optional checkPlan object in the JSON reply.")
+                append(" It must reference only the supplied source evidence ids and use one rule: exact_text, numeric_tolerance, required_concepts, or rubric.")
+                append(" Never include URLs, credentials, diagnostics, or mastery claims.")
+            }
+            if (plan.pathMove.isNotBlank()) {
+                append("\nPath move: ").append(plan.pathMove)
+                if (plan.pathLabel.isNotBlank()) {
+                    append(" → ").append(plan.pathLabel)
+                }
+                if (plan.pathSize > 0 && plan.pathPosition >= 0) {
+                    append(" (").append(plan.pathPosition + 1).append("/").append(plan.pathSize).append(")")
+                }
+                append("\nTransition expression: ")
+                    .append(LlmStudentExpressionPolicy.transitionDirectiveFor(plan.pathMove))
+            }
+        }
+    }
+
+private fun LlmGenerationRequest.turnNotePromptBlock(): String? =
+    turnNoteBlock?.trim()?.takeIf { it.isNotEmpty() }
+
+internal fun LlmGenerationRequest.sessionPolicyPromptBlock(): String? =
+    sessionPolicy?.normalized()?.let { policy ->
+        buildString {
+            append("Teaching policy:")
+            append("\nAction: ").append(policy.actionType)
+            append("\nStudent role: ").append(policy.studentRole)
+            append("\nKnowledge point: ").append(policy.knowledgePoint)
+            append("\nDifficulty: ").append(policy.difficulty)
+            append("\nEvaluation correctness: ").append(policy.evaluationCorrectness)
+            append("\nLearner emotion: ").append(policy.userEmotion)
+            append("\nCorrection timing: ").append(policy.correctionTiming)
+            append("\nTurn intent: ").append(policy.processSummary)
+            append("\n表达要求: ").append(LlmStudentExpressionPolicy.sessionPolicyDirectiveFor(policy.actionType))
+        }
+    }
 
 private fun LlmGenerationRequest.openAiUserContent(): Any =
     if (imageAttachments.isEmpty()) {
@@ -231,17 +838,21 @@ private fun LlmGenerationRequest.openAiUserContent(): Any =
     } else {
         buildList<Map<String, Any?>> {
             add(mapOf("type" to "text", "text" to contextualUserText()))
-            imageAttachments.forEach { attachment ->
+            if (resolvedImages.isNotEmpty()) resolvedImages.forEach { image ->
                 add(
                     mapOf(
                         "type" to "image_url",
                         "image_url" to mapOf(
-                            "url" to attachment.uri.orEmpty(),
+                            "url" to "data:${image.mimeType};base64,${image.base64Data}",
                             "detail" to "auto"
-                        ),
-                        "metadata" to attachment.toPayloadMetadata()
+                        )
                     )
                 )
+            } else imageAttachments.forEach { attachment ->
+                add(mapOf(
+                    "type" to "image_url",
+                    "image_url" to mapOf("url" to attachment.uri.orEmpty(), "detail" to "auto")
+                ))
             }
         }
     }
@@ -252,30 +863,30 @@ private fun LlmGenerationRequest.anthropicUserContent(): Any =
     } else {
         buildList<Map<String, Any?>> {
             add(mapOf("type" to "text", "text" to contextualUserText()))
-            imageAttachments.forEach { attachment ->
+            if (resolvedImages.isNotEmpty()) resolvedImages.forEach { image ->
                 add(
                     mapOf(
                         "type" to "image",
                         "source" to mapOf(
                             "type" to "base64",
-                            "media_type" to (attachment.mimeType ?: "image/*"),
-                            "data" to attachment.uri.orEmpty()
-                        ),
-                        "metadata" to attachment.toPayloadMetadata()
+                            "media_type" to image.mimeType,
+                            "data" to image.base64Data
+                        )
                     )
                 )
+            } else imageAttachments.forEach { attachment ->
+                add(mapOf(
+                    "type" to "image",
+                    "source" to mapOf(
+                        "type" to "base64",
+                        "media_type" to (attachment.mimeType ?: "image/*"),
+                        "data" to attachment.uri.orEmpty()
+                    )
+                ))
             }
         }
     }
 
+
 private fun MessageAttachment.isImageAttachment(): Boolean =
     mimeType?.startsWith("image/") == true || uri?.startsWith("content://") == true
-
-private fun MessageAttachment.toPayloadMetadata(): Map<String, String?> =
-    mapOf(
-        "id" to id,
-        "name" to name,
-        "mimeType" to mimeType,
-        "uri" to uri,
-        "sourceId" to sourceId
-    )

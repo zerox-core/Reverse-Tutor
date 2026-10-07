@@ -3,7 +3,9 @@ package com.reversetutor.core.llm
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.LlmProviderKind
 import com.reversetutor.core.model.MessageAttachment
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,6 +44,7 @@ class LlmGenerationLifecycleTest {
         assertEquals(listOf("question.png"), request.imageAttachments.map { it.name })
         assertEquals(listOf("Algebra note"), request.contextEvidence.map { it.title })
         assertEquals(LlmGenerationToken("token-1"), request.token)
+        assertNull(request.sessionPolicy)
 
         val blocked = LlmGenerationPlanner.plan(
             sessionId = "session-1",
@@ -77,7 +80,33 @@ class LlmGenerationLifecycleTest {
     }
 
     @Test
-    fun fakeRuntimeAggregatesStreamingChunksAndNeverCallsRealProviders() {
+    fun plannerCarriesAnOptionalNormalizedSessionPolicy() {
+        val policy = LlmSessionPolicyContext(
+            actionType = "probe",
+            studentRole = "probing_student",
+            knowledgePoint = "factoring",
+            difficulty = 0.7f,
+            processSummary = "ask for a justification",
+            evaluationCorrectness = 0.4f,
+            userEmotion = "engaged",
+            correctionTiming = "summary_only"
+        )
+
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Explain factoring",
+            profile = profile(LlmProviderKind.OpenAiCompatible, "secret-1"),
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-policy"),
+            sessionPolicy = policy
+        )
+
+        assertEquals(policy, (plan as LlmGenerationPlan.Ready).request.sessionPolicy)
+    }
+
+    @Test
+    fun fakeRuntimeAggregatesStreamingChunksAndNeverCallsRealProviders() = runBlocking {
         val request = LlmGenerationRequest(
             sessionId = "session-1",
             userMessageId = "user-1",
@@ -104,7 +133,7 @@ class LlmGenerationLifecycleTest {
     }
 
     @Test
-    fun fakeRuntimeReturnsFailureAndTimeoutOutcomesWithoutProviderCalls() {
+    fun fakeRuntimeReturnsFailureAndTimeoutOutcomesWithoutProviderCalls() = runBlocking {
         val failureToken = LlmGenerationToken("token-failure")
         val timeoutToken = LlmGenerationToken("token-timeout")
         val runtime = FakeLlmGenerationRuntime(
@@ -174,6 +203,164 @@ class LlmGenerationLifecycleTest {
         assertTrue(content.contains("Context evidence:"))
         assertTrue(content.contains("[1] Note - Algebra note: Remember difference of squares."))
         assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun providerPayloadsCarrySessionPolicyWithoutNetworkCalls() {
+        val runtime = OpenAiCompatibleGenerationRuntime()
+        val payload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                sessionPolicy = LlmSessionPolicyContext(
+                    actionType = "probe",
+                    studentRole = "probing_student",
+                    knowledgePoint = "factoring",
+                    difficulty = 0.7f,
+                    processSummary = "ask for a justification",
+                    evaluationCorrectness = 0.4f,
+                    userEmotion = "engaged",
+                    correctionTiming = "summary_only"
+                )
+            )
+        )
+        val messages = payload.body["messages"] as List<*>
+        val userMessage = messages.single() as Map<*, *>
+        val content = userMessage["content"] as String
+
+        assertTrue(content.contains("Teaching policy:"))
+        assertTrue(content.contains("Action: probe"))
+        assertTrue(content.contains("Knowledge point: factoring"))
+        assertTrue(content.contains("表达要求: "))
+        assertTrue(content.contains("追问一个"))
+        assertEquals(0, runtime.realProviderCallCount)
+    }
+
+
+
+    // NEWMP-V1-006 Task 1: single-turn rhythm contract — the student prompt
+    // block now locks natural chat principles (no arrow steps / bounded
+    // paragraphs / bold keywords); exactly one question stays with the teacher.
+    @Test
+    fun reverseTutorStudentPromptBlockLocksSingleTurnRhythmAndInteractionSpace() {
+        val request = LlmGenerationRequest(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Help",
+            profileId = "profile-1",
+            provider = LlmProviderKind.OpenAiCompatible,
+            model = "model",
+            baseUrl = "https://api.example.test/v1",
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-rhythm"),
+            sessionPolicy = LlmSessionPolicyContext(
+                actionType = "probe",
+                studentRole = "probing_student",
+                knowledgePoint = "factoring",
+                difficulty = 0.7f,
+                processSummary = "ask for a justification",
+                evaluationCorrectness = 0.4f,
+                userEmotion = "engaged",
+                correctionTiming = "summary_only"
+            )
+        )
+
+        val block = request.reverseTutorStudentPromptBlock()
+        assertTrue(block != null)
+        assertTrue(block!!.contains("像真人聊天一样说话"))
+        assertTrue(block.contains("绝不句句带「老师」"))
+        assertTrue(!block.contains("最多三小段或四短行"))
+        assertTrue(block.contains("不先总后分"))
+        assertTrue(block.contains("最多问老师一个问题"))
+    }
+
+    // NEWMP-V1-018: channel web-search switch — the Bailian-style param must ride
+    // the OpenAI-compatible payload only when the user turns the toggle on.
+    @Test
+    fun openAiPayloadCarriesEnableSearchOnlyWhenWebSearchEnabled() {
+        val runtime = OpenAiCompatibleGenerationRuntime()
+
+        val enabledPayload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible).copy(webSearchEnabled = true)
+        )
+        val disabledPayload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible)
+        )
+
+        assertEquals(true, enabledPayload.body["enable_search"])
+        assertEquals(false, disabledPayload.body.containsKey("enable_search"))
+        assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun plannerPropagatesWebSearchFlagIntoPlannedRequest() {
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Help",
+            profile = profile(LlmProviderKind.OpenAiCompatible, secretRef = null),
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-web-search"),
+            webSearchEnabled = true
+        )
+
+        assertEquals(true, (plan as LlmGenerationPlan.Ready).request.webSearchEnabled)
+    }
+
+    // Expression-loop slice 2: prompt blocks follow the cache-friendly layout —
+    // stable contract first, evidence mid, per-turn blocks and turn note at the
+    // tail, quote and user text last.
+    @Test
+    fun promptBlocksFollowCacheFriendlyOrderWithTurnNoteAtTail() {
+        val runtime = OpenAiCompatibleGenerationRuntime()
+        val payload = runtime.buildPayload(
+            request(LlmProviderKind.OpenAiCompatible).copy(
+                quoteExcerpt = "x^2 - 4",
+                contextEvidence = listOf(contextEvidence()),
+                sessionPolicy = LlmSessionPolicyContext(
+                    actionType = "probe",
+                    studentRole = "probing_student",
+                    knowledgePoint = "factoring",
+                    difficulty = 0.7f,
+                    processSummary = "ask for a justification",
+                    evaluationCorrectness = 0.4f,
+                    userEmotion = "engaged",
+                    correctionTiming = "summary_only"
+                ),
+                turnNoteBlock = "本轮便签（内部节奏提示，别念出来、别解释）：\n- 信息密度：中（回复 ≤160 字、最多 1 个新概念、最多 1 个问题）"
+            )
+        )
+        val messages = payload.body["messages"] as List<*>
+        val userMessage = messages.single() as Map<*, *>
+        val content = userMessage["content"] as String
+
+        val contractIdx = content.indexOf("反转教学·学生表达契约")
+        val evidenceIdx = content.indexOf("Context evidence:")
+        val policyIdx = content.indexOf("Teaching policy:")
+        val noteIdx = content.indexOf("本轮便签")
+        val quoteIdx = content.indexOf("Quote: x^2 - 4")
+        val userIdx = content.lastIndexOf("Help")
+
+        assertTrue(contractIdx >= 0)
+        assertTrue(contractIdx < evidenceIdx)
+        assertTrue(evidenceIdx < policyIdx)
+        assertTrue(policyIdx < noteIdx)
+        assertTrue(noteIdx < quoteIdx)
+        assertTrue(quoteIdx < userIdx)
+        assertEquals(0, runtime.realProviderCallCount)
+    }
+
+    @Test
+    fun plannerTrimsAndCarriesTurnNoteBlock() {
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = "session-1",
+            userMessageId = "user-1",
+            userText = "Help",
+            profile = profile(LlmProviderKind.OpenAiCompatible, secretRef = null),
+            capabilities = LlmCapabilities(),
+            token = LlmGenerationToken("token-note"),
+            turnNoteBlock = "  本轮便签：测试  "
+        )
+
+        assertEquals("本轮便签：测试", (plan as LlmGenerationPlan.Ready).request.turnNoteBlock)
     }
 
     private fun request(provider: LlmProviderKind): LlmGenerationRequest =

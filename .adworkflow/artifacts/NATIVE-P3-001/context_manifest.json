@@ -1,0 +1,47 @@
+{
+  "task_id": "NATIVE-P3-001",
+  "context_level": "L1-index",
+  "read_first": [
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/NewSessionTemplatesTest.kt",
+    "mobile-native/feature/chat/src/test/java/com/reversetutor/feature/chat/SessionListUiStateTest.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/llm/ChatGenerationRepository.kt",
+    "mobile-native/core/data/src/main/java/com/reversetutor/core/data/session/SessionRepository.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/llm/ChatGenerationRepositoryTest.kt",
+    "mobile-native/core/data/src/test/java/com/reversetutor/core/data/session/SessionRepositoryTest.kt",
+    "mobile-native/core/llm/src/main/java/com/reversetutor/core/llm/LlmGenerationLifecycle.kt",
+    "mobile-native/core/llm/src/test/java/com/reversetutor/core/llm/LlmGenerationLifecycleTest.kt"
+  ],
+  "relevant_symbols": [
+    "test_mobile_generation_callbacks_are_scoped_to_original_session (tests/test_mobile_persistence.py:1246)",
+    "test_mobile_session_list_clears_stale_keyboard_state_so_bottom_nav_returns (tests/test_mobile_persistence.py:854)",
+    "test_kg_queries_are_session_isolated (tests/test_kg_schema.py:179)",
+    "test_memory_api_filters_process_nodes_and_keeps_session_isolation (tests/test_memory_architecture.py:215)",
+    "test_mobile_new_session_can_optionally_import_documents_before_opening_turn (tests/test_mobile_persistence.py:141)",
+    "test_mobile_context_avatar_and_session_info_are_editable_without_layout_drift (tests/test_mobile_product_experience.py:155)",
+    "test_mobile_builtin_session_presets_are_rich_and_varied (tests/test_mobile_product_experience.py:516)",
+    "test_session_scope_isolation (tests/test_retrieval.py:71)",
+    "test_android_main_activity_refreshes_stale_app_shell_cache_on_native_upgrade (tests/test_android_background_llm.py:127)",
+    "test_same_concept_name_is_session_isolated (tests/test_kg_consistency.py:79)",
+    "test_run_turn_graph_extraction_is_session_isolated (tests/test_kg_consistency.py:119)",
+    "test_retrieve_context_is_session_isolated (tests/test_kg_retrieval.py:159)"
+  ],
+  "entrypoints": [],
+  "likely_tests": [
+    "tests/__init__.py",
+    "tests/conftest.py",
+    "tests/test_adapters.py",
+    "tests/test_android_background_llm.py",
+    "tests/test_clue_student_discipline.py",
+    "tests/test_clue_with_retrieval.py",
+    "tests/test_db.py",
+    "tests/test_e2e_scenarios.py"
+  ],
+  "do_not_touch": [
+    "Do not implement official release packaging.",
+    "Do not build signed or release APKs.",
+    "Do not modify existing mobile/ Capacitor/PWA release packaging.",
+    "Do not touch signing files, alias reverse-tutor, or existing applicationId com.reversetutor.app.",
+    "Do not mark native replacement readiness unless this is an explicitly approved Phase 6 readiness task with complete evidence."
+  ],
+  "open_questions": []
+}

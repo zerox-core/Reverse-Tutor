@@ -1,0 +1,603 @@
+package com.reversetutor.preview.shell
+
+import com.reversetutor.core.domain.ActivityLeaderboardEntry
+import com.reversetutor.core.domain.ActivityLeaderboardPage
+import com.reversetutor.core.domain.ActivityParticipation
+import com.reversetutor.core.domain.ActivityRepository
+import com.reversetutor.core.domain.ActivitySummary
+import com.reversetutor.core.domain.ActivityTask
+import com.reversetutor.core.domain.OnlineActivityPage
+import com.reversetutor.core.domain.OnlineData
+import com.reversetutor.core.remote.OnlineSessionIdentity
+import com.reversetutor.feature.chat.NewSessionConfiguration
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ChallengeRuntimeCoordinatorTest {
+    @Test
+    fun loadSelectsFirstActiveActivityAndConfirmsItsLeaderboard() = runBlocking {
+        val active = activity(id = "active-2", state = "active")
+        val leaderboard = leaderboard()
+        val repository = FakeActivityRepository(
+            listResults = listOf(
+                OnlineData.Content(
+                    OnlineActivityPage(
+                        items = listOf(activity(id = "ended-1", state = "ended"), active),
+                        nextCursor = null,
+                        updatedAtEpochMillis = 100L
+                    )
+                )
+            ),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+
+        coordinator.load()
+
+        assertFalse(coordinator.state.value.loading)
+        assertEquals(active, coordinator.state.value.activity)
+        assertEquals(leaderboard, coordinator.state.value.leaderboard)
+        assertNull(coordinator.state.value.participation)
+        assertNull(coordinator.state.value.failure)
+        assertEquals(listOf("active-2"), repository.leaderboardActivityIds)
+    }
+
+    @Test
+    fun joinUsesAuthenticatedIdentityAndDeterministicIdempotencyKey() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val participation = participation(
+            activityId = active.id,
+            userId = "account-9",
+            revision = 8L,
+            idempotencyKey = "join:active-2:account-9:7"
+        )
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(OnlineData.Content(participation))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) {
+            OnlineSessionIdentity(accountId = "account-9", deviceId = "device-4")
+        }
+        coordinator.load()
+
+        coordinator.join()
+
+        assertEquals(participation, coordinator.state.value.participation)
+        assertTrue(coordinator.state.value.participation?.joined == true)
+        assertEquals(
+            JoinCall(
+                activityId = "active-2",
+                userId = "account-9",
+                deviceId = "device-4",
+                revision = 7L,
+                idempotencyKey = "join:active-2:account-9:7"
+            ),
+            repository.joinCalls.single()
+        )
+    }
+
+    @Test
+    fun failedJoinDoesNotFabricateParticipationAndCanRetry() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val confirmed = participation(
+            activityId = active.id,
+            userId = "account-9",
+            revision = 8L,
+            idempotencyKey = "join:active-2:account-9:7"
+        )
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                OnlineData.Content(confirmed)
+            )
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+
+        coordinator.join()
+
+        assertNull(coordinator.state.value.participation)
+        assertEquals(
+            ChallengeRuntimeFailure(
+                code = "network_failure",
+                retryable = true,
+                operation = ChallengeRuntimeOperation.Join
+            ),
+            coordinator.state.value.failure
+        )
+
+        coordinator.retry()
+
+        assertEquals(confirmed, coordinator.state.value.participation)
+        assertEquals(2, repository.joinCalls.size)
+        assertEquals(repository.joinCalls[0], repository.joinCalls[1])
+    }
+
+    @Test
+    fun failedJoinRetryRunsSharedPostConfirmationAndReusesExistingSession() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                OnlineData.Content(participation(activityId = active.id))
+            )
+        )
+        val runtime = ChallengeRuntimeCoordinator(repository) { identity() }
+        runtime.load()
+        val flow = ChallengeJoinFlowCoordinator(runtime) {
+            listOf(
+                ChallengeSessionCandidate(
+                    sessionId = "existing",
+                    title = "Existing",
+                    learnerRole = "Learner",
+                    updatedAtEpochMillis = 10L,
+                    snapshot = NewSessionConfiguration(
+                        sourceSelections = listOf(" ACTIVITY : ACTIVE-2 ")
+                    )
+                )
+            )
+        }
+
+        assertNull(flow.join())
+        val decision = flow.retry() as ChallengeSessionLaunchDecision.Reuse
+
+        assertEquals("existing", decision.candidate.sessionId)
+        assertEquals(2, repository.joinCalls.size)
+    }
+
+    @Test
+    fun failedJoinRetryRunsSharedPostConfirmationAndOpensPrefill() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                OnlineData.Content(participation(activityId = active.id))
+            )
+        )
+        val runtime = ChallengeRuntimeCoordinator(repository) { identity() }
+        runtime.load()
+        val flow = ChallengeJoinFlowCoordinator(runtime) { emptyList() }
+
+        assertNull(flow.join())
+        val decision = flow.retry() as ChallengeSessionLaunchDecision.Create
+
+        assertEquals(
+            listOf("activity:active-2"),
+            decision.prefill.configuration.sourceSelections
+        )
+    }
+
+    @Test
+    fun loadRetryNeverRunsPostConfirmedJoinTransition() = runBlocking {
+        val active = activity(id = "active-2")
+        val repository = FakeActivityRepository(
+            listResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                page(active)
+            ),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard()))
+        )
+        val runtime = ChallengeRuntimeCoordinator(repository) { identity() }
+        var candidateLoads = 0
+        val flow = ChallengeJoinFlowCoordinator(runtime) {
+            candidateLoads += 1
+            emptyList()
+        }
+        runtime.load()
+
+        assertNull(flow.retry())
+
+        assertEquals(active, runtime.state.value.activity)
+        assertEquals(0, candidateLoads)
+        assertTrue(repository.joinCalls.isEmpty())
+    }
+
+    @Test
+    fun duplicateJoinTapIsDroppedWhileTheFirstRequestIsInFlight() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(OnlineData.Content(participation(activityId = active.id))),
+            joinGate = gate
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+
+        val first = async { coordinator.join() }
+        while (repository.joinCalls.isEmpty()) yield()
+        val duplicate = async { coordinator.join() }
+        duplicate.await()
+        gate.complete(Unit)
+        first.await()
+
+        assertEquals(1, repository.joinCalls.size)
+        assertTrue(coordinator.state.value.joined)
+    }
+
+    @Test
+    fun loadFailurePreservesLastConfirmedParticipation() = runBlocking {
+        val active = activity(id = "active-2")
+        val confirmed = participation(activityId = active.id)
+        val repository = FakeActivityRepository(
+            listResults = listOf(
+                page(active),
+                OnlineData.Failure("server_error", retryable = true)
+            ),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(OnlineData.Content(confirmed))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+        coordinator.join()
+
+        coordinator.load()
+
+        assertEquals(confirmed, coordinator.state.value.participation)
+        assertEquals(active, coordinator.state.value.activity)
+        assertEquals("server_error", coordinator.state.value.failure?.code)
+        assertTrue(coordinator.state.value.failure?.retryable == true)
+    }
+
+    @Test
+    fun leaderboardFailurePreservesTheLastConfirmedChallengeSnapshot() = runBlocking {
+        val first = activity(id = "active-1")
+        val replacement = activity(id = "active-2")
+        val confirmed = participation(activityId = first.id)
+        val confirmedLeaderboard = leaderboard()
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(first), page(replacement)),
+            leaderboardResults = listOf(
+                OnlineData.Content(confirmedLeaderboard),
+                OnlineData.Failure("network_failure", retryable = true)
+            ),
+            joinResults = listOf(OnlineData.Content(confirmed))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+        coordinator.join()
+
+        coordinator.load()
+
+        assertEquals(first, coordinator.state.value.activity)
+        assertEquals(confirmed, coordinator.state.value.participation)
+        assertEquals(confirmedLeaderboard, coordinator.state.value.leaderboard)
+        assertEquals("network_failure", coordinator.state.value.failure?.code)
+    }
+
+    @Test
+    fun localOnlyJoinKeepsReferenceChallengeUnjoined() = runBlocking {
+        var identityRequests = 0
+        val coordinator = ChallengeRuntimeCoordinator(activityRepository = null) {
+            identityRequests += 1
+            identity()
+        }
+
+        coordinator.load()
+        coordinator.join()
+
+        assertNull(coordinator.state.value.activity)
+        assertNull(coordinator.state.value.participation)
+        assertFalse(coordinator.state.value.loading)
+        assertEquals(0, identityRequests)
+    }
+
+    @Test
+    fun loadPrefersDetailWithTasksOverListSummary() = runBlocking {
+        val summary = activity(id = "active-2", state = "active")
+        val detailed = summary.copy(
+            tasks = listOf(
+                ActivityTask(
+                    dayNumber = 1L,
+                    title = "启动",
+                    taskMarkdown = "- 目标",
+                    stageGoal = "节奏"
+                )
+            )
+        )
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(summary)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            detailResults = listOf(OnlineData.Content(detailed))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+
+        coordinator.load()
+
+        assertEquals(detailed, coordinator.state.value.activity)
+        assertEquals(1, coordinator.state.value.activity?.tasks?.size)
+    }
+
+    @Test
+    fun reportProgressIncrementsWithDeterministicIdempotencyKey() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val joined = participation(activityId = active.id, revision = 8L)
+        val advanced = joined.copy(
+            progress = 1L,
+            revision = 9L,
+            idempotencyKey = "progress:active-2:account-9:1"
+        )
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(OnlineData.Content(joined)),
+            updateProgressResults = listOf(OnlineData.Content(advanced))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+        coordinator.join()
+
+        assertTrue(coordinator.reportProgress())
+
+        assertEquals(advanced, coordinator.state.value.participation)
+        assertEquals(
+            ProgressCall(
+                activityId = "active-2",
+                userId = "account-9",
+                deviceId = "device-4",
+                revision = 8L,
+                idempotencyKey = "progress:active-2:account-9:1",
+                progress = 1L
+            ),
+            repository.progressCalls.single()
+        )
+    }
+
+    @Test
+    fun failedReportProgressKeepsParticipationAndCanRetry() = runBlocking {
+        val active = activity(id = "active-2", revision = 7L)
+        val joined = participation(activityId = active.id, revision = 8L)
+        val advanced = joined.copy(progress = 1L, revision = 9L)
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            joinResults = listOf(OnlineData.Content(joined)),
+            updateProgressResults = listOf(
+                OnlineData.Failure("network_failure", retryable = true),
+                OnlineData.Content(advanced)
+            )
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+        coordinator.join()
+
+        assertFalse(coordinator.reportProgress())
+
+        assertEquals(joined, coordinator.state.value.participation)
+        assertEquals(
+            ChallengeRuntimeOperation.ReportProgress,
+            coordinator.state.value.failure?.operation
+        )
+
+        coordinator.retry()
+
+        assertEquals(advanced, coordinator.state.value.participation)
+        assertEquals(repository.progressCalls[0], repository.progressCalls[1])
+    }
+
+    @Test
+    fun reportProgressWithoutJoinIsNoOp() = runBlocking {
+        val active = activity(id = "active-2")
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard()))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+        coordinator.load()
+
+        assertFalse(coordinator.reportProgress())
+
+        assertTrue(repository.progressCalls.isEmpty())
+    }
+
+    @Test
+    fun loadRestoresJoinedParticipationFromServer() = runBlocking {
+        val active = activity(id = "active-2", revision = 3L)
+        val restored = participation(
+            activityId = active.id,
+            userId = "account-9",
+            revision = 9L,
+            idempotencyKey = "join:active-2:account-9:3"
+        )
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            participationResults = listOf(OnlineData.Content(restored))
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+
+        coordinator.load()
+
+        assertEquals(restored, coordinator.state.value.participation)
+        assertTrue(coordinator.state.value.joined)
+        assertNull(coordinator.state.value.failure)
+    }
+
+    @Test
+    fun loadLeavesParticipationEmptyWhenServerSaysNotJoined() = runBlocking {
+        val active = activity(id = "active-2")
+        val repository = FakeActivityRepository(
+            listResults = listOf(page(active)),
+            leaderboardResults = listOf(OnlineData.Content(leaderboard())),
+            participationResults = listOf(
+                OnlineData.Content(
+                    ActivityParticipation(
+                        activityId = active.id,
+                        userId = "",
+                        joined = false,
+                        progress = 0L,
+                        revision = 0L,
+                        state = "left",
+                        idempotencyKey = ""
+                    )
+                )
+            )
+        )
+        val coordinator = ChallengeRuntimeCoordinator(repository) { identity() }
+
+        coordinator.load()
+
+        assertNull(coordinator.state.value.participation)
+        assertFalse(coordinator.state.value.joined)
+    }
+}
+
+private data class JoinCall(
+    val activityId: String,
+    val userId: String,
+    val deviceId: String,
+    val revision: Long,
+    val idempotencyKey: String
+)
+
+private data class ProgressCall(
+    val activityId: String,
+    val userId: String,
+    val deviceId: String,
+    val revision: Long,
+    val idempotencyKey: String,
+    val progress: Long
+)
+
+private class FakeActivityRepository(
+    listResults: List<OnlineData<OnlineActivityPage>> = emptyList(),
+    leaderboardResults: List<OnlineData<ActivityLeaderboardPage>> = emptyList(),
+    joinResults: List<OnlineData<ActivityParticipation>> = emptyList(),
+    detailResults: List<OnlineData<ActivitySummary>> = emptyList(),
+    updateProgressResults: List<OnlineData<ActivityParticipation>> = emptyList(),
+    participationResults: List<OnlineData<ActivityParticipation>> = emptyList(),
+    private val joinGate: CompletableDeferred<Unit>? = null
+) : ActivityRepository {
+    private val listResults = ArrayDeque(listResults)
+    private val leaderboardResults = ArrayDeque(leaderboardResults)
+    private val joinResults = ArrayDeque(joinResults)
+    private val detailResults = ArrayDeque(detailResults)
+    private val updateProgressResults = ArrayDeque(updateProgressResults)
+    private val participationResults = ArrayDeque(participationResults)
+    val leaderboardActivityIds = mutableListOf<String>()
+    val joinCalls = mutableListOf<JoinCall>()
+    val progressCalls = mutableListOf<ProgressCall>()
+
+    override suspend fun listCachedActivities(): List<ActivitySummary> = emptyList()
+
+    override suspend fun list(cursor: String?, limit: Int): OnlineData<OnlineActivityPage> =
+        listResults.removeFirst()
+
+    override suspend fun detail(activityId: String): OnlineData<ActivitySummary> =
+        detailResults.removeFirstOrNull()
+            ?: OnlineData.Failure("not_configured", retryable = false)
+
+    override suspend fun leaderboard(
+        activityId: String,
+        cursor: String?,
+        limit: Int
+    ): OnlineData<ActivityLeaderboardPage> {
+        leaderboardActivityIds += activityId
+        return leaderboardResults.removeFirst()
+    }
+
+    override suspend fun join(
+        activityId: String,
+        userId: String,
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String
+    ): OnlineData<ActivityParticipation> {
+        joinCalls += JoinCall(activityId, userId, deviceId, revision, idempotencyKey)
+        joinGate?.await()
+        return joinResults.removeFirst()
+    }
+
+    override suspend fun updateProgress(
+        activityId: String,
+        userId: String,
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String,
+        progress: Long
+    ): OnlineData<ActivityParticipation> {
+        progressCalls += ProgressCall(activityId, userId, deviceId, revision, idempotencyKey, progress)
+        return updateProgressResults.removeFirstOrNull()
+            ?: OnlineData.Failure("not_configured", retryable = false)
+    }
+
+    override suspend fun leave(
+        activityId: String,
+        userId: String,
+        deviceId: String,
+        revision: Long,
+        idempotencyKey: String
+    ): OnlineData<ActivityParticipation> = error("Not used")
+
+    override suspend fun participation(activityId: String): OnlineData<ActivityParticipation> =
+        participationResults.removeFirstOrNull()
+            ?: OnlineData.Failure("not_configured", retryable = false)
+}
+
+private fun activity(
+    id: String = "active-1",
+    revision: Long = 3L,
+    state: String = "active"
+) = ActivitySummary(
+    id = id,
+    title = "Challenge",
+    revision = revision,
+    state = state
+)
+
+private fun page(activity: ActivitySummary): OnlineData<OnlineActivityPage> = OnlineData.Content(
+    OnlineActivityPage(
+        items = listOf(activity),
+        nextCursor = null,
+        updatedAtEpochMillis = 100L
+    )
+)
+
+private fun leaderboard() = ActivityLeaderboardPage(
+    items = listOf(
+        ActivityLeaderboardEntry(
+            rank = 1L,
+            displayName = "Learner",
+            avatarUrl = null,
+            progress = 5L,
+            isCurrentUser = false
+        )
+    ),
+    nextCursor = null,
+    updatedAtEpochMillis = 100L
+)
+
+private fun participation(
+    activityId: String = "active-1",
+    userId: String = "account-9",
+    revision: Long = 4L,
+    idempotencyKey: String = "join:$activityId:$userId:3"
+) = ActivityParticipation(
+    activityId = activityId,
+    userId = userId,
+    joined = true,
+    progress = 0L,
+    revision = revision,
+    state = "joined",
+    idempotencyKey = idempotencyKey
+)
+
+private fun identity() = OnlineSessionIdentity(
+    accountId = "account-9",
+    deviceId = "device-4"
+)

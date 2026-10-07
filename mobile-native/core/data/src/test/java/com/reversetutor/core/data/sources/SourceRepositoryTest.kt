@@ -1,5 +1,6 @@
 package com.reversetutor.core.data.sources
 
+import com.reversetutor.core.data.local.dao.SourceChunkEmbeddingRow
 import com.reversetutor.core.data.local.dao.SourceDao
 import com.reversetutor.core.data.local.entity.SourceChunkEntity
 import com.reversetutor.core.data.local.entity.SourceEntity
@@ -97,6 +98,151 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun pdfWithExtractedTextLayerParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "chapter.pdf",
+                mimeType = "application/pdf",
+                text = "Alpha content.\n\nBeta content.",
+                sourceId = "source-pdf-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Pdf, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Alpha content.", "Beta content."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun imageWithRecognizedOcrTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "question.png",
+                mimeType = "image/png",
+                text = "Alpha question.\n\nBeta note.",
+                sourceId = "source-image-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Image, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Alpha question.", "Beta note."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun imageWithoutReadableTextStaysFutureAssisted() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "diagram.png",
+                mimeType = "image/png",
+                text = null,
+                sourceId = "source-image-blank"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Image, result.source.type)
+        assertEquals(SourceParserStatus.FutureAssisted, result.source.parserStatus)
+        assertTrue(result.chunks.isEmpty())
+    }
+
+    @Test
+    fun docxWithExtractedTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "prd.docx",
+                mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                text = "Alpha requirement.\n\nBeta scope.",
+                sourceId = "source-docx-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Docx, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Alpha requirement.", "Beta scope."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun docxWithoutReadableTextStaysFutureAssisted() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "scanned.docx",
+                mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                text = null,
+                sourceId = "source-docx-blank"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Docx, result.source.type)
+        assertEquals(SourceParserStatus.FutureAssisted, result.source.parserStatus)
+        assertTrue(result.chunks.isEmpty())
+    }
+
+    @Test
+    fun pptxWithExtractedTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "deck.pptx",
+                mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                text = "Slide one title.\n\nSlide two agenda.",
+                sourceId = "source-pptx-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Pptx, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Slide one title.", "Slide two agenda."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
+    fun epubWithExtractedTextParsesLocally() = runBlocking {
+        val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
+
+        val result = repository.importSource(
+            input = SourceImportInput(
+                requestId = 1L,
+                fileName = "book.epub",
+                mimeType = "application/epub+zip",
+                text = "Chapter one.\n\nChapter two.",
+                sourceId = "source-epub-text"
+            ),
+            nowEpochMillis = 100L
+        )
+
+        assertEquals(SourceType.Epub, result.source.type)
+        assertEquals(SourceParserStatus.PartiallyLocal, result.source.parserStatus)
+        assertEquals(listOf("Chapter one.", "Chapter two."), result.chunks.map { it.text })
+        assertTrue(result.warnings.isNotEmpty())
+    }
+
+    @Test
     fun unsupportedAndFutureParserFilesRemainVisible() = runBlocking {
         val repository = SourceRepository(FakeSourceDao(), defaultSpaceId = "space-1")
 
@@ -157,6 +303,9 @@ class SourceRepositoryTest {
         val result = repository.reprocessSource("source-text", nowEpochMillis = 200L)
 
         assertEquals(SourceParserStatus.FullyLocal, result?.source?.parserStatus)
+        // Task 1 (hot-update): reprocessing stamps a newer creation time, so the
+        // adapter-derived revision (rev-<id>-<createdAt>) changes for the next turn.
+        assertEquals(200L, result?.source?.createdAtEpochMillis)
         assertEquals(listOf("First"), dao.listChunksForSource("source-text").map { it.text })
     }
 }
@@ -190,4 +339,13 @@ private class FakeSourceDao : SourceDao {
         ids.forEach { chunks.remove(it) }
         return ids.size
     }
+
+    override suspend fun updateChunkEmbedding(chunkId: String, embedding: ByteArray, embeddingModel: String?) {
+        chunks[chunkId]?.let { chunks[chunkId] = it.copy(embedding = embedding, embeddingModel = embeddingModel) }
+    }
+
+    override suspend fun listChunkEmbeddingRows(spaceId: String): List<SourceChunkEmbeddingRow> =
+        chunks.values
+            .filter { it.spaceId == spaceId && it.embedding != null }
+            .map { SourceChunkEmbeddingRow(it.id, it.embedding!!, it.embeddingModel) }
 }

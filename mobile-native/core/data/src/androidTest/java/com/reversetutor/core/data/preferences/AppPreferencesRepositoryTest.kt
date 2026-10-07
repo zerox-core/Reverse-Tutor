@@ -43,6 +43,8 @@ class AppPreferencesRepositoryTest {
         firstRepository.updateMemo(MemoSlot.Primary, "first memo")
         firstRepository.updateMemo(MemoSlot.Secondary, "second memo")
         firstRepository.updateMemo(MemoSlot.Scratch, "scratch memo")
+        firstRepository.setChallengeReminderEnabled(false)
+        firstRepository.setHapticFeedbackEnabled(false)
         scopes.removeFirst().cancel()
 
         val recreatedRepository = AppPreferencesRepository(newDataStore())
@@ -53,6 +55,8 @@ class AppPreferencesRepositoryTest {
         assertEquals("first memo", preferences.primaryMemo)
         assertEquals("second memo", preferences.secondaryMemo)
         assertEquals("scratch memo", preferences.scratchMemo)
+        assertFalse(preferences.challengeReminderEnabled)
+        assertFalse(preferences.hapticFeedbackEnabled)
     }
 
     private fun newDataStore() = PreferenceDataStoreFactory.create(

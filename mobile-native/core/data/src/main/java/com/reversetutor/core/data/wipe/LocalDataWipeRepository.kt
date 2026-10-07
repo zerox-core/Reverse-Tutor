@@ -41,7 +41,10 @@ class RoomLocalDataWipeStore(
     private val database: ReverseTutorDatabase
 ) : LocalDataWipeStore {
     override suspend fun listSecretRefs(): List<String> =
-        database.llmProfileDao().listAll().mapNotNull { it.secretRef }
+        buildList {
+            database.llmProfileDao().listAll().mapNotNullTo(this) { it.secretRef }
+            database.modelConnectionDao().listAllConnections().mapNotNullTo(this) { it.secretRef }
+        }
 
     override suspend fun clearAllUserTables() {
         database.clearAllTables()

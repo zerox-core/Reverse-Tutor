@@ -3,26 +3,54 @@ package com.reversetutor.feature.chat
 import com.reversetutor.core.data.message.MessageQuoteDraft
 import com.reversetutor.core.data.message.MessageRecord
 import com.reversetutor.core.data.message.MessageAttachmentDraft
+import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.model.MessageRole
 
 data class ChatUiState(
     val sessionTitle: String,
+    val learnerName: String,
+    val learnerStatus: String,
+    val contextPath: String,
     val messages: List<ChatTimelineItem>,
     val composer: ChatComposerState,
-    val generation: ChatGenerationUiState = ChatGenerationUiState.Idle
+    val generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
+    val learnerImageRef: String? = null,
+    val avatarVisible: Boolean = true,
+    val sources: List<ChatSourceUi> = emptyList(),
+    val currentSessionSourceIds: Set<String> = emptySet(),
+    val pendingDeletion: PendingChatMessageDeletion? = null,
+    val pendingDeletionRetryRequired: Boolean = false
 ) {
     val generationStatusLabel: String?
         get() = generation.statusLabel
+    val learnerAvatarReference: LearnerAvatarReference?
+        get() = LearnerAvatarReference.parse(learnerImageRef)
+    val reserveAvatarSpace: Boolean
+        get() = avatarVisible
 
     companion object {
         fun from(
             sessionTitle: String,
             records: List<MessageRecord>,
             composer: ChatComposerState,
-            generation: ChatGenerationUiState = ChatGenerationUiState.Idle
-        ): ChatUiState =
-            ChatUiState(
+            generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
+            learnerName: String = "林澈",
+            learnerStatus: String = "正在理解函数",
+            contextPath: String = "基础语法 / 函数 / 参数与返回值",
+            sessionSnapshot: NewSessionConfiguration? = null,
+            sources: List<ChatSourceUi> = emptyList(),
+            currentSessionSourceIds: Set<String> = emptySet(),
+            rememberedMessageIds: Set<String> = emptySet(),
+            pendingDeletion: PendingChatMessageDeletion? = null,
+            pendingDeletionRetryRequired: Boolean = false
+        ): ChatUiState {
+            val resolvedName = sessionSnapshot?.learnerDisplayName?.takeIf(String::isNotBlank) ?: learnerName
+            val resolvedStatus = sessionSnapshot?.learnerRole?.takeIf(String::isNotBlank) ?: learnerStatus
+            return ChatUiState(
                 sessionTitle = sessionTitle,
+                learnerName = resolvedName,
+                learnerStatus = resolvedStatus,
+                contextPath = contextPath,
                 messages = records
                     .sortedBy { it.message.createdAtEpochMillis }
                     .map { record ->
@@ -30,20 +58,112 @@ data class ChatUiState(
                             id = record.message.id,
                             spaceId = record.message.spaceId,
                             role = record.message.role,
-                            roleLabel = record.message.role.toChatLabel(),
+                            roleLabel = record.message.role.toChatLabel(resolvedName),
                             text = record.message.text,
                             createdAtEpochMillis = record.message.createdAtEpochMillis,
                             attachmentLabels = record.attachments.map { attachment ->
                                 attachment.toTimelineLabel()
                             },
-                            quoteLabel = record.quote?.let { "Replying to: ${it.excerpt}" }
+                            attachments = record.attachments.map { attachment ->
+                                ChatAttachmentUi(
+                                    name = attachment.name,
+                                    mimeType = attachment.mimeType,
+                                    uri = attachment.uri,
+                                    sourceId = attachment.sourceId
+                                )
+                            },
+                            quoteLabel = record.quote?.let { "正在回复：${it.excerpt}" },
+                            remembered = record.message.id in rememberedMessageIds,
+                            monologue = record.message.monologue
                         )
                     },
                 composer = composer,
-                generation = generation
+                generation = generation,
+                learnerImageRef = sessionSnapshot?.learnerImageRef,
+                avatarVisible = sessionSnapshot?.avatarVisible ?: true,
+                sources = sources,
+                currentSessionSourceIds = currentSessionSourceIds,
+                pendingDeletion = pendingDeletion,
+                pendingDeletionRetryRequired = pendingDeletionRetryRequired
             )
+        }
+
+        fun fromTimeline(
+            sessionTitle: String,
+            entries: List<WindowVisibleTimelineEntry>,
+            composer: ChatComposerState,
+            generation: ChatGenerationUiState = ChatGenerationUiState.Idle,
+            learnerName: String = "林澈",
+            learnerStatus: String = "正在理解函数",
+            contextPath: String = "基础语法 / 函数 / 参数与返回值",
+            sessionSnapshot: NewSessionConfiguration? = null,
+            sources: List<ChatSourceUi> = emptyList(),
+            currentSessionSourceIds: Set<String> = emptySet(),
+            rememberedMessageIds: Set<String> = emptySet(),
+            pendingDeletion: PendingChatMessageDeletion? = null,
+            pendingDeletionRetryRequired: Boolean = false
+        ): ChatUiState {
+            val resolvedName = sessionSnapshot?.learnerDisplayName?.takeIf(String::isNotBlank) ?: learnerName
+            val resolvedStatus = sessionSnapshot?.learnerRole?.takeIf(String::isNotBlank) ?: learnerStatus
+            return ChatUiState(
+                sessionTitle = sessionTitle,
+                learnerName = resolvedName,
+                learnerStatus = resolvedStatus,
+                contextPath = contextPath,
+                messages = entries.sortedBy { it.createdAtEpochMillis }.map { entry ->
+                    ChatTimelineItem(
+                        id = entry.id,
+                        spaceId = entry.spaceId,
+                        role = entry.role,
+                        roleLabel = entry.role.toChatLabel(resolvedName),
+                        text = entry.text,
+                        createdAtEpochMillis = entry.createdAtEpochMillis,
+                        attachmentLabels = entry.attachmentLabels,
+                        attachments = entry.attachments,
+                        quoteLabel = entry.quoteLabel,
+                        remembered = entry.id in rememberedMessageIds,
+                        inheritedReadOnly = entry.origin == WindowTimelineOrigin.INHERITED_READ_ONLY,
+                        monologue = entry.monologue
+                    )
+                },
+                composer = composer,
+                generation = generation,
+                learnerImageRef = sessionSnapshot?.learnerImageRef,
+                avatarVisible = sessionSnapshot?.avatarVisible ?: true,
+                sources = sources,
+                currentSessionSourceIds = currentSessionSourceIds,
+                pendingDeletion = pendingDeletion,
+                pendingDeletionRetryRequired = pendingDeletionRetryRequired
+            )
+        }
     }
 }
+
+fun buildChatRouteUiState(
+    sessionTitle: String,
+    records: List<MessageRecord>,
+    composer: ChatComposerState,
+    generation: ChatGenerationUiState,
+    learnerRoleFallback: String,
+    sessionSnapshot: NewSessionConfiguration?,
+    sources: List<ChatSourceUi> = emptyList(),
+    currentSessionSourceIds: Set<String> = emptySet(),
+    rememberedMessageIds: Set<String> = emptySet(),
+    pendingDeletion: PendingChatMessageDeletion? = null,
+    pendingDeletionRetryRequired: Boolean = false
+): ChatUiState = ChatUiState.from(
+    sessionTitle = sessionTitle,
+    records = records,
+    composer = composer,
+    generation = generation,
+    learnerStatus = learnerRoleFallback,
+    sessionSnapshot = sessionSnapshot,
+    sources = sources,
+    currentSessionSourceIds = currentSessionSourceIds,
+    rememberedMessageIds = rememberedMessageIds,
+    pendingDeletion = pendingDeletion,
+    pendingDeletionRetryRequired = pendingDeletionRetryRequired
+)
 
 sealed interface ChatGenerationUiState {
     val statusLabel: String?
@@ -53,17 +173,71 @@ sealed interface ChatGenerationUiState {
     }
 
     object NoModel : ChatGenerationUiState {
-        override val statusLabel: String = "No model configured"
+        override val statusLabel: String = "未配置模型"
     }
 
     object Pending : ChatGenerationUiState {
-        override val statusLabel: String = "Generating reply..."
+        override val statusLabel: String = "正在生成回复..."
+    }
+
+    data class Streaming(val text: String, val monologue: String? = null) : ChatGenerationUiState {
+        override val statusLabel: String = "正在生成回复..."
     }
 
     data class Failure(val message: String) : ChatGenerationUiState {
-        override val statusLabel: String = "Provider failed: $message"
+        override val statusLabel: String = "生成失败：$message"
     }
 }
+
+/**
+ * Feature-contract mapping from a persisted background job status to the safe
+ * chat generation UI state. Only white-listed failure reasons are surfaced:
+ * any other persisted text (an unknown, legacy or unexpected value) degrades
+ * to a fixed generic label, so URLs, Authorization headers, keys or exception
+ * class names can never reach the chat screen.
+ */
+fun backgroundGenerationUiState(
+    status: BackgroundJobStatus,
+    errorMessage: String?,
+    /** 2026-09-20 拍板接通：Running 期间从 GenerationPartialStore 读到的流式增量文本。 */
+    preview: String? = null,
+    /** 2026-09-21 思考链流式透出：Running 期间读到的独白快照（流式思考链抽屉内容）。 */
+    monologue: String? = null
+): ChatGenerationUiState = when (status) {
+    BackgroundJobStatus.Failed -> when (errorMessage) {
+        NoModelConfiguredReason -> ChatGenerationUiState.NoModel
+        else -> ChatGenerationUiState.Failure(
+            SafeBackgroundFailureLabels[errorMessage] ?: GenericGenerationFailureLabel
+        )
+    }
+    BackgroundJobStatus.Cancelled,
+    BackgroundJobStatus.Discarded,
+    BackgroundJobStatus.Completed -> ChatGenerationUiState.Idle
+    BackgroundJobStatus.Queued -> ChatGenerationUiState.Pending
+    BackgroundJobStatus.Running -> {
+        val cleanPreview = preview?.takeIf { it.isNotBlank() }
+        val cleanMonologue = monologue?.takeIf { it.isNotBlank() }
+        when {
+            cleanPreview != null -> ChatGenerationUiState.Streaming(cleanPreview, cleanMonologue)
+            // 独白先于正文到达：正文还空着也进 Streaming，让思考链抽屉先上屏。
+            cleanMonologue != null -> ChatGenerationUiState.Streaming("", cleanMonologue)
+            else -> ChatGenerationUiState.Pending
+        }
+    }
+}
+
+internal const val NoModelConfiguredReason = "No model configured"
+internal const val GenericGenerationFailureLabel = "后台生成失败"
+
+/** Persisted background failure reasons mapped to fixed, user-safe Chinese labels. */
+private val SafeBackgroundFailureLabels: Map<String, String> = mapOf(
+    "background_generation_failed" to "生成失败，请稍后重试",
+    "Session is unavailable" to "会话不可用，生成已取消",
+    "Generation token is stale" to "生成请求已过期",
+    "Initiative plan expired" to "主动消息已过期",
+    "Invalid generation job" to "生成任务无效",
+    "Vision input unsupported" to "当前模型不支持图片输入"
+)
 
 data class ChatTimelineItem(
     val id: String,
@@ -73,16 +247,43 @@ data class ChatTimelineItem(
     val text: String,
     val createdAtEpochMillis: Long,
     val attachmentLabels: List<String>,
-    val quoteLabel: String?
+    val attachments: List<ChatAttachmentUi>,
+    val quoteLabel: String?,
+    val remembered: Boolean = false,
+    val inheritedReadOnly: Boolean = false,
+    /** Expression-loop slice 4: thinking-drawer monologue; null on legacy messages. */
+    val monologue: String? = null
 )
+
+data class ChatAttachmentUi(
+    val name: String,
+    val mimeType: String?,
+    val uri: String?,
+    val sourceId: String?
+) {
+    val isImage: Boolean
+        get() = mimeType?.startsWith("image/") == true
+}
 
 data class ChatComposerState(
     val text: String,
     val quoteTarget: ChatQuoteTarget? = null,
-    val imageDraft: ChatImageDraft? = null
+    val imageDraft: ChatImageDraft? = null,
+    val attachments: List<ChatDraftAttachment> = emptyList(),
+    val isSending: Boolean = false,
+    val sendFailure: String? = null,
+    val notice: String? = null
 ) {
+    val orderedAttachments: List<ChatDraftAttachment>
+        get() = if (imageDraft == null) {
+            attachments
+        } else {
+            attachments + imageDraft.toChatDraftAttachment()
+        }
     val canSend: Boolean
-        get() = text.trim().isNotEmpty() || imageDraft != null
+        get() = !isSending &&
+            (text.isNotBlank() || orderedAttachments.any { it.readiness == ChatAttachmentReadiness.Ready }) &&
+            orderedAttachments.all { it.readiness == ChatAttachmentReadiness.Ready }
 
     fun toQuoteDraft(): MessageQuoteDraft? {
         if (!canSend) return null
@@ -94,7 +295,29 @@ data class ChatComposerState(
     }
 
     fun toAttachmentDrafts(): List<MessageAttachmentDraft> =
-        imageDraft?.toAttachmentDraft()?.let(::listOf).orEmpty()
+        orderedAttachments.map {
+            MessageAttachmentDraft(
+                name = it.name,
+                mimeType = it.mimeType,
+                uri = it.uri,
+                sourceId = it.sourceId
+            )
+        }
+
+    fun toPersistentDraft(clientRequestId: String): ChatComposerDraft = ChatComposerDraft(
+        clientRequestId = clientRequestId,
+        text = text,
+        quote = quoteTarget,
+        attachments = orderedAttachments
+    )
+
+    companion object {
+        fun from(draft: ChatComposerDraft): ChatComposerState = ChatComposerState(
+            text = draft.text,
+            quoteTarget = draft.quote,
+            attachments = draft.attachments
+        )
+    }
 }
 
 data class ChatImageDraft(
@@ -106,8 +329,8 @@ data class ChatImageDraft(
 ) {
     val displayLabel: String
         get() = buildString {
-            append("Image: ")
-            append(name.ifBlank { "attachment" })
+            append("图片：")
+            append(name.ifBlank { "附件" })
             if (!mimeType.isNullOrBlank()) {
                 append(" (")
                 append(mimeType)
@@ -122,34 +345,57 @@ data class ChatImageDraft(
             uri = uri,
             sourceId = sourceId
         )
+
+    fun toChatDraftAttachment(): ChatDraftAttachment = ChatDraftAttachment(
+        id = "image-$requestId",
+        kind = ChatAttachmentKind.Image,
+        name = name,
+        mimeType = mimeType,
+        uri = uri,
+        sourceId = sourceId,
+        readiness = ChatAttachmentReadiness.Ready
+    )
 }
 
 data class ChatQuoteTarget(
     val messageId: String,
-    val excerpt: String
+    val excerpt: String,
+    val sourceIdentity: String = "消息"
 )
 
 enum class ChatMessageAction(
-    val label: String,
-    val deferred: Boolean
+    val label: String
 ) {
-    Quote("Quote", false),
-    Note("Note", false),
-    Regenerate("Regenerate", true),
-    Delete("Delete", false)
+    Copy("复制"),
+    Quote("引用回复"),
+    Remember("记住这条"),
+    LocateSource("定位关联资料"),
+    Delete("删除消息")
 }
 
-private fun MessageRole.toChatLabel(): String =
+object ChatMessageActionPolicy {
+    fun actionsFor(item: ChatTimelineItem): List<ChatMessageAction> =
+        if (!item.inheritedReadOnly) {
+            ChatMessageAction.entries
+        } else {
+            buildList {
+                add(ChatMessageAction.Copy)
+                if (item.attachments.any { it.sourceId != null }) add(ChatMessageAction.LocateSource)
+            }
+        }
+}
+
+private fun MessageRole.toChatLabel(learnerName: String): String =
     when (this) {
-        MessageRole.User -> "You"
-        MessageRole.Assistant -> "Assistant"
-        MessageRole.System -> "System"
-        MessageRole.Tool -> "Tool"
+        MessageRole.User -> "我"
+        MessageRole.Assistant -> learnerName
+        MessageRole.System -> "学习记录"
+        MessageRole.Tool -> "资料"
     }
 
 private fun com.reversetutor.core.model.MessageAttachment.toTimelineLabel(): String =
     if (mimeType?.startsWith("image/") == true) {
-        "Image: $name"
+        "图片：$name"
     } else {
-        "Attachment: $name"
+        "附件：$name"
     }

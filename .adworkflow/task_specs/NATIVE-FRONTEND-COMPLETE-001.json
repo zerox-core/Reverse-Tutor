@@ -1,0 +1,51 @@
+{
+  "task_id": "NATIVE-FRONTEND-COMPLETE-001",
+  "task_type": "code",
+  "goal": "Implement the confirmed native Android frontend interaction contract for the five-page workspace, sessions, chat, weekly components, sources, settings, challenge flow, and resilient local UI states.",
+  "risk_level": "high",
+  "execution_mode": "worker_plus_reviewer",
+  "allowed_actions": ["read", "edit", "test"],
+  "requirements_artifact": ".adworkflow/artifacts/NATIVE-FRONTEND-COMPLETE-001/requirements.md",
+  "acceptance_criteria": [
+    "Cold start and process-recreated launch enter Home; a live process may restore its prior page after releasing heavy resources.",
+    "The circular workspace contains Weekly, Home, Global Graph, static Community, and Global Settings in that order.",
+    "Workspace paging, nested horizontal controls, graph canvas mode, challenge threshold/bottom gate, Back stack, and fading spatial indicators do not conflict.",
+    "Session cards, preset/custom creation, favorites, drafts, source revisions, and session snapshots obey the confirmed isolation rules.",
+    "Chat header, composer, attachments, message actions, rich content, retries, partial generation, and local drafts have complete states.",
+    "Weekly components support four fixed sizes, drag/remove/add/source selection, snapping, persistence, and the confirmed Token seven-day view.",
+    "Global settings, source management, challenge join/reuse, offline/article states, accessibility, safe areas, and reduced motion are covered.",
+    "No export formats, long-term-memory automation, graph algorithm generation, community business actions, or PWA/static-app changes are introduced."
+  ],
+  "entrypoints": [
+    "mobile-native/app/src/main/java/com/reversetutor/preview/shell",
+    "mobile-native/feature/chat",
+    "mobile-native/feature/memory",
+    "mobile-native/feature/settings",
+    "mobile-native/feature/graph"
+  ],
+  "write_scope": [
+    "mobile-native/app",
+    "mobile-native/feature"
+  ],
+  "do_not_touch": [
+    "static/app/index.html",
+    "mobile/",
+    "mobile-native/core/data",
+    "mobile-native/core/model",
+    "mobile-native/core/domain",
+    "mobile-native/core/protocol",
+    "mobile-native/core/llm",
+    "server.py",
+    "adapters/online"
+  ],
+  "dependencies": [
+    "NATIVE-HYBRID-BACKEND-001-contract-checkpoint",
+    "NATIVE-HYBRID-FRONTEND-001"
+  ],
+  "verification_expectations": [
+    "Run affected native JVM tests and Android lint.",
+    "Assemble debug APK only when explicitly requested.",
+    "Run emulator/device smoke across narrow and regular widths, light/dark themes, large text, IME, process recreation, and reduced motion.",
+    "Record screenshots and interaction evidence for each major route and state."
+  ]
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 在线版（R12/R15）：仅本变体放开开发联调所需的明文 HTTP，正式环境走 HTTPS。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:networkSecurityConfig="@xml/online_network_security_config" />
+</manifest>

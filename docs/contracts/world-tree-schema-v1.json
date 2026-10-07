@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://reversetutor.local/schemas/world-tree-v1.json",
+  "title": "Reverse Tutor World Tree Draft V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "spaceId",
+    "sessionId",
+    "templateId",
+    "title",
+    "mode",
+    "schemaVersion",
+    "sections",
+    "sourceIds",
+    "state",
+    "createdAtEpochMillis",
+    "updatedAtEpochMillis"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "spaceId": { "type": "string", "minLength": 1 },
+    "sessionId": { "type": ["string", "null"] },
+    "templateId": { "type": ["string", "null"] },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "mode": { "enum": ["learning", "review", "companion"] },
+    "schemaVersion": { "const": 1 },
+    "sections": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/section" }
+    },
+    "sourceIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 200,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "state": { "enum": ["draft", "ready", "archived"] },
+    "createdAtEpochMillis": { "type": "integer", "minimum": 0 },
+    "updatedAtEpochMillis": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "baseSectionFields": {
+      "type": "object",
+      "required": ["id", "type", "title", "order", "payload", "required", "completed"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "order": { "type": "integer", "minimum": 0 },
+        "payload": { "type": "object" },
+        "required": { "type": "boolean" },
+        "completed": { "type": "boolean" }
+      }
+    },
+    "section": {
+      "oneOf": [
+        { "$ref": "#/$defs/studentRoleSection" },
+        { "$ref": "#/$defs/learningGoalSection" },
+        { "$ref": "#/$defs/studyScheduleSection" },
+        { "$ref": "#/$defs/portraitSystemSection" },
+        { "$ref": "#/$defs/storyPlotSection" },
+        { "$ref": "#/$defs/sourceLibrarySection" },
+        { "$ref": "#/$defs/customSection" }
+      ]
+    },
+    "studentRoleSection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "student_role" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["avatarRef", "name", "personality", "currentUnderstanding", "interactionHabits"],
+              "properties": {
+                "avatarRef": { "type": ["string", "null"], "maxLength": 500 },
+                "name": { "type": "string", "maxLength": 80 },
+                "personality": { "type": "string", "maxLength": 4000 },
+                "currentUnderstanding": { "type": "string", "maxLength": 4000 },
+                "interactionHabits": { "type": "string", "maxLength": 4000 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "learningGoalSection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "learning_goal" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["description", "acceptanceCriteria"],
+              "properties": {
+                "description": { "type": "string", "maxLength": 12000 },
+                "acceptanceCriteria": {
+                  "type": "array",
+                  "maxItems": 30,
+                  "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "studyScheduleSection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "study_schedule" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["startAtEpochMillis", "endAtEpochMillis", "weeklyRhythm", "milestones"],
+              "properties": {
+                "startAtEpochMillis": { "type": ["integer", "null"], "minimum": 0 },
+                "endAtEpochMillis": { "type": ["integer", "null"], "minimum": 0 },
+                "weeklyRhythm": { "type": "string", "maxLength": 4000 },
+                "milestones": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "items": { "$ref": "#/$defs/milestone" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description", "targetAtEpochMillis", "order"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "targetAtEpochMillis": { "type": ["integer", "null"], "minimum": 0 },
+        "order": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "portraitSystemSection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "portrait_system" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dimensions"],
+              "properties": {
+                "dimensions": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "items": { "$ref": "#/$defs/portraitDimension" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "portraitDimension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "content", "order"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "content": { "type": "string", "maxLength": 6000 },
+        "order": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "storyPlotSection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "story_plot" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["background", "relationships", "stages"],
+              "properties": {
+                "background": { "type": "string", "maxLength": 12000 },
+                "relationships": { "type": "string", "maxLength": 12000 },
+                "stages": {
+                  "type": "array",
+                  "maxItems": 30,
+                  "items": { "$ref": "#/$defs/storyStage" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "storyStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "description", "illustrationRef", "order"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 12000 },
+        "illustrationRef": { "type": ["string", "null"], "maxLength": 500 },
+        "order": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sourceLibrarySection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "source_library" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["sourceIds"],
+              "properties": {
+                "sourceIds": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "maxItems": 200,
+                  "items": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "customSection": {
+      "allOf": [
+        { "$ref": "#/$defs/baseSectionFields" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": true,
+            "type": { "const": "custom" },
+            "title": true,
+            "order": true,
+            "required": true,
+            "completed": true,
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["content"],
+              "properties": {
+                "content": { "type": "string", "maxLength": 20000 }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
