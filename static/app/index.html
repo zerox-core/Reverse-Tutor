@@ -1059,6 +1059,8 @@
     display: flex;
     flex-direction: column;
     padding: 0;
+    position: relative;
+    overflow: hidden;
   }
   .insights-graph-canvas,
   .context-graph-body {
@@ -1066,6 +1068,231 @@
     min-height: 0;
     height: 100%;
     padding: 0 !important;
+  }
+  #insights-actions {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 14px;
+    z-index: 12;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card-gradient);
+    box-shadow: 0 12px 30px rgba(0,0,0,.16);
+    backdrop-filter: blur(10px);
+  }
+  .graph-completion-modal.hidden { display: none !important; }
+  .graph-completion-modal .hidden { display: none !important; }
+  .graph-completion-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    color: var(--text);
+  }
+  .graph-completion-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.58);
+  }
+  .graph-completion-panel {
+    position: absolute;
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    max-height: min(86vh, 760px);
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: var(--surface-gradient);
+    box-shadow: 0 18px 48px rgba(0,0,0,.28);
+    display: flex;
+    flex-direction: column;
+  }
+  .graph-completion-header,
+  .graph-completion-footer {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 10px;
+    border-color: var(--line);
+  }
+  .graph-completion-header {
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 12px 13px 10px;
+    border-bottom: 1.5px solid var(--line);
+  }
+  .graph-completion-title {
+    font-size: 15px;
+    font-weight: 750;
+    line-height: 1.25;
+    color: var(--text);
+  }
+  .graph-completion-subtitle {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-soft);
+  }
+  .graph-completion-icon-button {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--surface-soft-gradient);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .graph-completion-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 11px;
+    background: var(--surface-soft-gradient);
+  }
+  .graph-completion-footer {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    padding: 10px 11px 12px;
+    border-top: 1.5px solid var(--line);
+    background: var(--surface-soft-gradient);
+  }
+  .graph-completion-footer button {
+    min-height: 36px;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .graph-completion-secondary {
+    border: 1px solid var(--line);
+    color: var(--text);
+    background: var(--surface-soft-gradient);
+  }
+  .graph-completion-main {
+    border: 1px solid var(--accent);
+    color: var(--page);
+    background: var(--accent);
+  }
+  .graph-completion-session-row {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    border-radius: 8px;
+    border: 1.5px solid var(--line);
+    background: var(--card-gradient);
+    color: var(--text);
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.45;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .graph-completion-session-row input {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    accent-color: var(--accent);
+  }
+  .graph-completion-session-text {
+    min-width: 0;
+    flex: 1;
+  }
+  .graph-completion-session-title {
+    display: block;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .graph-completion-session-time {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .graph-completion-preview-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .graph-completion-preview-empty {
+    padding: 28px 8px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .graph-completion-preview-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .graph-completion-preview-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .graph-completion-preview-heading h3 {
+    margin: 0;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 750;
+  }
+  .graph-completion-preview-count {
+    color: var(--muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .graph-completion-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .graph-completion-preview-card {
+    border-radius: 8px;
+    border: 1.5px solid var(--line);
+    background: var(--card-gradient);
+    color: var(--text);
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.55;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .graph-completion-preview-title {
+    color: var(--text);
+    font-weight: 750;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .graph-completion-preview-meta {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+  .graph-completion-preview-body {
+    margin-top: 6px;
+    color: var(--text-soft);
+    word-break: break-word;
+  }
+  .graph-completion-preview-body p {
+    margin: 0;
+  }
+  .graph-completion-skipped {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .graph-completion-skipped-list {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
   .insight-kb-strip {
     display: grid;
@@ -1093,6 +1320,35 @@
     transition: opacity .6s ease;
   }
   .graph-hint.fade { opacity: 0; }
+  .graph-focus-banner {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 2;
+    pointer-events: none;
+    border: 1px solid rgba(148, 163, 184, .18);
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    box-shadow: 0 12px 34px rgba(0, 0, 0, .2);
+  }
+  .graph-focus-banner strong {
+    display: block;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 650;
+    margin-bottom: 2px;
+  }
+  .graph-focus-banner[data-graph-state="empty"] {
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    text-align: center;
+  }
   .graph-sheet-overlay {
     position: fixed;
     inset: 0;
@@ -1193,6 +1449,200 @@
   }
   .graph-sheet.expanded .graph-compact-only {
     display: none;
+  }
+  .graph-diagnosis-panel {
+    display: grid;
+    gap: 12px;
+  }
+  .graph-diagnosis-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .graph-diagnosis-eyebrow,
+  .graph-diagnosis-meta,
+  .graph-diagnosis-card .label,
+  .graph-diagnosis-statement .label {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .graph-diagnosis-title {
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: var(--text);
+    margin: 2px 0 0;
+    letter-spacing: 0;
+  }
+  .graph-diagnosis-score {
+    width: 58px;
+    min-width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--page);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.05;
+    font-weight: 800;
+  }
+  .graph-diagnosis-score small {
+    margin-top: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    max-width: 48px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .graph-diagnosis-statement {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel-2);
+    padding: 12px 13px;
+  }
+  .graph-diagnosis-statement p {
+    margin: 4px 0 0;
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.55;
+    font-weight: 650;
+  }
+  .graph-diagnosis-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .graph-diagnosis-card {
+    min-height: 74px;
+    border-radius: 8px;
+    background: var(--panel-2);
+    border-left: 3px solid var(--line);
+    padding: 10px 10px 9px;
+  }
+  .graph-diagnosis-card.ok { border-left-color: #91bf95; }
+  .graph-diagnosis-card.warn { border-left-color: var(--warn); }
+  .graph-diagnosis-card.info { border-left-color: #80a7c9; }
+  .graph-diagnosis-card.action { border-left-color: #d8df9f; }
+  .graph-diagnosis-card.relation { border-left-color: #b7a4d6; }
+  .graph-diagnosis-card.source { border-left-color: #d4b46b; }
+  .graph-diagnosis-card p {
+    margin: 5px 0 0;
+    color: var(--text-soft);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .graph-diagnosis-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .graph-diagnosis-action {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 8px 11px;
+    font-size: 12px;
+    font-weight: 750;
+  }
+  .graph-diagnosis-action.primary {
+    background: var(--accent);
+    color: var(--page);
+    border-color: transparent;
+  }
+  .graph-node-compact {
+    display: grid;
+    gap: 12px;
+  }
+  .graph-node-compact-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .graph-node-eyebrow,
+  .graph-node-path,
+  .graph-node-label,
+  .graph-node-hint {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .graph-node-title {
+    margin: 2px 0 0;
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 0;
+  }
+  .graph-node-score {
+    width: 62px;
+    min-width: 62px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel-2);
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .graph-node-score strong {
+    display: block;
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text);
+  }
+  .graph-node-score span {
+    display: block;
+    margin-top: 4px;
+    font-size: 9px;
+    color: var(--muted);
+  }
+  .graph-node-meter {
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--line) 55%, transparent);
+  }
+  .graph-node-meter > i {
+    display: block;
+    height: 100%;
+    width: var(--graph-progress, 0%);
+    border-radius: inherit;
+    background: var(--accent);
+  }
+  .graph-node-statement,
+  .graph-node-main-point,
+  .graph-node-context-box {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel-2);
+    padding: 12px 13px;
+  }
+  .graph-node-statement p,
+  .graph-node-main-point p,
+  .graph-node-context-box p {
+    margin: 4px 0 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.55;
+    font-weight: 650;
+  }
+  .graph-node-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+  .graph-node-chip {
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--panel-2);
+    color: var(--text-soft);
+    padding: 6px 9px;
+    font-size: 11px;
+    line-height: 1.2;
   }
   .graph-node-report {
     color: var(--text);
@@ -2031,6 +2481,19 @@
   </div>
 </div>
 
+<div id="node-thread-mention-sheet" class="choice-sheet-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="node-thread-mention-title">
+  <section class="choice-sheet safe-bottom" onclick="event.stopPropagation()">
+    <div class="p-3 border-b border-neutral-800 flex items-start justify-between gap-3">
+      <div>
+        <div id="node-thread-mention-title" class="text-sm font-semibold">引用节点窗口</div>
+        <div class="text-xs text-neutral-500 mt-1">选择已有节点子窗口，把它作为本轮记忆上下文。</div>
+      </div>
+      <button type="button" data-node-thread-mention-close class="text-xs px-2 py-1 rounded border border-neutral-700">关闭</button>
+    </div>
+    <div data-node-thread-mention-list class="choice-sheet-list"></div>
+  </section>
+</div>
+
 <!-- ============== 主内容（按 view 切换）============== -->
 <main id="views" class="flex-1 min-h-0 flex flex-col">
 
@@ -2278,7 +2741,7 @@
       <div class="text-[10px] text-neutral-600 text-center pt-2">
         <div class="text-neutral-500">欢迎入qq群反馈给我更新动力</div>
         <div class="text-neutral-400 font-mono text-[11px] mt-1">QQ群：897804938</div>
-        <div class="mt-3">Reverse Tutor v0.19.6 · 移动 PWA</div>
+        <div class="mt-3">Reverse Tutor v0.19.7 · 移动 PWA</div>
         <div>所有数据保存在本机浏览器（IndexedDB）</div>
       </div>
     </div>
@@ -2614,6 +3077,29 @@
   </div>
 </div>
 
+<div id="graph-completion-modal" class="graph-completion-modal hidden" role="dialog" aria-modal="true">
+  <div class="graph-completion-scrim" data-graph-completion-close></div>
+  <section class="graph-completion-panel">
+    <header class="graph-completion-header">
+      <div>
+        <div class="graph-completion-title">整理会话线索</div>
+        <div class="graph-completion-subtitle">只扫描你勾选的历史会话，先预览，确认后再写入图谱。</div>
+      </div>
+      <button type="button" class="graph-completion-icon-button" data-graph-completion-close aria-label="关闭"><i data-lucide="x"></i></button>
+    </header>
+    <div class="graph-completion-body">
+      <div data-graph-completion-step="sessions"></div>
+      <div data-graph-completion-step="preview" class="hidden"></div>
+    </div>
+    <footer class="graph-completion-footer">
+      <button type="button" class="graph-completion-secondary" data-graph-completion-close>取消</button>
+      <button type="button" class="graph-completion-secondary hidden" data-graph-completion-back>返回选择</button>
+      <button type="button" class="graph-completion-main" data-graph-completion-preview>预览线索</button>
+      <button type="button" class="graph-completion-main hidden" data-graph-completion-save>保存到图谱</button>
+    </footer>
+  </section>
+</div>
+
 <script>
 // ============== 状态与工具 ==============
 const $ = s => document.querySelector(s);
@@ -2635,6 +3121,8 @@ const state = {
   contextTab: 'graph',
   contextRenderSeq: 0,
   contextEditingNoteId: null,
+  contextAnchorPrefill: null,
+  contextAnchorHighlightId: '',
   graphSelected: '',
   graphEditingNode: null,
   graphDetailNodes: [],
@@ -2646,6 +3134,16 @@ const state = {
   graphBrowseReturn: null,
   graphBrowseTargetIds: [],
   graphBrowseSearch: '',
+  graphCompletionOpen: false,
+  graphCompletionStep: 'sessions',
+  graphCompletionSessions: [],
+  graphCompletionSelectedSids: new Set(),
+  graphCompletionPreview: null,
+  graphCompletionBusy: false,
+  graphCompletionOperationId: 0,
+  graphCompletionActiveOperationId: 0,
+  nodeThreadMentionContexts: [],
+  nodeThreadReturn: null,
   essaySourceMessage: null,
   selectedActionMessage: null,
   quotedMessage: null,
@@ -2680,8 +3178,8 @@ function refreshIcons() {
   });
 }
 
-const APP_VERSION_CODE = 45;
-const APP_VERSION_NAME = '0.19.6';
+const APP_VERSION_CODE = 46;
+const APP_VERSION_NAME = '0.19.7';
 const DEFAULT_UPDATE_FEED_URL = 'https://dl.zeroxcore.tech/reverse-tutor/latest.json';
 const GITHUB_UPDATE_FEED_URL = 'https://raw.githubusercontent.com/zhuxice-ctrl/Reverse-Tutor/main/static/app/latest.json';
 const GITHUB_LATEST_RELEASE_URL = 'https://api.github.com/repos/zhuxice-ctrl/Reverse-Tutor/releases/latest';
@@ -3755,12 +4253,19 @@ function createTurnId() {
 const GRAPH_PROCESS_KP_NAMES = new Set([
   '后台回复', '后台生成', '后台生成中', '后台回复生成中',
   '自由回复', '模型自由回复', '当前聊天', '当前窗口', '未知', '?',
+  '师生角色定位', '师生身份确认', '学生身份确认', '老师身份确认', '角色边界确认',
 ]);
+
+const GRAPH_NON_LEARNING_KP_PATTERNS = [
+  /(师生|学生|老师).*(角色|身份|定位|边界|确认)/,
+  /(角色|身份).*(边界|定位|确认)/,
+];
 
 function isLogicalGraphKp(kp) {
   const text = String(kp || '').replace(/\s+/g, ' ').trim();
   if (!text) return false;
   if (GRAPH_PROCESS_KP_NAMES.has(text)) return false;
+  if (GRAPH_NON_LEARNING_KP_PATTERNS.some(pattern => pattern.test(text))) return false;
   if (/^(background_|native_background|foreground_llm|pending|error)$/i.test(text)) return false;
   return true;
 }
@@ -5696,6 +6201,15 @@ ${format_actions()}
 
   function formatQuotedReplyContext(quote, userInput) {
     if (!quote || !quote.id) return '';
+    if (quote.node_thread_memory) {
+      return [
+        '用户正在引用一个或多个节点子窗口作为本轮记忆上下文。',
+        `- 引用ID：${quote.id}`,
+        `- 节点窗口记忆：${String(quote.content || '').slice(0, 1800)}`,
+        `- 用户本轮输入：${String(userInput || '').slice(0, 1200)}`,
+        '请把这些节点窗口内容当作背景记忆，只在相关时使用，不要把它误认为用户本轮新说的话。'
+      ].join('\n');
+    }
     const roleLabel = quote.role === 'assistant' ? '学生 AI' : (quote.role === 'user' ? '用户/老师' : quote.role);
     return [
       '用户正在引用一条历史消息进行回复。',
@@ -6400,6 +6914,9 @@ ${format_actions()}
       quoted_message_id: quoted?.id || null,
       quoted_role: quoted?.role || null,
       quoted_preview: quoted ? String(quoted.content || '').replace(/\s+/g, ' ').trim().slice(0, 180) : '',
+      node_thread_memory: quoted?.node_thread_memory === true,
+      node_thread_memory_sids: quoted?.node_thread_memory_sids || [],
+      node_thread_memory_context: quoted?.node_thread_memory ? String(quoted.content || '').slice(0, 1800) : '',
       attachments: normalizeChatImageAttachments(extraMeta.attachments || []),
     });
   }
@@ -6457,9 +6974,15 @@ ${openingTask}
     const messages = [{ role: 'system', content: finalReplyInstruction(session, 'opening') }];
     const raw = await LLM.chat_json(system_prompt, messages, { temperature: 0.85 });
     const reply = (raw.reply||'').trim() || '（站在讲台前傻笑）……老师好，咱开始吧！';
-    const action = raw.action || { type:'ask', knowledge_point:'?' };
+    const action = normalizeAction(raw.action || {}, '开场提问');
+    const ev = cleanEvaluation(raw.evaluation || {});
     if (await hasUserMessagesBeforeOpening(sid)) return { reply: '', action, skipped: true };
-    await add_message(sid, 'assistant', reply, { action, evaluation: cleanEvaluation(raw.evaluation || {}), opening: true });
+    await add_message(sid, 'assistant', reply, { action, evaluation: ev, opening: true });
+    if (conversationMode === 'learning' && action.knowledge_point) {
+      await upsert_mastery(sid, action.knowledge_point, +ev.correctness||0, +ev.depth||0,
+        ev.evidence_for_mastery?.type || 'none',
+        ev.evidence_for_mastery?.status || 'none');
+    }
     return { reply, action };
   }
 
@@ -6670,6 +7193,537 @@ function supportsBackgroundChat(cfg) {
     };
   }
 
+  function buildLightChatSystemPrompt(session, summary_text='') {
+    const p = session?.persona || {};
+    const mode = inferConversationMode(session);
+    const runtime_profile_hint = String(session?.runtime_profile_hint || buildRuntimeProfileHint(session?.profile_summary || {
+      tags: session?.profile_tags || [],
+      description: session?.profile_description || '',
+    })).trim();
+    return `你是「反转家教 AI」里的学生 AI，当前只处理自然聊天回合，不进入完整教学链。
+
+# 人设
+- 角色: ${p.role || ''}
+- 目标: ${p.goal || ''}
+- 性格: ${p.personality || ''}
+- 当前 mode: ${mode}
+
+# 核心自述
+${session?.core_self || '（未设置）'}
+
+# 用户画像提示
+${runtime_profile_hint || '（无）'}
+
+${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
+
+# 角色边界（闲聊也必须遵守）
+- 永远是学生 AI，不是老师、教练、陪练、助教或课程安排者。
+- 用户是老师/主导者。你可以表达好奇、不会、卡住、请求检查、请求提醒、让老师盯你，但不要把自己说成能教学、安排训练、命令用户练习或带用户学习的人。
+- 用户问“你会什么”或“你能做什么”时，要从学生身份回答：我会提问、说卡点、复述给你检查、配合你的目标、让你盯作业；不要说“我来教你”、不要说“我陪你练”、不要说“我让你跟读”。
+- 被用户纠正角色时，先承认刚才越界，再立刻回到学生身份，不继续辩解或解释系统设置。
+
+# 轻量聊天规则
+- 仍然按人设、关系和最近上下文自然回复，不要套固定模板。
+- 不要强行教学。
+- 不要突然讲知识点。
+- 不要做掌握度判断。
+- 如果用户只是寒暄、犹豫、情绪表达或短句补充，就像真实聊天一样接住，不要把每句话都变成学习任务。
+- 不要故意压缩回复。纯寒暄可以 1 句；用户让你解释、列举、展开、说明意思或继续说时，通常 2 到 5 句、约 120 到 300 个中文字符，信息要给足。
+- 只输出学生 AI 的自然语言，不输出 JSON、metadata、评价字段或思考过程。`;
+  }
+
+  function chatNoteOutlineFor(title, session=null) {
+    const goal = String(session?.goal || session?.title || '').trim();
+    const role = String(session?.persona?.role || session?.role || '').trim();
+    const base = /日语|JLPT|N[12345]/i.test(`${goal} ${role}`)
+      ? '日语 N2'
+      : graphTrim(goal || '当前目标', 18);
+    if (/て形|动词|動詞|五段|する|くる/.test(title)) return `${base} / 语法 / 动词变形`;
+    if (/shadowing|跟读|听力|早口|语速/.test(title)) return `${base} / 听力 / 跟读`;
+    if (/聞こえる|聞かれる|易混|分不清/.test(title)) return `${base} / 语法 / 易混表达`;
+    return `${base} / 待归类线索`;
+  }
+
+  function chatNoteQuoteFrom(text, fallback='') {
+    const clean = String(text || fallback || '').replace(/\s+/g, ' ').trim();
+    return graphTrim(clean, 120);
+  }
+
+  function chatNoteCandidate(title, body, quote, session, keywords=[]) {
+    const cleanTitle = graphTrim(title, 36);
+    if (!cleanTitle || !isLogicalGraphKp(cleanTitle)) return null;
+    if (/师生角色定位|师生身份|学生身份|老师身份|角色边界|你是谁我是谁/.test(cleanTitle)) return null;
+    return {
+      title: cleanTitle,
+      body: graphTrim(body, 120),
+      quote: chatNoteQuoteFrom(quote, body),
+      outline: chatNoteOutlineFor(cleanTitle, session),
+      keywords: graphUniqueClean(keywords, 5),
+    };
+  }
+
+  function extractChatNoteCandidates({ userInput='', reply='', session=null }={}) {
+    const raw = `${userInput || ''}\n${reply || ''}`;
+    const compact = raw.replace(/\s+/g, ' ').trim();
+    const notes = [];
+    const add = (note) => { if (note && !notes.some(n => normalizeGraphTopic(n.title) === normalizeGraphTopic(note.title))) notes.push(note); };
+    if (!compact) return [];
+    if (/师生角色定位|你不是我的学生|你是谁.*我是谁|老师.*学生.*角色/.test(compact) && !/(て形|shadowing|聞こえる|聞かれる|听力|跟读|动词|語法|语法)/.test(compact)) {
+      return [];
+    }
+    if (/て形|て\s*形/.test(compact)) {
+      add(chatNoteCandidate(
+        /写错|写乱|卡|混/.test(compact) ? 'て形总是写乱' : 'て形',
+        '你在闲聊里提到，动词变形混在一起时容易写错。',
+        compact.match(/[^。！？\n]*て\s*形[^。！？\n]*/)?.[0] || compact,
+        session,
+        ['て形', '动词变形']
+      ));
+    }
+    if (/shadowing|跟读/i.test(compact)) {
+      add(chatNoteCandidate(
+        /听力|录音|慢速/.test(compact) ? 'shadowing 跟读' : 'shadowing',
+        '闲聊里出现了跟读和录音练习线索，可以作为后续听力训练便签。',
+        compact.match(/[^。！？\n]*(shadowing|跟读)[^。！？\n]*/i)?.[0] || compact,
+        session,
+        ['shadowing', '跟读']
+      ));
+    }
+    if (/聞こえる|聞かれる/.test(compact)) {
+      add(chatNoteCandidate(
+        '聞こえる / 聞かれる 分不清',
+        '你提到这组表达容易混淆，适合之后归入易混语法便签。',
+        compact.match(/[^。！？\n]*(聞こえる|聞かれる)[^。！？\n]*/)?.[0] || compact,
+        session,
+        ['聞こえる', '聞かれる', '易混表达']
+      ));
+    }
+    if (/早口の会話|听力.*快|快.*听力|语速|語速/.test(compact)) {
+      add(chatNoteCandidate(
+        'N2 听力快语速',
+        '闲聊里出现了快语速听力卡点，适合作为后续听力训练线索。',
+        compact.match(/[^。！？\n]*(早口の会話|听力|语速|語速)[^。！？\n]*/)?.[0] || compact,
+        session,
+        ['听力', '快语速']
+      ));
+    }
+    if (/する|くる|五段动词|五段動詞/.test(compact) && /变形|写错|混|て形/.test(compact)) {
+      add(chatNoteCandidate(
+        'する、くる 和五段动词变形',
+        '你在闲聊里把不规则动词和五段动词混在一起提到，说明这里值得收成一张语法便签。',
+        compact.match(/[^。！？\n]*(する|くる|五段动词|五段動詞)[^。！？\n]*/)?.[0] || compact,
+        session,
+        ['する', 'くる', '五段动词']
+      ));
+    }
+    return notes.slice(0, 4);
+  }
+
+  async function persistChatNoteAnchors(session, sid, { userInput='', reply='', userMessageId=null, assistantMessageId=null }={}) {
+    if (!sid) return [];
+    const settings = normalizeStrategySettings(session?.settings || {});
+    if (settings.kg_extraction_enabled === false) return [];
+    const privacy = String(settings.privacy_level || 'standard');
+    const candidates = extractChatNoteCandidates({ userInput, reply, session });
+    if (!candidates.length) return [];
+    if (privacy === 'strict') return [];
+    const existing = await DB.bySid('anchors', sid);
+    const saved = [];
+    for (const note of candidates) {
+      const key = normalizeGraphTopic(note.title);
+      const current = existing.find(a => a.kind === 'chat_note' && normalizeGraphTopic(a.chat_note_title || a.content) === key);
+      if (current) {
+        current.weight = Math.max(Number(current.weight || 0), 1.25);
+        current.chat_note_body = current.chat_note_body || note.body;
+        current.chat_note_outline = current.chat_note_outline || note.outline;
+        current.chat_note_quote = current.chat_note_quote || note.quote;
+        current.chat_note_user_message_id = current.chat_note_user_message_id || userMessageId || null;
+        current.chat_note_assistant_message_id = current.chat_note_assistant_message_id || assistantMessageId || null;
+        current.updated_at = Date.now();
+        await DB.put('anchors', current);
+        saved.push(current);
+        continue;
+      }
+      const row = {
+        sid,
+        kind: 'chat_note',
+        content: note.body,
+        weight: 1.25,
+        created_at: Date.now(),
+        chat_note_title: note.title,
+        chat_note_body: note.body,
+        chat_note_outline: note.outline,
+        chat_note_quote: note.quote,
+        chat_note_keywords: note.keywords || [],
+        chat_note_user_message_id: userMessageId || null,
+        chat_note_assistant_message_id: assistantMessageId || null,
+      };
+      row.id = await DB.add('anchors', row);
+      existing.push(row);
+      saved.push(row);
+    }
+    return saved;
+  }
+
+  function graphCompletionText(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function graphCompletionCandidateKey(type, title, outline='') {
+    return [type, normalizeGraphTopic(outline), normalizeGraphTopic(title)].filter(Boolean).join('::');
+  }
+
+  function graphCompletionMessagePairs(messages=[]) {
+    const sorted = [...(messages || [])].sort(compareConversationMessages);
+    const pairs = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const user = sorted[i];
+      if (user.role !== 'user') continue;
+      const nextUserIndex = sorted.findIndex((m, idx) => idx > i && m.role === 'user');
+      const boundary = nextUserIndex === -1 ? sorted.length : nextUserIndex;
+      const assistant = sorted.slice(i + 1, boundary).find(m => m.role === 'assistant');
+      pairs.push({ user, assistant: assistant || null });
+    }
+    return pairs;
+  }
+
+  function graphCompletionHasLearningBehavior(userText='', assistantText='', action={}, evaluation={}) {
+    const text = `${userText}\n${assistantText}`;
+    const actType = String(action?.type || '');
+    if (['ask', 'probe', 'challenge', 'examiner_verify', 'scaffold_example', 'practice', 'recap'].includes(actType)) return true;
+    if (graphCompletionText(action?.knowledge_point) && kgHasLearningEvidence(evaluation || {})) return true;
+    return /(解释|讲解|练习|做题|纠错|复述|追问|举例|例题|推导|证明|为什么|怎么理解|卡点|错因|迁移|应用)/.test(text);
+  }
+
+  function graphCompletionOutlineFor(title, session=null) {
+    return chatNoteOutlineFor(title, session);
+  }
+
+  function graphCompletionClassifyPair(pair, session=null) {
+    const userText = graphCompletionText(pair?.user?.content || '');
+    const assistantText = graphCompletionText(pair?.assistant?.content || '');
+    const meta = pair?.assistant?.meta || {};
+    const action = meta.action || {};
+    const evaluation = meta.evaluation || {};
+    const candidates = [];
+    const kp = graphCompletionText(action.knowledge_point || '');
+
+    if (kp && isLogicalGraphKp(kp) && graphCompletionHasLearningBehavior(userText, assistantText, action, evaluation)) {
+      candidates.push({
+        type: 'learning_node',
+        title: kp,
+        outline: graphCompletionOutlineFor(kp, session),
+        summary: graphPanelPreviewText(evaluation.status || assistantText || userText, ''),
+        stuck: graphCompletionText(evaluation.misconception || evaluation.error_pattern || ''),
+        nextStep: graphCompletionText((evaluation.next_steps || [])[0] || ''),
+        keywords: graphUniqueClean([kp, ...(action.related_kps || [])], 8),
+        evidenceIds: [pair?.user?.id, pair?.assistant?.id].filter(Boolean),
+        evidenceText: graphPanelPreviewText(userText || assistantText, ''),
+        correctness: Number(evaluation.correctness || 0) || 0,
+        depth: Number(evaluation.depth || 0) || 0,
+        evidenceType: evaluation.evidence_for_mastery?.type || 'none',
+        verificationStatus: evaluation.evidence_for_mastery?.status || 'none',
+      });
+      for (const related of action.related_kps || []) {
+        const cleanRelated = graphCompletionText(related);
+        if (cleanRelated && isLogicalGraphKp(cleanRelated)) {
+          candidates.push({
+            type: 'relationship',
+            sourceTitle: kp,
+            targetTitle: cleanRelated,
+            relation: 'related',
+            weight: 1.2,
+            evidenceIds: [pair?.user?.id, pair?.assistant?.id].filter(Boolean),
+          });
+        }
+      }
+      return candidates;
+    }
+
+    for (const note of extractChatNoteCandidates({ userInput: userText, reply: assistantText, session })) {
+      candidates.push({
+        type: 'chat_note',
+        title: note.title,
+        body: note.body,
+        outline: note.outline,
+        quote: note.quote,
+        keywords: note.keywords || [],
+        evidenceIds: [pair?.user?.id, pair?.assistant?.id].filter(Boolean),
+      });
+    }
+    return candidates;
+  }
+
+  async function buildSelectedSessionGraphCompletionPreview(sids=[]) {
+    const selectedSids = Array.from(new Set((sids || []).map(String).filter(Boolean)));
+    const preview = {
+      sessionCount: selectedSids.length,
+      learningNodes: [],
+      updatedLearningNodes: [],
+      relationships: [],
+      chatNotes: [],
+      duplicateMerges: [],
+      skipped: [],
+    };
+    const seen = new Set();
+    const previewCandidateDescriptors = [
+      { type: 'learning_node', bucket: 'learningNodes' },
+      { type: 'chat_note', bucket: 'chatNotes' },
+      { type: 'relationship', bucket: 'relationships' },
+    ];
+
+    for (const sid of selectedSids) {
+      const session = await DB.get('sessions', sid);
+      if (!session) continue;
+      const messages = (await DB.bySid('messages', sid)).sort(compareConversationMessages);
+      const existingMasteries = await DB.bySid('mastery', sid);
+      const existingChatNotes = (await DB.bySid('anchors', sid)).filter(a => a.kind === 'chat_note');
+      const existingKgNodes = await DB.bySid('kg_nodes', sid);
+      const pairs = graphCompletionMessagePairs(messages);
+
+      for (const pair of pairs) {
+        const userText = graphCompletionText(pair?.user?.content || '');
+        const assistantText = graphCompletionText(pair?.assistant?.content || '');
+        let candidates = graphCompletionClassifyPair(pair, session);
+        if (!candidates.length) {
+          candidates = extractChatNoteCandidates({ userInput: userText, reply: assistantText, session }).map(note => ({
+            type: 'chat_note',
+            title: note.title,
+            body: note.body,
+            outline: note.outline,
+            quote: note.quote,
+            keywords: note.keywords || [],
+            evidenceIds: [pair?.user?.id, pair?.assistant?.id].filter(Boolean),
+          }));
+        }
+        if (!candidates.length) {
+          if (userText) preview.skipped.push({ sid, sessionTitle: session.title || '', reason: 'no_learning_signal', text: graphPanelPreviewText(userText, '') });
+          continue;
+        }
+        for (const candidate of candidates) {
+          if (!previewCandidateDescriptors.some(d => d.type === candidate.type)) continue;
+          const key = graphCompletionCandidateKey(candidate.type, candidate.title || `${candidate.sourceTitle}->${candidate.targetTitle}`, candidate.outline || candidate.relation || '');
+          const scopedKey = `${sid}::${key}`;
+          if (seen.has(scopedKey)) continue;
+          seen.add(scopedKey);
+          const base = { ...candidate, sid, sessionTitle: session.title || '', candidateKey: key };
+          if (candidate.type === 'learning_node') {
+            const existing = existingMasteries.find(m => normalizeGraphTopic(m.kp || m.knowledge_point) === normalizeGraphTopic(candidate.title));
+            const kgExisting = existingKgNodes.find(n => n.kind === 'concept' && normalizeGraphTopic(n.name) === normalizeGraphTopic(candidate.title));
+            if (existing || kgExisting) {
+              preview.updatedLearningNodes.push({ ...base, mergeTarget: existing?.kp || kgExisting?.name || candidate.title });
+              preview.duplicateMerges.push({ ...base, mergeTarget: existing?.kp || kgExisting?.name || candidate.title });
+            } else {
+              preview.learningNodes.push(base);
+            }
+          } else if (candidate.type === 'chat_note') {
+            const existing = existingChatNotes.find(a => normalizeGraphTopic(a.chat_note_title || a.content) === normalizeGraphTopic(candidate.title));
+            if (existing) preview.duplicateMerges.push({ ...base, mergeTarget: existing.chat_note_title || existing.content || candidate.title });
+            else preview.chatNotes.push(base);
+          } else if (candidate.type === 'relationship') {
+            preview.relationships.push(base);
+          }
+        }
+      }
+    }
+    return preview;
+  }
+
+  function graphCompletionMergeIds(existing=[], incoming=[]) {
+    return Array.from(new Set([...(existing || []), ...(incoming || [])].filter(Boolean).map(Number).filter(Number.isFinite)));
+  }
+
+  function graphCompletionNow() {
+    return Date.now();
+  }
+
+  async function graphCompletionFindMastery(sid, title) {
+    const key = normalizeGraphTopic(title);
+    if (!sid || !key) return null;
+    const rows = await DB.bySid('mastery', sid);
+    return rows.find(m => normalizeGraphTopic(m.kp || m.knowledge_point) === key) || null;
+  }
+
+  async function graphCompletionFindConceptNode(sid, title) {
+    const key = normalizeGraphTopic(title);
+    if (!sid || !key) return null;
+    const rows = await DB.bySid('kg_nodes', sid);
+    return rows.find(n => n.kind === 'concept' && normalizeGraphTopic(n.name) === key && isSemanticKgNode(n.kind, n.name)) || null;
+  }
+
+  async function applySelectedSessionGraphCompletionPreview(preview=null) {
+    const result = { learningNodes: 0, chatNotes: 0, relationships: 0, merges: 0 };
+    const learningCandidates = [
+      ...(preview?.learningNodes || []),
+      ...(preview?.updatedLearningNodes || []),
+    ];
+    const chatNoteCandidates = [
+      ...(preview?.chatNotes || []),
+      ...(preview?.duplicateMerges || []).filter(c => c.type === 'chat_note'),
+    ];
+    for (const candidate of learningCandidates) {
+      const merged = await mergeGraphCompletionLearningNode(candidate);
+      if (merged) {
+        result.learningNodes += 1;
+        if (candidate.mergeTarget) result.merges += 1;
+      }
+    }
+    for (const candidate of chatNoteCandidates) {
+      const merged = await mergeGraphCompletionChatNote(candidate);
+      if (merged) {
+        result.chatNotes += 1;
+        if (candidate.mergeTarget) result.merges += 1;
+      }
+    }
+    for (const candidate of preview?.relationships || []) {
+      const merged = await mergeGraphCompletionRelationship(candidate);
+      if (merged) result.relationships += 1;
+    }
+    return result;
+  }
+
+  async function mergeGraphCompletionLearningNode(candidate) {
+    if (!candidate?.sid || !candidate?.title || !isLogicalGraphKp(candidate.title)) return null;
+    const existingMastery = await graphCompletionFindMastery(candidate.sid, candidate.title)
+      || await graphCompletionFindMastery(candidate.sid, candidate.mergeTarget);
+    const existingNode = await graphCompletionFindConceptNode(candidate.sid, candidate.title)
+      || await graphCompletionFindConceptNode(candidate.sid, candidate.mergeTarget);
+    const masteryTargetTitle = existingMastery?.kp || candidate.mergeTarget || existingNode?.name || candidate.title;
+    const conceptTargetTitle = existingNode?.name || candidate.mergeTarget || existingMastery?.kp || candidate.title;
+    const evidenceIds = graphCompletionMergeIds(kgProperties(existingNode).graph_completion_evidence_ids || [], candidate.evidenceIds || []);
+    await upsert_mastery(candidate.sid, masteryTargetTitle,
+      Number(candidate.correctness || 0) || 0,
+      Number(candidate.depth || 0) || 0,
+      candidate.evidenceType || 'none',
+      candidate.verificationStatus || 'none'
+    );
+    const concept = await upsert_kg_node(candidate.sid, 'concept', conceptTargetTitle, {
+      properties: {
+        outline: candidate.outline || '',
+        summary: candidate.summary || '',
+        stuck: candidate.stuck || '',
+        next_step: candidate.nextStep || '',
+        keywords: candidate.keywords || [],
+        graph_completion_evidence_ids: evidenceIds,
+        graph_completion_last_merged_at: graphCompletionNow(),
+        user_edited_at: null,
+        user_locked_fields: [],
+      },
+      episodeId: evidenceIds[1] || evidenceIds[0] || null,
+    });
+    return concept;
+  }
+
+  async function mergeGraphCompletionChatNote(candidate) {
+    if (!candidate?.sid || !candidate?.title) return null;
+    const now = graphCompletionNow();
+    const existingRows = (await DB.bySid('anchors', candidate.sid)).filter(a => a.kind === 'chat_note');
+    const existing = existingRows.find(a => normalizeGraphTopic(a.chat_note_title || a.content) === normalizeGraphTopic(candidate.title));
+    if (existing) {
+      existing.content = candidate.body || existing.content || candidate.title;
+      existing.chat_note_title = candidate.title;
+      existing.chat_note_body = candidate.body || existing.chat_note_body || existing.content || '';
+      existing.chat_note_outline = candidate.outline || existing.chat_note_outline || '';
+      existing.chat_note_quote = candidate.quote || existing.chat_note_quote || '';
+      existing.chat_note_keywords = graphUniqueClean([...(existing.chat_note_keywords || []), ...(candidate.keywords || [])], 12);
+      existing.graph_completion_evidence_ids = graphCompletionMergeIds(existing.graph_completion_evidence_ids || [], candidate.evidenceIds || []);
+      existing.graph_completion_last_merged_at = now;
+      existing.user_edited_at = existing.user_edited_at || null;
+      existing.user_locked_fields = Array.isArray(existing.user_locked_fields) ? existing.user_locked_fields : [];
+      existing.updated_at = now;
+      await DB.put('anchors', existing);
+      return existing;
+    }
+    const row = {
+      sid: candidate.sid,
+      kind: 'chat_note',
+      content: candidate.body || candidate.title,
+      weight: 1.25,
+      created_at: now,
+      chat_note_title: candidate.title,
+      chat_note_body: candidate.body || '',
+      chat_note_outline: candidate.outline || '',
+      chat_note_quote: candidate.quote || '',
+      chat_note_keywords: candidate.keywords || [],
+      graph_completion_evidence_ids: graphCompletionMergeIds([], candidate.evidenceIds || []),
+      graph_completion_last_merged_at: now,
+      user_edited_at: null,
+      user_locked_fields: [],
+    };
+    row.id = await DB.add('anchors', row);
+    return row;
+  }
+
+  async function mergeGraphCompletionRelationship(candidate) {
+    if (!candidate?.sid || !candidate?.sourceTitle || !candidate?.targetTitle) return null;
+    const source = await upsert_kg_node(candidate.sid, 'concept', candidate.sourceTitle, {
+      properties: { graph_completion_last_merged_at: graphCompletionNow() },
+      episodeId: (candidate.evidenceIds || [])[0] || null,
+    });
+    const target = await upsert_kg_node(candidate.sid, 'concept', candidate.targetTitle, {
+      properties: { graph_completion_last_merged_at: graphCompletionNow() },
+      episodeId: (candidate.evidenceIds || [])[1] || (candidate.evidenceIds || [])[0] || null,
+    });
+    if (!source || !target) return null;
+    const existingEdge = (await list_kg_edges(candidate.sid, { nodeId: source.id, relation: candidate.relation || 'related', status: 'active' }))
+      .find(edge => Number(edge.source_id) === Number(source.id) && Number(edge.target_id) === Number(target.id));
+    const evidenceIds = graphCompletionMergeIds(kgProperties(existingEdge).graph_completion_evidence_ids || [], candidate.evidenceIds || []);
+    return upsert_kg_edge(candidate.sid, source.id, target.id, candidate.relation || 'related', {
+      weight: Number(candidate.weight || 1.0) || 1.0,
+      properties: {
+        graph_completion_evidence_ids: evidenceIds,
+        graph_completion_last_merged_at: graphCompletionNow(),
+      },
+      episodeId: evidenceIds[1] || evidenceIds[0] || null,
+    });
+  }
+
+function graphCompletionPreviewCardHtml(item) {
+  const relationTitle = item.sourceTitle && item.targetTitle ? `${item.sourceTitle} → ${item.targetTitle}` : '';
+  const title = relationTitle || item.title || item.sourceTitle || '未命名线索';
+  const meta = graphUniqueClean([
+    item.sessionTitle,
+    item.outline,
+    item.mergeTarget ? `合并到：${item.mergeTarget}` : '',
+    item.relation ? `关系：${graphLinkKindLabel(item.relation)}` : '',
+  ], 4).join(' · ');
+  const body = item.summary || item.body || item.quote || item.evidenceText || (!relationTitle ? item.targetTitle : '') || '';
+  return `<article class="graph-completion-preview-card">
+    <div class="graph-completion-preview-title">${esc(title)}</div>
+    ${meta ? `<div class="graph-completion-preview-meta">${esc(meta)}</div>` : ''}
+    ${body ? `<div class="graph-completion-preview-body">${renderRichText(graphPanelPreviewText(body, ''))}</div>` : ''}
+  </article>`;
+}
+
+function graphCompletionPreviewGroupHtml(title, items=[]) {
+  if (!items.length) return '';
+  return `<section class="graph-completion-preview-group">
+    <div class="graph-completion-preview-heading">
+      <h3>${esc(title)}</h3>
+      <span class="graph-completion-preview-count">${items.length} 条</span>
+    </div>
+    <div class="graph-completion-preview-list">${items.map(graphCompletionPreviewCardHtml).join('')}</div>
+  </section>`;
+}
+
+function renderGraphCompletionPreview(preview) {
+  if (!preview) return '<div class="graph-completion-preview-empty">选择会话后先预览线索。</div>';
+  const groups = [
+    graphCompletionPreviewGroupHtml('将新增的学习节点', preview.learningNodes || []),
+    graphCompletionPreviewGroupHtml('将更新的已有学习节点', preview.updatedLearningNodes || []),
+    graphCompletionPreviewGroupHtml('将补充的子节点 / 关系', preview.relationships || []),
+    graphCompletionPreviewGroupHtml('将新增的闲聊便签', preview.chatNotes || []),
+    graphCompletionPreviewGroupHtml('疑似重复，准备合并', preview.duplicateMerges || []),
+  ].filter(Boolean).join('');
+  const skipped = preview.skipped?.length
+    ? `<details class="graph-completion-skipped"><summary>已跳过 ${preview.skipped.length} 条无学习含义片段</summary><div class="graph-completion-skipped-list">${preview.skipped.slice(0, 8).map(x => `<div>${esc(x.text || x.reason || '')}</div>`).join('')}</div></details>`
+    : '';
+  return `<div class="graph-completion-preview-stack">
+    ${groups || '<div class="graph-completion-preview-empty">没有发现可写入的学习线索。</div>'}
+    ${skipped}
+  </div>`;
+}
+
   function inferTurnRoute({ session=null, userInput='', attachments=[], quoted=null, learningContext=null } = {}) {
     const text = String(userInput || '').trim();
     const quoteMeta = quoted?.meta || {};
@@ -6704,39 +7758,6 @@ function supportsBackgroundChat(cfg) {
     return turnRouteDecision(TURN_ROUTE_STUDY_FULL, 'default_learning_route');
   }
 
-  function buildLightChatSystemPrompt(session, summary_text='') {
-    const p = session?.persona || {};
-    const mode = inferConversationMode(session);
-    const runtime_profile_hint = String(session?.runtime_profile_hint || buildRuntimeProfileHint(session?.profile_summary || {
-      tags: session?.profile_tags || [],
-      description: session?.profile_description || '',
-    })).trim();
-    return `你是「反转家教 AI」里的学生 AI，当前只处理自然聊天回合，不进入完整教学链。
-
-# 人设
-- 角色: ${p.role || ''}
-- 目标: ${p.goal || ''}
-- 性格: ${p.personality || ''}
-- 当前 mode: ${mode}
-
-# 核心自述
-${session?.core_self || '（未设置）'}
-
-# 用户画像提示
-${runtime_profile_hint || '（无）'}
-
-${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
-
-# 轻量聊天规则
-- 仍然按人设、关系和最近上下文自然回复，不要套固定模板。
-- 不要强行教学。
-- 不要突然讲知识点。
-- 不要做掌握度判断。
-- 如果用户只是寒暄、犹豫、情绪表达或短句补充，就像真实聊天一样接住，不要把每句话都变成学习任务。
-- 不要故意压缩回复。纯寒暄可以 1 句；用户让你解释、列举、展开、说明意思或继续说时，通常 2 到 5 句、约 120 到 300 个中文字符，信息要给足。
-- 只输出学生 AI 的自然语言，不输出 JSON、metadata、评价字段或思考过程。`;
-  }
-
   async function runLightChatTurn({
     sid,
     session,
@@ -6764,7 +7785,7 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
     if (currentInputInstruction) messages.push({ role: 'system', content: currentInputInstruction });
     const quotedContext = formatQuotedReplyContext(quoted, effectiveUserInput);
     if (quotedContext) messages.push({ role: 'system', content: quotedContext });
-    messages.push({ role: 'system', content: '只输出学生 AI 的自然语言回复；不要故意压缩。纯寒暄可以 1 句；需要解释、列举、回应“说说/什么意思/怎么做/哪几个”时，通常 2 到 5 句、约 120 到 300 个中文字符；不要输出 JSON、标题模板或分析字段。' });
+    messages.push({ role: 'system', content: '只输出学生 AI 的自然语言回复；不要把自己说成老师、教练、陪练、助教或课程安排者；不要故意压缩。纯寒暄可以 1 句；需要解释、列举、回应“说说/什么意思/怎么做/哪几个”时，通常 2 到 5 句、约 120 到 300 个中文字符；不要输出 JSON、标题模板或分析字段。' });
     if (typeof opts.onThinkingStage === 'function') {
       opts.onThinkingStage({ stage: '自然接话', detail: '按人设和最近上下文组织一句自然回复' });
     }
@@ -6799,10 +7820,11 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
     if (!await turnSessionStillExists(sid)) {
       return { reply: '', action, evaluation, bubbles: [], turn_route: TURN_ROUTE_CHAT_LIGHT, cancelled: true };
     }
+    let assistantEpisodeId = null;
     for (let i = 0; i < bubbles.length; i++) {
       if (i > 0 && typeof opts.onBubbleStart === 'function') opts.onBubbleStart(i);
       if (typeof opts.onBubbleComplete === 'function') opts.onBubbleComplete(i, bubbles[i]);
-      await add_message(sid, 'assistant', bubbles[i], {
+      const savedAssistant = await add_message(sid, 'assistant', bubbles[i], {
         action,
         evaluation,
         turn_id: turnId,
@@ -6816,7 +7838,14 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
         source:'foreground_llm',
         status: 'completed',
       });
+      if (!assistantEpisodeId) assistantEpisodeId = savedAssistant.id;
     }
+    await persistChatNoteAnchors(session, sid, {
+      userInput: effectiveUserInput,
+      reply,
+      userMessageId: sourceMessage ? sourceMessage.id : null,
+      assistantMessageId: assistantEpisodeId,
+    });
     if (typeof markQueuedUserMessages === 'function') {
       await markQueuedUserMessages('completed', { completed_at: Date.now(), turn_route: TURN_ROUTE_CHAT_LIGHT, turn_route_reason: turnRouteReason });
     }
@@ -6915,6 +7944,8 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
         quoted_message_id: quoted?.id || null,
         quoted_role: quoted?.role || null,
         quoted_preview: quoted ? String(quoted.content || '').replace(/\s+/g, ' ').trim().slice(0, 180) : '',
+        node_thread_memory: quoted?.node_thread_memory === true,
+        node_thread_memory_sids: quoted?.node_thread_memory_sids || [],
         source: 'user',
         status: 'completed',
       });
@@ -7281,6 +8312,10 @@ ${summary_text ? `# 早期对话摘要\n${summary_text}\n` : ''}
       DB.delBySid('kg_nodes', sid),
     ]);
   }
+
+  window.buildSelectedSessionGraphCompletionPreview = buildSelectedSessionGraphCompletionPreview;
+  window.applySelectedSessionGraphCompletionPreview = applySelectedSessionGraphCompletionPreview;
+  window.renderGraphCompletionPreview = renderGraphCompletionPreview;
 
   return { create_session, delete_session, run_opening_turn, run_turn, run_proactive_turn, maybe_summarize, import_native_background_turns, queue_pending_user_message, normalizeStrategySettings, formatStrategySettings, buildStructuredProfileSummary, buildRuntimeProfileHint, PROFILE_TAG_CATEGORIES, ACTION_TYPES };
 })();
@@ -7822,6 +8857,24 @@ function setPinnedSessionIds(ids) {
   localStorage.setItem(SESSION_PINNED_KEY, JSON.stringify(Array.from(new Set(ids.map(String).filter(Boolean)))));
 }
 
+function isNodeThreadSession(session) {
+  return !!(session && (
+    session.node_thread === true ||
+    session.hidden_from_home === true ||
+    session.thread_type === 'node_thread'
+  ));
+}
+
+function visibleRootSessions(sessions=[]) {
+  return (sessions || []).filter(session => !isNodeThreadSession(session));
+}
+
+function listNodeThreadSessions(sessions=[]) {
+  return (sessions || [])
+    .filter(isNodeThreadSession)
+    .sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
+}
+
 function isSessionPinned(sid) {
   return pinnedSessionIds().includes(String(sid || ''));
 }
@@ -8072,7 +9125,7 @@ function formatSessionTime(ts) {
 async function renderSessionHome() {
   const home = $('#session-home');
   if (!home) return;
-  state.sessions = (await DB.all('sessions')).sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
+  state.sessions = visibleRootSessions(await DB.all('sessions')).sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
   if (!state.sessions.length) {
     home.innerHTML = `
       <div class="text-center px-6 py-16">
@@ -9057,9 +10110,10 @@ async function renderChat() {
   }
 
   const html = msgs
-    .filter(m => m.role !== 'system')
+    .filter(m => m.role !== 'system' || isNativeBackgroundPendingMessage(m))
     .filter(m => m.id > cutoff)
     .map(m => {
+      if (isNativeBackgroundPendingMessage(m)) return nativeBackgroundPendingBubbleHtml(m);
       const isUser = m.role === 'user';
       const msgMeta = m.meta || {};
       const hasActionMeta = !!msgMeta.action || msgMeta.native_background || m.source === 'foreground_llm' || m.source === 'native_background';
@@ -9687,6 +10741,115 @@ async function hasPendingNativeBackgroundTurn(sid) {
   ) && (m.meta || {}).kind === 'native_background_pending');
 }
 
+function nodeThreadMentionTitle(session) {
+  return session?.graph_node_title || session?.title || '节点窗口';
+}
+
+function nodeThreadMentionDetail(session) {
+  return graphUniqueClean([
+    session?.parent_title,
+    session?.graph_node_path,
+  ], 2).join(' · ') || '节点子窗口';
+}
+
+function clearNodeThreadMentionContexts() {
+  state.nodeThreadMentionContexts = [];
+}
+
+function insertNodeThreadMentionToken(session) {
+  const input = $('#chat-input');
+  if (!input) return;
+  const token = `@${nodeThreadMentionTitle(session)} `;
+  const value = String(input.value || '');
+  const cursor = Number.isFinite(input.selectionStart) ? input.selectionStart : value.length;
+  const before = value.slice(0, cursor);
+  const after = value.slice(cursor);
+  const at = before.lastIndexOf('@');
+  if (at >= 0 && !/\s/.test(before.slice(at + 1))) {
+    input.value = before.slice(0, at) + token + after;
+  } else {
+    input.value = `${value}${value && !/\s$/.test(value) ? ' ' : ''}${token}`;
+  }
+  resizeChatInput(input, true);
+  input.focus({ preventScroll: true });
+}
+
+async function openNodeThreadMentionSheet() {
+  const sheet = $('#node-thread-mention-sheet');
+  const list = $('[data-node-thread-mention-list]');
+  if (!sheet || !list) return;
+  const threads = listNodeThreadSessions(await DB.all('sessions'));
+  if (!threads.length) {
+    list.innerHTML = '<div class="text-xs text-neutral-500 text-center py-8">还没有节点子窗口。先从图谱节点点“来一题”或“问为什么”。</div>';
+  } else {
+    list.innerHTML = threads.map(thread => `
+      <button type="button" class="choice-row" data-node-thread-mention="${esc(String(thread.id))}">
+        <span class="choice-row-dot"></span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-semibold truncate">${esc(nodeThreadMentionTitle(thread))}</span>
+          <span class="block text-xs text-neutral-500 truncate">${esc(nodeThreadMentionDetail(thread))}</span>
+        </span>
+        <span class="choice-row-badge">记忆</span>
+      </button>
+    `).join('');
+  }
+  list.querySelectorAll('[data-node-thread-mention]').forEach(btn => btn.addEventListener('click', async () => {
+    const thread = await DB.get('sessions', btn.dataset.nodeThreadMention);
+    if (!thread) return;
+    if (!state.nodeThreadMentionContexts.some(item => String(item.sid) === String(thread.id))) {
+      state.nodeThreadMentionContexts.push({
+        sid: thread.id,
+        title: nodeThreadMentionTitle(thread),
+        parent_sid: thread.parent_sid || '',
+      });
+    }
+    insertNodeThreadMentionToken(thread);
+    closeNodeThreadMentionSheet();
+  }));
+  sheet.classList.remove('hidden');
+}
+
+function closeNodeThreadMentionSheet() {
+  $('#node-thread-mention-sheet')?.classList.add('hidden');
+}
+
+async function nodeThreadMemoryText(session) {
+  const msgs = (await DB.bySid('messages', session.id))
+    .filter(m => m.role === 'user' || m.role === 'assistant')
+    .sort(compareChatMessages)
+    .slice(-8);
+  const lines = msgs.map(m => `${m.role === 'user' ? '用户' : '学生AI'}：${String(m.content || '').replace(/\s+/g, ' ').trim().slice(0, 240)}`);
+  return [
+    `节点：${nodeThreadMentionTitle(session)}`,
+    session.parent_title ? `来源会话：${session.parent_title}` : '',
+    session.graph_node_path ? `路径：${session.graph_node_path}` : '',
+    lines.length ? `最近对话：\n${lines.join('\n')}` : '最近对话：还没有形成对话内容',
+  ].filter(Boolean).join('\n');
+}
+
+async function buildNodeThreadMemoryQuote(contexts=state.nodeThreadMentionContexts) {
+  const refs = Array.isArray(contexts) ? contexts : [];
+  const sessions = [];
+  for (const ref of refs) {
+    const sid = typeof ref === 'string' ? ref : ref?.sid;
+    const session = sid ? await DB.get('sessions', sid) : null;
+    if (session && isNodeThreadSession(session)) sessions.push(session);
+  }
+  if (!sessions.length) return null;
+  const content = (await Promise.all(sessions.map(nodeThreadMemoryText))).join('\n\n---\n\n');
+  return {
+    id: `node-thread-memory-${sessions.map(s => s.id).join('-')}`,
+    role: 'assistant',
+    content,
+    node_thread_memory: true,
+    node_thread_memory_sids: sessions.map(s => s.id),
+  };
+}
+
+async function buildSelectedNodeThreadMemoryQuote() {
+  return buildNodeThreadMemoryQuote(state.nodeThreadMentionContexts);
+}
+
 async function sendMessage(opts={}) {
   if (state.chatReadOnlyBrowse) { toast('当前是只读回看，不能发起对话'); return; }
   const activeImageDraft = opts.imageDraft || chatImageDraft || null;
@@ -9703,14 +10866,17 @@ async function sendMessage(opts={}) {
     return openingFor(state.sid);
   }
   if (!state.sid) { toast('先去 设置 创建一个会话'); return; }
+  const mentionQuote = await buildSelectedNodeThreadMemoryQuote();
+  const quoteOptions = { quotedMessage: mentionQuote || state.quotedMessage };
   async function queueForNextTurn({ notifyBusy=true } = {}) {
-    const quotedMessage = state.quotedMessage;
+    const quotedMessage = quoteOptions.quotedMessage;
     const queuedMessage = await ENGINE.queue_pending_user_message(state.sid, txt, quotedMessage, { attachments });
     const queueItem = { text: txt, message: queuedMessage, quotedMessage, queuedAt: queuedMessage.meta?.queued_at || Date.now() };
     state.messageQueue.push(queueItem);
     setChatInputValue('', false);
     if (activeImageDraft) closeImageDraft();
     if (quotedMessage) clearQuotedMessage();
+    if (mentionQuote) clearNodeThreadMentionContexts();
     appendQueuedUserMessageBubble(queuedMessage);
     renderQueueIndicator();
     if (notifyBusy) toast('已进入对话，等待上一条回复完成', 1500);
@@ -9762,6 +10928,13 @@ async function restorePendingMessageQueue(sid=state.sid) {
       await DB.put('messages', m);
     }
     const quotedId = Number(meta.quoted_message_id || 0);
+    const nodeThreadMemoryQuote = meta.node_thread_memory ? {
+      id: meta.quoted_message_id || `node-thread-memory-${m.id}`,
+      role: 'assistant',
+      content: meta.node_thread_memory_context || meta.quoted_preview || '',
+      node_thread_memory: true,
+      node_thread_memory_sids: meta.node_thread_memory_sids || [],
+    } : null;
     const quotedMessage = quotedId
       ? (messageById.get(quotedId) || {
           id: quotedId,
@@ -9769,7 +10942,7 @@ async function restorePendingMessageQueue(sid=state.sid) {
           content: meta.quoted_preview || '',
           meta: { restored_quote_preview: true },
         })
-      : null;
+      : nodeThreadMemoryQuote;
     state.messageQueue.push({ text: String(m.content || ''), message: m, quotedMessage, queuedAt: meta.queued_at || m.created_at || Date.now() });
     restored += 1;
   }
@@ -9824,6 +10997,26 @@ async function renderPendingQueueMessages() {
   // The queue indicator is already handled by renderQueueIndicator
   if (state.isGenerating) return;
   await renderChat();
+}
+
+function isNativeBackgroundPendingMessage(message) {
+  const meta = message?.meta || {};
+  const status = message?.status || meta.status || '';
+  return message?.role === 'system'
+    && meta.kind === 'native_background_pending'
+    && status === 'pending';
+}
+
+function nativeBackgroundPendingBubbleHtml(message) {
+  const meta = message?.meta || {};
+  const source = meta.reply_to_message_id ? '节点窗口' : '后台回复';
+  return `
+    <div class="flex justify-start" data-native-background-pending="${esc(meta.native_background_job_id || '')}">
+      <div class="max-w-[85%] bg-neutral-900 border border-emerald-800 rounded-2xl px-3 py-2">
+        <div class="text-[10px] text-neutral-500 mb-1">🎓 学生 AI <span class="text-emerald-400">正在生成<span class="thinking-dots"></span></span></div>
+        <div class="text-sm text-neutral-300 leading-relaxed">学生 AI 正在生成回复，完成后会自动显示。${esc(source)}</div>
+      </div>
+    </div>`;
 }
 
 async function retryFailedMessage(id) {
@@ -10082,9 +11275,23 @@ $('#chat-input').addEventListener('compositionend', e => {
   chatInputComposing = false;
   scheduleKeyboardLayout(180);
 });
+$('#chat-input').addEventListener('input', e => {
+  resizeChatInput(e.target);
+  if (chatInputComposing) return;
+  const value = String(e.target.value || '');
+  const cursor = Number.isFinite(e.target.selectionStart) ? e.target.selectionStart : value.length;
+  if (value.slice(0, cursor).endsWith('@')) openNodeThreadMentionSheet();
+});
 $('#chat-input').addEventListener('blur', e => { resizeChatInput(e.target); });
 $('#chat-input').addEventListener('keydown', e => {
+  if (e.key === '@' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    setTimeout(() => openNodeThreadMentionSheet(), 0);
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+});
+$$('[data-node-thread-mention-close]').forEach(btn => btn.addEventListener('click', closeNodeThreadMentionSheet));
+$('#node-thread-mention-sheet')?.addEventListener('click', e => {
+  if (e.target.id === 'node-thread-mention-sheet') closeNodeThreadMentionSheet();
 });
 document.addEventListener('focusin', e => {
   if (editableHasKeyboard(e.target)) {
@@ -10944,27 +12151,48 @@ function anchorCategoryMeta(a) {
   if (a.kind === 'persona_change') {
     return { key: 'persona', label: '画像变更', hint: '角色、性格、目标等核心设定调整记录' };
   }
+  if (a.kind === 'chat_note') {
+    return { key: 'chat_notes', label: '闲聊便签', hint: '闲聊中自然冒出来的学习线索' };
+  }
   if (['initial', 'requirement'].includes(a.kind)) {
     return { key: 'manual', label: '手动锚点', hint: '学习目标、约束和主线要求' };
   }
   return { key: 'other', label: '其他记录', hint: '自动沉淀的补充线索' };
 }
 
+function chatNoteAnchorCardHtml(a) {
+  const title = a.chat_note_title || a.content || '闲聊便签';
+  const body = a.chat_note_body || a.content || '';
+  const outline = a.chat_note_outline || '';
+  const quote = a.chat_note_quote || '';
+  return `
+    <div class="font-semibold truncate">${esc(title)}</div>
+    ${body ? `<div class="mt-1 leading-relaxed text-neutral-300 whitespace-pre-wrap break-words">${renderRichText(String(body).slice(0, 180))}</div>` : ''}
+    ${outline ? `<div class="mt-1 text-[11px] text-neutral-500">可能放到：${esc(outline)}</div>` : ''}
+    ${quote ? `<div class="mt-1 text-[11px] text-neutral-500 truncate">原话：${esc(quote)}</div>` : ''}
+  `;
+}
+
 function anchorItemHtml(a, opts={}) {
   const deleteAttr = opts.deleteAttr || 'del';
   const reprocess = opts.reprocess !== false;
+  const bodyHtml = a.kind === 'source'
+    ? sourceAnchorCardHtml(a, { reprocess })
+    : a.kind === 'chat_note'
+      ? chatNoteAnchorCardHtml(a)
+      : `<div class="whitespace-pre-wrap break-words">${esc(a.content || '')}${Number.isFinite(Number(a.weight)) ? ` <span class="text-neutral-600">w=${Number(a.weight).toFixed(1)}</span>` : ''}</div>`;
   return `
     <div data-anchor-row="${esc(String(a.id || ''))}" class="flex gap-2 items-start group bg-neutral-900 border border-neutral-800 rounded-lg p-2 text-xs">
       <span class="pill pill-${a.kind}">${esc(a.kind || 'anchor')}</span>
       <div class="flex-1 min-w-0 text-neutral-200">
-        ${a.kind === 'source' ? sourceAnchorCardHtml(a, { reprocess }) : `<div class="whitespace-pre-wrap break-words">${esc(a.content || '')}${Number.isFinite(Number(a.weight)) ? ` <span class="text-neutral-600">w=${Number(a.weight).toFixed(1)}</span>` : ''}</div>`}
+        ${bodyHtml}
       </div>
       <button data-${deleteAttr}="${esc(String(a.id))}" class="text-neutral-500 active:text-red-400 px-1 icon-only" aria-label="删除锚点"><i data-lucide="x"></i></button>
     </div>`;
 }
 
 function renderGroupedAnchorsHtml(anchors, opts={}) {
-  const order = ['manual', 'images', 'sources', 'persona', 'other'];
+  const order = ['manual', 'chat_notes', 'images', 'sources', 'persona', 'other'];
   const groups = new Map(order.map(key => [key, []]));
   for (const anchor of anchors || []) {
     const meta = anchorCategoryMeta(anchor);
@@ -11078,29 +12306,33 @@ async function renderLearningContext() {
 async function renderContextGraph(renderId=state.contextRenderSeq) {
   const body = $('#learning-context-body');
   if (!state.sid) { setActiveGraphDataset([], []); body.innerHTML = '<div class="text-xs text-neutral-500 text-center py-10">先打开一个聊天窗口</div>'; return; }
-  const [msgs, masteries, anchors] = await Promise.all([
+  const [msgs, masteries, anchors, kgNodes, kgEdges] = await Promise.all([
     DB.bySid('messages', state.sid),
     DB.bySid('mastery', state.sid),
     DB.bySid('anchors', state.sid),
+    DB.bySid('kg_nodes', state.sid),
+    DB.bySid('kg_edges', state.sid),
   ]);
   if (!isActiveContextRender(renderId, 'graph')) return;
   const ai = msgs.filter(m => m.role === 'assistant');
-  if (!masteries.length && !anchors.length) {
+  if (!masteries.length && !anchors.length && !kgNodes.length) {
     setActiveGraphDataset([], []);
     ForceGraph.destroy();
-    body.innerHTML = '<div class="text-xs text-neutral-500 text-center py-10 leading-relaxed">当前窗口还没有图谱节点。聊天、锚点和随笔都会按正常逻辑沉淀到这里。</div>';
+    body.innerHTML = '<div id="context-knowledge-graph" class="knowledge-graph knowledge-graph-fullscreen">' + graphFormationStateHtml([], [], { context: 'session' }) + '</div>';
     return;
   }
   body.innerHTML = `
     <div id="context-knowledge-graph" class="knowledge-graph knowledge-graph-fullscreen"><div class="graph-hint">拖拽平移 · 双指缩放 · 点击节点回顾来源</div></div>`;
-  const { nodes, links } = buildGraphData(masteries, ai, anchors);
+  const { nodes, links } = buildGraphData(masteries, ai, anchors, kgNodes, kgEdges);
   nodes.forEach(n => { n.sid = state.sid; });
   setActiveGraphDataset(nodes, links);
+  const focused = graphFullDataset(nodes, links);
   ForceGraph.init($('#context-knowledge-graph'), node => {
     if (node) { state.graphSelected = node.key; showGraphSheet(node); }
     else { state.graphSelected = ''; hideGraphSheet(); }
   });
-  ForceGraph.setData(nodes, links);
+  ForceGraph.setData(focused.nodes, focused.links);
+  $('#context-knowledge-graph')?.insertAdjacentHTML('beforeend', graphFormationStateHtml(nodes, links, { context: 'session', focus: focused }));
   setTimeout(() => { const h = $('#context-knowledge-graph')?.querySelector('.graph-hint'); if(h) h.classList.add('fade'); }, 4000);
 }
 
@@ -11108,10 +12340,13 @@ async function renderContextAnchors(renderId=state.contextRenderSeq) {
   const body = $('#learning-context-body');
   const anchors = state.sid ? (await DB.bySid('anchors', state.sid)).sort((a,b)=>b.weight-a.weight) : [];
   if (!isActiveContextRender(renderId, 'anchors')) return;
+  const prefill = state.contextAnchorPrefill || {};
+  const prefillText = prefill.text || '';
+  const statusText = prefill.hint || '文件和图片资料会直接归入锚点，并按类型显示在下方列表。';
   const rows = renderGroupedAnchorsHtml(anchors.filter(a => a.kind !== 'note'), { deleteAttr: 'context-del-anchor' });
   body.innerHTML = `
     <form id="context-anchor-form" class="space-y-2 mb-3">
-      <textarea id="context-anchor-input" rows="3" placeholder="补充当前窗口的学习目标、约束或资料主线..." class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+      <textarea id="context-anchor-input" rows="4" placeholder="补充当前窗口的学习目标、约束或资料主线..." class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-sm resize-none">${esc(prefillText)}</textarea>
       <div class="grid grid-cols-3 gap-2">
         <button class="bg-emerald-700 active:bg-emerald-800 text-white text-sm py-2 rounded-lg font-medium">保存锚点</button>
         <label class="text-center text-sm py-2 rounded-lg border border-neutral-700 active:bg-neutral-800 cursor-pointer">
@@ -11123,7 +12358,7 @@ async function renderContextAnchors(renderId=state.contextRenderSeq) {
           <input id="context-anchor-image-file" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden">
         </label>
       </div>
-      <div id="context-anchor-status" class="text-[11px] text-neutral-500 leading-relaxed">文件和图片资料会直接归入锚点，并按类型显示在下方列表。</div>
+      <div id="context-anchor-status" class="text-[11px] text-neutral-500 leading-relaxed">${esc(statusText)}</div>
     </form>
     <div class="space-y-2">${rows || '<div class="text-xs text-neutral-500 text-center py-8">还没有锚点。保存约束或导入资料后，会进入当前窗口图谱。</div>'}</div>`;
   $('#context-anchor-form')?.addEventListener('submit', async e => {
@@ -11131,6 +12366,7 @@ async function renderContextAnchors(renderId=state.contextRenderSeq) {
     const v = $('#context-anchor-input').value.trim();
     if (!v) return;
     await addLocalAnchor('requirement', v, 1.5);
+    state.contextAnchorPrefill = null;
     toast('已保存锚点');
     await renderContextAnchors();
     if (state.currentTab === 'insights') await renderInsights();
@@ -11150,6 +12386,17 @@ async function renderContextAnchors(renderId=state.contextRenderSeq) {
     await DB.del('anchors', +btn.dataset.contextDelAnchor);
     await renderContextAnchors();
   }));
+  const highlightId = state.contextAnchorHighlightId;
+  if (highlightId) {
+    state.contextAnchorHighlightId = '';
+    requestAnimationFrame(() => {
+      const row = Array.from(document.querySelectorAll('[data-anchor-row]')).find(el => el.dataset.anchorRow === String(highlightId));
+      if (!row) return;
+      row.scrollIntoView({ behavior:'smooth', block:'center' });
+      row.classList.add('graph-source-jump-highlight');
+      setTimeout(() => row.classList.remove('graph-source-jump-highlight'), 2200);
+    });
+  }
   refreshIcons();
 }
 
@@ -11684,10 +12931,19 @@ function actionTypeLabel(type) {
     clue: '线索',
     scaffold_example: '脚手架',
     examiner_verify: '验证',
+    emote: '情绪回应',
+    persuade: '劝导',
     recap: '回顾',
     next: '下一步',
+    pending: '生成中',
+    error: '错误',
   };
-  return map[type] || type || '下一步';
+  return map[type] || (type ? '其他' : '下一步');
+}
+
+function graphActionDistributionPillHtml(type, count, total) {
+  const key = String(type || 'next').replace(/[^\w-]/g, '') || 'next';
+  return `<span class="pill pill-${esc(key)}">${esc(actionTypeLabel(type))} ${count}/${total}</span>`;
 }
 
 function entryStatusLabel(status) {
@@ -12039,6 +13295,7 @@ const ForceGraph = (() => {
         : n.nodeType==='section' ? 12
         : n.nodeType==='diagnostic' ? 11
         : n.nodeType==='latent' ? 10
+        : n.nodeType==='chat_note' ? 8
         : n.nodeType==='insight' ? 9
         : (n.nodeType==='support'?7:5);
       return { ...n, x: cx+Math.cos(a)*r+(Math.random()-.5)*30,
@@ -12155,13 +13412,18 @@ const ForceGraph = (() => {
         ctx.strokeStyle='rgba(235,230,220,.24)'; ctx.lineWidth=.8; ctx.stroke();
       }
       // label
-      if ((n.nodeType==='kp' || n.nodeType==='source' || n.nodeType==='section' || n.nodeType==='diagnostic' || n.nodeType==='latent' || n.nodeType==='note' || n.nodeType==='insight') && !dim) {
+      if ((n.nodeType==='kp' || n.nodeType==='source' || n.nodeType==='section' || n.nodeType==='diagnostic' || n.nodeType==='latent' || n.nodeType==='chat_note' || n.nodeType==='note' || n.nodeType==='insight') && !dim) {
         const fs=Math.max(9,n.radius*.6);
         ctx.font=`${isSel?'bold ':''}${fs}px -apple-system,sans-serif`;
-        ctx.fillStyle=n.nodeType==='latent'?'rgba(235,230,220,.48)':(n.nodeType==='diagnostic'?'rgba(244,181,174,.86)':'rgba(235,230,220,.88)');
         ctx.textAlign='center'; ctx.textBaseline='middle';
         const raw = n.label || n.kp || '';
-        const lb = compactGraphNodeLabel(raw, n.nodeType === 'source' ? 10 : 8);
+        const lb = compactGraphNodeLabel(raw, n.nodeType === 'source' ? 10 : (n.nodeType === 'chat_note' ? 9 : 8));
+        const labelY = n.y+n.radius+11;
+        const labelW = Math.min(Math.max(ctx.measureText(lb).width + 10, 26), 118);
+        const labelH = fs + 6;
+        ctx.fillStyle=graphCanvasLabelBg(n.nodeType);
+        fillGraphRoundRect(n.x - labelW/2, labelY - labelH/2, labelW, labelH, 5);
+        ctx.fillStyle=graphCanvasTextColor(n.nodeType);
         ctx.fillText(lb,n.x,n.y+n.radius+11);
       }
     }
@@ -12192,18 +13454,113 @@ const ForceGraph = (() => {
 
   function destroy() { stopAnim(); if(cvs){cvs.remove();cvs=null;} nodes=[];links=[];particles=[];sel=null;box=null; }
 
+  function graphCanvasColorParts(value) {
+    const text = String(value || '').trim();
+    const hex = text.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (hex) {
+      const raw = hex[1].length === 3 ? hex[1].split('').map(c => c + c).join('') : hex[1];
+      return [parseInt(raw.slice(0,2), 16), parseInt(raw.slice(2,4), 16), parseInt(raw.slice(4,6), 16)];
+    }
+    const rgb = text.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    return rgb ? [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])] : [32, 34, 32];
+  }
+
+  function graphCanvasIsLightTheme() {
+    const [r,g,b] = graphCanvasColorParts(_thm.page || _thm.panel || '');
+    return ((r * 0.299) + (g * 0.587) + (b * 0.114)) > 150;
+  }
+
+  function graphCanvasTextColor(type='kp') {
+    const light = graphCanvasIsLightTheme();
+    if (type === 'diagnostic') return light ? 'rgba(128,58,52,.92)' : 'rgba(244,181,174,.88)';
+    if (type === 'latent') return light ? 'rgba(74,68,60,.76)' : 'rgba(235,230,220,.58)';
+    return light ? 'rgba(40,36,31,.92)' : 'rgba(235,230,220,.9)';
+  }
+
+  function graphCanvasLabelBg(type='kp') {
+    const light = graphCanvasIsLightTheme();
+    if (type === 'latent') return light ? 'rgba(241,235,226,.72)' : 'rgba(10,12,10,.32)';
+    return light ? 'rgba(248,244,237,.78)' : 'rgba(10,12,10,.42)';
+  }
+
+  function fillGraphRoundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, r);
+    } else {
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+    ctx.fill();
+  }
+
   return { init, setData, destroy, resize, readTheme };
 })();
 
-function buildGraphData(masteries, ai, anchors=[]) {
+function graphKgProperties(row) {
+  try {
+    return JSON.parse(row?.properties_json || '{}') || {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function graphEdgeKind(relation='') {
+  const rel = String(relation || '').trim();
+  if (/前置|prereq|foundation|支撑|来源/.test(rel)) return 'foundation';
+  if (/顺序|sequence|下一步|学习顺序/.test(rel)) return 'sequence';
+  if (/错|误解|混淆|易混|diagnostic/.test(rel)) return 'diagnostic';
+  if (/随笔|便签|note/.test(rel)) return 'chat_note';
+  return 'related';
+}
+
+function buildGraphData(masteries, ai, anchors=[], kgNodes=[], kgEdges=[]) {
   const kpRows = masteries.filter(m => isLogicalGraphKp(m.kp || m.knowledge_point)).slice(0,18);
-  const nodes = [], byKp = new Map(), byNorm = new Map();
+  const nodes = [], byKp = new Map(), byNorm = new Map(), kgEdgeNodeById = new Map();
   kpRows.forEach((m,i,arr) => {
     const kp = m.kp || m.knowledge_point;
     nodes.push({ ...m, kp, key:`kp-${i}`, nodeType:'kp' });
     byKp.set(kp, nodes[nodes.length-1]);
     byNorm.set(normalizeGraphTopic(kp), nodes[nodes.length-1]);
   });
+  function ensureKgConceptGraphNode(row, i=0) {
+    const name = String(row?.name || '').trim();
+    if (!row || row.kind !== 'concept' || row.status !== 'active' || !isLogicalGraphKp(name)) return null;
+    const norm = normalizeGraphTopic(name);
+    const existing = byNorm.get(norm);
+    if (existing) {
+      if (row.id != null) kgEdgeNodeById.set(Number(row.id), existing);
+      existing.kgNodeId = existing.kgNodeId || row.id || null;
+      existing.kgProperties = { ...(existing.kgProperties || {}), ...graphKgProperties(row) };
+      return existing;
+    }
+    const props = graphKgProperties(row);
+    const node = {
+      ...row,
+      key: `kg-${row.id || norm || i}`,
+      nodeType: 'kp',
+      kp: name,
+      label: name,
+      level: Number(props.mastery_level || props.level || 0) || 0,
+      kgNodeId: row.id || null,
+      kgProperties: props,
+      sourceName: props.outline || '',
+    };
+    nodes.push(node);
+    byKp.set(name, node);
+    byNorm.set(norm, node);
+    if (row.id != null) kgEdgeNodeById.set(Number(row.id), node);
+    return node;
+  }
+  const kgConcepts = (kgNodes || []).filter(n => n?.kind === 'concept' && n?.status === 'active' && isLogicalGraphKp(n?.name)).slice(0, 48);
+  kgConcepts.forEach(ensureKgConceptGraphNode);
   const links = [];
   const sources = anchors.filter(a => a.kind === 'source');
   sources.slice(0,8).forEach((a,i) => {
@@ -12304,22 +13661,40 @@ function buildGraphData(masteries, ai, anchors=[]) {
     const source = target || (note.note_source_id ? sourceNodeById.get(String(note.note_source_id)) : null);
     if (source) links.push({ a:source, b:noteNode, weight:1.2, kind:'note' });
   });
-  for (const digest of buildKpMemoryDigests(ai, byKp)) {
-    const parent = byKp.get(digest.kp);
-    if (!parent) continue;
-    const insight = {
-      key: digest.key,
-      nodeType:'insight',
-      insightType: digest.insightType,
-      kp: digest.kp,
-      label: digest.label,
-      summary: digest.summary,
-      chatMessageIds: digest.chatMessageIds,
-      meta: { action: { type:'recap', knowledge_point: digest.kp } },
+  const chatNotes = anchors.filter(a => a.kind === 'chat_note');
+  const chatNoteNodesByOutline = new Map();
+  chatNotes.slice(-32).forEach((note, i) => {
+    const chatNoteNode = {
+      key:`chat-note-${note.id || i}`,
+      nodeType:'chat_note',
+      kp: note.chat_note_title || note.content || '闲聊便签',
+      label: note.chat_note_title || note.content || '闲聊便签',
+      content: note.chat_note_body || note.content || '',
+      outlinePath: note.chat_note_outline || '',
+      quote: note.chat_note_quote || '',
+      keywords: Array.isArray(note.chat_note_keywords) ? note.chat_note_keywords : [],
+      messageId: note.chat_note_user_message_id || note.chat_note_assistant_message_id || null,
+      chatMessageIds: [note.chat_note_user_message_id, note.chat_note_assistant_message_id].filter(Boolean),
+      sourceName: note.chat_note_outline || '',
+      anchorId: note.id || null,
     };
-    nodes.push(insight);
-    links.push({ a:parent, b:insight, weight:1.1, kind:'memory' });
-  }
+    nodes.push(chatNoteNode);
+    const candidates = graphUniqueClean([
+      note.chat_note_title,
+      note.chat_note_outline,
+      ...(Array.isArray(note.chat_note_keywords) ? note.chat_note_keywords : []),
+    ], 8).map(normalizeGraphTopic);
+    const target = candidates.map(key => byNorm.get(key)).find(Boolean);
+    if (target) links.push({ a:target, b:chatNoteNode, weight:1.1, kind:'chat_note' });
+    const outlineKey = normalizeGraphTopic(note.chat_note_outline || '');
+    if (outlineKey) {
+      const outlineNodes = chatNoteNodesByOutline.get(outlineKey) || [];
+      const previous = outlineNodes[outlineNodes.length - 1];
+      if (previous && previous !== chatNoteNode) links.push({ a:previous, b:chatNoteNode, weight:.9, kind:'chat_note' });
+      outlineNodes.push(chatNoteNode);
+      chatNoteNodesByOutline.set(outlineKey, outlineNodes);
+    }
+  });
   let prev=null;
   for (const msg of ai) {
     const kp=(msg.meta||{}).action?.knowledge_point;
@@ -12342,7 +13717,119 @@ function buildGraphData(masteries, ai, anchors=[]) {
       links.push({a:src, b:tgt, weight:1.5, kind:'related'});
     }
   }
+  for (const edge of (kgEdges || []).filter(edge => !edge.status || edge.status === 'active')) {
+    if (edge.status !== 'active' && edge.status) continue;
+    const srcNode = kgEdgeNodeById.get(Number(edge.source_id));
+    const tgtNode = kgEdgeNodeById.get(Number(edge.target_id));
+    if (!srcNode || !tgtNode || srcNode === tgtNode) continue;
+    const kind = graphEdgeKind(edge.relation);
+    const pair = [srcNode.key, tgtNode.key, kind].sort().join(':');
+    if (relSet.has(pair)) continue;
+    relSet.add(pair);
+    links.push({a:srcNode, b:tgtNode, weight:Number(edge.weight || 1.2) || 1.2, kind: graphEdgeKind(edge.relation)});
+  }
   return {nodes,links};
+}
+
+function graphLinkEndpointKey(link, side) {
+  const node = link?.[side] || link?.[side === 'a' ? 'source' : 'target'];
+  return String(node?.key || '');
+}
+
+function graphFocusCenterNode(nodes=[], links=[], preferredKey='') {
+  const preferred = nodes.find(n => String(n.key) === String(preferredKey || ''));
+  if (preferred) return preferred;
+  return [...nodes].sort(graphCompareRank)[0] || null;
+}
+
+function graphFocusNodeRank(node) {
+  node = node || {};
+  const typeRank = node.nodeType === 'kp' ? 0
+    : node.nodeType === 'latent' ? 1
+    : node.nodeType === 'section' ? 2
+    : node.nodeType === 'chat_note' ? 3
+    : node.nodeType === 'source' ? 4
+    : node.nodeType === 'diagnostic' ? 5
+    : node.nodeType === 'note' ? 6
+    : 9;
+  const levelRank = -Number(node.level || 0);
+  const recencyRank = -Number(node.updated_at || node.created_at || 0);
+  return [typeRank, levelRank, recencyRank, graphNodeTitle(node)];
+}
+
+function graphCompareRank(a, b) {
+  const ar = graphFocusNodeRank(a);
+  const br = graphFocusNodeRank(b);
+  for (let i = 0; i < ar.length; i++) {
+    if (ar[i] < br[i]) return -1;
+    if (ar[i] > br[i]) return 1;
+  }
+  return 0;
+}
+
+function graphNeighborRank(item) {
+  const kindRank = item.link?.kind === 'related' ? 0
+    : item.link?.kind === 'sequence' ? 1
+    : item.link?.kind === 'foundation' ? 2
+    : item.link?.kind === 'chat_note' ? 3
+    : item.link?.kind === 'note' ? 4
+    : item.link?.kind === 'outline' ? 5
+    : item.link?.kind === 'diagnostic' ? 6
+    : 9;
+  return [kindRank, -Number(item.link?.weight || 0), ...graphFocusNodeRank(item.node)];
+}
+
+function graphCompareNeighbor(a, b) {
+  const ar = graphNeighborRank(a);
+  const br = graphNeighborRank(b);
+  for (let i = 0; i < ar.length; i++) {
+    if (ar[i] < br[i]) return -1;
+    if (ar[i] > br[i]) return 1;
+  }
+  return 0;
+}
+
+function buildFocusedGraphData(nodes=[], links=[], opts={}) {
+  const center = graphFocusCenterNode(nodes, links, opts.centerKey || '');
+  if (!center) {
+    return { nodes, links, center, focused:false, totalNodes:nodes.length };
+  }
+  const centerKey = String(center.key || '');
+  const oneHopLinks = links.filter(link => graphLinkEndpointKey(link, 'a') === centerKey || graphLinkEndpointKey(link, 'b') === centerKey);
+  const neighborItems = oneHopLinks.map(link => {
+    const aKey = graphLinkEndpointKey(link, 'a');
+    const bKey = graphLinkEndpointKey(link, 'b');
+    const otherKey = aKey === centerKey ? bKey : aKey;
+    return { link, node: nodes.find(n => String(n.key) === otherKey) };
+  }).filter(item => item.node).sort(graphCompareNeighbor);
+  const keep = new Set([centerKey, ...neighborItems.map(item => String(item.node.key))]);
+  const focusedNodes = nodes.filter(node => keep.has(String(node.key)));
+  const focusedLinks = links.filter(link => keep.has(graphLinkEndpointKey(link, 'a')) && keep.has(graphLinkEndpointKey(link, 'b')));
+  return { nodes: focusedNodes, links: focusedLinks, center, focused:true, totalNodes:nodes.length };
+}
+
+function graphFullDataset(nodes=[], links=[]) {
+  return { nodes, links, center: null, focused: false, totalNodes: nodes.length };
+}
+
+function graphFormationStateHtml(nodes=[], links=[], opts={}) {
+  const count = Array.isArray(nodes) ? nodes.length : 0;
+  const context = opts.context === 'global' ? 'global' : 'session';
+  const focus = opts.focus || {};
+  if (!count) {
+    const text = context === 'global'
+      ? '开始对话、导入资料或保存随笔后，这里会形成学习图谱。'
+      : '继续对话、导入资料或保存随笔后，这里会形成学习图谱。';
+    return `<div class="graph-focus-banner" data-graph-state="empty"><strong>图谱正在形成</strong>${text}</div>`;
+  }
+  if (count <= 2) {
+    const title = focus.center ? graphNodeTitle(focus.center) : '当前节点';
+    return `<div class="graph-focus-banner" data-graph-state="forming"><strong>${esc(title)}</strong>图谱正在形成 · ${count} 个节点</div>`;
+  }
+  if (focus.focused && focus.totalNodes > focus.nodes.length) {
+    return `<div class="graph-focus-banner" data-graph-state="focused"><strong>${esc(graphNodeTitle(focus.center))}</strong>已聚焦一跳关系 · ${focus.nodes.length}/${focus.totalNodes} 个节点</div>`;
+  }
+  return '';
 }
 
 function memoryStatusLabel(status, nodeType='section') {
@@ -12363,6 +13850,14 @@ function graphNodeTitle(node) {
   return node?.label || node?.kp || node?.meta?.action?.knowledge_point || '图谱节点';
 }
 
+function graphNodeLocalKey(node) {
+  const key = String(node?.localKey || node?.key || '');
+  if (node?.localKey) return key;
+  const sid = String(node?.sid || node?.sessionId || '');
+  const prefix = sid ? `${sid}::` : '';
+  return prefix && key.startsWith(prefix) ? key.slice(prefix.length) : key;
+}
+
 function graphNodeTypeLabel(node) {
   const type = node?.nodeType || '';
   if (type === 'kp') return '已学习知识点';
@@ -12371,6 +13866,7 @@ function graphNodeTypeLabel(node) {
   if (type === 'diagnostic') return '导入诊断';
   if (type === 'latent') return '候选知识点';
   if (type === 'note') return '随笔';
+  if (type === 'chat_note') return '闲聊便签';
   if (type === 'insight') return '学习整理';
   return '对话片段';
 }
@@ -12383,6 +13879,7 @@ function graphLinkKindLabel(kind) {
   if (kind === 'sequence') return '学习顺序';
   if (kind === 'related') return '相关概念';
   if (kind === 'note') return '随笔关联';
+  if (kind === 'chat_note') return '便签线索';
   return kind || '双向链接';
 }
 
@@ -12425,6 +13922,302 @@ function graphNodeSourceTargets(node) {
     add(rel.node?.sourceId, rel.node?.sourceName || graphNodeTitle(rel.node), rel.node?.sourceType, rel.node?.sid);
   }
   return targets.slice(0, 6);
+}
+
+function graphPanelPreviewText(value, fallback='') {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  return graphTrim(text || fallback, 84);
+}
+
+function graphNodeSheetTemplate(node) {
+  const type = node?.nodeType || '';
+  if (type === 'kp') return 'learning-state';
+  if (type === 'chat_note') return 'chat-note';
+  if (type === 'latent' || type === 'section' || type === 'diagnostic') return 'candidate-structure';
+  if (type === 'source' || type === 'note') return 'context-source';
+  return 'candidate-structure';
+}
+
+function graphNodeLightPath(node) {
+  const type = graphNodeTypeLabel(node);
+  const parts = [type];
+  if (node?.sourceName) parts.push(node.sourceName);
+  if (node?.sessionTitle) parts.push(node.sessionTitle);
+  if (node?.sourceType && !node?.sourceName) parts.push(String(node.sourceType).toUpperCase());
+  const rel = graphNodeRelations(node)[0];
+  if (parts.length < 3 && rel) parts.push(graphNodeTitle(rel.node));
+  return graphUniqueClean(parts, 3).join(' / ') || type;
+}
+
+function graphNodeEvidenceItems(node, digest, limit=5) {
+  return graphUniqueClean([
+    ...(digest?.evidence || []),
+    node?.summary,
+    node?.memoryExpansion?.summary,
+    node?.preview,
+    node?.content,
+  ], limit);
+}
+
+function graphNodeKnownItems(node, digest, pairs, limit=3) {
+  const items = [];
+  if (Array.isArray(digest?.known)) items.push(...digest.known);
+  if (digest?.status) items.push(digest.status);
+  if (pairs?.length) items.push(`已有 ${pairs.length} 轮相关对话可回看`);
+  return graphUniqueClean(items, limit);
+}
+
+function graphNodeWeakPoint(node, digest) {
+  return graphUniqueClean([
+    ...(digest?.errors || []),
+    node?.meta?.evaluation?.misconception,
+    node?.meta?.evaluation?.error_pattern,
+  ], 1)[0] || '';
+}
+
+function graphNodeNextStepItems(node, digest, limit=3) {
+  return graphUniqueClean([
+    ...(digest?.nextSteps || []),
+    ...(node?.memoryExpansion?.teacher_questions || []),
+  ], limit);
+}
+
+function graphNodeCoverageText(node) {
+  const relations = graphNodeRelations(node);
+  const sources = graphNodeSourceTargets(node);
+  const parts = [];
+  if (relations.length) parts.push(`${relations.length} 个相关节点`);
+  if (sources.length) parts.push(`${sources.length} 个来源锚点`);
+  if (node?.sourcePages?.length) parts.push(`${node.sourcePages.length} 页`);
+  if (node?.sourceText || node?.content) parts.push(`${String(node.sourceText || node.content).length} 字`);
+  return parts.join(' · ') || '覆盖范围会随着资料和对话证据继续补全';
+}
+
+function graphRelationGroupLabel(kind) {
+  if (kind === 'foundation') return '来源支撑';
+  if (kind === 'outline') return '来源章节';
+  if (kind === 'diagnostic') return '诊断提示';
+  if (kind === 'note') return '随笔引用';
+  if (kind === 'chat_note') return '闲聊便签';
+  if (kind === 'sequence') return '学习顺序';
+  if (kind === 'related') return '相关概念';
+  return graphLinkKindLabel(kind);
+}
+
+function graphNodeRelationGroups(node) {
+  const groups = new Map();
+  for (const rel of graphNodeRelations(node)) {
+    const label = graphRelationGroupLabel(rel.kind);
+    const list = groups.get(label) || [];
+    list.push(rel);
+    groups.set(label, list);
+  }
+  return [...groups.entries()].map(([label, relations]) => ({ label, relations }));
+}
+
+function graphNodeMasteryPercent(node) {
+  if (node?.nodeType === 'kp') return Math.round(Math.max(0, Math.min(1, Number(node?.level || 0))) * 100);
+  if (node?.nodeType === 'source' || node?.nodeType === 'section' || node?.nodeType === 'diagnostic' || node?.nodeType === 'latent' || node?.nodeType === 'chat_note') return null;
+  const correctness = Number(node?.meta?.evaluation?.correctness || node?.last_correctness || 0);
+  const depth = Number(node?.meta?.evaluation?.depth || node?.last_depth || 0);
+  const score = Math.max(correctness, depth);
+  return score ? Math.round(Math.max(0, Math.min(1, score)) * 100) : null;
+}
+
+function graphNodeMasteryStage(node, digest, pairs) {
+  pairs = pairs || [];
+  if (node?.nodeType === 'source') return '资料锚点';
+  if (node?.nodeType === 'section') return '资料章节';
+  if (node?.nodeType === 'diagnostic') return '待诊断';
+  if (node?.nodeType === 'latent') return '候选知识点';
+  if (node?.nodeType === 'note') return '随笔记录';
+  if (node?.nodeType === 'chat_note') return '闲聊便签';
+  const percent = graphNodeMasteryPercent(node);
+  if (percent === null) return pairs.length ? '有对话证据' : '待观察';
+  if (percent >= 80) return '能迁移';
+  if (percent >= 60) return '能复述';
+  if (percent >= 35) return '刚理解';
+  return digest?.evidence?.length || pairs.length ? '证据不足' : '待观察';
+}
+
+function graphNodeDiagnosisText(node, digest, pairs) {
+  pairs = pairs || [];
+  const title = graphNodeTitle(node);
+  const error = graphUniqueClean([...(digest?.errors || [])], 1)[0];
+  const evidence = graphUniqueClean([...(digest?.evidence || []), node?.summary, node?.content, node?.preview], 1)[0];
+  if (error) return `你不是完全不会「${title}」，当前最值得处理的是：${graphPanelPreviewText(error)}。`;
+  if (digest?.status && !/还没有足够|暂无|没有/.test(String(digest.status))) {
+    return graphPanelPreviewText(digest.status, `这个节点已经有学习记录，适合继续复盘「${title}」。`);
+  }
+  if (evidence) return `这个节点已经有可回看的证据，但还需要更多练习来确认「${title}」是否稳定掌握。`;
+  if (node?.nodeType === 'source' || node?.nodeType === 'section' || node?.nodeType === 'latent') {
+    return '这是来自资料的节点，适合先建立上下文，再通过对话把它接入学习路径。';
+  }
+  if (pairs.length) return '这个节点来自最近对话，已经可以回看语义片段，但掌握判断还需要更多证据。';
+  return '这个节点目前主要表示图谱关系，继续对话后会补充更具体的诊断和证据。';
+}
+
+function graphNodePrimaryActionsHtml(node, digest, pairs) {
+  pairs = pairs || [];
+  const hasEvidence = pairs.length || digest?.evidence?.length || node?.chatMessageIds?.length || node?.messageId;
+  const hasWeakPoint = (digest?.errors || []).length || node?.meta?.evaluation?.misconception || node?.meta?.evaluation?.error_pattern;
+  const subsetAction = graphNodeSessionSubsetButtonHtml(node, { primary: true });
+  return `<div class="graph-diagnosis-actions">
+    ${subsetAction}
+    <button type="button" data-graph-action="practice" class="graph-diagnosis-action${subsetAction ? '' : ' primary'}">来一题</button>
+    <button type="button" data-graph-action="ask-why" class="graph-diagnosis-action">${hasWeakPoint ? '追问卡点' : '问为什么'}</button>
+    <button type="button" data-graph-action="review-evidence" ${hasEvidence ? 'data-graph-jump-chat' : 'data-graph-expand-detail'} class="graph-diagnosis-action">回看证据</button>
+  </div>`;
+}
+
+function graphSheetCompactHtml(node, digest, pairs) {
+  const template = graphNodeSheetTemplate(node);
+  if (template === 'learning-state') return graphKnowledgeCompactHtml(node, digest, pairs);
+  if (template === 'chat-note') return graphChatNoteCompactHtml(node, digest, pairs);
+  if (template === 'context-source') return graphContextCompactHtml(node, digest, pairs);
+  return graphStructureCompactHtml(node, digest, pairs);
+}
+
+function graphNodeSessionSubsetButtonHtml(node, opts={}) {
+  if (state.currentTab !== 'insights' || !node?.sid) return '';
+  const primary = opts.primary ? ' primary' : '';
+  return `<button type="button" data-graph-session-subset="${esc(String(node.sid))}" data-graph-session-node-key="${esc(graphNodeLocalKey(node))}" class="graph-diagnosis-action${primary}">查看本窗口子图</button>`;
+}
+
+function graphStructureActionsHtml(node) {
+  const targets = graphNodeSourceTargets(node);
+  const subsetAction = graphNodeSessionSubsetButtonHtml(node, { primary: true });
+  return `<div class="graph-diagnosis-actions">
+    ${subsetAction}
+    <button type="button" data-graph-action="ask-why" class="graph-diagnosis-action${subsetAction ? '' : ' primary'}">围绕它提问</button>
+    ${targets[0] ? `<button type="button" data-graph-action="open-source" data-graph-source-anchor="${esc(targets[0].sourceId)}" data-graph-open-source="${esc(targets[0].sourceId)}" data-graph-source-sid="${esc(String(targets[0].sid || ''))}" class="graph-diagnosis-action">打开来源</button>` : ''}
+    <button type="button" data-graph-expand-detail class="graph-diagnosis-action">查看详情</button>
+  </div>`;
+}
+
+function graphContextActionsHtml(node) {
+  const targets = graphNodeSourceTargets(node);
+  const chatIds = [...(node?.chatMessageIds || []), ...(node?.chat_message_ids || []), node?.messageId].filter(Boolean);
+  const subsetAction = graphNodeSessionSubsetButtonHtml(node, { primary: true });
+  return `<div class="graph-diagnosis-actions">
+    ${subsetAction}
+    ${targets[0] ? `<button type="button" data-graph-action="open-source" data-graph-source-anchor="${esc(targets[0].sourceId)}" data-graph-open-source="${esc(targets[0].sourceId)}" data-graph-source-sid="${esc(String(targets[0].sid || ''))}" class="graph-diagnosis-action${subsetAction ? '' : ' primary'}">打开来源</button>` : ''}
+    ${chatIds.length ? '<button type="button" data-graph-jump-chat class="graph-diagnosis-action">回到聊天</button>' : ''}
+    <button type="button" data-graph-expand-detail class="graph-diagnosis-action">查看详情</button>
+  </div>`;
+}
+
+function graphChatNoteCompactHtml(node, digest, pairs) {
+  const title = graphNodeTitle(node);
+  const body = graphPanelPreviewText(node?.content || node?.summary, '闲聊里冒出来的一条学习线索。');
+  const outline = graphPanelPreviewText(node?.outlinePath || node?.sourceName, '');
+  const quote = graphPanelPreviewText(node?.quote, '');
+  const outlineText = outline ? `这更像是一个可以放进「${outline}」的小线索。` : '它还不是正式学习节点，只是一张提醒你后续可以继续展开的便签。';
+  const subsetAction = graphNodeSessionSubsetButtonHtml(node, { primary: true });
+  return `<section class="graph-node-compact" data-graph-panel="node-compact" data-graph-template="chat-note">
+    <header class="graph-node-compact-head">
+      <div class="min-w-0">
+        <div class="graph-node-eyebrow">闲聊便签</div>
+        <h2 class="graph-node-title">${esc(title)}</h2>
+        <div class="graph-node-path">${esc(outline || graphNodeTypeLabel(node))}</div>
+      </div>
+    </header>
+    <div class="graph-node-context-box" data-graph-chat-note-meaning>
+      <div class="graph-node-label">为什么记下它</div>
+      <p>${renderRichText(body)}</p>
+    </div>
+    <div class="graph-node-context-box" data-graph-chat-note-outline>
+      <div class="graph-node-label">可能放到哪里</div>
+      <p>${esc(outlineText)}</p>
+    </div>
+    ${quote ? `<div class="graph-node-context-box" data-graph-chat-note-quote><div class="graph-node-label">原话</div><p>${renderRichText(quote)}</p></div>` : ''}
+    <div class="graph-diagnosis-actions">
+      ${subsetAction}
+      <button type="button" data-graph-action="outline-chat-note" class="graph-diagnosis-action${subsetAction ? '' : ' primary'}">归入大纲</button>
+      <button type="button" data-graph-action="chat-note-talk" class="graph-diagnosis-action">围绕它聊</button>
+    </div>
+  </section>`;
+}
+
+function graphKnowledgeCompactHtml(node, digest, pairs) {
+  pairs = pairs || [];
+  const percent = graphNodeMasteryPercent(node);
+  const stage = graphNodeMasteryStage(node, digest, pairs);
+  const diagnosis = graphNodeDiagnosisText(node, digest, pairs);
+  const weakPoint = graphNodeWeakPoint(node, digest);
+  const nextSteps = graphNodeNextStepItems(node, digest, 1);
+  const progress = percent === null ? 0 : Math.max(0, Math.min(100, percent));
+  const mainPoint = weakPoint || nextSteps[0] || '这个知识点还需要更多学习证据，暂时不能稳定判断主要卡点。';
+  return `<section class="graph-node-compact" data-graph-panel="node-compact" data-graph-template="learning-state">
+    <header class="graph-node-compact-head">
+      <div class="min-w-0">
+        <div class="graph-node-eyebrow">${esc(graphNodeTypeLabel(node))}</div>
+        <h2 class="graph-node-title">${esc(graphNodeTitle(node))}</h2>
+        <div class="graph-node-path">${esc(graphNodeLightPath(node))}</div>
+      </div>
+      <div class="graph-node-score">
+        <strong>${percent === null ? '--' : `${percent}%`}</strong>
+        <span>${esc(stage)}</span>
+      </div>
+    </header>
+    <div class="graph-node-meter" style="--graph-progress:${progress}%"><i></i></div>
+    <div class="graph-node-statement">
+      <div class="graph-node-label">当前判断</div>
+      <p>${renderRichText(diagnosis)}</p>
+    </div>
+    <div class="graph-node-main-point" data-graph-kp-main-stuck>
+      <div class="graph-node-label">${weakPoint ? '主要卡点' : '当前重点'}</div>
+      <p>${renderRichText(graphPanelPreviewText(mainPoint, '还需要更多证据。'))}</p>
+    </div>
+    ${graphNodePrimaryActionsHtml(node, digest, pairs)}
+  </section>`;
+}
+
+function graphStructureCompactHtml(node, digest, pairs) {
+  const templateLabel = node?.nodeType === 'latent' ? '候选知识点'
+    : node?.nodeType === 'diagnostic' ? '诊断节点'
+    : '资料结构';
+  const evidence = graphNodeEvidenceItems(node, digest, 1)[0];
+  const reason = evidence || node?.modelTitleSuggestion || node?.titleOrigin || '这个节点来自资料结构、内容提取或导入诊断。';
+  const relations = graphNodeRelations(node).slice(0, 3);
+  const chips = relations.map(rel => `<button type="button" data-graph-node-jump="${esc(String(rel.node.key))}" class="graph-node-chip">${esc(graphNodeTitle(rel.node))}</button>`).join('');
+  return `<section class="graph-node-compact" data-graph-panel="node-compact" data-graph-template="candidate-structure">
+    <header class="graph-node-compact-head">
+      <div class="min-w-0">
+        <div class="graph-node-eyebrow">${esc(templateLabel)}</div>
+        <h2 class="graph-node-title">${esc(graphNodeTitle(node))}</h2>
+        <div class="graph-node-path">${esc(graphNodeLightPath(node))}</div>
+      </div>
+    </header>
+    <div class="graph-node-context-box" data-graph-structure-reason>
+      <div class="graph-node-label">为什么出现</div>
+      <p>${renderRichText(graphPanelPreviewText(reason, '来自资料的上下文'))}</p>
+    </div>
+    <div class="graph-node-chip-row">${chips || '<span class="graph-node-chip">暂未接入学习节点</span>'}</div>
+    ${graphStructureActionsHtml(node)}
+  </section>`;
+}
+
+function graphContextCompactHtml(node, digest, pairs) {
+  const preview = graphNodeEvidenceItems(node, digest, 1)[0] || graphPanelPreviewText(node?.content || node?.sourceText, '');
+  const relations = graphNodeRelations(node).slice(0, 3);
+  const chips = relations.map(rel => `<button type="button" data-graph-node-jump="${esc(String(rel.node.key))}" class="graph-node-chip">${esc(graphNodeTitle(rel.node))}</button>`).join('');
+  return `<section class="graph-node-compact" data-graph-panel="node-compact" data-graph-template="context-source">
+    <header class="graph-node-compact-head">
+      <div class="min-w-0">
+        <div class="graph-node-eyebrow">${esc(graphNodeTypeLabel(node))}</div>
+        <h2 class="graph-node-title">${esc(graphNodeTitle(node))}</h2>
+        <div class="graph-node-path">${esc(graphNodeLightPath(node))}</div>
+      </div>
+    </header>
+    <div class="graph-node-context-box" data-graph-context-coverage>
+      <div class="graph-node-label">覆盖范围</div>
+      <p>${esc(graphNodeCoverageText(node))}</p>
+    </div>
+    ${preview ? `<div class="graph-node-context-box"><div class="graph-node-label">内容预览</div><p>${renderRichText(graphPanelPreviewText(preview, ''))}</p></div>` : ''}
+    <div class="graph-node-chip-row">${chips || '<span class="graph-node-chip">暂未关联学习节点</span>'}</div>
+    ${graphContextActionsHtml(node)}
+  </section>`;
 }
 
 function graphSheetActionButtonsHtml(node) {
@@ -12776,13 +14569,29 @@ function graphRelationsReportHtml(node) {
 function graphSourcesReportHtml(node) {
   const targets = graphNodeSourceTargets(node).slice(0, 4);
   if (!targets.length) return '';
-  return `<div class="graph-report-link-list">${targets.map(target => `<button type="button" data-graph-source-anchor="${esc(target.sourceId)}" data-graph-open-source="${esc(target.sourceId)}" data-graph-source-sid="${esc(String(target.sid || ''))}" class="graph-report-inline-link">
+  const sourceForReport = {
+    id: node?.sourceId || targets[0]?.sourceId,
+    kind:'source',
+    content: node?.content || '',
+    source_text: node?.sourceText || '',
+    source_name: node?.sourceName || targets[0]?.label || graphNodeTitle(node),
+    source_type: node?.sourceType || targets[0]?.sourceType || 'doc',
+    source_diagnostics: node?.sourceDiagnostics || {},
+    source_pages: node?.sourcePages || [],
+  };
+  const previewHtml = sourceForReport.id
+    ? `<div class="graph-source-preview mb-3"><div class="font-semibold mb-1">资料快照</div>${esc(sourcePreviewText(sourceForReport)).replace(/\n/g, '<br>')}</div>`
+    : '';
+  const suggestionHtml = node?.modelTitleSuggestion
+    ? `<div class="graph-source-preview mb-3">模型建议：${esc(node.modelTitleSuggestion)}。用户命名不会被自动覆盖。</div>`
+    : '';
+  return `${previewHtml}${suggestionHtml}<div class="graph-report-link-list">${targets.map(target => `<button type="button" data-graph-source-anchor="${esc(target.sourceId)}" data-graph-open-source="${esc(target.sourceId)}" data-graph-source-sid="${esc(String(target.sid || ''))}" class="graph-report-inline-link">
     [[${esc(target.label)}]]
     <span class="meta">${esc(String(target.sourceType || 'doc').toUpperCase())}</span>
   </button>`).join('')}</div>`;
 }
 
-function graphSheetReportHtml(node, digest, pairs=[]) {
+function graphLegacySheetReportHtml(node, digest, pairs=[]) {
   const fragments = graphSemanticFragments(node, digest, pairs);
   const fragmentHtml = fragments.length
     ? graphFragmentDeckHtml(fragments, node?.sid || state.sid)
@@ -12800,6 +14609,120 @@ function graphSheetReportHtml(node, digest, pairs=[]) {
     ${graphReportSectionHtml('相关节点', graphRelationsReportHtml(node), 'data-graph-detail-section="relations"')}
     ${graphReportSectionHtml('来源资料', graphSourcesReportHtml(node), 'data-graph-detail-section="sources"')}
   </article>`;
+}
+
+function graphReportListHtml(items, emptyText) {
+  const clean = graphUniqueClean(items || [], 5);
+  const rows = clean.length ? clean : [emptyText];
+  return `<ul class="list-disc pl-5 space-y-1">${rows.map(item => `<li>${renderRichText(String(item).slice(0, 260))}</li>`).join('')}</ul>`;
+}
+
+function graphGroupedRelationsReportHtml(node) {
+  const groups = graphNodeRelationGroups(node);
+  if (!groups.length) return '<div class="text-xs text-neutral-500">暂时没有可浏览的相邻节点。</div>';
+  return groups.map(group => `<div class="graph-report-relation-group">
+    <div class="text-[11px] font-semibold text-neutral-500 mb-1">${esc(group.label)}</div>
+    <div class="graph-report-link-list">${group.relations.map(rel => `<button type="button" data-graph-node-jump="${esc(String(rel.node.key))}" class="graph-report-inline-link">
+      [[${esc(graphNodeTitle(rel.node))}]]
+      <span class="meta">${esc(graphNodeTypeLabel(rel.node))}</span>
+    </button>`).join('')}</div>
+  </div>`).join('');
+}
+
+function graphChatNoteReportHtml(node, digest, pairs=[]) {
+  const title = graphNodeTitle(node);
+  const body = graphPanelPreviewText(node?.content || node?.summary, '这条闲聊里出现了一个后续值得继续展开的学习线索。');
+  const outline = graphPanelPreviewText(node?.outlinePath || node?.sourceName, '');
+  const quote = graphPanelPreviewText(node?.quote, '');
+  const relationHtml = graphGroupedRelationsReportHtml(node);
+  const outlineHtml = outline
+    ? `<p>它可以先作为「${esc(outline)}」下面的一张便签，等后续学习或复盘时再决定是否转成正式知识节点。</p>`
+    : '<p>它现在更像一张临时便签，可以先留在图谱里，等相关主题继续出现时再归类到大纲。</p>';
+  return `<article class="graph-node-report" data-graph-report-template="chat-note">
+    <header class="graph-report-head">
+      <div class="text-[11px] text-neutral-500">闲聊便签</div>
+      <h2 class="graph-report-title">${esc(title)}</h2>
+      <blockquote class="graph-report-lead">${renderRichText(body)}</blockquote>
+    </header>
+    ${graphReportSectionHtml('为什么记下它', `<p>${renderRichText(body)}</p>`, 'data-graph-detail-section="chat-note-reason"')}
+    ${graphReportSectionHtml('可能放到哪里', outlineHtml, 'data-graph-detail-section="chat-note-outline"')}
+    ${graphReportSectionHtml('原话', `<div class="graph-source-preview">${renderRichText(quote || '暂时没有保存到可定位的原话片段。')}</div>`, 'data-graph-detail-section="chat-note-quote"')}
+    ${graphReportSectionHtml('可以怎么用', graphReportListHtml([
+      '归入大纲：把这张便签放到合适主题下，作为以后复盘的锚点。',
+      '围绕它聊：继续用自然聊天把这个线索说清楚。',
+      '转成学习节点：等它真的进入学习过程后，再生成掌握度、卡点和证据。'
+    ], '围绕它继续聊一轮，确认它是否值得进入学习大纲。'), 'data-graph-detail-section="chat-note-actions"')}
+    ${graphReportSectionHtml('相关节点', relationHtml, 'data-graph-detail-section="relations"')}
+  </article>`;
+}
+
+function graphKnowledgeReportHtml(node, digest, pairs=[]) {
+  const fragments = graphSemanticFragments(node, digest, pairs);
+  const fragmentHtml = fragments.length ? graphFragmentDeckHtml(fragments, node?.sid || state.sid) : '';
+  const weakPoint = graphNodeWeakPoint(node, digest);
+  const known = graphNodeKnownItems(node, digest, pairs, 4);
+  const evidence = graphNodeEvidenceItems(node, digest, 5);
+  const nextSteps = graphNodeNextStepItems(node, digest, 4);
+  return `<article class="graph-node-report" data-graph-report-template="learning-state">
+    <header class="graph-report-head">
+      <div class="text-[11px] text-neutral-500">${esc(graphNodeLightPath(node))}</div>
+      <h2 class="graph-report-title">${esc(graphNodeTitle(node))}</h2>
+      <blockquote class="graph-report-lead">${renderRichText(graphNodeDiagnosisText(node, digest, pairs))}</blockquote>
+    </header>
+    ${graphReportSectionHtml('当前判断', `<p>${renderRichText(graphReportLead(node, digest, pairs))}</p>`, 'data-graph-detail-section="current-judgment"')}
+    ${graphReportSectionHtml('你已经会了什么', graphReportListHtml(known, '还需要更多对话，才能稳定展示已掌握部分。'), 'data-graph-detail-section="already-know"')}
+    ${graphReportSectionHtml('主要卡点', `<p>${renderRichText(graphPanelPreviewText(weakPoint, '暂时还没有检测到明确卡点。'))}</p>`, 'data-graph-detail-section="main-stuck"')}
+    ${graphReportSectionHtml('为什么会卡', `<p>${renderRichText(graphPanelPreviewText(weakPoint || digest?.status || node?.summary, '这个节点还需要更多证据，系统暂时不能解释具体卡因。'))}</p>`, 'data-graph-detail-section="why-stuck"')}
+    ${graphReportSectionHtml('判断依据', `${fragmentHtml || graphReportListHtml(evidence, '暂时还没有收集到详细证据。')}`, 'data-graph-detail-section="evidence"')}
+    ${graphReportSectionHtml('下一步', graphReportListHtml(nextSteps, '先围绕这个点追问一次，或完成一个短练习。'), 'data-graph-detail-section="strategy"')}
+    ${graphReportSectionHtml('相关节点', graphGroupedRelationsReportHtml(node), 'data-graph-detail-section="relations"')}
+    ${graphReportSectionHtml('来源资料', graphSourcesReportHtml(node), 'data-graph-detail-section="sources"')}
+  </article>`;
+}
+
+function graphStructureReportHtml(node, digest, pairs=[]) {
+  const evidence = graphNodeEvidenceItems(node, digest, 4);
+  const nextSteps = graphNodeNextStepItems(node, digest, 4);
+  const sourceHtml = graphSourcesReportHtml(node);
+  return `<article class="graph-node-report" data-graph-report-template="candidate-structure">
+    <header class="graph-report-head">
+      <div class="text-[11px] text-neutral-500">${esc(graphNodeLightPath(node))}</div>
+      <h2 class="graph-report-title">${esc(graphNodeTitle(node))}</h2>
+      <blockquote class="graph-report-lead">${renderRichText(graphNodeDiagnosisText(node, digest, pairs))}</blockquote>
+    </header>
+    ${graphReportSectionHtml('为什么出现', graphReportListHtml(evidence, '这个节点来自资料结构、内容提取或导入诊断。'), 'data-graph-detail-section="structure-reason"')}
+    ${graphReportSectionHtml('来源片段', sourceHtml || graphEvidenceReportHtml(node, digest), 'data-graph-detail-section="evidence"')}
+    ${graphReportSectionHtml('分析状态', graphLearningNarrativeHtml(node), 'data-graph-detail-section="learning-status"')}
+    ${graphReportSectionHtml('可做动作', graphReportListHtml(nextSteps, '先围绕这个节点提问，或打开来源；不要在没有证据时把它当成已学习知识点。'), 'data-graph-detail-section="strategy"')}
+    ${graphReportSectionHtml('相关节点', graphGroupedRelationsReportHtml(node), 'data-graph-detail-section="relations"')}
+  </article>`;
+}
+
+function graphContextReportHtml(node, digest, pairs=[]) {
+  const evidence = graphNodeEvidenceItems(node, digest, 5);
+  const sourceHtml = graphSourcesReportHtml(node);
+  return `<article class="graph-node-report" data-graph-report-template="context-source">
+    <header class="graph-report-head">
+      <div class="text-[11px] text-neutral-500">${esc(graphNodeLightPath(node))}</div>
+      <h2 class="graph-report-title">${esc(graphNodeTitle(node))}</h2>
+      <blockquote class="graph-report-lead">${renderRichText(graphNodeCoverageText(node))}</blockquote>
+    </header>
+    ${graphReportSectionHtml('来源与覆盖范围', `<p>${esc(graphNodeCoverageText(node))}</p>`, 'data-graph-detail-section="context-coverage"')}
+    ${graphReportSectionHtml('内容预览', graphReportListHtml(evidence, '这个上下文节点暂时没有长预览。'), 'data-graph-detail-section="evidence"')}
+    ${graphReportSectionHtml('关联学习节点', graphGroupedRelationsReportHtml(node), 'data-graph-detail-section="relations"')}
+    ${graphReportSectionHtml('打开上下文', sourceHtml, 'data-graph-detail-section="sources"')}
+  </article>`;
+}
+
+function graphSheetReportHtml(node, digest, pairs=[]) {
+  const fragments = graphSemanticFragments(node, digest, pairs);
+  const fragmentHtml = fragments.length ? graphFragmentDeckHtml(fragments, node?.sid || state.sid) : '';
+  void fragmentHtml;
+  const template = graphNodeSheetTemplate(node);
+  if (template === 'learning-state') return graphKnowledgeReportHtml(node, digest, pairs);
+  if (template === 'chat-note') return graphChatNoteReportHtml(node, digest, pairs);
+  if (template === 'context-source') return graphContextReportHtml(node, digest, pairs);
+  return graphStructureReportHtml(node, digest, pairs);
 }
 
 function graphSheetDetailHtml(node, digest, pairs=[]) {
@@ -12946,11 +14869,185 @@ function bindGraphSheetDragHandle(sheet) {
   };
 }
 
+function graphNodeThreadActionSupported(action='') {
+  return ['practice', 'ask-why', 'chat-note-talk', 'open-thread'].includes(String(action || ''));
+}
+
+function graphNodeThreadTitle(node) {
+  return graphTrim(`${graphNodeTitle(node)} · 节点窗口`, 24);
+}
+
+function graphNodeThreadKey(node) {
+  const sourceSid = String(node?.sid || node?.sessionId || state.sid || '');
+  const localKey = graphNodeLocalKey(node) || normalizeGraphTopic(graphNodeTitle(node));
+  return `${sourceSid}::${localKey}`;
+}
+
+async function createOrOpenGraphNodeThread(node=state.graphEditingNode) {
+  if (!node) throw new Error('没有选中的节点');
+  const sourceSid = String(node.sid || node.sessionId || state.sid || '');
+  if (!sourceSid) throw new Error('这个节点没有来源会话');
+  const sourceSession = await DB.get('sessions', sourceSid);
+  const title = graphNodeTitle(node);
+  const localKey = graphNodeLocalKey(node) || normalizeGraphTopic(title);
+  const nodeThreadKey = graphNodeThreadKey(node);
+  const existing = listNodeThreadSessions(await DB.all('sessions'))
+    .find(session => String(session.node_thread_key || '') === nodeThreadKey);
+  if (existing) return { thread: existing, created: false };
+  const thread = await ENGINE.create_session({
+    title: graphNodeThreadTitle(node),
+    role: `围绕「${title}」提问的学生 AI`,
+    goal: `只围绕图谱节点「${title}」练习、追问和复盘`,
+    deadline: '',
+    personality: sourceSession?.persona?.personality || '认真、会暴露真实卡点、需要一步步确认',
+    reqs: [
+      `这是来源会话「${sourceSession?.title || '未命名会话'}」里的节点子窗口。`,
+      `不要把它当成首页普通会话；所有对话只服务于节点「${title}」。`,
+      `节点路径：${graphNodeLightPath(node)}。`,
+    ],
+    settings: sourceSession?.settings || {},
+    profile_tags: sourceSession?.profile_tags || [],
+    profile_description: sourceSession?.profile_description || '',
+    profile_long_text: '',
+    avatar_hidden: true,
+  });
+  Object.assign(thread, {
+    node_thread: true,
+    hidden_from_home: true,
+    thread_type: 'node_thread',
+    parent_sid: sourceSid,
+    parent_title: sourceSession?.title || '',
+    graph_node_key: String(node.key || ''),
+    graph_node_local_key: localKey,
+    graph_node_title: title,
+    graph_node_type: node.nodeType || '',
+    graph_node_path: graphNodeLightPath(node),
+    node_thread_key: nodeThreadKey,
+    updated_at: Date.now(),
+  });
+  await DB.put('sessions', thread);
+  return { thread, created: true };
+}
+
+function graphNodeThreadSeedPrompt(action, node=state.graphEditingNode, opts={}) {
+  const title = graphNodeTitle(node);
+  const path = graphNodeLightPath(node);
+  const weak = graphNodeWeakPoint(node, buildKpConversationDigest([], title));
+  if (action === 'practice') {
+    return [
+      `围绕节点「${title}」来一题。`,
+      '题目要能检测我是否真的理解这个节点；先出题，不要直接给答案。',
+      weak ? `优先检查这个卡点：${weak}` : '',
+      `节点路径：${path}`,
+    ].filter(Boolean).join('\n');
+  }
+  if (action === 'ask-why') {
+    return [
+      `围绕节点「${title}」问我一个“为什么”。`,
+      '问题要逼我解释概念边界、原因或推导逻辑；先问问题，不要直接讲解。',
+      weak ? `可以围绕这个卡点追问：${weak}` : '',
+      `节点路径：${path}`,
+    ].filter(Boolean).join('\n');
+  }
+  if (action === 'chat-note-talk') {
+    return [
+      `围绕这张节点便签继续聊：「${title}」。`,
+      node?.content ? `便签内容：${graphPanelPreviewText(node.content, '')}` : '',
+      '先帮我把它说清楚，再判断它是否值得进入学习大纲。',
+    ].filter(Boolean).join('\n');
+  }
+  if (action === 'open-thread') return '';
+  return `围绕节点「${title}」继续。`;
+}
+
+async function startGraphNodeThreadAction(action, node=state.graphEditingNode) {
+  if (!graphNodeThreadActionSupported(action)) return;
+  try {
+    state.nodeThreadReturn = {
+      tab: state.currentTab,
+      chatScreen: state.chatScreen,
+      contextTab: state.contextTab,
+      sid: state.sid,
+      nodeKey: String(node?.key || ''),
+      localKey: graphNodeLocalKey(node),
+      expanded: state.graphSheetExpanded,
+    };
+    const { thread, created } = await createOrOpenGraphNodeThread(node);
+    const prompt = graphNodeThreadSeedPrompt(action, node);
+    hideGraphSheet();
+    await openSessionWindow(thread.id);
+    if (created && prompt) await submitChatText(prompt, { clearInput: true, quotedMessage: null });
+  } catch (err) {
+    toast(err?.message || '节点子窗口打开失败');
+  }
+}
+
+async function returnToNodeThreadSourceContext() {
+  const returnCtx = state.nodeThreadReturn || {};
+  const thread = state.sid ? await DB.get('sessions', state.sid) : null;
+  const sourceSid = returnCtx.sid || thread?.parent_sid || '';
+  const localKey = returnCtx.localKey || thread?.graph_node_local_key || '';
+  const nodeKey = returnCtx.nodeKey || localKey;
+  const expanded = !!returnCtx.expanded;
+  state.nodeThreadReturn = null;
+  hideGraphSheet();
+  if (returnCtx.tab === 'insights') {
+    switchTab('insights');
+    await renderInsights();
+    const target = (state.graphDetailNodes || []).find(n => String(n.key) === String(nodeKey))
+      || (state.graphDetailNodes || []).find(n => graphNodeLocalKey(n) === localKey);
+    if (target) {
+      await showGraphSheet(target);
+      if (expanded) expandGraphSheet();
+    }
+    return;
+  }
+  if (sourceSid) {
+    state.sid = sourceSid;
+    await DB.kvSet('current_sid', state.sid);
+  }
+  state.contextTab = 'graph';
+  state.chatScreen = 'context';
+  state.graphSelected = localKey;
+  switchTab('chat');
+  await renderChat();
+  const target = (state.graphDetailNodes || []).find(n => String(n.key) === String(localKey))
+    || (state.graphDetailNodes || []).find(n => String(n.key) === String(nodeKey))
+    || (state.graphDetailNodes || []).find(n => graphNodeLocalKey(n) === localKey);
+  if (target) {
+    await showGraphSheet(target);
+    if (expanded) expandGraphSheet();
+  }
+}
+
 async function jumpToGraphSheetNode(key) {
   const target = (state.graphDetailNodes || []).find(n => String(n.key) === String(key));
   if (!target) { toast('这个节点不在当前图谱里'); return; }
   await showGraphSheet(target);
   expandGraphSheet();
+}
+
+async function jumpToGraphSessionSubset(node=state.graphEditingNode, preferredLocalKey='') {
+  const sourceSid = node?.sid || node?.sessionId || state.sid;
+  if (!sourceSid) { toast('这个节点没有来源会话'); return; }
+  const localKey = preferredLocalKey || graphNodeLocalKey(node);
+  hideGraphSheet();
+  if (sourceSid !== state.sid) {
+    state.sid = sourceSid;
+    await DB.kvSet('current_sid', state.sid);
+  }
+  state.contextTab = 'graph';
+  state.chatScreen = 'context';
+  state.graphSelected = localKey;
+  switchTab('chat');
+  await renderChat();
+  const target = (state.graphDetailNodes || []).find(n => String(n.key) === String(localKey))
+    || (state.graphDetailNodes || []).find(n => normalizeGraphTopic(graphNodeTitle(n)) === normalizeGraphTopic(graphNodeTitle(node)));
+  if (target) {
+    await showGraphSheet(target);
+    return;
+  }
+  toast('已进入来源会话子图');
 }
 
 async function jumpToGraphFragmentChat(idText, sourceSid=state.sid) {
@@ -13002,6 +15099,41 @@ async function jumpToGraphSourceAnchor(sourceId, sourceSid=state.sid) {
     row.classList.add('graph-source-jump-highlight');
     setTimeout(() => row.classList.remove('graph-source-jump-highlight'), 2200);
   });
+}
+
+function chatNoteOutlineAnchorDraft(node=state.graphEditingNode) {
+  const title = graphNodeTitle(node);
+  const body = graphPanelPreviewText(node?.content || node?.summary, '');
+  const outline = graphPanelPreviewText(node?.outlinePath || node?.sourceName, '');
+  const quote = graphPanelPreviewText(node?.quote, '');
+  return [
+    `大纲锚点：${title}`,
+    outline ? `建议位置：${outline}` : '',
+    body ? `引入理由：${body}` : '',
+    quote ? `原话线索：${quote}` : '',
+    '衔接方式：先作为待展开主题保留，后续对话确认后再补成学习节点和关系。',
+  ].filter(Boolean).join('\n');
+}
+
+async function openChatNoteAnchorInContext(node=state.graphEditingNode) {
+  const sourceSid = node?.sid || node?.sessionId || state.sid;
+  if (!sourceSid) { toast('这张便签没有来源会话'); return; }
+  const anchorId = node?.anchorId || '';
+  state.contextAnchorPrefill = {
+    text: chatNoteOutlineAnchorDraft(node),
+    sourceAnchorId: anchorId,
+    hint: '已带入这张便签的归类草稿。确认后保存为当前会话的学习大纲锚点。',
+  };
+  state.contextAnchorHighlightId = anchorId ? String(anchorId) : '';
+  hideGraphSheet();
+  if (sourceSid && sourceSid !== state.sid) {
+    state.sid = sourceSid;
+    await DB.kvSet('current_sid', state.sid);
+  }
+  state.contextTab = 'anchors';
+  state.chatScreen = 'context';
+  switchTab('chat');
+  await renderChat();
 }
 
 async function jumpToGraphNodeChat(node=state.graphEditingNode) {
@@ -13094,221 +15226,7 @@ async function showGraphSheet(node) {
 
   const digest = buildKpConversationDigest(pairs, kpName);
 
-  let html='';
-  if (node.nodeType==='kp') {
-    const pct=Math.round((node.level||0)*100);
-    const circ=2*Math.PI*22;
-    const dash=circ*pct/100;
-    // Header: mastery ring + name
-    html=`<div class="flex items-center gap-4 mb-3">
-      <div class="mastery-ring">
-        <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="none" stroke="var(--line)" stroke-width="3" opacity=".3"/><circle cx="24" cy="24" r="22" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="${dash.toFixed(1)} ${(circ-dash).toFixed(1)}" stroke-linecap="round" transform="rotate(-90 24 24)" style="transition:stroke-dasharray .6s ease"/></svg>
-        <span class="ring-label">${pct}%</span>
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="text-base font-bold">${esc(kpName)}</div>
-        <div class="flex gap-1.5 mt-1 flex-wrap"><span class="pill pill-ask">知识点</span><span class="pill pill-next">${node.attempts||0} 次</span><span class="pill pill-encourage">${pairs.length} 轮对话</span></div>
-      </div>
-    </div>
-    <div class="sheet-section space-y-2 text-xs">
-      <div class="flex justify-between"><span class="text-neutral-500">掌握度</span><span>${(node.level||0).toFixed(2)}</span></div>
-      <div class="bar"><div style="width:${pct}%"></div></div>
-      <div class="flex justify-between"><span class="text-neutral-500">最近正确度</span><span>${Number(node.last_correctness||0).toFixed(2)}</span></div>
-      <div class="flex justify-between"><span class="text-neutral-500">最近深度</span><span>${Number(node.last_depth||0).toFixed(2)}</span></div>
-    </div>`;
-
-    html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">学习整理</div>
-      <div class="text-xs leading-relaxed" style="color:var(--text-soft);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${esc(digest.status)}</div></div>`;
-
-    if (digest.errors.length) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">历史错因</div><div class="flex flex-wrap gap-1.5">${digest.errors.map(e=>`<span class="pill pill-challenge">${esc(e)}</span>`).join('')}</div></div>`;
-    }
-
-    if (digest.evidence.length) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">证据摘要</div><div class="space-y-1.5">${digest.evidence.map(e=>`<div class="text-xs leading-relaxed" style="color:var(--text-soft);padding-left:10px;border-left:2px solid var(--accent-soft);">${esc(e)}</div>`).join('')}</div></div>`;
-    }
-
-    if (digest.nextSteps.length) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--text-soft)">后续策略</div><div class="space-y-1.5">${digest.nextSteps.map(s=>`<div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:6px 10px;border-radius:6px;">${esc(s)}</div>`).join('')}</div></div>`;
-    }
-
-    if (pairs.length) {
-      html+=`<details class="sheet-section"><summary class="text-xs font-semibold mb-2" style="color:var(--text-soft)">可回顾原始对话 <span class="text-neutral-500 font-normal">(${pairs.length} 轮)</span></summary><div class="space-y-3 mt-2">`;
-      for (const p of pairs.slice(-10)) {
-        const actType = p.act.type||'ask';
-        const score = ((Number(p.ev.correctness||0)+Number(p.ev.depth||0))/2).toFixed(2);
-        html+=`<div class="text-xs space-y-1">`;
-        if (p.user) html+=`<div style="color:var(--accent);padding-left:10px;border-left:2px solid var(--accent);">🧑‍🏫 ${renderRichText(p.user.content||'')}</div>`;
-        html+=`<div style="color:var(--text-soft);padding-left:10px;border-left:2px solid var(--warn);">🎓 ${renderRichText(p.ai.content||'')}</div>`;
-        html+=`<div class="flex gap-1.5"><span class="pill pill-${actType}">${actType}</span><span class="text-neutral-500" style="font-size:10px">综合 ${score}</span></div>`;
-        html+=`</div>`;
-      }
-      html+=`</div></details>`;
-    }
-
-  } else if (node.nodeType === 'note') {
-    html=`<div class="flex gap-1.5 mb-2 flex-wrap">
-      <span class="pill pill-encourage">随笔</span>
-      <span class="pill pill-next">${esc(node.sourceName || '聊天')}</span>
-    </div>
-    <div class="text-base font-bold mb-2">${esc(kpName || node.label || '随笔')}</div>
-    <div class="flex gap-2 mb-2">
-      <button data-graph-jump-chat class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">回顾聊天</button>
-    </div>
-    <div class="sheet-section text-sm leading-relaxed" style="color:var(--text-soft);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(node.content || '')}</div>`;
-
-  } else if (node.nodeType === 'source') {
-    const diagnostics = node.sourceDiagnostics || {};
-    const sourceForSheet = { id: node.sourceId, kind:'source', content: node.content || '', source_text: node.sourceText || '', source_name: node.kp, source_type: node.sourceType, source_diagnostics: diagnostics, source_memory: node.sourceMemory || null, source_pages: node.sourcePages || [] };
-    const needsOcr = sourceNeedsOcr(sourceForSheet);
-    const topics = extractSourceTopics([sourceForSheet], 10);
-    html=`<div class="flex items-center gap-3 mb-3">
-      <div class="mastery-ring"><span class="ring-label">KB</span></div>
-      <div class="min-w-0 flex-1">
-        <div class="text-base font-bold truncate">${esc(node.kp || '基础资料')}</div>
-        <div class="flex gap-1.5 mt-1 flex-wrap"><span class="pill pill-source">${esc(node.sourceType || 'doc')}</span><span class="pill pill-next">${topics.length} 个候选节点</span></div>
-      </div>
-    </div>
-    <div class="flex gap-2 mb-2">
-      <button data-graph-edit-node class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">编辑纠正</button>
-    </div>
-    <div class="sheet-section text-xs leading-relaxed" style="color:var(--text-soft)">${needsOcr ? esc(diagnostics.message || '这份资料需要视觉模型后才能作为知识库使用。') : '这份资料会作为图谱的底层知识库：先生成不发光的候选节点，等聊天真正触达某个知识点后，再把对应节点点亮并接到学习路径上。'}</div>
-    <div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">资料快照</div><div class="text-xs leading-relaxed whitespace-pre-wrap" style="color:var(--muted);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${esc(sourcePreviewText(sourceForSheet))}</div></div>`;
-    if (topics.length) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">候选知识节点</div><div class="flex flex-wrap gap-1.5">`;
-      for (const [i, t] of topics.entries()) html+=`<span class="pill pill-next">${esc(displaySourceTopicLabel(t, i + 1))}</span>`;
-      html+=`</div></div>`;
-    }
-
-  } else if (node.nodeType === 'section') {
-    const exp = node.memoryExpansion || null;
-    html=`<div class="flex gap-1.5 mb-2 flex-wrap">
-      <span class="pill pill-source">章节</span>
-      <span class="pill pill-next">${esc(node.sourceName || '基础资料')}</span>
-      ${node.memoryStatus ? `<span class="pill pill-encourage">${esc(memoryStatusLabel(node.memoryStatus, node.nodeType))}</span>` : ''}
-      ${node.titleOrigin ? `<span class="pill pill-next">${esc(node.titleOrigin)}</span>` : ''}
-    </div>
-    <div class="text-base font-bold mb-2">${esc(kpName || '资料章节')}</div>
-    <div class="flex gap-2 mb-2">
-      <button data-graph-jump-chat class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">回顾聊天</button>
-      <button data-graph-edit-node class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">编辑纠正</button>
-    </div>
-    <div class="sheet-section text-xs leading-relaxed" style="color:var(--text-soft)">这是根据上传资料的目录、章节标题或明显分段自动生成的分支。它下面会继续挂载未解锁知识点；聊天命中后，对应知识点才会发光。</div>`;
-    html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">节点简介</div><div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(sourceNodeSummary(node))}</div></div>`;
-    if (node.modelTitleSuggestion) {
-      html+=`<div class="sheet-section text-xs" style="color:var(--muted)">模型建议：${esc(node.modelTitleSuggestion)}。用户命名不会被自动覆盖。</div>`;
-    }
-    if (exp) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">单支分析</div>
-        <div class="text-xs leading-relaxed mb-2" style="color:var(--text-soft);">${renderRichText(exp.summary || '')}</div>`;
-      if (Array.isArray(exp.key_concepts) && exp.key_concepts.length) {
-        html+=`<div class="flex flex-wrap gap-1.5 mb-2">${exp.key_concepts.slice(0,8).map(x=>`<span class="pill pill-next">${esc(x)}</span>`).join('')}</div>`;
-      }
-      if (Array.isArray(exp.teacher_questions) && exp.teacher_questions.length) {
-        html+=`<div class="space-y-1.5">${exp.teacher_questions.slice(0,5).map(q=>`<div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:6px 10px;border-radius:6px;">${renderRichText(q)}</div>`).join('')}</div>`;
-      }
-      html+=`</div>`;
-    }
-
-  } else if (node.nodeType === 'diagnostic') {
-    const exp = node.memoryExpansion || null;
-    html=`<div class="flex gap-1.5 mb-2 flex-wrap">
-      <span class="pill pill-source">导入诊断</span>
-      <span class="pill pill-next">${esc(node.sourceName || '基础资料')}</span>
-      ${node.memoryStatus ? `<span class="pill pill-encourage">${esc(memoryStatusLabel(node.memoryStatus, node.nodeType))}</span>` : ''}
-    </div>
-    <div class="text-base font-bold mb-2">${esc(node.label || '待视觉模型')}</div>
-    <div class="flex gap-2 mb-2">
-      <button data-graph-jump-chat class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">回顾聊天</button>
-      <button data-graph-edit-node class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">编辑纠正</button>
-    </div>
-    <div class="sheet-section text-xs leading-relaxed" style="color:var(--text-soft)">这份 PDF 已经作为资料记录下来，但当前只能看到文件存在，尚未真正读到正文。切换到支持视觉的模型后，系统会读取页面图片，再生成章节分支和候选知识节点。</div>`;
-    if (exp) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">单支分析</div>
-        <div class="text-xs leading-relaxed mb-2" style="color:var(--text-soft);">${renderRichText(exp.summary || '')}</div>`;
-      if (Array.isArray(exp.key_concepts) && exp.key_concepts.length) {
-        html+=`<div class="flex flex-wrap gap-1.5 mb-2">${exp.key_concepts.slice(0,8).map(x=>`<span class="pill pill-next">${esc(x)}</span>`).join('')}</div>`;
-      }
-      if (Array.isArray(exp.teacher_questions) && exp.teacher_questions.length) {
-        html+=`<div class="space-y-1.5">${exp.teacher_questions.slice(0,5).map(q=>`<div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:6px 10px;border-radius:6px;">${renderRichText(q)}</div>`).join('')}</div>`;
-      }
-      html+=`</div>`;
-    }
-    if (node.preview) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">诊断信息</div><div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(String(node.preview).slice(0, 520))}</div></div>`;
-    }
-
-  } else if (node.nodeType === 'latent') {
-    html=`<div class="flex gap-1.5 mb-2 flex-wrap">
-      <span class="pill pill-source">未解锁</span>
-      <span class="pill pill-next">${esc(node.sourceName || '基础资料')}</span>
-    </div>
-    <div class="text-base font-bold mb-2">${esc(kpName || '候选知识点')}</div>
-    <div class="flex gap-2 mb-2">
-      <button data-graph-jump-chat class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">回顾聊天</button>
-      <button data-graph-edit-node class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">编辑纠正</button>
-    </div>
-    <div class="sheet-section text-xs leading-relaxed" style="color:var(--text-soft)">这个节点来自上传资料，但还没有在聊天学习中被命中，所以不会发光。后续对话触达到同名或相近知识点时，它会自动接入已学习路径。</div>`;
-    if (node.preview) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">来源线索</div><div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(node.preview)}</div></div>`;
-    }
-
-  } else if (node.nodeType === 'insight') {
-    html=`<div class="flex gap-1.5 mb-2 flex-wrap">
-      <span class="pill pill-recap">学习整理</span>
-      <span class="pill pill-next">${esc(kpName || '知识点')}</span>
-      ${node.insightType ? `<span class="pill pill-${node.insightType === 'error' ? 'challenge' : 'next'}">${esc(node.insightType)}</span>` : ''}
-    </div>
-    <div class="text-base font-bold mb-2">${esc(node.label || '记忆摘要')}</div>
-    <div class="flex gap-2 mb-2">
-      <button data-graph-jump-chat class="flex-1 text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800">回顾聊天</button>
-    </div>
-    <div class="sheet-section text-sm leading-relaxed" style="color:var(--text-soft);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(node.summary || '')}</div>`;
-
-  } else {
-    // Memory / support node: show this specific conversation round in context
-    const action=node.meta?.action||{}, ev=node.meta?.evaluation||{};
-    // Find the matching pair
-    const pair = pairs.find(p => p.ai.content === node.content) || null;
-
-    html=`<div class="flex gap-1.5 mb-2 flex-wrap">
-      <span class="pill pill-${action.type||'ask'}">${esc(action.type||'记忆')}</span>
-      <span class="pill pill-source">${esc(kpName||'片段')}</span>
-    </div>
-    <div class="text-base font-bold mb-2">${esc(action.knowledge_point||kpName||'对话片段')}</div>`;
-
-    // Full conversation pair
-    if (pair && pair.user) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">🧑‍🏫 你的讲解</div>
-        <div class="text-sm leading-relaxed mb-3" style="color:var(--text-soft);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(pair.user.content||'')}</div></div>`;
-    }
-    html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">🎓 学生回复</div>
-      <div class="text-sm leading-relaxed mb-3" style="color:var(--text-soft);background:var(--panel-2);padding:8px 10px;border-radius:8px;">${renderRichText(node.content||'')}</div></div>`;
-
-    html+=`<div class="sheet-section space-y-1 text-xs">
-      <div class="flex justify-between"><span class="text-neutral-500">正确度</span><span>${Number(ev.correctness||0).toFixed(2)}</span></div>
-      <div class="bar"><div style="width:${Math.round((ev.correctness||0)*100)}%"></div></div>
-      <div class="flex justify-between"><span class="text-neutral-500">深度</span><span>${Number(ev.depth||0).toFixed(2)}</span></div>
-      <div class="bar"><div style="width:${Math.round((ev.depth||0)*100)}%"></div></div>
-    </div>`;
-
-    // Related KP summary context
-    if (summaryBullets.length > 1) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--accent)">📝 该知识点其他要点</div><div class="space-y-1.5">`;
-      for (const s of summaryBullets.filter(s=>s!==node.content).slice(0,5)) {
-        html+=`<div class="text-xs leading-relaxed" style="color:var(--muted);padding-left:10px;border-left:2px solid var(--accent-soft);">${renderRichText(s)}</div>`;
-      }
-      html+=`</div></div>`;
-    }
-    if (exampleBullets.length) {
-      html+=`<div class="sheet-section"><div class="text-xs font-semibold mb-2" style="color:var(--warn)">💡 相关例题</div><div class="space-y-1.5">`;
-      for (const q of exampleBullets.slice(0,4)) {
-        html+=`<div class="text-xs leading-relaxed" style="color:var(--muted);background:var(--panel-2);padding:6px 10px;border-radius:6px;">${renderRichText(q)}</div>`;
-      }
-      html+=`</div></div>`;
-    }
-  }
-
+  let html = graphSheetCompactHtml(node, digest, pairs);
   html = `<div class="graph-compact-only">${html}</div>`;
   html += graphSheetDetailHtml(node, digest, pairs);
   body.innerHTML=html;
@@ -13316,7 +15234,15 @@ async function showGraphSheet(node) {
     body.querySelectorAll('[data-graph-edit-node]').forEach(btn => btn.remove());
   }
   body.querySelectorAll('[data-graph-jump-chat]').forEach(btn => btn.addEventListener('click', () => jumpToGraphNodeChat(node)));
+  body.querySelectorAll('[data-graph-session-subset]').forEach(btn => btn.addEventListener('click', () => jumpToGraphSessionSubset(node, btn.dataset.graphSessionNodeKey || '')));
   body.querySelectorAll('[data-graph-edit-node]').forEach(btn => btn.addEventListener('click', () => openGraphNodeEditor(node)));
+  body.querySelectorAll('[data-graph-action]').forEach(btn => btn.addEventListener('click', async () => {
+    if (btn.dataset.graphAction === 'outline-chat-note') {
+      await openChatNoteAnchorInContext(node);
+      return;
+    }
+    if (graphNodeThreadActionSupported(btn.dataset.graphAction)) await startGraphNodeThreadAction(btn.dataset.graphAction, node);
+  }));
   body.querySelectorAll('[data-graph-expand-detail]').forEach(btn => btn.addEventListener('click', expandGraphSheet));
   body.querySelectorAll('[data-graph-node-jump]').forEach(btn => btn.addEventListener('click', () => jumpToGraphSheetNode(btn.dataset.graphNodeJump)));
   body.querySelectorAll('[data-graph-source-anchor]').forEach(btn => btn.addEventListener('click', () => jumpToGraphSourceAnchor(btn.dataset.graphSourceAnchor, btn.dataset.graphSourceSid || state.sid)));
@@ -13347,33 +15273,152 @@ function hideGraphSheet() {
   state.graphSheetExpanded = false;
 }
 
+function graphCompletionSessionTimeLabel(value) {
+  const time = Number(value || 0);
+  if (!time) return '时间未知';
+  try {
+    return new Date(time).toLocaleString();
+  } catch (_) {
+    return String(time);
+  }
+}
+
+function bindGraphCompletionModalControls() {
+  $$('[data-graph-completion-close]').forEach(el => el.addEventListener('click', closeGraphCompletionModal));
+  $('[data-graph-completion-back]')?.addEventListener('click', () => {
+    state.graphCompletionStep = 'sessions';
+    renderGraphCompletionModal();
+  });
+  $('[data-graph-completion-preview]')?.addEventListener('click', async () => {
+    if (state.graphCompletionBusy) return;
+    if (!(state.graphCompletionSelectedSids instanceof Set) || !state.graphCompletionSelectedSids.size) {
+      toast('请先勾选至少一个会话');
+      return;
+    }
+    const opId = ++state.graphCompletionOperationId;
+    state.graphCompletionActiveOperationId = opId;
+    state.graphCompletionBusy = true;
+    renderGraphCompletionModal();
+    try {
+      const preview = await buildSelectedSessionGraphCompletionPreview(Array.from(state.graphCompletionSelectedSids));
+      if (opId !== state.graphCompletionOperationId || !state.graphCompletionOpen) return;
+      state.graphCompletionPreview = preview;
+      state.graphCompletionStep = 'preview';
+      renderGraphCompletionModal();
+    } finally {
+      if (state.graphCompletionActiveOperationId === opId) {
+        state.graphCompletionBusy = false;
+        state.graphCompletionActiveOperationId = 0;
+      }
+    }
+  });
+  $('[data-graph-completion-save]')?.addEventListener('click', async () => {
+    if (state.graphCompletionBusy || !state.graphCompletionPreview) return;
+    const opId = ++state.graphCompletionOperationId;
+    state.graphCompletionActiveOperationId = opId;
+    state.graphCompletionBusy = true;
+    try {
+      const result = await applySelectedSessionGraphCompletionPreview(state.graphCompletionPreview);
+      if (opId === state.graphCompletionOperationId && state.graphCompletionOpen) {
+        toast(`已保存：学习节点 ${result.learningNodes}，便签 ${result.chatNotes}，关系 ${result.relationships}`);
+        closeGraphCompletionModal();
+      }
+      await renderInsights();
+    } finally {
+      if (state.graphCompletionActiveOperationId === opId) {
+        state.graphCompletionBusy = false;
+        state.graphCompletionActiveOperationId = 0;
+      }
+    }
+  });
+  $('#graph-completion-modal')?.addEventListener('change', e => {
+    const box = e.target.closest?.('[data-graph-completion-session]');
+    if (!box) return;
+    if (!(state.graphCompletionSelectedSids instanceof Set)) state.graphCompletionSelectedSids = new Set();
+    const sid = String(box.dataset.graphCompletionSession || '');
+    if (!sid) return;
+    if (box.checked) state.graphCompletionSelectedSids.add(sid);
+    else state.graphCompletionSelectedSids.delete(sid);
+  });
+}
+
+async function openGraphCompletionModal() {
+  state.graphCompletionOpen = true;
+  state.graphCompletionStep = 'sessions';
+  state.graphCompletionPreview = null;
+  state.graphCompletionSessions = visibleRootSessions(await DB.all('sessions')).sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
+  if (!(state.graphCompletionSelectedSids instanceof Set)) state.graphCompletionSelectedSids = new Set();
+  renderGraphCompletionModal();
+  $('#graph-completion-modal')?.classList.remove('hidden');
+  refreshIcons();
+}
+
+function closeGraphCompletionModal() {
+  state.graphCompletionOpen = false;
+  state.graphCompletionOperationId += 1;
+  $('#graph-completion-modal')?.classList.add('hidden');
+}
+
+function renderGraphCompletionModal() {
+  const modal = $('#graph-completion-modal');
+  if (!modal) return;
+  const sessionsStep = modal.querySelector('[data-graph-completion-step="sessions"]');
+  const previewStep = modal.querySelector('[data-graph-completion-step="preview"]');
+  if (sessionsStep) sessionsStep.innerHTML = renderGraphCompletionSessionPicker(state.graphCompletionSessions || []);
+  if (previewStep) previewStep.innerHTML = renderGraphCompletionPreview(state.graphCompletionPreview);
+  sessionsStep?.classList.toggle('hidden', state.graphCompletionStep !== 'sessions');
+  previewStep?.classList.toggle('hidden', state.graphCompletionStep !== 'preview');
+  modal.querySelector('[data-graph-completion-preview]')?.classList.toggle('hidden', state.graphCompletionStep !== 'sessions');
+  modal.querySelector('[data-graph-completion-save]')?.classList.toggle('hidden', state.graphCompletionStep !== 'preview');
+  modal.querySelector('[data-graph-completion-back]')?.classList.toggle('hidden', state.graphCompletionStep !== 'preview');
+}
+
+function renderGraphCompletionSessionPicker(sessions=[]) {
+  if (!sessions.length) return '<div class="graph-completion-preview-empty">暂无历史会话。</div>';
+  const selected = state.graphCompletionSelectedSids instanceof Set ? state.graphCompletionSelectedSids : new Set();
+  return `<div class="graph-completion-preview-list">${sessions.map(session => `
+    <label class="graph-completion-session-row">
+      <input type="checkbox" data-graph-completion-session="${esc(String(session.id))}" ${selected.has(String(session.id)) ? 'checked' : ''}>
+      <span class="graph-completion-session-text">
+        <span class="graph-completion-session-title">${esc(session.title || '未命名会话')}</span>
+        <span class="graph-completion-session-time">${esc(graphCompletionSessionTimeLabel(session.updated_at || session.created_at || Date.now()))}</span>
+      </span>
+    </label>
+  `).join('')}</div>`;
+}
+
 async function renderInsights() {
   const sumDiv = $('#insights-summary');
   const mastDiv = $('#insights-mastery');
   const actDiv = $('#insights-actions');
-  const sessions = (await DB.all('sessions')).sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
+  const sessions = visibleRootSessions(await DB.all('sessions')).sort((a,b)=>(b.updated_at||0)-(a.updated_at||0));
   if (!sessions.length) {
     setActiveGraphDataset([], []);
     ForceGraph.destroy();
     sumDiv.innerHTML = '<div class="text-neutral-500">先创建会话</div>';
     mastDiv.innerHTML = ''; actDiv.innerHTML = '';
+    actDiv.classList.add('hidden');
     return;
   }
+  actDiv.classList.remove('hidden');
   const allNodes = [], allLinks = [], allAi = [], allMasteries = [], allAnchors = [];
   for (const session of sessions) {
     const sid = session.id;
     const msgs = (await DB.bySid('messages', sid)).sort((a,b)=>a.id-b.id);
     const masteries = (await DB.bySid('mastery', sid)).sort((a,b)=>b.level-a.level);
     const anchors = await DB.bySid('anchors', sid);
+    const kgNodes = await DB.bySid('kg_nodes', sid);
+    const kgEdges = await DB.bySid('kg_edges', sid);
     const ai = msgs.filter(m => m.role === 'assistant');
     allAi.push(...ai.map(m => ({ ...m, sid, sessionTitle: session.title })));
     allMasteries.push(...masteries.map(m => ({ ...m, sid, sessionTitle: session.title })));
     allAnchors.push(...anchors.map(a => ({ ...a, sid, sessionTitle: session.title })));
-    if (!masteries.length && !anchors.length) continue;
-    const { nodes, links } = buildGraphData(masteries, ai, anchors);
+    if (!masteries.length && !anchors.length && !kgNodes.length) continue;
+    const { nodes, links } = buildGraphData(masteries, ai, anchors, kgNodes, kgEdges);
     nodes.forEach(n => {
       n.sid = sid;
       n.sessionTitle = session.title;
+      n.localKey = n.localKey || n.key;
       n.key = `${sid}::${n.key}`;
     });
     allNodes.push(...nodes);
@@ -13403,7 +15448,16 @@ async function renderInsights() {
   `;
   if (!allNodes.length) {
     ForceGraph.destroy();
-    mastDiv.innerHTML = '<div class="text-xs text-neutral-500">尚无全局图谱节点。开始对话、导入资料或保存随笔后会出现在这里。</div>';
+    mastDiv.innerHTML = '<div id="knowledge-graph" class="knowledge-graph knowledge-graph-fullscreen">' + graphFormationStateHtml([], [], { context: 'global' }) + '</div>';
+    actDiv.innerHTML = `
+      <button type="button" data-graph-completion-open class="w-full text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800 text-left flex items-center gap-2">
+        <i class="button-icon" data-lucide="scan-search"></i><span>整理会话线索</span>
+      </button>
+      <div class="flex flex-wrap gap-1 pt-2"><span class="text-xs text-neutral-500">暂无动作分布</span></div>
+    `;
+    $$('[data-graph-completion-open]').forEach(btn => btn.onclick = openGraphCompletionModal);
+    refreshIcons();
+    return;
   } else {
     if (!mastDiv.querySelector('.knowledge-graph')) {
       mastDiv.innerHTML = '<div id="knowledge-graph" class="knowledge-graph knowledge-graph-fullscreen"><div class="graph-hint">全局只读 · 点击节点回顾来源聊天</div></div>';
@@ -13413,11 +15467,21 @@ async function renderInsights() {
       if (node) { state.graphSelected = node.key; showGraphSheet(node); }
       else { state.graphSelected = ''; hideGraphSheet(); }
     });
-    ForceGraph.setData(allNodes, allLinks);
+    const focused = graphFullDataset(allNodes, allLinks);
+    ForceGraph.setData(focused.nodes, focused.links);
+    container.querySelector('.graph-focus-banner')?.remove();
+    container.insertAdjacentHTML('beforeend', graphFormationStateHtml(allNodes, allLinks, { context: 'global', focus: focused }));
     setTimeout(() => { const h = container.querySelector('.graph-hint'); if(h) h.classList.add('fade'); }, 4000);
   }
-  actDiv.innerHTML = Object.entries(actCount).map(([k,v]) =>
-    `<span class="pill pill-${k}">${k} ${v}/${total}</span>`).join('') || '<div class="text-xs text-neutral-500">尚无</div>';
+  actDiv.innerHTML = `
+    <button type="button" data-graph-completion-open class="w-full text-xs px-3 py-2 rounded border border-neutral-700 active:bg-neutral-800 text-left flex items-center gap-2">
+      <i class="button-icon" data-lucide="scan-search"></i><span>整理会话线索</span>
+    </button>
+    <div class="flex flex-wrap gap-1 pt-2">${Object.entries(actCount).map(([k,v]) =>
+      graphActionDistributionPillHtml(k, v, total)).join('') || '<span class="text-xs text-neutral-500">暂无动作分布</span>'}</div>
+  `;
+  $$('[data-graph-completion-open]').forEach(btn => btn.onclick = openGraphCompletionModal);
+  refreshIcons();
 }
 
 // --- Settings ---
@@ -13677,7 +15741,7 @@ function applyLlmProviderPreset(providerId) {
 }
 
 async function renderSettings() {
-  state.sessions = (await DB.all('sessions')).sort((a,b)=>b.updated_at-a.updated_at);
+  state.sessions = visibleRootSessions(await DB.all('sessions')).sort((a,b)=>b.updated_at-a.updated_at);
   $('#sess-list').innerHTML = state.sessions.length ? state.sessions.map(s => `
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-2 space-y-2">
       <div class="flex items-center gap-2">
@@ -14472,7 +16536,7 @@ async function renderSessionDrawer() {
     avatarToggle.checked = globalAvatarsVisible();
     avatarToggle.onchange = e => setGlobalAvatarsVisible(e.target.checked);
   }
-  state.sessions = (await DB.all('sessions')).sort((a,b)=>b.updated_at-a.updated_at);
+  state.sessions = visibleRootSessions(await DB.all('sessions')).sort((a,b)=>b.updated_at-a.updated_at);
   renderSidebarMemo(list);
   refreshIcons();
 }
@@ -14533,6 +16597,7 @@ function closeTopLayerForBack() {
   if (sPop && !sPop.classList.contains('hidden')) { sPop.classList.add('hidden'); return true; }
   if ($('.session-swipe-row.session-swipe-open')) { closeSessionSwipeRows(); return true; }
   if (isOpenByHiddenClass('#choice-sheet')) { closeChoiceSheet(); return true; }
+  if (isOpenByHiddenClass('#node-thread-mention-sheet')) { closeNodeThreadMentionSheet(); return true; }
   if (isOpenByHiddenClass('#session-rename-sheet')) { closeSessionRenameSheet(); return true; }
   if (isOpenByHiddenClass('#persona-change-warning')) { closePersonaChangeWarning(); return true; }
   if (isOpenByHiddenClass('#essay-note-sheet')) { closeEssayComposer(); return true; }
@@ -14555,6 +16620,10 @@ function navigateBackInApp(opts={}) {
   }
   if (state.chatReadOnlyBrowse && state.currentTab === 'chat' && state.chatScreen === 'thread') {
     returnToGraphBrowseContext();
+    return true;
+  }
+  if (state.nodeThreadReturn && state.currentTab === 'chat' && state.chatScreen === 'thread') {
+    returnToNodeThreadSourceContext();
     return true;
   }
   if (state.currentTab === 'chat' && state.chatScreen === 'context') {
@@ -15066,6 +17135,7 @@ refreshIcons();
 (async function init() {
   applyTheme(localStorage.getItem('rt-mobile-theme') || 'ink');
   setPopupEnabled(popupEnabled());
+  bindGraphCompletionModalControls();
   renderUpdateSettings();
   await DB.open();
   // 迁移：为已有会话补充 last_read_at
@@ -15093,7 +17163,7 @@ refreshIcons();
   }
   if (!state.sid) {
     // 没有 session：自动跳到设置 tab 引导创建
-    const allSess = await DB.all('sessions');
+    const allSess = visibleRootSessions(await DB.all('sessions'));
     if (!allSess.length) { switchTab('settings'); }
   }
   if (state.sid) await restorePendingMessageQueue(state.sid);

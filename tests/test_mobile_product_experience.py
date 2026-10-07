@@ -767,8 +767,271 @@ def test_mobile_graph_filters_process_nodes_from_mastery_and_digest_paths():
     upsert_mastery_fn = html.split("async function upsert_mastery", 1)[1].split("async function upsert_error_log", 1)[0]
     build_graph_fn = html.split("function buildGraphData", 1)[1].split("function memoryStatusLabel", 1)[0]
 
-    for name in ["后台回复", "后台生成", "自由回复", "模型自由回复"]:
+    for name in ["后台回复", "后台生成", "自由回复", "模型自由回复", "师生角色定位"]:
         assert name in html
+    assert "GRAPH_NON_LEARNING_KP_PATTERNS" in html
     assert "!isLogicalGraphKp(kp)" in normalize_action_fn
     assert "if (!isLogicalGraphKp(kp)) return;" in upsert_mastery_fn
     assert "masteries.filter(m => isLogicalGraphKp(m.kp || m.knowledge_point))" in build_graph_fn
+
+
+def test_mobile_graph_nodes_come_from_learning_structure_not_panel_fields():
+    html = mobile_html()
+    build_graph_fn = html.split("function buildGraphData", 1)[1].split("function memoryStatusLabel", 1)[0]
+    assert "function graphSheetCompactHtml" in html
+    compact_region = html.split("function graphSheetCompactHtml", 1)[1].split("function graphSheetActionButtonsHtml", 1)[0]
+
+    assert "nodeType:'kp'" in build_graph_fn
+    assert "nodeType:'latent'" in build_graph_fn
+    assert "nodeType:'note'" in build_graph_fn
+    assert "nodeType:'source'" in build_graph_fn
+    assert "nodeType:'section'" in build_graph_fn
+    assert "nodeType:'insight'" not in build_graph_fn
+    assert "kind:'memory'" not in build_graph_fn
+    assert "data-graph-kp-main-stuck" in compact_region
+    assert "data-graph-structure-reason" in compact_region
+    assert "data-graph-context-coverage" in compact_region
+    assert "graphNodeSheetTemplate(node)" in compact_region
+def test_mobile_graph_canvas_preserves_global_union_and_session_subset_contract():
+    html = mobile_html()
+    context_graph_fn = html.split("async function renderContextGraph", 1)[1].split("async function renderContextAnchors", 1)[0]
+    insights_fn = html.split("async function renderInsights", 1)[1].split("// --- Settings ---", 1)[0]
+
+    assert "setActiveGraphDataset(nodes, links);" in context_graph_fn
+    assert "const focused = graphFullDataset(nodes, links);" in context_graph_fn
+    assert "buildFocusedGraphData(nodes, links" not in context_graph_fn
+    assert "ForceGraph.setData(focused.nodes, focused.links);" in context_graph_fn
+    assert "graphFormationStateHtml(nodes, links, { context: 'session', focus: focused })" in context_graph_fn
+
+    assert "setActiveGraphDataset(allNodes, allLinks);" in insights_fn
+    assert "const focused = graphFullDataset(allNodes, allLinks);" in insights_fn
+    assert "buildFocusedGraphData(allNodes, allLinks" not in insights_fn
+    assert "ForceGraph.setData(focused.nodes, focused.links);" in insights_fn
+    assert "graphFormationStateHtml(allNodes, allLinks, { context: 'global', focus: focused })" in insights_fn
+
+
+def test_mobile_global_graph_nodes_can_open_their_session_subset():
+    html = mobile_html()
+    insights_fn = html.split("async function renderInsights", 1)[1].split("// --- Settings ---", 1)[0]
+    subset_fn = html.split("async function jumpToGraphSessionSubset", 1)[1].split("async function jumpToGraphSheetNode", 1)[0]
+    sheet_fn = html.split("async function showGraphSheet", 1)[1].split("function hideGraphSheet", 1)[0]
+    actions_region = html.split("function graphNodeSessionSubsetButtonHtml", 1)[1].split("function graphStructureActionsHtml", 1)[0]
+
+    assert "n.localKey = n.localKey || n.key;" in insights_fn
+    assert "function graphNodeLocalKey" in html
+    assert "function graphNodeSessionSubsetButtonHtml" in html
+    assert "data-graph-session-subset" in actions_region
+    assert "查看本窗口子图" in actions_region
+    assert "state.currentTab !== 'insights'" in actions_region
+    assert "const localKey = preferredLocalKey || graphNodeLocalKey(node);" in subset_fn
+    assert "state.sid = sourceSid;" in subset_fn
+    assert "await DB.kvSet('current_sid', state.sid);" in subset_fn
+    assert "state.contextTab = 'graph';" in subset_fn
+    assert "state.chatScreen = 'context';" in subset_fn
+    assert "state.graphSelected = localKey;" in subset_fn
+    assert "await renderChat();" in subset_fn
+    assert "showGraphSheet(target)" in subset_fn
+    assert "body.querySelectorAll('[data-graph-session-subset]')" in sheet_fn
+
+
+def test_mobile_graph_actions_open_hidden_node_threads():
+    html = mobile_html()
+    create_fn = html.split("async function createOrOpenGraphNodeThread", 1)[1].split("function graphNodeThreadSeedPrompt", 1)[0]
+    action_fn = html.split("async function startGraphNodeThreadAction", 1)[1].split("async function jumpToGraphSheetNode", 1)[0]
+    return_fn = html.split("async function returnToNodeThreadSourceContext", 1)[1].split("async function jumpToGraphSheetNode", 1)[0]
+    back_fn = html.split("function navigateBackInApp", 1)[1].split("window.__rtHandleNativeBack", 1)[0]
+    home_fn = html.split("async function renderSessionHome", 1)[1].split("async function handleSessionSwipeAction", 1)[0]
+    settings_fn = html.split("async function renderSettings", 1)[1].split("// --- PWA", 1)[0]
+    sheet_fn = html.split("async function showGraphSheet", 1)[1].split("function hideGraphSheet", 1)[0]
+
+    assert "function isNodeThreadSession" in html
+    assert "function visibleRootSessions" in html
+    assert "node_thread: true" in create_fn
+    assert "hidden_from_home: true" in create_fn
+    assert "parent_sid: sourceSid" in create_fn
+    assert "graph_node_local_key: localKey" in create_fn
+    assert "graph_node_title: title" in create_fn
+    assert "node_thread_key" in create_fn
+    assert "await ENGINE.create_session" in create_fn
+    assert "created && prompt" in action_fn
+    assert "state.nodeThreadReturn" in action_fn
+    assert "await openSessionWindow(thread.id)" in action_fn
+    assert "await submitChatText(prompt" in action_fn
+    assert "returnToNodeThreadSourceContext()" in back_fn
+    assert "showGraphSheet(target)" in return_fn
+    assert "state.graphSelected = localKey;" in return_fn
+    assert "body.querySelectorAll('[data-graph-action]')" in sheet_fn
+    assert "startGraphNodeThreadAction(btn.dataset.graphAction, node)" in sheet_fn
+    assert "visibleRootSessions(await DB.all('sessions'))" in home_fn
+    assert "visibleRootSessions(await DB.all('sessions'))" in settings_fn
+
+
+def test_mobile_at_mentions_can_attach_node_thread_memory_context():
+    html = mobile_html()
+    picker_markup = html.split('id="node-thread-mention-sheet"', 1)[1].split("</section>", 1)[0]
+    mention_fn = html.split("async function openNodeThreadMentionSheet", 1)[1].split("function closeNodeThreadMentionSheet", 1)[0]
+    input_region = html.split("$('#chat-input').addEventListener('keydown'", 1)[1].split("$('#quote-clear')", 1)[0]
+    send_fn = html.split("async function sendMessage", 1)[1].split("function scheduleMessageQueueProcessing", 1)[0]
+    run_turn_region = html.split("async function run_turn", 1)[1].split("async function has_session", 1)[0]
+
+    assert 'id="node-thread-mention-sheet"' in html
+    assert 'data-node-thread-mention-list' in picker_markup
+    assert "listNodeThreadSessions" in mention_fn
+    assert "buildNodeThreadMemoryQuote" in html
+    assert "state.nodeThreadMentionContexts" in html
+    assert "openNodeThreadMentionSheet()" in input_region
+    assert "const mentionQuote = await buildSelectedNodeThreadMemoryQuote();" in send_fn
+    assert "quotedMessage: mentionQuote || state.quotedMessage" in send_fn
+    assert "node_thread_memory: true" in run_turn_region
+
+
+def test_mobile_native_background_pending_turn_renders_generation_bubble():
+    html = mobile_html()
+    render_chat_fn = html.split("async function renderChat", 1)[1].split("async function deleteAllSummaries", 1)[0]
+
+    assert "function isNativeBackgroundPendingMessage" in html
+    assert "function nativeBackgroundPendingBubbleHtml" in html
+    assert "isNativeBackgroundPendingMessage(m)" in render_chat_fn
+    assert "学生 AI 正在生成" in html
+    assert "thinking-dots" in html
+
+
+def test_mobile_chat_note_graph_nodes_use_sticky_note_template():
+    html = mobile_html()
+    build_graph_fn = html.split("function buildGraphData", 1)[1].split("function graphLinkEndpointKey", 1)[0]
+    force_graph_fn = html.split("const ForceGraph = (() => {", 1)[1].split("function buildGraphData", 1)[0]
+    sheet_template_fn = html.split("function graphNodeSheetTemplate", 1)[1].split("function graphNodeLightPath", 1)[0]
+    compact_region = html.split("function graphChatNoteCompactHtml", 1)[1].split("function graphKnowledgeCompactHtml", 1)[0]
+    report_region = html.split("function graphChatNoteReportHtml", 1)[1].split("function graphKnowledgeReportHtml", 1)[0]
+
+    assert "anchors.filter(a => a.kind === 'chat_note')" in build_graph_fn
+    assert "nodeType:'chat_note'" in build_graph_fn
+    assert "kind:'chat_note'" in build_graph_fn
+    assert "n.nodeType==='chat_note' ? 8" in force_graph_fn
+    assert "n.nodeType==='chat_note'" in force_graph_fn
+    assert "type === 'chat_note'" in sheet_template_fn
+    assert "return 'chat-note'" in sheet_template_fn
+    assert "闲聊便签" in compact_region
+    assert "归入大纲" in compact_region
+    assert "围绕它聊" in compact_region
+    assert "进入子会话窗" not in compact_region
+    assert 'data-graph-action="open-thread"' not in compact_region
+    outline_button = compact_region.split('data-graph-action="outline-chat-note"', 1)[1].split("</button>", 1)[0]
+    assert "data-graph-expand-detail" not in outline_button
+    assert "openChatNoteAnchorInContext" in html
+    assert "await openChatNoteAnchorInContext(node)" in html
+    assert "查看原话" not in compact_region
+    assert "为什么记下它" in report_region
+    assert "可能放到哪里" in report_region
+    assert "原话" in report_region
+    assert "可以怎么用" in report_region
+    assert "待接入学习" not in compact_region
+    assert "证据不足" not in compact_region
+    assert "graph-node-score" not in compact_region
+
+
+def test_mobile_global_graph_has_selected_session_completion_modal_shell():
+    html = mobile_html()
+    insights_fn = html.split("async function renderInsights", 1)[1].split("// --- Settings ---", 1)[0]
+    populated_actions_region = insights_fn.split("const focused = graphFullDataset(allNodes, allLinks);", 1)[1]
+    modal_region = html.split('id="graph-completion-modal"', 1)[1].split("<!--", 1)[0]
+    actions_css = html.split("#insights-actions", 1)[1].split("}", 1)[0]
+    modal_css = html.split(".graph-completion-modal.hidden", 1)[1].split(".graph-completion-session-row input", 1)[0]
+
+    assert 'data-graph-completion-open' in insights_fn
+    assert "整理会话线索" in insights_fn
+    assert "actDiv.classList.remove('hidden')" in insights_fn
+    assert "actDiv.classList.add('hidden')" in insights_fn
+    assert "position: absolute" in actions_css
+    assert "z-index" in actions_css
+    assert "$$('[data-graph-completion-open]').forEach(btn => btn.onclick = openGraphCompletionModal);\n  refreshIcons();" in populated_actions_region
+    assert "graphActionDistributionPillHtml(k, v, total)" in insights_fn
+    assert '<span class="pill pill-${k}">${k} ${v}/${total}</span>' not in insights_fn
+    assert "actionTypeLabel(type)" in html
+    assert 'id="graph-completion-modal"' in html
+    assert "function openGraphCompletionModal" in html
+    assert "function closeGraphCompletionModal" in html
+    assert "function renderGraphCompletionSessionPicker" in html
+    assert "function renderGraphCompletionPreview" in html
+    assert "data-graph-completion-step=\"sessions\"" in modal_region
+    assert "data-graph-completion-step=\"preview\"" in modal_region
+    assert "预览线索" in modal_region
+    assert "保存到图谱" in modal_region
+    assert "取消" in modal_region
+    assert 'class="graph-completion-panel"' in modal_region
+    assert "graph-completion-title" in modal_region
+    assert "graph-completion-subtitle" in modal_region
+    assert "graph-completion-secondary" in modal_region
+    assert "graph-completion-main" in modal_region
+    assert "display: none !important" in modal_css
+    assert "background: var(--surface-gradient)" in modal_css
+    assert "border: 1.5px solid" in modal_css
+    assert "color: var(--text)" in modal_css
+    assert "max-height: min(86vh, 760px)" in modal_css
+
+
+def test_mobile_graph_completion_preview_groups_and_confirm_flow_are_wired():
+    html = mobile_html()
+    preview_fn = html.split("function graphCompletionPreviewCardHtml", 1)[1].split("async function renderInsights", 1)[0]
+    controls_fn = html.split("function bindGraphCompletionModalControls", 1)[1].split("async function openGraphCompletionModal", 1)[0]
+
+    assert "function graphCompletionPreviewGroupHtml" in html
+    assert "graph-completion-preview-card" in preview_fn
+    assert "graph-completion-preview-title" in preview_fn
+    assert "graph-completion-preview-meta" in preview_fn
+    assert "graph-completion-preview-body" in preview_fn
+    assert "border-neutral-800 bg-neutral-900" not in preview_fn
+    assert "text-neutral-100" not in preview_fn
+    assert "将新增的学习节点" in preview_fn
+    assert "将更新的已有学习节点" in preview_fn
+    assert "将补充的子节点 / 关系" in preview_fn
+    assert "将新增的闲聊便签" in preview_fn
+    assert "疑似重复，准备合并" in preview_fn
+    assert "保存到图谱" in html
+    assert "buildSelectedSessionGraphCompletionPreview(Array.from(state.graphCompletionSelectedSids))" in controls_fn
+    assert "applySelectedSessionGraphCompletionPreview(state.graphCompletionPreview)" in controls_fn
+    assert "await renderInsights()" in controls_fn
+    assert "closeGraphCompletionModal()" in controls_fn
+    assert "DB.add(" not in controls_fn
+    assert "DB.put(" not in controls_fn
+
+
+def test_mobile_graph_completion_modal_operations_are_tokenized_and_close_does_not_unlock_busy():
+    html = mobile_html()
+    state_block = html.split("graphCompletionOpen: false,", 1)[1].split("essaySourceMessage: null,", 1)[0]
+    controls_fn = html.split("function bindGraphCompletionModalControls", 1)[1].split("async function openGraphCompletionModal", 1)[0]
+    close_fn = html.split("function closeGraphCompletionModal()", 1)[1].split("function renderGraphCompletionModal()", 1)[0]
+
+    assert "graphCompletionOperationId" in state_block
+    assert "graphCompletionActiveOperationId" in state_block
+    assert "state.graphCompletionBusy = false" not in close_fn
+    assert "state.graphCompletionOperationId += 1;" in close_fn
+    assert controls_fn.count("const opId = ++state.graphCompletionOperationId") >= 2
+    assert "state.graphCompletionActiveOperationId = opId;" in controls_fn
+    assert "const preview = await buildSelectedSessionGraphCompletionPreview(Array.from(state.graphCompletionSelectedSids));" in controls_fn
+    assert "state.graphCompletionPreview = preview;" in controls_fn
+    assert "if (opId !== state.graphCompletionOperationId || !state.graphCompletionOpen) return;" in controls_fn
+    assert controls_fn.index("if (opId !== state.graphCompletionOperationId || !state.graphCompletionOpen) return;") < controls_fn.index("state.graphCompletionPreview = preview;")
+    assert "if (opId === state.graphCompletionOperationId && state.graphCompletionOpen) {" in controls_fn
+    assert "finally" in controls_fn
+    assert "if (state.graphCompletionActiveOperationId === opId)" in controls_fn
+    assert "state.graphCompletionBusy = false;" in controls_fn
+
+
+def test_mobile_graph_completion_modal_runtime_helpers_cross_script_boundary():
+    html = mobile_html()
+    scripts = re.findall(r"<script[^>]*>([\s\S]*?)</script>", html)
+    preview_script_index = next(i for i, script in enumerate(scripts) if "function renderGraphCompletionPreview" in script)
+    modal_script_index = next(i for i, script in enumerate(scripts) if "function renderGraphCompletionModal" in script)
+    if preview_script_index == modal_script_index:
+        return
+
+    preview_script = scripts[preview_script_index]
+    engine_return = preview_script.index("return { create_session")
+    for export_line in [
+        "window.buildSelectedSessionGraphCompletionPreview = buildSelectedSessionGraphCompletionPreview;",
+        "window.applySelectedSessionGraphCompletionPreview = applySelectedSessionGraphCompletionPreview;",
+        "window.renderGraphCompletionPreview = renderGraphCompletionPreview;",
+    ]:
+        assert export_line in preview_script
+        assert preview_script.index(export_line) < engine_return

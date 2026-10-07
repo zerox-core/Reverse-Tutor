@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import json
 import re
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def mobile_html() -> str:
+    return (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 
 
 def test_mobile_llm_config_uses_native_preferences_for_long_term_storage():
@@ -55,6 +61,7 @@ def test_android_manifest_requests_notification_permission_only_for_background_l
 
 def test_mobile_insights_graph_keeps_minimum_canvas_and_slower_gestures():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    force_graph_fn = html.split("const ForceGraph = (() => {", 1)[1].split("function buildGraphData", 1)[0]
 
     assert "GRAPH_MIN_W" in html
     assert "GRAPH_MIN_H" in html
@@ -63,6 +70,10 @@ def test_mobile_insights_graph_keeps_minimum_canvas_and_slower_gestures():
     assert "Math.max(GRAPH_MIN_W" in html
     assert "dx > 110" in html
     assert "swipeStart.x < 18" in html
+    assert "function graphCanvasTextColor" in force_graph_fn
+    assert "function graphCanvasLabelBg" in force_graph_fn
+    assert "ctx.fillStyle=graphCanvasTextColor" in force_graph_fn
+    assert "ctx.fillStyle=graphCanvasLabelBg" in force_graph_fn
 
 
 def test_mobile_insights_graph_includes_source_grounded_locked_nodes():
@@ -73,7 +84,28 @@ def test_mobile_insights_graph_includes_source_grounded_locked_nodes():
     assert "nodeType:'latent'" in html
     assert "unlockedFromSource" in html
     assert "Glow is reserved for learned nodes" in html
-    assert "buildGraphData(masteries, ai, anchors)" in html
+    assert "buildGraphData(masteries, ai, anchors" in html
+
+
+def test_mobile_graph_completion_saved_kg_edges_are_rendered_as_graph_links():
+    html = mobile_html()
+    build_graph_fn = html.split("function buildGraphData", 1)[1].split("function graphLinkEndpointKey", 1)[0]
+    context_graph_fn = html.split("async function renderContextGraph", 1)[1].split("async function renderContextAnchors", 1)[0]
+    insights_fn = html.split("async function renderInsights", 1)[1].split("// --- Settings ---", 1)[0]
+
+    assert "kgNodes=[]" in build_graph_fn
+    assert "kgEdges=[]" in build_graph_fn
+    assert "kgConcepts" in build_graph_fn
+    assert "kgEdgeNodeById" in build_graph_fn
+    assert "kgEdges || []" in build_graph_fn
+    assert "edge.status !== 'active'" in build_graph_fn
+    assert "links.push({a:srcNode, b:tgtNode" in build_graph_fn
+    assert "kind: graphEdgeKind(edge.relation)" in build_graph_fn
+    assert "DB.bySid('kg_nodes', state.sid)" in context_graph_fn
+    assert "DB.bySid('kg_edges', state.sid)" in context_graph_fn
+    assert "const kgNodes = await DB.bySid('kg_nodes', sid);" in insights_fn
+    assert "const kgEdges = await DB.bySid('kg_edges', sid);" in insights_fn
+    assert "buildGraphData(masteries, ai, anchors, kgNodes, kgEdges)" in html
 
 
 def test_mobile_pdf_sources_are_retrieved_for_each_llm_turn():
@@ -206,17 +238,54 @@ def test_mobile_graph_sheet_displays_saved_branch_expansion():
     assert "key_concepts" in html
 
 
-def test_mobile_graph_organizes_chat_turns_into_learning_digest_nodes():
+def test_mobile_graph_keeps_learning_digest_data_out_of_canvas_nodes():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    build_graph_fn = html.split("function buildGraphData", 1)[1].split("function memoryStatusLabel", 1)[0]
 
     assert "function buildKpMemoryDigests" in html
-    assert "nodeType:'insight'" in html
     assert "insightType:'error'" in html
     assert "insightType:'evidence'" in html
     assert "insightType:'next_step'" in html
-    assert "chatMessageIds: digest.chatMessageIds" in html
+    assert "chatMessageIds: ids" in html
+    assert "nodeType:'insight'" not in build_graph_fn
+    assert "kind:'memory'" not in build_graph_fn
+    assert "chatMessageIds: digest.chatMessageIds" not in build_graph_fn
     assert "content:msg.content" not in html
     assert "nodeType: count%5===0?'support':'memory'" not in html
+
+
+def test_mobile_graph_has_focus_dataset_helpers():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+
+    assert "function graphFocusCenterNode(nodes=[], links=[], preferredKey='')" in html
+    focus_region = html.split("function graphFocusCenterNode", 1)[1].split("function setActiveGraphDataset", 1)[0]
+
+    assert "function buildFocusedGraphData(nodes=[], links=[], opts={})" in html
+    assert "function graphFormationStateHtml(nodes=[], links=[], opts={})" in html
+    assert "node.nodeType === 'kp'" in focus_region
+    assert "const oneHopLinks = links.filter" in focus_region
+    assert "const neighborItems = oneHopLinks.map" in focus_region
+    assert "sort(graphCompareNeighbor)" in focus_region
+    assert "MAX_FOCUS_GRAPH_NEIGHBORS" not in focus_region
+    assert "maxNeighbors" not in focus_region
+    assert "slice(0, maxNeighbors)" not in focus_region
+    assert "return { nodes: focusedNodes, links: focusedLinks, center, focused:true" in focus_region
+
+
+def test_mobile_graph_natural_relations_do_not_add_backend_storage():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    build_graph_fn = html.split("function buildGraphData", 1)[1].split("function memoryStatusLabel", 1)[0]
+    focus_region = html.split("function graphFocusCenterNode", 1)[1].split("function setActiveGraphDataset", 1)[0]
+
+    assert "related_kps" in build_graph_fn
+    assert "kind:'related'" in build_graph_fn
+    assert "kind:'sequence'" in build_graph_fn
+    assert "kind:'foundation'" in build_graph_fn
+    assert "kind:'note'" in build_graph_fn
+    assert "indexedDB" not in focus_region
+    assert "DB.add(" not in focus_region
+    assert "DB.put(" not in focus_region
+    assert "objectStoreNames" not in focus_region
 
 
 def test_mobile_graph_sheet_shows_structured_learning_digest_before_raw_records():
@@ -226,7 +295,11 @@ def test_mobile_graph_sheet_shows_structured_learning_digest_before_raw_records(
     assert "学习整理" in html
     assert "历史错因" in html
     assert "证据摘要" in html
-    assert "可回顾原始对话" in html
+    assert "data-graph-panel=\"node-compact\"" in html
+    assert "data-graph-template=\"learning-state\"" in html
+    assert "data-graph-detail-section=\"evidence\"" in html
+    assert "function graphSemanticFragments" in html
+    assert "data-graph-fragment-chat" in html
     assert "summaryBullets.push(c)" not in html
     assert "exampleBullets.push(c)" not in html
 
@@ -431,7 +504,7 @@ def test_mobile_service_worker_cache_key_tracks_release_version():
     sw = (ROOT / "static" / "app" / "sw.js").read_text(encoding="utf-8")
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 
-    assert "rt-mobile-v0.19.6-45-native-cache-retry" in sw
+    assert "rt-mobile-v0.19.7-46-knowledge-node-release" in sw
     assert "'./index.html'," not in sw.split("const SHELL =", 1)[1].split("];", 1)[0]
     assert "fetch(e.request, { cache: 'no-store' })" in sw
     assert "url.pathname.endsWith('/index.html')" in sw
@@ -606,6 +679,89 @@ def test_mobile_graph_sheet_expanded_detail_reads_like_report_with_semantic_card
     assert "graphSheetDetailTabsHtml" not in html
     assert "data-graph-detail-tab" not in html
     assert "graphSheetDetailHtml(node, digest, pairs)" in html
+
+
+def test_mobile_graph_sheet_uses_tiered_compact_templates():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    sheet_fn = html.split("async function showGraphSheet", 1)[1].split("function hideGraphSheet", 1)[0]
+
+    assert "function graphNodeSheetTemplate(node)" in html
+    assert "function graphSheetCompactHtml(node, digest, pairs)" in html
+    assert "function graphKnowledgeCompactHtml(node, digest, pairs)" in html
+    assert "function graphStructureCompactHtml(node, digest, pairs)" in html
+    assert "function graphContextCompactHtml(node, digest, pairs)" in html
+    assert "function graphNodeDiagnosisText" in html
+    assert "function graphNodePrimaryActionsHtml" in html
+    assert "data-graph-panel=\"node-compact\"" in html
+    assert "data-graph-template=\"learning-state\"" in html
+    assert "data-graph-template=\"candidate-structure\"" in html
+    assert "data-graph-template=\"context-source\"" in html
+    assert "data-graph-kp-main-stuck" in html
+    assert "data-graph-structure-reason" in html
+    assert "data-graph-context-coverage" in html
+    assert "data-graph-action=\"practice\"" in html
+    assert "data-graph-action=\"ask-why\"" in html
+    assert "data-graph-action=\"open-source\"" in html
+    assert "graphSheetCompactHtml(node, digest, pairs)" in sheet_fn
+    assert sheet_fn.index("graphSheetCompactHtml(node, digest, pairs)") < sheet_fn.index("graphSheetDetailHtml(node, digest, pairs)")
+
+
+def test_mobile_graph_sheet_expanded_detail_uses_tiered_reports():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    report_fn = html.split("function graphSheetReportHtml", 1)[1].split("function graphSheetDetailHtml", 1)[0]
+
+    assert "function graphKnowledgeReportHtml(node, digest, pairs=[])" in html
+    assert "function graphStructureReportHtml(node, digest, pairs=[])" in html
+    assert "function graphContextReportHtml(node, digest, pairs=[])" in html
+    assert "data-graph-report-template=\"learning-state\"" in html
+    assert "data-graph-report-template=\"candidate-structure\"" in html
+    assert "data-graph-report-template=\"context-source\"" in html
+    assert "data-graph-detail-section=\"current-judgment\"" in html
+    assert "data-graph-detail-section=\"already-know\"" in html
+    assert "data-graph-detail-section=\"main-stuck\"" in html
+    assert "data-graph-detail-section=\"why-stuck\"" in html
+    assert "data-graph-detail-section=\"evidence\"" in html
+    assert "data-graph-detail-section=\"strategy\"" in html
+    assert "data-graph-detail-section=\"relations\"" in html
+    assert "graphNodeSheetTemplate(node)" in report_fn
+    assert "graphKnowledgeReportHtml(node, digest, pairs)" in report_fn
+    assert "graphStructureReportHtml(node, digest, pairs)" in report_fn
+    assert "graphContextReportHtml(node, digest, pairs)" in report_fn
+
+
+def test_mobile_graph_sheet_diagnosis_panel_preserves_existing_semantic_cards():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    sheet_fn = html.split("async function showGraphSheet", 1)[1].split("function hideGraphSheet", 1)[0]
+    report_fn = html.split("function graphSheetReportHtml", 1)[1].split("function graphSheetDetailHtml", 1)[0]
+
+    assert "html = graphSheetCompactHtml(node, digest, pairs);" in sheet_fn
+    assert "html = `<div class=\"graph-compact-only\">${html}</div>`;" in sheet_fn
+    assert "html += graphSheetDetailHtml(node, digest, pairs);" in sheet_fn
+    assert "const fragments = graphSemanticFragments(node, digest, pairs);" in report_fn
+    assert "graphFragmentDeckHtml(fragments, node?.sid || state.sid)" in report_fn
+    assert "node.nodeType==='chat_session'" not in sheet_fn
+    assert "node.nodeType==='chat_fragment'" not in sheet_fn
+
+
+def test_mobile_graph_sheet_diagnosis_helpers_use_existing_graph_data():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    helper_region = html.split("function graphSheetActionButtonsHtml", 1)[0].split("function graphNodeRelations", 1)[1]
+
+    assert "function graphNodeMasteryPercent(node)" in html
+    assert "function graphNodeMasteryStage(node, digest, pairs)" in html
+    assert "function graphNodeDiagnosisText(node, digest, pairs)" in html
+    assert "function graphPanelPreviewText(value, fallback='')" in html
+    assert "Number(node?.level || 0)" in html
+    assert "digest?.status" in html
+    assert "digest?.errors" in html
+    assert "digest?.evidence" in html
+    assert "pairs.length" in html
+    assert "graphNodeRelations(node)" in html
+    assert "graphNodeSourceTargets(node)" in html
+    assert "function graphNodeRelations" in html
+    assert "function graphNodeSourceTargets" in html
+    assert "node.nodeType==='chat_session'" not in helper_region
+    assert "node.nodeType==='chat_fragment'" not in helper_region
 
 
 def test_mobile_graph_fragment_cards_open_readonly_chat_browse():
@@ -945,6 +1101,18 @@ def test_mobile_opening_turn_is_skipped_once_user_has_started_talking():
     assert "if (state.messageQueue.length) await processMessageQueue();" in html
 
 
+def test_mobile_study_opening_turn_creates_initial_graph_node_source():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    opening_fn = html.split("async function run_opening_turn", 1)[1].split("async function maybe_enqueue_native_background_turn", 1)[0]
+
+    assert "const action = normalizeAction(raw.action || {}, '开场提问');" in opening_fn
+    assert "const ev = cleanEvaluation(raw.evaluation || {});" in opening_fn
+    assert "if (conversationMode === 'learning' && action.knowledge_point)" in opening_fn
+    assert "await upsert_mastery(sid, action.knowledge_point, +ev.correctness||0, +ev.depth||0," in opening_fn
+    assert "ev.evidence_for_mastery?.type || 'none'," in opening_fn
+    assert "ev.evidence_for_mastery?.status || 'none');" in opening_fn
+
+
 def test_mobile_regular_sends_are_processed_one_queued_turn_at_a_time():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
 
@@ -1031,6 +1199,13 @@ def test_mobile_turn_route_uses_light_llm_chain_without_teaching_postprocessing(
     assert "不要强行教学" in light_prompt_fn
     assert "不要突然讲知识点" in light_prompt_fn
     assert "不要做掌握度判断" in light_prompt_fn
+    assert "永远是学生 AI，不是老师、教练、陪练、助教或课程安排者" in light_prompt_fn
+    assert "用户问“你会什么”或“你能做什么”" in light_prompt_fn
+    assert "不要说“我来教你”" in light_prompt_fn
+    assert "不要说“我陪你练”" in light_prompt_fn
+    assert "不要说“我让你跟读”" in light_prompt_fn
+    assert "被用户纠正角色时" in light_prompt_fn
+    assert "不要把自己说成老师、教练、陪练、助教或课程安排者" in light_fn
     assert "不要故意压缩回复" in light_prompt_fn
     assert "约 120 到 300 个中文字符" in light_prompt_fn
     assert "const LIGHT_CHAT_MAX_TOKENS = 460;" in html
@@ -1056,6 +1231,28 @@ def test_mobile_turn_route_uses_light_llm_chain_without_teaching_postprocessing(
     assert "source:'foreground_llm'" in light_fn
     assert "TURN_ROUTE_CHAT_LIGHT" in run_turn_fn
     assert "TURN_ROUTE_STUDY_FULL" in run_turn_fn
+
+
+def test_mobile_light_chat_persists_chat_note_anchors_without_mastery():
+    html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    light_fn = html.split("async function runLightChatTurn", 1)[1].split("async function tryQueueNativeTurnEarly", 1)[0]
+    extraction_region = html.split("function extractChatNoteCandidates", 1)[1].split("async function persistChatNoteAnchors", 1)[0]
+    persist_region = html.split("async function persistChatNoteAnchors", 1)[1].split("function inferTurnRoute", 1)[0]
+
+    assert "function extractChatNoteCandidates" in html
+    assert "async function persistChatNoteAnchors" in html
+    assert "kind: 'chat_note'" in persist_region
+    assert "chat_note_title" in persist_region
+    assert "chat_note_outline" in persist_region
+    assert "chat_note_quote" in persist_region
+    assert "privacy_level || 'standard'" in persist_region
+    assert "kg_extraction_enabled === false" in persist_region
+    assert "师生角色定位" in extraction_region
+    assert "shadowing" in extraction_region
+    assert "て形" in extraction_region
+    assert "聞こえる / 聞かれる" in extraction_region
+    assert "persistChatNoteAnchors(session, sid, {" in light_fn
+    assert "upsert_mastery" not in light_fn
 
 
 def test_mobile_turn_route_uses_context_before_source_hits_for_ambiguous_short_text():
@@ -1238,8 +1435,9 @@ def test_mobile_graph_view_is_fullscreen_and_filters_process_nodes():
     assert "动作分布（近 12 轮）" not in insights_section
     assert "function isLogicalGraphKp" in html
     assert "GRAPH_PROCESS_KP_NAMES" in html
-    for process_kp in ["后台回复", "后台生成", "自由回复", "模型自由回复", "后台生成中", "后台回复生成中"]:
+    for process_kp in ["后台回复", "后台生成", "自由回复", "模型自由回复", "后台生成中", "后台回复生成中", "师生角色定位"]:
         assert process_kp in html
+    assert "GRAPH_NON_LEARNING_KP_PATTERNS" in html
     assert "!isLogicalGraphKp(kp)" in normalize_action_fn
     assert "if (!isLogicalGraphKp(kp)) return;" in upsert_mastery_fn
     assert "masteries.filter(m => isLogicalGraphKp(m.kp || m.knowledge_point))" in build_graph_fn
@@ -1285,3 +1483,186 @@ def test_mobile_zip_based_formats_use_jszip_and_preserve_structure_for_graph():
     assert "META-INF/container.xml" in html
     assert "extractTextFromHtmlDocument" in html
     assert "source_metadata" in html
+
+
+def test_mobile_selected_session_graph_completion_builds_preview_without_writes():
+    html = mobile_html()
+    pairs_region = html.split("function graphCompletionMessagePairs", 1)[1].split("function graphCompletionHasLearningBehavior", 1)[0]
+    preview_region = html.split("async function buildSelectedSessionGraphCompletionPreview", 1)[1].split("async function applySelectedSessionGraphCompletionPreview", 1)[0]
+
+    assert "function graphCompletionMessagePairs" in html
+    assert "function graphCompletionCandidateKey" in html
+    assert "function graphCompletionText" in html
+    assert "function graphCompletionHasLearningBehavior" in html
+    assert "function graphCompletionOutlineFor" in html
+    assert "function graphCompletionClassifyPair" in html
+    assert "async function buildSelectedSessionGraphCompletionPreview" in html
+    assert "nextUserIndex" in pairs_region
+    assert "m.role === 'user'" in pairs_region
+    assert ".slice(i + 1).find(m => m.role === 'assistant')" not in pairs_region
+    assert "extractChatNoteCandidates({" in preview_region
+    assert "type: 'learning_node'" in preview_region
+    assert "type: 'chat_note'" in preview_region
+    assert "type: 'relationship'" in preview_region
+    assert "duplicateMerges" in preview_region
+    assert "skipped" in preview_region
+    assert "existingMasteries" in preview_region
+    assert "existingChatNotes" in preview_region
+    assert "existingKgNodes" in preview_region
+    assert "DB.add(" not in preview_region
+    assert "DB.put(" not in preview_region
+    assert "upsert_mastery(" not in preview_region
+    assert "upsert_kg_node(" not in preview_region
+    assert "upsert_kg_edge(" not in preview_region
+
+
+def test_mobile_selected_session_graph_completion_applies_merge_only_writes():
+    html = mobile_html()
+    apply_region = html.split("async function applySelectedSessionGraphCompletionPreview", 1)[1].split("function renderGraphCompletionPreview", 1)[0]
+    chat_note_merge_region = html.split("async function mergeGraphCompletionChatNote", 1)[1].split("async function mergeGraphCompletionRelationship", 1)[0]
+    learning_merge_region = html.split("async function mergeGraphCompletionLearningNode", 1)[1].split("async function mergeGraphCompletionChatNote", 1)[0]
+    relationship_merge_region = html.split("async function mergeGraphCompletionRelationship", 1)[1].split("function renderGraphCompletionPreview", 1)[0]
+
+    assert "async function mergeGraphCompletionLearningNode" in html
+    assert "async function mergeGraphCompletionChatNote" in html
+    assert "async function mergeGraphCompletionRelationship" in html
+    assert "async function graphCompletionFindMastery" in html
+    assert "async function graphCompletionFindConceptNode" in html
+    assert "applySelectedSessionGraphCompletionPreview" in html
+    assert html.index("function graphCompletionMergeIds") < html.index("async function applySelectedSessionGraphCompletionPreview")
+    assert html.index("function graphCompletionNow") < html.index("async function applySelectedSessionGraphCompletionPreview")
+    learning_candidates_region = apply_region.split("const learningCandidates = [", 1)[1].split("];", 1)[0]
+    assert "duplicateMerges" not in learning_candidates_region
+    assert "upsert_mastery(candidate.sid, masteryTargetTitle" in apply_region
+    assert "upsert_kg_node(candidate.sid, 'concept', conceptTargetTitle" in apply_region
+    assert "normalizeGraphTopic(m.kp || m.knowledge_point)" in html
+    assert "normalizeGraphTopic(n.name)" in html
+    assert "upsert_kg_edge(candidate.sid" in apply_region
+    assert "kind: 'chat_note'" in apply_region
+    assert "DB.put('anchors', existing)" in apply_region
+    assert "DB.add('anchors'" in apply_region
+    assert "existing.user_edited_at" in chat_note_merge_region
+    assert "existing.user_locked_fields" in chat_note_merge_region
+    assert "graphCompletionMergeIds(kgProperties(existingNode)" in learning_merge_region
+    assert "graphCompletionMergeIds(existing.graph_completion_evidence_ids" in chat_note_merge_region
+    assert "graphCompletionMergeIds(kgProperties(existingEdge)" in relationship_merge_region
+    assert "graph_completion_evidence_ids" in apply_region
+    assert "graph_completion_last_merged_at" in apply_region
+    assert "user_edited_at" in apply_region
+    assert "user_locked_fields" in apply_region
+    assert "DB.del(" not in apply_region
+    assert "invalidate_kg_node(" not in apply_region
+    assert "invalidate_kg_edge(" not in apply_region
+
+
+def test_mobile_graph_completion_merge_reuses_normalized_learning_target_once():
+    html = mobile_html()
+    engine_script = next(
+        match.group(1)
+        for match in re.finditer(r"<script[^>]*>([\s\S]*?)</script>", html)
+        if "const ENGINE = (() =>" in match.group(1)
+    )
+    node_program = f"""
+const window = {{}};
+const stores = {{
+  sessions: [],
+  messages: [],
+  mastery: [{{ id: 1, sid: 's1', kp: '导数定义', level: 0.2, attempts: 1 }}],
+  anchors: [],
+  kg_nodes: [{{
+    id: 10,
+    sid: 's1',
+    kind: 'concept',
+    name: '导 数 定 义',
+    properties_json: JSON.stringify({{ graph_completion_evidence_ids: [1] }}),
+    source_episode_ids: '[]',
+    status: 'active'
+  }}],
+  kg_edges: []
+}};
+let nextId = 100;
+const DB = {{
+  bySid: async (store, sid) => (stores[store] || []).filter(row => row.sid === sid),
+  get: async (store, id) => (stores[store] || []).find(row => row.id === id) || null,
+  add: async (store, row) => {{ row.id = row.id || ++nextId; (stores[store] || (stores[store] = [])).push(row); return row.id; }},
+  put: async (store, row) => {{
+    const rows = stores[store] || (stores[store] = []);
+    const idx = rows.findIndex(item => item.id === row.id);
+    if (idx >= 0) rows[idx] = row;
+    else rows.push(row);
+    return row.id;
+  }}
+}};
+function normalizeGraphTopic(s) {{
+  return String(s || '').toLowerCase().replace(/[《》“”"'\\[\\]【】()（）:：,，.。;；!?！？\\s]/g, '').slice(0, 42);
+}}
+function isLogicalGraphKp(kp) {{ return String(kp || '').trim().length > 0; }}
+function extractChatNoteCandidates() {{ return []; }}
+function chatNoteOutlineFor(title) {{ return `学习 / ${{title}}`; }}
+function graphPanelPreviewText(value) {{ return String(value || '').trim().slice(0, 84); }}
+function graphUniqueClean(items, limit=8) {{
+  const seen = new Set(), out = [];
+  for (const item of items || []) {{
+    const text = String(item || '').trim();
+    const key = normalizeGraphTopic(text);
+    if (!text || seen.has(key)) continue;
+    seen.add(key); out.push(text);
+    if (out.length >= limit) break;
+  }}
+  return out;
+}}
+function graphLinkKindLabel(value) {{ return value; }}
+function renderRichText(value) {{ return String(value || ''); }}
+function esc(value) {{ return String(value || ''); }}
+eval({json.dumps(engine_script)});
+(async () => {{
+  const candidate = {{
+    type: 'learning_node',
+    sid: 's1',
+    title: ' 导 数 定 义 ',
+    mergeTarget: '导数定义',
+    correctness: 0.7,
+    depth: 0.6,
+    evidenceType: 'explanation',
+    verificationStatus: 'passed',
+    evidenceIds: [2, 3],
+    keywords: ['导数定义']
+  }};
+  const result = await window.applySelectedSessionGraphCompletionPreview({{
+    learningNodes: [],
+    updatedLearningNodes: [candidate],
+    duplicateMerges: [candidate],
+    chatNotes: [],
+    relationships: []
+  }});
+  const conceptRows = stores.kg_nodes.filter(row => row.sid === 's1' && row.kind === 'concept');
+  const targetConcept = conceptRows.find(row => row.name === '导 数 定 义');
+  console.log(JSON.stringify({{
+    result,
+    masteryRows: stores.mastery,
+    conceptRows,
+    targetEvidenceIds: JSON.parse(targetConcept.properties_json).graph_completion_evidence_ids
+  }}));
+}})().catch(err => {{ console.error(err && err.stack || err); process.exit(1); }});
+"""
+    completed = subprocess.run(
+        ["node", "--input-type=module", "-"],
+        cwd=ROOT,
+        input=node_program,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    data = json.loads(completed.stdout)
+
+    assert data["result"]["learningNodes"] == 1
+    assert data["result"]["merges"] == 1
+    assert len(data["masteryRows"]) == 1
+    assert data["masteryRows"][0]["kp"] == "导数定义"
+    assert data["masteryRows"][0]["attempts"] == 2
+    assert [row["name"] for row in data["conceptRows"]] == ["导 数 定 义"]
+    assert data["targetEvidenceIds"] == [1, 2, 3]
