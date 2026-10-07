@@ -55,6 +55,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -220,8 +221,6 @@ internal fun ReverseTeachingChatScreen(
     onReselectInvalidSource: (String, String) -> Unit = { _, _ -> },
     onOpenExternalLink: (String) -> Unit = {},
     onComposerFocusChanged: (Boolean) -> Unit,
-    webSearchEnabled: Boolean = false,
-    onWebSearchChange: (Boolean) -> Unit = {},
     onOpenContextHub: () -> Unit,
     onOpenWindowBranches: () -> Unit = {},
     onOpenGlobalGraph: () -> Unit = {},
@@ -264,7 +263,6 @@ internal fun ReverseTeachingChatScreen(
     // 相册缩略图勾选状态（2026-09-24）：勾选即把图片作为草稿附件加入输入区，
     // 发送按钮随 canSend 自动亮起；取消勾选按 uri 找回附件并移除。
     var selectedGalleryUris by remember(state.sessionTitle) { mutableStateOf(setOf<String>()) }
-    var showWebSearchConfirm by remember(state.sessionTitle) { mutableStateOf(false) }
     var showSourcePicker by remember(state.sessionTitle) { mutableStateOf(false) }
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = initialScrollPosition.index,
@@ -346,6 +344,46 @@ internal fun ReverseTeachingChatScreen(
             listState.animateScrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
         } else {
             listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+        }
+    }
+
+    // R99：键盘弹起补偿滚动（2026-10-04 用户拍板规格）——弹起前贴近底部
+    // （容差 2 条，与自动跟随同口径）时，视口压缩后仍钉住最新一条。
+    // 跟随标记只在滚动进行中/刚结束采样：键盘压缩视口是纯重排、不改写标记。
+    var nearEndFollow by remember(state.sessionTitle) { mutableStateOf(true) }
+    LaunchedEffect(state.sessionTitle) {
+        var wasScrolling = false
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val near = layout.totalItemsCount == 0 || lastVisible >= layout.totalItemsCount - 2
+            near to listState.isScrollInProgress
+        }.collect { (near, scrolling) ->
+            if (scrolling || wasScrolling) nearEndFollow = near
+            wasScrolling = scrolling
+        }
+    }
+    val imeOpen = androidx.compose.foundation.layout.WindowInsets.ime
+        .getBottom(LocalDensity.current) > 0
+    LaunchedEffect(imeOpen) {
+        if (imeOpen && nearEndFollow && timelineItemCount > 0) {
+            repeat(3) {
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+                kotlinx.coroutines.delay(120)
+            }
+        }
+    }
+
+    // R101（2026-10-05 用户拍板）：输入框聚焦即把最新消息钉进视口——
+    // 不依赖 IME inset 是否送达（部分机型 adjustResize/insets 不同时生效），
+    // 键盘弹起后最新一条始终可见。
+    var composerFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(composerFocused) {
+        if (composerFocused && timelineItemCount > 0) {
+            repeat(3) {
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+                kotlinx.coroutines.delay(120)
+            }
         }
     }
 
@@ -559,16 +597,6 @@ internal fun ReverseTeachingChatScreen(
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                WebSearchToggle(
-                    enabled = webSearchEnabled,
-                    onToggle = { wantEnabled ->
-                        if (wantEnabled) {
-                            showWebSearchConfirm = true
-                        } else {
-                            onWebSearchChange(false)
-                        }
-                    }
-                )
                 ChatModelSelectorChip(
                     profiles = llmProfiles,
                     onActivate = onActivateLlmProfile
@@ -597,67 +625,10 @@ internal fun ReverseTeachingChatScreen(
                 },
                 onFocusChanged = { focused ->
                     if (focused) showAttachmentActions = false
+                    composerFocused = focused
                     onComposerFocusChanged(focused)
                 }
             )
-            if (showWebSearchConfirm) {
-                AlertDialog(
-                    onDismissRequest = { showWebSearchConfirm = false },
-                    modifier = Modifier.width(320.dp),
-                    shape = RoundedCornerShape(24.dp),
-                    containerColor = Color.White,
-                    tonalElevation = 0.dp,
-                    title = {
-                        Text(
-                            text = "开启联网搜索",
-                            fontSize = 17.sp,
-                            lineHeight = 24.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = ChatInk,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "联网搜索会大幅增加额度消耗，每次提问的消耗可能增加到原来的几十倍。确定要开启吗？",
-                            fontSize = 14.sp,
-                            lineHeight = 21.sp,
-                            color = Color(0xFF5A6478),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                showWebSearchConfirm = false
-                                onWebSearchChange(true)
-                            },
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = "开启",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF3478F6)
-                            )
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(
-                            onClick = { showWebSearchConfirm = false },
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = "取消",
-                                fontSize = 16.sp,
-                                color = ChatMuted
-                            )
-                        }
-                    }
-                )
-            }
             if (showAttachmentActions) {
                 ChatAttachmentPanelActions(
                     onPickImages = {
@@ -2590,39 +2561,6 @@ private fun ChatSourcePickerSheet(
             Text("打开资料中心", color = ChatMuted)
         }
         Spacer(Modifier.height(24.dp))
-    }
-}
-
-@Composable
-private fun WebSearchToggle(
-    enabled: Boolean,
-    onToggle: (Boolean) -> Unit
-) {
-    Surface(
-        color = if (enabled) Color(0xFFE4EEFC) else Color(0xFFF6F8FD),
-        contentColor = if (enabled) Color(0xFF2E66C7) else ChatMuted,
-        shape = RoundedCornerShape(999.dp),
-        border = BorderStroke(1.dp, if (enabled) Color(0xFF4283D9) else Color(0xFFC7D8EA)),
-        modifier = Modifier
-            .padding(start = 14.dp, top = 10.dp)
-            .clickable { onToggle(!enabled) }
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Icon(
-                Icons.Rounded.Public,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = if (enabled) "联网搜索·已开启" else "联网搜索",
-                fontSize = 13.sp,
-                lineHeight = 17.sp
-            )
-        }
     }
 }
 

@@ -154,7 +154,11 @@ class AgentCreationProactiveAskTest {
         coordinator.sendUserText("我想学物理")
         coordinator.sendUserText("孩子初三，基础弱")
         assertFalse(coordinator.state.requestDocumentActive)
+        // R102：「嗯」确认悬置的 learnerRole 提案——但策略快照在轮首读的是上轮草案，
+        // 本轮还不放行；草案落定后的下一轮才放行要资料。
         coordinator.sendUserText("嗯")
+        assertFalse(coordinator.state.requestDocumentActive)
+        coordinator.sendUserText("好")
         assertTrue(coordinator.state.requestDocumentActive)
     }
 

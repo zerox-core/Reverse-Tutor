@@ -188,6 +188,9 @@ class HybridAppGraph private constructor(
     /** R85：创建会话状态本地仓库（跨页面 / 跨进程恢复创建进度）。 */
     val agentCreationStateStore: AgentCreationStateStore
 ) {
+    /** R100 方案B 状态机灰度：BuildConfig 按构建类型下发（debug/online/full 开、release 关）。 */
+    val agentCreationGraphEnabled: Boolean = BuildConfig.AGENT_CREATION_GRAPH_ENABLED
+
     companion object {
         fun create(
             context: Context,
@@ -229,11 +232,10 @@ class HybridAppGraph private constructor(
             )
 
             val previewRuntime = FakeLlmGenerationRuntime()
-            // NEWMP-V1-018: consult the web-search preference per reply so the
-            // settings toggle takes effect without rebuilding the graph.
+            // R101（2026-10-05 用户拍板）：联网搜索系统级常开——不再提供手动开关，
+            // 底栏只保留「切换模型」。偏好钥匙保留以兼容旧数据，但不再参与读取。
             val appPreferencesRepository = DataModule.appPreferencesRepository(appContext)
-            val webSearchPreference: suspend () -> Boolean =
-                appPreferencesRepository::currentWebSearchEnabled
+            val webSearchPreference: suspend () -> Boolean = { true }
             val chatGenerationRepository = when (llmRuntimeMode) {
                 HybridLlmRuntimeMode.Fake ->
                     DataModule.chatGenerationRepository(
@@ -267,7 +269,8 @@ class HybridAppGraph private constructor(
                         DataModule.llmProfileRepository(appContext)
                             .listProfiles()
                             .firstOrNull { it.enabled }
-                    }
+                    },
+                    webSearchPreference = webSearchPreference
                 )
             }
             val sourceRepository = DataModule.sourceRepository(appContext)

@@ -5,13 +5,12 @@ import kotlin.math.roundToInt
 /**
  * 创建会话了解程度算法（设计方案 v3 · 第十章 10.2）。
  *
- * 双源混合：确定性字段覆盖分 u_det + LLM 自评 u_llm 按 0.5/0.5 融合；
- * 必填（title/learnerRole）缺失封顶 60；展示值单调不减（回退会打击信任）。
+ * 双源混合：确定性字段覆盖分 u_det + LLM 自评 u_llm 按 0.5/0.5 融合；展示值单调不减（回退会打击信任）。
+ * R102：删除必填缺失 60 封顶——了解度降级为纯展示值，流程推进改由槽位确认状态裁决。
  * 全部为纯函数，可单测，不依赖任何 LLM 行为。
  */
 object AgentCreationUnderstanding {
 
-    const val CAP_REQUIRED_MISSING = 60
     const val CAP_FULL = 100
 
     private const val DEFAULT_OPENING = "准备好后，请开始讲给我听吧。"
@@ -56,25 +55,23 @@ object AgentCreationUnderstanding {
     }
 
     /**
-     * 融合：u_raw = round(0.5 × u_llm + 0.5 × u_det)；
-     * 必填缺失封顶 60；与上一轮取大者保证单调不减。
+     * 融合：u_raw = round(0.5 × u_llm + 0.5 × u_det)；与上一轮取大者保证单调不减。
      * llmScore 为 null（LLM 没给分）时退化为纯确定值。
+     * R102：去掉必填缺失封顶参数——分数不再影响流程推进。
      */
     fun fuse(
         llmScore: Int?,
         detScore: Int,
-        previousFused: Int,
-        requiredFieldsReady: Boolean
+        previousFused: Int
     ): Int {
-        val cap = if (requiredFieldsReady) CAP_FULL else CAP_REQUIRED_MISSING
         val llm = (llmScore ?: detScore).coerceIn(0, CAP_FULL)
-        val raw = (0.5f * llm + 0.5f * detScore).roundToInt().coerceIn(0, cap)
-        return maxOf(previousFused, raw).coerceAtMost(cap)
+        val raw = (0.5f * llm + 0.5f * detScore).roundToInt().coerceIn(0, CAP_FULL)
+        return maxOf(previousFused, raw)
     }
 
     /**
      * 兜底标题提案（10.3 收敛 / 10.4 title 提案的客户端兜底）：
-     * LLM 该给没给时，用 goal 首句裁 14 字合成，避免一直卡 60 封顶。
+     * LLM 该给没给时，用 goal 首句裁 14 字合成（R102：仅 Goal 已确认时由协调器调用）。
      */
     fun proposeTitle(goal: String): String {
         val clean = goal.replace(Regex("\\s+"), " ").trim()

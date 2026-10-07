@@ -22,7 +22,7 @@ class ConversationContextAssembler(
     private val masteryFactPort: MasteryFactContextPort? = null,
     private val digestPort: SessionDigestContextPort? = null,
     private val windowMemoryPort: WindowMemoryContextPort? = null,
-    private val messageLimit: Int = 10,
+    private val messageLimit: Int = 30,
     private val memoryLimit: Int = 5,
     private val errorLimit: Int = 5,
     private val gapLimit: Int = 5,

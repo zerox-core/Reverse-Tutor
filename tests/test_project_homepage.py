@@ -1,7 +1,15 @@
+import json
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _current_release_version():
+    """Current release versionName from the release manifest (single source of truth)."""
+    data = json.loads((ROOT / "static" / "app" / "latest.json").read_text(encoding="utf-8"))
+    return data["versionName"]
 
 
 def test_readme_includes_qq_group_entry_and_asset():
@@ -18,10 +26,11 @@ def test_readme_includes_qq_group_entry_and_asset():
 
 def test_mobile_settings_footer_includes_qq_group_number():
     html = (ROOT / "static" / "app" / "index.html").read_text(encoding="utf-8")
+    version = _current_release_version()
 
     assert "欢迎入qq群反馈给我更新动力" in html
     assert "QQ群：897804938" in html
-    assert "Reverse Tutor v0.17.15 · 移动 PWA" in html
+    assert re.search(r"Reverse Tutor v%s[^<]*· 移动 PWA" % re.escape(version), html)
 
 
 def test_readme_showcase_text_uses_explicit_alignment():
@@ -43,13 +52,16 @@ def test_release_docs_summarize_current_major_changes():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     latest = (ROOT / "static" / "app" / "latest.json").read_text(encoding="utf-8")
+    version = _current_release_version()
+    tag = "v" + version
+    apk_name = "Reverse-Tutor-%s.apk" % tag
 
     for text in (readme, changelog, latest):
-        assert "v0.17.15" in text or "0.17.15" in text
+        assert tag in text or version in text
         assert "Reverse Tutor" in text
-        assert "Reverse-Tutor-v0.17.15.apk" in text
-        assert "免费 GLM" in text
+        assert apk_name in text
     for text in (readme, changelog):
+        assert "免费 GLM" in text
         assert "本地 mock" in text or "mock" in text
         assert "反转家教" in text
         assert "体验额度" not in text

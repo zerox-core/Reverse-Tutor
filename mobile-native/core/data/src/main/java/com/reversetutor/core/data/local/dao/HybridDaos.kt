@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Upsert
 import com.reversetutor.core.data.local.entity.ContextSnapshotEntity
+import com.reversetutor.core.data.local.entity.DailySummaryEntity
 import com.reversetutor.core.data.local.entity.EntityTombstoneEntity
 import com.reversetutor.core.data.local.entity.ModelBindingEntity
 import com.reversetutor.core.data.local.entity.ProviderConnectionEntity
@@ -137,6 +138,28 @@ interface LearningDao {
 
     @Query("SELECT * FROM weekly_summaries WHERE spaceId = :spaceId ORDER BY weekStartEpochMillis DESC")
     suspend fun listWeeklySummaries(spaceId: String): List<WeeklySummaryEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDailySummary(summary: DailySummaryEntity)
+
+    @Query("SELECT * FROM daily_summaries WHERE spaceId = :spaceId ORDER BY dayStartEpochMillis DESC")
+    suspend fun listDailySummaries(spaceId: String): List<DailySummaryEntity>
+
+    @Query(
+        """
+        SELECT * FROM daily_summaries
+        WHERE spaceId = :spaceId
+          AND dayStartEpochMillis = :dayStartEpochMillis
+          AND generatorVersion = :generatorVersion
+        ORDER BY generatedAtEpochMillis DESC
+        LIMIT 1
+        """
+    )
+    suspend fun findLatestDailySummary(
+        spaceId: String,
+        dayStartEpochMillis: Long,
+        generatorVersion: String
+    ): DailySummaryEntity?
 
     @Query(
         """

@@ -20,7 +20,8 @@ class LearningOverviewCoordinator(
     private val tokenPort: LearningOverviewTokenPort,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
     private val mainlineLimit: Int = 5,
-    private val weakPointLimit: Int = 5
+    private val weakPointLimit: Int = 5,
+    private val dailySummaryPort: LearningOverviewDailySummaryPort? = null
 ) {
 
     suspend fun generate(scope: LearningOverviewScope): LearningOverviewContract {
@@ -70,6 +71,13 @@ class LearningOverviewCoordinator(
             tokenPort.aggregateTokenUsage(spaceId, sessionIds)
         }
 
+        // Daily summary (derived view — intentionally NOT part of no-data detection)
+        val dailySummary = dailySummaryPort?.let { port ->
+            safeRead("dailySummary", DailySummaryContract(), warnings) {
+                port.getDailySummary(spaceId, sessionIds)
+            }
+        } ?: DailySummaryContract()
+
         // No-data detection: all sources returned empty
         val isNoData = activeSessionCount == 0 &&
             progress.totalKnowledgePoints == 0 &&
@@ -88,6 +96,7 @@ class LearningOverviewCoordinator(
             weakPoints = weakPoints,
             tokenUsage = tokenUsage,
             warnings = warnings,
+            dailySummary = dailySummary,
             isNoData = isNoData
         )
     }

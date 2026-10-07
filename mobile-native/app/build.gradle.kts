@@ -56,6 +56,8 @@ android {
             buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"${debugLlmBaseUrl.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"${debugLlmFallbackModels.asBuildConfigString()}\"")
+            // R100 方案B 创建流程状态机：开发期变体默认开启（2026-10-04 用户拍板）。
+            buildConfigField("boolean", "AGENT_CREATION_GRAPH_ENABLED", "true")
         }
         create("full") {
             // 全量版（2026-09-25 用户拍板）：独立身份 .full，与「记忆测试」并存，
@@ -79,12 +81,16 @@ android {
             buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"${debugLlmBaseUrl.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"${debugLlmDefaultModel.asBuildConfigString()}\"")
             buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"${debugLlmFallbackModels.asBuildConfigString()}\"")
+            // R100 方案B 创建流程状态机：开发期变体默认开启（2026-10-04 用户拍板）。
+            buildConfigField("boolean", "AGENT_CREATION_GRAPH_ENABLED", "true")
         }
         getByName("release") {
             buildConfigField("String", "DEBUG_LLM_API_KEY", "\"\"")
             buildConfigField("String", "DEBUG_LLM_BASE_URL", "\"\"")
             buildConfigField("String", "DEBUG_LLM_DEFAULT_MODEL", "\"\"")
             buildConfigField("String", "DEBUG_LLM_FALLBACK_MODELS", "\"\"")
+            // R100 方案B 创建流程状态机：release 灰度关闭，走 R99 契约路径。
+            buildConfigField("boolean", "AGENT_CREATION_GRAPH_ENABLED", "false")
         }
     }
 

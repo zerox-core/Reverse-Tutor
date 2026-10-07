@@ -35,8 +35,8 @@ class AgentCreationSnapshotCodecProactiveTest {
             planner = AgentCreationPlannerState(rounds = 2)
         )
         val encoded = AgentCreationSnapshotCodec.encode(snapshot)
-        // 截掉末尾两个新字段（各为 3 字符 "1:0"），回到 11 字段旧格式。
-        val legacy = encoded.dropLast(6)
+        // 截掉末尾三个新字段（两个标记位各 3 字符 "1:0" + R102 空槽位字段 2 字符 "0:"），回到 11 字段旧格式。
+        val legacy = encoded.dropLast(8)
         val decoded = AgentCreationSnapshotCodec.decode(legacy)
         assertNotNull(decoded)
         assertFalse(decoded!!.planner.documentAsked)

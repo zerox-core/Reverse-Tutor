@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.reversetutor.core.design.FormalColors
@@ -205,8 +206,9 @@ private fun OverviewBody(
         if (state.warnings.isNotEmpty()) {
             WarningBanner(warnings = state.warnings)
         }
+        DailySummaryCard(state = state)
         ProgressCard(state = state)
-        TodayPlanCard(state = state)
+        TodayPlanCard(state = state, onOpenWeekly = onOpenWeekly)
         WeeklyMainlineCard(state = state, onOpenWeekly = onOpenWeekly)
         WeakPointCard(state = state, onOpenWeakPoint = onOpenWeakPoint)
         TokenUsageCard(state = state)
@@ -227,6 +229,67 @@ private fun WarningBanner(warnings: List<String>) {
             style = type.style(11f, 16f, FontWeight.Medium, FormalColors.Warning),
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
         )
+    }
+}
+
+@Composable
+private fun DailySummaryCard(state: LearningOverviewUiState) {
+    val type = LocalFormalTypeScale.current
+    val daily = state.dailySummary
+    OverviewCard {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "每日总结",
+                    style = type.style(12f, 17f, FontWeight.Bold, FormalColors.Ink),
+                    modifier = Modifier.weight(1f)
+                )
+                if (state.dailySummaryAiStateLabel.isNotBlank()) {
+                    Text(
+                        state.dailySummaryAiStateLabel,
+                        style = type.style(10f, 14f, color = FormalColors.Muted),
+                        modifier = Modifier.testTag("learning_overview_daily_ai_state")
+                    )
+                }
+            }
+            if (!daily.hasActivity) {
+                Text(
+                    "今天还没有学习记录",
+                    style = type.style(11f, 16f, color = FormalColors.Muted),
+                    modifier = Modifier.testTag("learning_overview_daily_empty")
+                )
+            } else {
+                Text(
+                    "知识点 ${daily.knowledgePoints.size} 个 · 证据 ${daily.evidenceCount} 条（通过 ${daily.passedCount}）",
+                    style = type.style(11f, 16f, color = FormalColors.Ink),
+                    modifier = Modifier.testTag("learning_overview_daily_stats")
+                )
+                val extras = listOfNotNull(
+                    if (daily.masteredTodayCount > 0) "新掌握 ${daily.masteredTodayCount}" else null,
+                    if (daily.planCompletedCount > 0) "完成计划 ${daily.planCompletedCount}" else null
+                ).joinToString(" · ")
+                if (extras.isNotBlank()) {
+                    Text(extras, style = type.style(10f, 14f, color = FormalColors.Muted))
+                }
+                if (daily.knowledgePoints.isNotEmpty()) {
+                    Text(
+                        daily.knowledgePoints.joinToString("、"),
+                        style = type.style(10f, 14f, color = FormalColors.Muted),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("learning_overview_daily_knowledge_points")
+                    )
+                }
+                val aiText = daily.aiText
+                if (!aiText.isNullOrBlank()) {
+                    Text(
+                        aiText,
+                        style = type.style(11f, 17f, color = FormalColors.Ink),
+                        modifier = Modifier.testTag("learning_overview_daily_ai_text")
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -263,7 +326,7 @@ private fun ProgressCard(state: LearningOverviewUiState) {
 }
 
 @Composable
-private fun TodayPlanCard(state: LearningOverviewUiState) {
+private fun TodayPlanCard(state: LearningOverviewUiState, onOpenWeekly: () -> Unit) {
     val type = LocalFormalTypeScale.current
     val plan = state.todayPlan
     OverviewCard {
@@ -287,6 +350,7 @@ private fun TodayPlanCard(state: LearningOverviewUiState) {
             } else {
                 plan.tasks.take(4).forEach { task ->
                     val status = TodayTaskStatus.from(task.status)
+                    val done = status == TodayTaskStatus.DONE
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
@@ -296,12 +360,50 @@ private fun TodayPlanCard(state: LearningOverviewUiState) {
                         Spacer(Modifier.width(8.dp))
                         Text(
                             text = task.title,
-                            style = type.style(11f, 16f, color = FormalColors.Ink),
+                            style = type.style(
+                                11f,
+                                16f,
+                                color = if (done) FormalColors.Muted else FormalColors.Ink
+                            ),
+                            textDecoration = if (done) TextDecoration.LineThrough else null,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
                         )
+                        val dueLabel = task.dueLabel()
+                        if (dueLabel.isNotBlank()) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = dueLabel,
+                                style = type.style(
+                                    10f,
+                                    14f,
+                                    color = if (task.isDueOverdue()) {
+                                        FormalColors.Warning
+                                    } else {
+                                        FormalColors.Muted
+                                    }
+                                )
+                            )
+                        }
                     }
+                }
+                TextButton(
+                    onClick = onOpenWeekly,
+                    contentPadding = PaddingValues(0.dp),
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 48.dp)
+                        .testTag("learning_overview_open_all_plans")
+                        .semantics { contentDescription = "查看全部学习计划" }
+                ) {
+                    Text("查看全部", style = type.style(11f, 16f, color = FormalColors.Primary))
+                    Spacer(Modifier.width(2.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(12.dp),
+                        tint = FormalColors.Primary
+                    )
                 }
             }
         }

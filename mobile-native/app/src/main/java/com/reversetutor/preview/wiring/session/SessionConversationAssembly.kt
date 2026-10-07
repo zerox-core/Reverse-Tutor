@@ -23,6 +23,11 @@ import com.reversetutor.core.domain.WindowMemoryContextPort
 import com.reversetutor.feature.chat.ConversationMessageContract
 import com.reversetutor.feature.chat.SessionConversationContract
 import com.reversetutor.feature.chat.SessionConversationFacade
+import com.reversetutor.core.domain.LearningFactReceipt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharedFlow
 import com.reversetutor.core.domain.LearningOverviewContract
 
 /**
@@ -103,7 +108,7 @@ class SessionConversationAssembly(
     }
 
     /** 1g 轻量装配口径：与重装配的 messageLimit/textCap 保持一致。 */
-    private val lightweightMessageLimit = 10
+    private val lightweightMessageLimit = 30
     private val lightweightTextCap = 200
 
     private val contextAssembler: ConversationContextAssembler = ConversationContextAssembler(
@@ -132,12 +137,61 @@ class SessionConversationAssembly(
         nowEpochMillis = nowEpochMillis
     )
 
+    /**
+     * Step-2 面板真数据接缝：学习台账读口，供进度/本周主线适配器做确定性聚合。
+     * 未注入台账仓库时为 null，适配器保持诚实的空/默认契约。
+     */
+    private val listLearningFactsForOverview: (suspend (String) -> List<LearningFactReceipt>)? =
+        learningLedgerRepository?.let { repo -> { spaceId -> repo.listLearningFacts(spaceId) } }
+
+    /** V1 方向三「每日总结」：后台懒生成状态与生成器（绝不阻塞聊天轮次）。 */
+    private val dailySummaryGenerationState = DailySummaryGenerationState()
+
+    private val dailySummaryGenerationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    private val dailySummaryGenerator: DailySummaryGenerator? = learningLedgerRepository?.let { ledger ->
+        DailySummaryGenerator(
+            generateSummary = chatGenerationRepository::generateSessionSummary,
+            findStored = { spaceId, dayStart ->
+                learningRepository.findLatestDailySummary(
+                    spaceId,
+                    dayStart,
+                    DailySummaryGenerator.GeneratorVersion
+                )
+            },
+            saveStored = { summary -> learningRepository.saveDailySummary(summary) },
+            listLearningFacts = ledger::listLearningFacts,
+            listPlanTasks = learningRepository::listTasks,
+            listTokenUsage = learningRepository::listTokenUsage,
+            pickSessionId = { spaceId ->
+                sessionRepository.listSessions(spaceId).firstOrNull { !it.archived }?.id
+            },
+            state = dailySummaryGenerationState,
+            generationScope = dailySummaryGenerationScope,
+            nowEpochMillis = nowEpochMillis
+        )
+    }
+
     private val overviewCoordinator: LearningOverviewCoordinator = LearningOverviewCoordinator(
         sessionPort = LearningOverviewSessionPortAdapter(sessionRepository),
-        progressPort = LearningOverviewProgressPortAdapter(learningRepository, nowEpochMillis),
+        progressPort = LearningOverviewProgressPortAdapter(
+            learningRepository,
+            nowEpochMillis,
+            listLearningFacts = listLearningFactsForOverview
+        ),
         planPort = LearningOverviewPlanPortAdapter(learningRepository),
-        threadPort = LearningOverviewThreadPortAdapter(learningRepository),
+        threadPort = LearningOverviewThreadPortAdapter(
+            learningRepository,
+            listLearningFacts = listLearningFactsForOverview,
+            nowEpochMillis = nowEpochMillis
+        ),
         weakPointPort = LearningOverviewWeakPointPortAdapter(memoryRepository),
+        dailySummaryPort = LearningOverviewDailySummaryPortAdapter(
+            learningRepository,
+            listLearningFacts = listLearningFactsForOverview,
+            generationState = dailySummaryGenerationState,
+            nowEpochMillis = nowEpochMillis
+        ),
         tokenPort = LearningOverviewTokenPortAdapter(
             listTokenUsage = learningRepository::listTokenUsage,
             sessionIdForTurn = { turnId ->
@@ -240,4 +294,13 @@ class SessionConversationAssembly(
      */
     suspend fun overview(scope: LearningOverviewScope): LearningOverviewContract =
         overviewCoordinator.generate(scope)
+
+    /** 每日总结懒生成入口：空数据日不烧额度，已有有效总结不重复生成。 */
+    suspend fun requestDailySummaryGeneration(scope: LearningOverviewScope) {
+        dailySummaryGenerator?.requestGeneration(scope.spaceId)
+    }
+
+    /** 后台生成结束事件（成功或失败），面板据此静默刷新。 */
+    val dailySummaryUpdates: SharedFlow<Unit>
+        get() = dailySummaryGenerationState.updates
 }

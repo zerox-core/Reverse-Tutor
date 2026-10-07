@@ -136,7 +136,79 @@ interface AgentCreationGateway {
 
     /** P1 文档分析。R-A 返回脚本化结果；R-C 接真实解析文本。 */
     suspend fun analyzeDocument(fileName: String): AgentCreationDocAnalysis
+
+    /**
+     * R100 孵化草案提案（方案B · DRAFT_PROPOSAL 节点）：访谈收敛后生成
+     * 「人物性格假设 / 教学方式 / 阶段目标 / 里程碑」草案给用户确认。
+     * 默认实现从现有草案确定性拼装，Fake 与测试网关零改动。
+     */
+    suspend fun proposeIncubation(
+        history: List<AgentCreationHistoryTurn>,
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?
+    ): AgentCreationIncubation = AgentCreationIncubation(
+        personaHypothesis = currentDraft.persona.ifBlank { "慢热但较真，卡壳时会先复述一遍自己的问题" },
+        teachingStyle = currentDraft.dialogueStrategy.ifBlank { "先听你讲，卡壳处追问，讲完带你复盘" },
+        stageGoals = currentDraft.learningPath.take(3).ifEmpty {
+            listOf(currentDraft.goal.ifBlank { "把目标主题讲明白" })
+        },
+        milestones = currentDraft.stageMilestones
+            .takeIf { it.isNotBlank() && it != "未设置" }
+            ?.split("→", "->", "，", ",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: currentDraft.learningPath.take(3)
+    )
+
+    /**
+     * R100 学习流程图生成（方案B · GENERATE_LEARNING_FLOW 节点）：
+     * 主题 → 子技能 → 依赖边。默认实现从学习路径确定性展开（顺序链），
+     * Fake 与测试网关零改动；生产网关走 LLM 契约生成。
+     */
+    suspend fun generateLearningFlow(
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?
+    ): AgentCreationLearningFlow {
+        val titles = currentDraft.learningPath.ifEmpty {
+            docAnalysis?.suggestedPath.orEmpty()
+        }.map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(8)
+        if (titles.isEmpty()) return AgentCreationLearningFlow()
+        return AgentCreationLearningFlow(
+            topics = titles.map { AgentCreationFlowTopic(title = it) },
+            edges = titles.zipWithNext { a, b -> AgentCreationFlowEdge(fromTitle = a, toTitle = b) }
+        )
+    }
 }
+
+/**
+ * R100 孵化草案（方案B 状态机 · DRAFT_PROPOSAL 节点产物，2026-10-04 用户拍板落地）：
+ * 访谈收敛后先给用户看的「AI 学生养成草案」——确认前不落库、不进正式草案卡。
+ */
+data class AgentCreationIncubation(
+    val personaHypothesis: String = "",
+    val teachingStyle: String = "",
+    val stageGoals: List<String> = emptyList(),
+    val milestones: List<String> = emptyList()
+)
+
+/** R100 学习流程图主题节点（GENERATE_LEARNING_FLOW 节点产物）。 */
+data class AgentCreationFlowTopic(
+    val title: String,
+    val subSkills: List<String> = emptyList()
+)
+
+/** R100 学习流程图依赖边：from 必须先于 to 学。语义对齐图谱 relation=depends_on。 */
+data class AgentCreationFlowEdge(
+    val fromTitle: String,
+    val toTitle: String,
+    val relation: String = "depends_on"
+)
+
+/** R100 学习流程图：主题 → 子技能 → 依赖边（首版仅存内存，Room 落库留后续）。 */
+data class AgentCreationLearningFlow(
+    val topics: List<AgentCreationFlowTopic> = emptyList(),
+    val edges: List<AgentCreationFlowEdge> = emptyList()
+)
 
 /** 对话流条目（UI 渲染模型）。 */
 sealed interface AgentCreationFeedEntry {
@@ -176,5 +248,24 @@ sealed interface AgentCreationFeedEntry {
     data class DraftCard(
         override val id: String,
         val configuration: NewSessionConfiguration
+    ) : AgentCreationFeedEntry
+
+    /**
+     * R100 孵化草案卡（方案B）：访谈收敛后浮现一版待确认草案；
+     * 用户确认 → Confirmed，批注打回 → 旧卡 Superseded、新卡 PendingConfirm。
+     * 首版无 checkpoint——不落快照，进程重建后不恢复。
+     */
+    data class IncubationDraftCard(
+        override val id: String,
+        val incubation: AgentCreationIncubation,
+        val status: Status = Status.PendingConfirm
+    ) : AgentCreationFeedEntry {
+        enum class Status { PendingConfirm, Confirmed, Superseded }
+    }
+
+    /** R100 学习流程图卡（方案B）：孵化草案确认后生成的学习路径图谱预览。 */
+    data class LearningFlowCard(
+        override val id: String,
+        val flow: AgentCreationLearningFlow
     ) : AgentCreationFeedEntry
 }

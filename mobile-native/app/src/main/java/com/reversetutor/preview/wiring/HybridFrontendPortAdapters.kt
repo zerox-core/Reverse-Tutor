@@ -41,6 +41,7 @@ import com.reversetutor.feature.settings.ModelConnectionsSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 
 class RepositoryHomePortAdapter(
     private val listSessions: suspend () -> List<TutorSession>
@@ -336,4 +337,10 @@ class RepositoryLearningOverviewPortAdapter(
 ) : LearningOverviewPort {
     override suspend fun loadOverview(scope: LearningOverviewScope): LearningOverviewContract =
         assembly.overview(scope)
+
+    override suspend fun requestDailySummaryGeneration(scope: LearningOverviewScope) =
+        assembly.requestDailySummaryGeneration(scope)
+
+    override val dailySummaryUpdates: Flow<Unit>
+        get() = assembly.dailySummaryUpdates
 }

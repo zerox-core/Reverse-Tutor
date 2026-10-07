@@ -24,6 +24,7 @@ import com.reversetutor.core.model.SyncOwnership
 import com.reversetutor.core.model.TokenUsageRecord
 import com.reversetutor.core.model.TurnRun
 import com.reversetutor.core.model.TurnRunState
+import com.reversetutor.core.model.DailySummary
 import com.reversetutor.core.model.WeeklySummary
 import com.reversetutor.core.model.WidgetLayoutPreference
 import com.reversetutor.core.model.WidgetSize
@@ -185,6 +186,25 @@ data class StudyPlanTaskEntity(
     val revision: Long,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long
+)
+
+@Entity(
+    tableName = "daily_summaries",
+    indices = [
+        Index("spaceId"),
+        Index(value = ["spaceId", "dayStartEpochMillis", "generatorVersion"], unique = true)
+    ]
+)
+data class DailySummaryEntity(
+    @PrimaryKey val id: String,
+    val spaceId: String,
+    val dayStartEpochMillis: Long,
+    val dayEndEpochMillis: Long,
+    val sourceRevision: Long,
+    val generatorVersion: String,
+    val summary: String,
+    val generatedAtEpochMillis: Long,
+    val stale: Boolean
 )
 
 @Entity(
@@ -483,6 +503,16 @@ fun StudyPlanTaskEntity.toDomain(): StudyPlanTask = StudyPlanTask(
     id, spaceId, title, detail, enumValueOrDefault(state, StudyPlanTaskState.Proposed),
     dueAtEpochMillis, completedAtEpochMillis, sourceSessionId, sourceMessageId, revision,
     createdAtEpochMillis, updatedAtEpochMillis
+)
+
+fun DailySummary.toEntity(): DailySummaryEntity = DailySummaryEntity(
+    id, spaceId, dayStartEpochMillis, dayEndEpochMillis, sourceRevision, generatorVersion,
+    summary, generatedAtEpochMillis, stale
+)
+
+fun DailySummaryEntity.toDomain(): DailySummary = DailySummary(
+    id, spaceId, dayStartEpochMillis, dayEndEpochMillis, sourceRevision, generatorVersion,
+    summary, generatedAtEpochMillis, stale
 )
 
 fun WeeklySummary.toEntity(): WeeklySummaryEntity = WeeklySummaryEntity(

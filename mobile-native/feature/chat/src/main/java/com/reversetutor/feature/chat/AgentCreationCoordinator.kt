@@ -34,16 +34,12 @@ data class AgentCreationUiState(
     /** R92：检测到有上次未完成的快照，等用户选「继续上次 / 创建新会话」。 */
     val resumeAvailable: Boolean = false
 ) {
-    /** 兜底钳制：必填缺失时封顶 60（设计方案 §三）。 */
+    /** R102：了解度降级为纯展示值——分数不再封顶，也不再驱动流程推进（改由槽位确认状态裁决）。 */
     val displayedUnderstanding: Int
-        get() = if (draft.title.isBlank() || draft.learnerRole.isBlank()) {
-            rawUnderstanding.coerceAtMost(AgentCreationUnderstanding.CAP_REQUIRED_MISSING)
-        } else {
-            rawUnderstanding
-        }
+        get() = rawUnderstanding
 
-    val understandingHigh: Boolean get() = displayedUnderstanding >= 70
-    val understandingLow: Boolean get() = displayedUnderstanding < 40
+    val understandingHigh: Boolean get() = displayedUnderstanding >= 85
+    val understandingLow: Boolean get() = displayedUnderstanding < 50
 
     /** 创建可用：必填齐全即常驻可点。 */
     val canCreate: Boolean get() = draft.validationErrors().isEmpty()
@@ -52,7 +48,9 @@ data class AgentCreationUiState(
 class AgentCreationCoordinator(
     private val gateway: AgentCreationGateway,
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
-    private val stateStore: AgentCreationStateStore? = null
+    private val stateStore: AgentCreationStateStore? = null,
+    /** R100：方案B 状态机灰度（2026-10-04 用户拍板）。false = 完全走 R99 契约路径。 */
+    private val graphEnabled: Boolean = false
 ) {
     /**
      * R91：状态变更即时通知——用户消息发出后气泡立刻上屏，
@@ -69,8 +67,15 @@ class AgentCreationCoordinator(
     private val history = mutableListOf<AgentCreationHistoryTurn>()
     private var planner = AgentCreationFollowUpPlanner()
     private var entrySequence = 0
+    /** R102：信息槽位确认闸门——propose/confirm 全在代码层，模型对状态转移零投票权。 */
+    private var slots = CreationSlots()
+    /** R102：上一轮悬置提案对应的槽位；本轮用户文本先对它做确认信号判定。 */
+    private var lastAskedSlot: CreationSlot? = null
     /** R92：检测到但未恢复的快照——入口弹窗确认「继续上次」才真正恢复。 */
     private var pendingSnapshot: AgentCreationSnapshot? = null
+
+    /** R100 方案B 状态机：graphEnabled 时由它裁决「什么时候该出孵化草案 / 流程图」。 */
+    internal val creationGraph = AgentCreationGraph()
 
     init {
         // R92：有本地快照不再静默恢复（R85 是静默恢复）——先挂起，
@@ -119,7 +124,10 @@ class AgentCreationCoordinator(
         history.clear()
         planner = AgentCreationFollowUpPlanner()
         entrySequence = 0
+        slots = CreationSlots()
+        lastAskedSlot = null
         state = AgentCreationUiState()
+        if (graphEnabled) creationGraph.restoreFromSnapshot(false)
         start()
     }
 
@@ -127,6 +135,25 @@ class AgentCreationCoordinator(
     suspend fun sendUserText(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || state.busy || state.phase != AgentCreationPhase.Conversing) return
+        if (graphEnabled) {
+            // R100 方案B：草案待确认期间，确认语走确认节点，其余文字一律当批注打回访谈。
+            if (creationGraph.state == CreationState.ConfirmDraft) {
+                appendUser(trimmed)
+                history += AgentCreationHistoryTurn(isUser = true, text = trimmed)
+                if (isIncubationConfirm(trimmed)) {
+                    confirmIncubation()
+                } else {
+                    supersedePendingIncubationCard()
+                    creationGraph.transitionTo(CreationState.Interview)
+                    converseTurn(trimmed)
+                }
+                persist()
+                return
+            }
+            // 流程图出完后继续发消息 = 修订：重开访谈轨道；首轮说话进访谈。
+            creationGraph.reopenForRevision()
+            creationGraph.noteUserSpoke()
+        }
         // 10.3：用户明确说「别问了 / 直接生成」→ 立即收敛，本轮即按收敛策略执行。
         if (AgentCreationFollowUpPlanner.isStopAsking(trimmed)) {
             planner.forceConverge()
@@ -204,6 +231,7 @@ class AgentCreationCoordinator(
         val hasDoc = state.docAnalysis != null
         val strategy = planner.strategyFor(
             draft = state.draft,
+            slots = slots,
             detScore = AgentCreationUnderstanding.deterministicScore(state.draft, hasDoc),
             documentAvailable = hasDoc
         )
@@ -347,10 +375,83 @@ class AgentCreationCoordinator(
         if (strategy.shouldRequestDocument) planner.markDocumentAsked()
         if (strategy.mustConfirmPath) planner.markPathConfirmAsked()
 
-        var newDraft = turn.draft?.applyTo(state.draft) ?: state.draft
-        // 10.4 title 提案的客户端兜底：goal 已明确而 title 仍空时直接合成提案，
-        // 不等 LLM 下一轮自觉——避免了解度一直卡 60 封顶。
-        if (newDraft.title.isBlank() && newDraft.goal.isNotBlank()) {
+        // R102 确认闸门：模型回包 draft 只能进 Proposed；确认信号（代码判定）才升 Confirmed；
+        // 草案只落 Confirmed 值——模型对「什么算定稿」零投票权。
+        val converging = strategy.converge || planner.shouldConverge()
+        val roundNow = planner.rounds
+        // ① 上一轮悬置提案 × 本轮用户文本：确认信号判定（非正面回答一律拦截）。
+        val asked = lastAskedSlot
+        if (asked != null && slots.statusOf(asked) == SlotStatus.Proposed &&
+            !CreationConfirmationSignals.isNonAnswer(userText)
+        ) {
+            val proposed = slots.valueOf(asked)
+            if (CreationConfirmationSignals.isExplicitConfirm(userText) ||
+                CreationConfirmationSignals.hasConfirmPrefix(userText) ||
+                CreationConfirmationSignals.overlapsProposal(proposed, userText)
+            ) {
+                slots = slots.confirm(asked, round = roundNow)
+            }
+        }
+        // ② 本轮模型提案逐个过闸：用户亲口给值 → Confirmed；收敛兜底（Goal 除外）→ Confirmed；
+        // 其余只进 Proposed、不落草案。
+        val patch = turn.draft
+        var newDraft = state.draft
+        if (patch != null) {
+            fun gate(slot: CreationSlot, value: String?): Boolean {
+                if (value.isNullOrBlank()) return true
+                val v = value.trim()
+                if (slots.statusOf(slot) == SlotStatus.Confirmed) {
+                    return slots.valueOf(slot) == v
+                }
+                if (CreationConfirmationSignals.userSourced(v, userText)) {
+                    slots = slots.confirm(slot, v, roundNow)
+                    return true
+                }
+                if (converging && slot != CreationSlot.Goal) {
+                    slots = slots.confirm(slot, v, roundNow)
+                    return true
+                }
+                slots = slots.propose(slot, v, roundNow)
+                return false
+            }
+            val filtered = patch.copy(
+                goal = patch.goal.takeIf { gate(CreationSlot.Goal, it) },
+                learnerRole = patch.learnerRole.takeIf { gate(CreationSlot.LearnerRole, it) },
+                persona = patch.persona.takeIf { gate(CreationSlot.Persona, it) },
+                dialogueStrategy = patch.dialogueStrategy.takeIf { gate(CreationSlot.TeachingStyle, it) },
+                plan = patch.plan.takeIf { gate(CreationSlot.Constraints, it) },
+                learningScope = patch.learningScope.takeIf { gate(CreationSlot.Constraints, it) },
+                stageMilestones = patch.stageMilestones.takeIf { gate(CreationSlot.Constraints, it) }
+            )
+            newDraft = filtered.applyTo(state.draft)
+        }
+        // ③ 收敛兜底：学习者角色仍空 → 默认值直接 Confirmed（用户止损路径；Goal 永不默认）。
+        if (converging && slots.statusOf(CreationSlot.LearnerRole) != SlotStatus.Confirmed) {
+            slots = slots.confirm(CreationSlot.LearnerRole, "基础未说明，按零基础起步", roundNow)
+        }
+        // ④ 已确认值同步进草案（只填空白——提案值与未确认值一律不进草案）。
+        run {
+            var synced = newDraft
+            if (synced.goal.isBlank() && slots.statusOf(CreationSlot.Goal) == SlotStatus.Confirmed) {
+                synced = synced.copy(goal = slots.valueOf(CreationSlot.Goal))
+            }
+            if (synced.learnerRole.isBlank() && slots.statusOf(CreationSlot.LearnerRole) == SlotStatus.Confirmed) {
+                synced = synced.copy(learnerRole = slots.valueOf(CreationSlot.LearnerRole))
+            }
+            if (synced.persona.isBlank() && slots.statusOf(CreationSlot.Persona) == SlotStatus.Confirmed) {
+                synced = synced.copy(persona = slots.valueOf(CreationSlot.Persona))
+            }
+            if (synced.dialogueStrategy.isBlank() && slots.statusOf(CreationSlot.TeachingStyle) == SlotStatus.Confirmed) {
+                synced = synced.copy(dialogueStrategy = slots.valueOf(CreationSlot.TeachingStyle))
+            }
+            newDraft = synced
+        }
+        // ⑤ R102 title 兜底：Goal 已确认且 goal 非空、title 仍空时才合成提案
+        // （修复「魔方」事故放大器——目标未经用户确认前绝不派生标题）。
+        if (newDraft.title.isBlank() &&
+            slots.statusOf(CreationSlot.Goal) == SlotStatus.Confirmed &&
+            newDraft.goal.isNotBlank()
+        ) {
             newDraft = newDraft.copy(title = AgentCreationUnderstanding.proposeTitle(newDraft.goal))
         }
         // R86 学习路径的客户端兜底：LLM 没给路径时，用文档分析的「建议路径」
@@ -367,13 +468,11 @@ class AgentCreationCoordinator(
         }
         val draftChanged = newDraft != state.draft
 
-        // 10.2 双源融合：u_raw = 0.5×u_llm + 0.5×u_det，封顶 + 单调不减。
-        val requiredReady = newDraft.title.isNotBlank() && newDraft.learnerRole.isNotBlank()
+        // 10.2 双源融合：u_raw = 0.5×u_llm + 0.5×u_det，单调不减（R102 起纯展示、无封顶）。
         val fused = AgentCreationUnderstanding.fuse(
             llmScore = turn.understanding,
             detScore = AgentCreationUnderstanding.deterministicScore(newDraft, hasDoc),
-            previousFused = state.rawUnderstanding,
-            requiredFieldsReady = requiredReady
+            previousFused = state.rawUnderstanding
         )
 
         // 10.3 requestDocument 客户端门槛：goal+role 就绪、无文档、满 2 轮才放行。
@@ -390,25 +489,41 @@ class AgentCreationCoordinator(
             requestDocumentActive = allowRequestDocument
         )
 
-        // 追问把关（10.3）：收敛或高分一律不追问；低分（<40）必问，LLM 没问用兜底话术补上。
-        val converging = strategy.converge || planner.shouldConverge()
+        // R102 追问把关：推进条件从「分数驱动」改为「确认驱动」——必填槽全 Confirmed 且
+        // （收敛或可选槽全 Confirmed）即就绪出草案；目标未确认时强制追问目标，模型高分压不住。
         var followUp = turn.followUpQuestion
         // R87：「确认路径 / 主动要资料」是客户端排定的关键动作，了解度高分也不许吞掉。
         val proactiveAsk = strategy.mustConfirmPath || strategy.shouldRequestDocument
-        if (converging || (fused >= 70 && !proactiveAsk)) {
+        val goalMissing = slots.statusOf(CreationSlot.Goal) != SlotStatus.Confirmed
+        val readyForProposal = !goalMissing && slots.requiredConfirmed() &&
+            (converging || slots.optionalAllConfirmed())
+        if (readyForProposal && !proactiveAsk) {
             followUp = null
-        } else if (fused < 40 && followUp == null && strategy.targetFollowUpField != null) {
+        } else if (followUp == null && strategy.targetFollowUpField != null) {
             followUp = planner.fieldByLabel(strategy.targetFollowUpField)?.fallbackQuestion
         }
+        // R102 修正：planner 本轮目标本来就是 Goal 时，保留 LLM 给的选项问题（比兜底话术更有价值）。
+        if (goalMissing && !proactiveAsk &&
+            strategy.targetFollowUpField != AgentCreationFollowUpPlanner.Field.Goal.label
+        ) {
+            followUp = AgentCreationFollowUpPlanner.Field.Goal.fallbackQuestion
+        }
         // R87 兜底：LLM 没问时客户端确定性补上（确认路径优先于要资料）。
-        if (!converging && followUp == null && strategy.mustConfirmPath) {
+        if (proactiveAsk && followUp == null && strategy.mustConfirmPath) {
             followUp = planner.pathConfirmQuestion(newDraft.learningPath)
         }
-        if (!converging && followUp == null && strategy.shouldRequestDocument) {
+        if (proactiveAsk && followUp == null && strategy.shouldRequestDocument) {
             followUp = AgentCreationFollowUpPlanner.DOC_REQUEST_FALLBACK
         }
+        // R102：记录本轮悬置追问对应的槽位，下一轮用户文本先对它做确认信号判定。
+        lastAskedSlot = when {
+            followUp == null || proactiveAsk -> null
+            goalMissing -> CreationSlot.Goal
+            else -> CreationSlot.fromLabel(strategy.targetFollowUpField)
+        }
 
-        val note = turn.assistantNote ?: if (converging) {
+        // R102 修正：收敛但目标未确认时不说「不问了」——本轮还在强制追问目标。
+        val note = turn.assistantNote ?: if (converging && !goalMissing) {
             "好的，不问了。草案缺的我按常规补上了，你看看有没有要改的，没问题就点右上角创建。"
         } else {
             null
@@ -429,7 +544,125 @@ class AgentCreationCoordinator(
                     )
             )
         }
+
+        // R102：出孵化草案只读槽位确认状态——了解度分数对状态转移零投票权。
+        if (graphEnabled && creationGraph.state == CreationState.Interview && readyForProposal) {
+            runIncubationNode()
+        }
     }
+
+    /** R100 方案B · CONFIRM_DRAFT → GENERATE_PROFILE → GENERATE_LEARNING_FLOW：用户确认孵化草案。 */
+    suspend fun confirmIncubation() {
+        if (!graphEnabled || state.busy || creationGraph.state != CreationState.ConfirmDraft) return
+        val card = state.feed.filterIsInstance<AgentCreationFeedEntry.IncubationDraftCard>()
+            .firstOrNull { it.status == AgentCreationFeedEntry.IncubationDraftCard.Status.PendingConfirm }
+            ?: return
+        val incubation = card.incubation
+        // 草案结论叠进正式配置——「确认前不落库」的红线在确认这一刻解除。
+        var newDraft = state.draft.copy(
+            persona = incubation.personaHypothesis,
+            dialogueStrategy = incubation.teachingStyle
+        )
+        if (incubation.milestones.isNotEmpty()) {
+            newDraft = newDraft.copy(stageMilestones = incubation.milestones.joinToString(" → "))
+        }
+        if (newDraft.plan.isBlank() && incubation.stageGoals.isNotEmpty()) {
+            newDraft = newDraft.copy(plan = incubation.stageGoals.joinToString("\n"))
+        }
+        state = state.copy(draft = newDraft)
+        state = state.copy(
+            feed = state.feed.map {
+                if (it.id == card.id && it is AgentCreationFeedEntry.IncubationDraftCard) {
+                    it.copy(status = AgentCreationFeedEntry.IncubationDraftCard.Status.Confirmed)
+                } else it
+            }.filterNot { it is AgentCreationFeedEntry.DraftCard } +
+                AgentCreationFeedEntry.DraftCard(id = nextId(), configuration = newDraft)
+        )
+        appendAssistant("草案确认了——人物性格和教学方式已经定进草案，接下来给你生成学习流程图。")
+        creationGraph.transitionTo(CreationState.GenerateProfile)
+        creationGraph.transitionTo(CreationState.GenerateLearningFlow)
+        runLearningFlowNode()
+        persist()
+    }
+
+    /** R100 方案B · DRAFT_PROPOSAL 节点：生成孵化草案卡（失败退回访谈，对话与草案保留）。 */
+    private suspend fun runIncubationNode() {
+        creationGraph.transitionTo(CreationState.DraftProposal)
+        state = state.copy(busy = true)
+        val incubation = runNodeWithRetry {
+            gateway.proposeIncubation(history.toList(), state.draft, state.docAnalysis)
+        }
+        state = state.copy(busy = false)
+        if (incubation == null) {
+            // 生成失败：回访谈轨道，下一轮收敛时可再试；不打断对话。
+            creationGraph.transitionTo(CreationState.Interview)
+            appendAssistant("草案整理卡了一下，没关系——你接着说，我一会儿再整理。")
+            return
+        }
+        // 孵化草案卡单卡化：待确认卡永远只有一张，沉在流尾。
+        state = state.copy(
+            feed = state.feed.filterNot {
+                it is AgentCreationFeedEntry.IncubationDraftCard &&
+                    it.status == AgentCreationFeedEntry.IncubationDraftCard.Status.PendingConfirm
+            } + AgentCreationFeedEntry.IncubationDraftCard(
+                id = nextId(),
+                incubation = incubation
+            )
+        )
+        appendAssistant("我按咱们聊的整理了一版养成草案，你看看——没问题就点「确认草案」，要改哪里直接回复告诉我。")
+        creationGraph.transitionTo(CreationState.ConfirmDraft)
+    }
+
+    /** R100 方案B · GENERATE_LEARNING_FLOW 节点：流程图失败静默降级（草案与创建不受影响）。 */
+    private suspend fun runLearningFlowNode() {
+        val flow = runNodeWithRetry {
+            gateway.generateLearningFlow(state.draft, state.docAnalysis)
+        }
+        if (flow == null || flow.topics.isEmpty()) {
+            // 静默降级：流程图是增强项，失败不阻塞创建。
+            creationGraph.transitionTo(CreationState.Done)
+            return
+        }
+        // 学习路径为空时用流程图主题序补齐——图谱与路径同源。
+        if (state.draft.learningPath.isEmpty()) {
+            state = state.copy(draft = state.draft.copy(learningPath = flow.topics.map { it.title }))
+        }
+        state = state.copy(
+            feed = state.feed.filterNot { it is AgentCreationFeedEntry.LearningFlowCard } +
+                AgentCreationFeedEntry.LearningFlowCard(id = nextId(), flow = flow)
+        )
+        appendAssistant("学习流程图好了——按这个顺序先基础后提升。点右上角「创建并进入聊天」就可以开始上课。")
+        creationGraph.transitionTo(CreationState.Done)
+    }
+
+    /** R100 节点调用重试：失败原样重试 1 次，仍失败返回 null 由各节点自行降级。 */
+    private suspend fun <T> runNodeWithRetry(call: suspend () -> T): T? {
+        repeat(2) { attempt ->
+            val outcome = runCatching { call() }
+            outcome.fold(
+                onSuccess = { return it },
+                onFailure = { failure -> if (failure is CancellationException) throw failure }
+            )
+            if (attempt == 1) return null
+        }
+        return null
+    }
+
+    /** R100 批注打回：把待确认草案卡标记为已作废（保留在流里当历史）。 */
+    private fun supersedePendingIncubationCard() {
+        state = state.copy(
+            feed = state.feed.map {
+                if (it is AgentCreationFeedEntry.IncubationDraftCard &&
+                    it.status == AgentCreationFeedEntry.IncubationDraftCard.Status.PendingConfirm
+                ) {
+                    it.copy(status = AgentCreationFeedEntry.IncubationDraftCard.Status.Superseded)
+                } else it
+            }
+        )
+    }
+
+    /** R100 确认语判定：整句就是短肯定才算确认，其余文字一律按批注处理。 */
+    private fun isIncubationConfirm(text: String): Boolean = INCUBATION_CONFIRM.matches(text)
 
     /** 生成失败 → 自动原样重试 1 次；仍失败按生成失败降级。R93：onPartialSpoken 透传流式口语快照；R95：onReasoning 透传思考流；R98：onThinkingDecision 透传决策、onRetryAttempt 在重试前回调（自检段 + 缓存重置）。 */
     private suspend fun runConverseWithRetry(
@@ -496,7 +729,8 @@ class AgentCreationCoordinator(
                 history = history.toList(),
                 planner = planner.exportState(),
                 docAnalysis = state.docAnalysis,
-                entrySequence = entrySequence
+                entrySequence = entrySequence,
+                slots = slots.toNamedEntries()
             )
         )
     }
@@ -506,6 +740,12 @@ class AgentCreationCoordinator(
         history.clear()
         history += snapshot.history
         planner.restoreState(snapshot.planner)
+        slots = CreationSlots.fromNamedEntries(snapshot.slots)
+        if (slots.entries.isEmpty()) {
+            // R102 旧快照迁移：草案已有字段一律降 Proposed，要求用户确认一次。
+            slots = CreationSlots.migratedFrom(snapshot.draft)
+        }
+        lastAskedSlot = null
         entrySequence = snapshot.entrySequence
         state = AgentCreationUiState(
             phase = if (snapshot.feed.isEmpty()) AgentCreationPhase.Idle else AgentCreationPhase.Conversing,
@@ -514,6 +754,18 @@ class AgentCreationCoordinator(
             rawUnderstanding = snapshot.rawUnderstanding,
             requestDocumentActive = snapshot.requestDocumentActive,
             docAnalysis = snapshot.docAnalysis
+        )
+        if (graphEnabled) {
+            // R100 首版无 checkpoint：孵化卡 / 流程图卡不落快照，恢复后回到访谈轨道。
+            creationGraph.restoreFromSnapshot(snapshot.feed.isNotEmpty())
+        }
+    }
+
+    private companion object {
+        /** R100 草案确认语：整句短肯定才算确认，长句一律按批注处理。 */
+        val INCUBATION_CONFIRM = Regex(
+            "^(确认|确认了|确认草案|可以|可以了|行|好|好的|没问题|就这样|就这样吧|通过|ok|okay)[！!。.~～ ]*$",
+            RegexOption.IGNORE_CASE
         )
     }
 }

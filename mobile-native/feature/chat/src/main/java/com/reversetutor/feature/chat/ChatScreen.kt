@@ -1115,8 +1115,6 @@ fun ChatScreen(
         onReselectInvalidSource = onReselectInvalidSource,
         onOpenExternalLink = onOpenExternalLink,
         onComposerFocusChanged = onComposerFocusChanged,
-        webSearchEnabled = webSearchEnabled,
-        onWebSearchChange = onWebSearchChange,
         onOpenContextHub = onOpenContextHub,
         onOpenWindowBranches = onOpenWindowBranches,
         onOpenGlobalGraph = onOpenGlobalGraph,

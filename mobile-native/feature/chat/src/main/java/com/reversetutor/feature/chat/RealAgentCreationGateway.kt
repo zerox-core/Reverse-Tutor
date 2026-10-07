@@ -27,9 +27,17 @@ class AgentCreationGenerationException(message: String) : IllegalStateException(
  * - 确定性推进逻辑（追问策略、了解度融合、收敛）全在协调器，
  *   本类只负责把策略快照译成提示词、把返回文本译回契约对象。
  */
+/** R99：联网搜索开启时追加的提示——模型据此把「你去搜索」当成可执行指令。 */
+private const val SEARCH_ENABLED_HINT =
+    "\n\n[联网搜索已开启]\n你可以联网搜索实时信息。用户说「你去搜索 / 查一下 / 搜一下」时，" +
+        "按搜索到的信息直接回应，不要再说「没有资料」。"
+
 class RealAgentCreationGateway(
     private val runtime: LlmGenerationRuntime,
-    private val activeProfile: suspend () -> LlmProfile?
+    private val activeProfile: suspend () -> LlmProfile?,
+    // R99：创建流程接入全局联网搜索开关（2026-10-04 用户拍板），
+    // 与主聊天同一把偏好钥匙，开了之后创建顾问也能真正「去搜索」。
+    private val webSearchPreference: suspend () -> Boolean = { false }
 ) : AgentCreationGateway {
 
     private var turnSequence = 0
@@ -67,13 +75,15 @@ class RealAgentCreationGateway(
         } else {
             history
         }
-        val prompt = AgentCreationPrompts.buildTurnPrompt(
+        val searchOn = webSearchPreference()
+        val basePrompt = AgentCreationPrompts.buildTurnPrompt(
             history = priorHistory,
             userText = trimmed,
             currentDraft = currentDraft,
             docAnalysis = docAnalysis,
             strategy = strategy
         )
+        val prompt = if (searchOn) basePrompt + SEARCH_ENABLED_HINT else basePrompt
         val turn = turnSequence++
         // R96：按轮决策是否请求思考——资料/复材输入开（保质量，思考期有「思考中」
         // 气泡可见），短答复承接轮关（时延从 ~32s 回到秒级）。
@@ -109,6 +119,7 @@ class RealAgentCreationGateway(
         val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(
             streaming = true,
             thinkingEnabled = thinkingDecision.enabled,
+            webSearchEnabled = searchOn,
             onStreamChunk = { chunk ->
                 streamed.append(chunk)
                 chunkCount += 1
@@ -156,6 +167,74 @@ class RealAgentCreationGateway(
                 throw AgentCreationGenerationException(result.message)
             LlmGenerationResult.Timeout ->
                 throw AgentCreationGenerationException("timeout")
+        }
+    }
+
+    /**
+     * R100 孵化草案提案（方案B · DRAFT_PROPOSAL 节点）：
+     * 非流式小契约——访谈收敛后压一版草案给用户确认。
+     */
+    override suspend fun proposeIncubation(
+        history: List<AgentCreationHistoryTurn>,
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?
+    ): AgentCreationIncubation {
+        val prompt = AgentCreationPrompts.buildIncubationPrompt(history, currentDraft, docAnalysis)
+        val text = runNodePrompt(prompt, tag = "incubation")
+        return AgentCreationParser.parseIncubation(text)
+            ?: throw AgentCreationGenerationException("incubation parse failed")
+    }
+
+    /**
+     * R100 学习流程图生成（方案B · GENERATE_LEARNING_FLOW 节点）：
+     * 非流式小契约——主题 / 子技能 / 依赖边。
+     */
+    override suspend fun generateLearningFlow(
+        currentDraft: NewSessionConfiguration,
+        docAnalysis: AgentCreationDocAnalysis?
+    ): AgentCreationLearningFlow {
+        val prompt = AgentCreationPrompts.buildLearningFlowPrompt(currentDraft, docAnalysis)
+        val text = runNodePrompt(prompt, tag = "learning-flow")
+        return AgentCreationParser.parseLearningFlow(text)
+            ?: throw AgentCreationGenerationException("learning flow parse failed")
+    }
+
+    /**
+     * R100 节点小契约的公共执行段：非流式、关思考（秒级小 JSON），
+     * 联网搜索偏好与主链路同一把钥匙。失败一律抛 [AgentCreationGenerationException]
+     * 交给协调器重试 / 降级。
+     */
+    private suspend fun runNodePrompt(prompt: String, tag: String): String {
+        val profile = activeProfile()
+            ?.takeIf { it.enabled && it.model.isNotBlank() }
+            ?: throw AgentCreationNoModelException()
+        val searchOn = webSearchPreference()
+        val turn = turnSequence++
+        val plan = LlmGenerationPlanner.plan(
+            sessionId = SESSION_ID,
+            userMessageId = "agent-creation-" + tag + "-" + turn,
+            userText = if (searchOn) prompt + SEARCH_ENABLED_HINT else prompt,
+            profile = profile,
+            capabilities = LlmProfileCapabilityResolver.infer(profile),
+            token = LlmGenerationToken("agent-creation-" + tag + "-" + turn)
+        )
+        val request = (plan as? LlmGenerationPlan.Ready)?.request?.copy(
+            streaming = false,
+            thinkingEnabled = false,
+            webSearchEnabled = searchOn
+        ) ?: throw AgentCreationNoModelException()
+        val startedAt = System.currentTimeMillis()
+        val result = runtime.generate(request)
+        Log.d(
+            STREAM_LOG_TAG,
+            "node " + tag + " done type=" + result::class.simpleName +
+                " elapsed=" + (System.currentTimeMillis() - startedAt) + "ms"
+        )
+        return when (result) {
+            is LlmGenerationResult.Success -> result.text
+            is LlmGenerationResult.Streamed -> result.visibleText
+            is LlmGenerationResult.Failure -> throw AgentCreationGenerationException(result.message)
+            LlmGenerationResult.Timeout -> throw AgentCreationGenerationException("timeout")
         }
     }
 
