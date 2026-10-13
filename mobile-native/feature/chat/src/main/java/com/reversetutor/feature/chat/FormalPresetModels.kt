@@ -259,6 +259,30 @@ object FormalLearningPresets {
             sourceSummary = "可连接本次解释对应的数据版本",
             avatarRes = R.drawable.formal_preset_ml_avatar,
             storyRes = R.drawable.formal_preset_ml_story
+        ),
+        // R-RT-6：反转家教内置预设（id 与 RoutingTurnPreparationPort 的路由标记一致）。
+        // 命中 builtInPresetId == "reverse-tutor" 的会话走算法内核 ToolLoop，不走 RAG/记忆链路。
+        FormalLearningPreset(
+            id = "reverse-tutor",
+            figmaNodeId = "reverse-tutor-core",
+            title = "反转家教课堂",
+            category = "反转家教",
+            learnerName = "李想",
+            learnerProfile = "初二 · 概念懂一半 · 容易卡在步骤上",
+            schedule = "端侧实时决策 · 31 个教学工具 · 每次讲透一个概念",
+            goal = "把“老师讲题”变成“学生能讲回来”",
+            goalTags = listOf("讲透概念", "探出薄弱点", "验收掌握"),
+            scopeSummary = "初中至高中数学课标目录（端侧知识图谱）",
+            scopeModules = listOf(
+                FormalScopeModule("高中数学", "30 个概念 · 3 个年级", .50f)
+            ),
+            episodeTitle = "讲回来",
+            episodeBody = "李想想自己讲明白“一元一次方程”。你先听他讲，再顺着他的卡壳点引导他补齐。",
+            connectedSources = 0,
+            sourceTitle = "本地课标与学生角色卡",
+            sourceSummary = "端侧运行，无需连接资料源",
+            avatarRes = R.drawable.formal_preset_math_avatar,
+            storyRes = R.drawable.formal_preset_math_story
         )
     )
 

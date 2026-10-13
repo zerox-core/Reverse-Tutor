@@ -1,0 +1,424 @@
+{
+  "高中数学": {
+    "grade_order": [
+      "高一",
+      "高二",
+      "高三"
+    ],
+    "concepts": [
+      {
+        "id": "集合与常用逻辑用语",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 1,
+        "prerequisites": [],
+        "standard_definition": "集合是一些确定的、互不相同的对象组成的整体；常用逻辑用语研究命题的充分必要条件、量词与否定。",
+        "key_facts": [
+          "子集/交/并/补运算",
+          "充分条件与必要条件的判定方向"
+        ]
+      },
+      {
+        "id": "函数的概念与表示",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 1,
+        "prerequisites": [
+          "集合与常用逻辑用语"
+        ],
+        "standard_definition": "设 A、B 是非空数集，若对 A 中任意 x，按对应关系 f 在 B 中都有唯一确定的 y 与之对应，则称 f:A→B 为从 A 到 B 的函数。",
+        "key_facts": [
+          "定义域、对应关系、值域三要素",
+          "解析法/列表法/图像法"
+        ]
+      },
+      {
+        "id": "二次函数",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "形如 y=ax²+bx+c（a≠0）的函数，图像是抛物线。",
+        "key_facts": [
+          "顶点 (-b/(2a), (4ac-b²)/(4a))",
+          "a>0 开口向上，a<0 开口向下"
+        ]
+      },
+      {
+        "id": "配方法与顶点公式",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "二次函数"
+        ],
+        "standard_definition": "加上并减去一次项系数一半的平方，把二次式化为 a(x-h)²+k 的形式，从而读出顶点与对称轴。",
+        "key_facts": [
+          "x²+bx=(x+b/2)²-(b/2)²",
+          "顶点横坐标 x=-b/(2a)"
+        ]
+      },
+      {
+        "id": "函数的单调性与最值",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "任取 x₁<x₂∈I，若 f(x₁)<f(x₂) 则 f 在 I 上递增；若 f(x₁)>f(x₂) 则递减。",
+        "key_facts": [
+          "定义法：作差→变形→定号",
+          "复合函数单调性'同增异减'"
+        ]
+      },
+      {
+        "id": "函数的奇偶性",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "对定义域内任意 x，f(-x)=f(x) 为偶函数（图像关于 y 轴对称）；f(-x)=-f(x) 为奇函数（关于原点对称）。",
+        "key_facts": [
+          "定义域须关于原点对称",
+          "奇函数在 x=0 有定义则 f(0)=0"
+        ]
+      },
+      {
+        "id": "指数与对数函数",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "y=aˣ（a>0，a≠1）为指数函数；y=log_a x（a>0，a≠1）为对数函数，二者互为反函数。",
+        "key_facts": [
+          "按 a>1 与 0<a<1 分类讨论",
+          "换底公式 log_a b=ln b/ln a"
+        ]
+      },
+      {
+        "id": "函数零点与方程的根",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "使 f(x)=0 的实数 x 叫做函数 f(x) 的零点，即方程 f(x)=0 的实根。",
+        "key_facts": [
+          "零点存在定理：f 在 [a,b] 连续且 f(a)f(b)<0，则 (a,b) 内有零点",
+          "二分法求近似解"
+        ]
+      },
+      {
+        "id": "平面向量",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [],
+        "standard_definition": "既有大小又有方向的量；可用有向线段表示，能进行加减、数乘与数量积运算。",
+        "key_facts": [
+          "数量积 a·b=|a||b|cosθ",
+          "共线 a∥b ⇔ a=λb；垂直 a⊥b ⇔ a·b=0"
+        ]
+      },
+      {
+        "id": "三角函数与恒等变换",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "任意角三角函数的定义、同角基本关系与和差倍角公式及其应用。",
+        "key_facts": [
+          "sin²α+cos²α=1",
+          "sin(α+β)=sinαcosβ+cosαsinβ"
+        ]
+      },
+      {
+        "id": "解三角形",
+        "grade": "高一",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "三角函数与恒等变换"
+        ],
+        "standard_definition": "利用正弦定理与余弦定理处理三角形中的边角计算与判断问题。",
+        "key_facts": [
+          "正弦定理 a/sinA=b/sinB=c/sinC=2R",
+          "余弦定理 a²=b²+c²-2bc·cosA"
+        ]
+      },
+      {
+        "id": "数列与等差等比数列",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的概念与表示"
+        ],
+        "standard_definition": "按确定顺序排列的一列数称为数列；等差（等比）数列从第 2 项起每一项与前一项之差（比）为同一常数。",
+        "key_facts": [
+          "等差通项 aₙ=a₁+(n-1)d",
+          "等比求和 Sₙ=a₁(1-qⁿ)/(1-q)（q≠1）"
+        ]
+      },
+      {
+        "id": "导数的概念与几何意义",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "函数的单调性与最值"
+        ],
+        "standard_definition": "函数在 x₀ 处的导数 f'(x₀)=lim_{Δx→0} [f(x₀+Δx)-f(x₀)]/Δx，几何意义是曲线在该点切线的斜率。",
+        "key_facts": [
+          "切线方程 y-f(x₀)=f'(x₀)(x-x₀)",
+          "可导必连续，连续不一定可导"
+        ]
+      },
+      {
+        "id": "导数的运算",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "导数的概念与几何意义"
+        ],
+        "standard_definition": "基本初等函数的求导公式，以及导数的四则运算法则与复合函数求导法则。",
+        "key_facts": [
+          "(xⁿ)'=n·xⁿ⁻¹",
+          "链式法则 [f(g(x))]'=f'(g(x))·g'(x)"
+        ]
+      },
+      {
+        "id": "导数与函数单调性",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 3,
+        "prerequisites": [
+          "导数的运算"
+        ],
+        "standard_definition": "在区间 I 内 f'(x)>0 则 f 递增，f'(x)<0 则 f 递减；反之单调性可对导数符号提出恒成立要求。",
+        "key_facts": [
+          "逆问题：f'(x)≥0 恒成立求参数范围",
+          "含参时按根的个数与位置分类讨论"
+        ]
+      },
+      {
+        "id": "函数的极值与最值",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 3,
+        "prerequisites": [
+          "导数与函数单调性"
+        ],
+        "standard_definition": "f'(x₀)=0 且在 x₀ 两侧导数变号，则 x₀ 为极值点；最值是闭区间上的整体最大/最小值。",
+        "key_facts": [
+          "极值是局部概念，最值是整体概念",
+          "求最值需比较诸极值与端点值"
+        ]
+      },
+      {
+        "id": "直线与圆",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [
+          "平面向量"
+        ],
+        "standard_definition": "直线的五种方程形式、圆的标准方程与一般方程，以及直线、圆之间位置关系的判定。",
+        "key_facts": [
+          "点到直线距离 d=|Ax₀+By₀+C|/√(A²+B²)",
+          "圆心距与半径比较判位置关系"
+        ]
+      },
+      {
+        "id": "圆锥曲线的标准方程与性质",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 3,
+        "prerequisites": [
+          "直线与圆"
+        ],
+        "standard_definition": "椭圆、双曲线、抛物线的定义、标准方程及几何性质（顶点、焦点、离心率、渐近线）。",
+        "key_facts": [
+          "椭圆 a²=b²+c²；双曲线 c²=a²+b²",
+          "离心率 e 刻画扁/开程度"
+        ]
+      },
+      {
+        "id": "轨迹方程",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 3,
+        "prerequisites": [
+          "圆锥曲线的标准方程与性质"
+        ],
+        "standard_definition": "把动点满足的几何条件翻译为坐标方程，并检验纯粹性与完备性。",
+        "key_facts": [
+          "直接法/定义法/参数法/相关点法"
+        ]
+      },
+      {
+        "id": "空间向量与立体几何",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 3,
+        "prerequisites": [
+          "平面向量"
+        ],
+        "standard_definition": "建立空间直角坐标系，用空间向量（含平面法向量）研究平行、垂直与空间角、距离。",
+        "key_facts": [
+          "法向量求线面角与二面角",
+          "向量共面定理"
+        ]
+      },
+      {
+        "id": "排列组合与二项式定理",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 3,
+        "prerequisites": [],
+        "standard_definition": "分类加法与分步乘法计数原理，排列数、组合数公式与二项式定理。",
+        "key_facts": [
+          "C(n,k)=C(n-1,k-1)+C(n-1,k)",
+          "通项 T_{k+1}=C(n,k)·a^{n-k}·b^k"
+        ]
+      },
+      {
+        "id": "概率与统计",
+        "grade": "高二",
+        "track": "新课",
+        "difficulty": 2,
+        "prerequisites": [],
+        "standard_definition": "古典概型、条件概率与独立事件，离散型随机变量分布列、期望与方差；抽样方法与统计推断初步。",
+        "key_facts": [
+          "E(X)=Σxᵢpᵢ",
+          "独立事件 P(AB)=P(A)P(B)"
+        ]
+      },
+      {
+        "id": "定积分与微积分基本定理",
+        "grade": "高二",
+        "track": "选学",
+        "difficulty": 3,
+        "prerequisites": [
+          "导数的运算"
+        ],
+        "standard_definition": "定积分是曲边梯形面积的极限；牛顿-莱布尼茨公式 ∫ₐᵇ f(x)dx=F(b)-F(a)。",
+        "key_facts": [
+          "定积分的几何意义是面积的代数和"
+        ]
+      },
+      {
+        "id": "含参分类讨论",
+        "grade": "高三",
+        "track": "一轮复习",
+        "difficulty": 4,
+        "prerequisites": [
+          "导数与函数单调性",
+          "函数的极值与最值"
+        ],
+        "standard_definition": "当参数影响导数符号或图像形态时，按参数取值范围划分情形分别讨论并综合结论。",
+        "key_facts": [
+          "分类标准：判别式、根的位置、区间端点",
+          "不重不漏，最后写'综上'"
+        ]
+      },
+      {
+        "id": "恒成立与能成立问题",
+        "grade": "高三",
+        "track": "一轮复习",
+        "difficulty": 4,
+        "prerequisites": [
+          "函数的极值与最值"
+        ],
+        "standard_definition": "f(x)≥a 在 D 上恒成立 ⇔ f(x)min≥a；存在 x 使 f(x)≥a 成立 ⇔ f(x)max≥a（注意定义域）。",
+        "key_facts": [
+          "分离参数法",
+          "直接求最值法与端点效应"
+        ]
+      },
+      {
+        "id": "隐零点问题",
+        "grade": "高三",
+        "track": "二轮复习",
+        "difficulty": 4,
+        "prerequisites": [
+          "函数的极值与最值"
+        ],
+        "standard_definition": "f'(x)=0 的零点无法用初等形式解出时，设该零点为 x₀，利用 x₀ 满足的方程做整体代换。",
+        "key_facts": [
+          "'虚设零点'后整体代换",
+          "用隐零点表示极值再放缩估计范围"
+        ]
+      },
+      {
+        "id": "圆锥曲线联立与设而不求",
+        "grade": "高三",
+        "track": "一轮复习",
+        "difficulty": 4,
+        "prerequisites": [
+          "圆锥曲线的标准方程与性质"
+        ],
+        "standard_definition": "直线与圆锥曲线方程联立消元，不解出交点而用韦达定理整体代换处理中点、弦长、面积等问题。",
+        "key_facts": [
+          "先验 Δ>0 再用韦达定理",
+          "弦长 |AB|=√(1+k²)·|x₁-x₂|"
+        ]
+      },
+      {
+        "id": "极值点偏移",
+        "grade": "高三",
+        "track": "二轮复习",
+        "difficulty": 5,
+        "prerequisites": [
+          "函数的极值与最值",
+          "函数零点与方程的根"
+        ],
+        "standard_definition": "已知 x₁、x₂ 是 f(x)=m（或 f(x)=0）的两个根，利用单调性与对称性证明 x₁+x₂ 与极值点两倍 2x₀（或某定值）的不等关系的一类问题。",
+        "key_facts": [
+          "核心方法：对称化构造 g(x)=f(x₀+x)-f(x₀-x) 判断单调性",
+          "也可用差值函数 F(x)=f(x₀+x)-f(x₀-x) 或比值代换",
+          "结论方向由极值点两侧函数增减速度差异决定"
+        ]
+      },
+      {
+        "id": "对称化构造",
+        "grade": "高三",
+        "track": "二轮复习",
+        "difficulty": 5,
+        "prerequisites": [
+          "函数的极值与最值"
+        ],
+        "standard_definition": "构造 g(x)=f(x₀+x)-f(x₀-x)（x₀ 为极值点），通过 g 的单调性与端点值把'两根之和'问题转化为单变量函数符号问题。",
+        "key_facts": [
+          "g(x) 的符号与 x₁+x₂-2x₀ 的符号对应",
+          "构造方向取决于 f 在极值点两侧的凹凸趋势"
+        ]
+      },
+      {
+        "id": "数列不等式放缩",
+        "grade": "高三",
+        "track": "二轮复习",
+        "difficulty": 5,
+        "prerequisites": [
+          "数列与等差等比数列"
+        ],
+        "standard_definition": "将数列通项放缩为可求和（或可裂项、可等比压缩）的形式，再求和证明不等式。",
+        "key_facts": [
+          "常用：1/n² > 1/(n(n+1)) = 1/n - 1/(n+1)",
+          "放缩方向要与服务求和方向一致，注意等号取舍"
+        ]
+      }
+    ]
+  }
+}

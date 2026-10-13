@@ -74,13 +74,19 @@ internal fun MonologueDrawer(
                 )
             }
             if (expanded) {
-                Text(
-                    monologue,
-                    modifier = Modifier.padding(top = 6.dp),
-                    color = Color(0xFF3D4657),
-                    fontSize = 12.sp,
-                    lineHeight = 17.sp,
-                    fontStyle = FontStyle.Normal
+                // 2026-10-11 用户拍板：独白走 Markdown 渲染（与消息正文同一套
+                // ChatRichContentParser：标题/列表/代码/公式），紧凑字号保证
+                // 辅助信息不喧宾夺主。
+                RichMessageContent(
+                    source = monologue,
+                    userAligned = false,
+                    onOpenExternalLink = {},
+                    onMessageTap = {},
+                    onMessageLongPress = {},
+                    onCopySource = { ChatClipboardResult.Unavailable },
+                    textColor = Color(0xFF3D4657),
+                    bodyFontSize = 13.sp,
+                    bodyLineHeight = 19.sp
                 )
             }
         }

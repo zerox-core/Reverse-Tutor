@@ -122,7 +122,9 @@ internal fun ChatGuidanceCard(
                 OutlinedButton(
                     onClick = { detourExpanded = !detourExpanded },
                     modifier = Modifier.testTag("guidance-detour"),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GuidanceActionBlue),
+                    border = BorderStroke(1.dp, Color(0x4D8F6400)),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 12.dp,
                         vertical = 4.dp
@@ -137,6 +139,7 @@ internal fun ChatGuidanceCard(
                 TextButton(
                     onClick = { examplesExpanded = !examplesExpanded },
                     modifier = Modifier.testTag("guidance-example"),
+                    colors = ButtonDefaults.textButtonColors(contentColor = GuidanceActionBlue),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 8.dp,
                         vertical = 0.dp
@@ -174,7 +177,9 @@ internal fun ChatGuidanceCard(
                                         ChatDetourPath.CUSTOM -> "guidance-detour-custom"
                                     }
                                 ),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GuidanceActionBlue),
+                            border = BorderStroke(1.dp, Color(0x4D8F6400)),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(
                                 horizontal = 12.dp,
                                 vertical = 4.dp

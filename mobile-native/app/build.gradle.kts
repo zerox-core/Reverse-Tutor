@@ -126,6 +126,7 @@ dependencies {
     implementation(project(":feature:memory"))
     implementation(project(":feature:sources"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:reversetutor"))
 
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
     implementation("androidx.activity:activity-compose:1.8.2")
@@ -140,6 +141,7 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))

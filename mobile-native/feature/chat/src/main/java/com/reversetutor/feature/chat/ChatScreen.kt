@@ -373,12 +373,19 @@ fun ChatRoute(
             if (activeJob != null) {
                 activeGenerationToken = activeJob.token
                 activeBackgroundJobId = activeJob.id
-                generation = backgroundGenerationUiState(
-                    activeJob.status,
-                    activeJob.errorMessage,
-                    repository.getGenerationPreview(activeJob.id, activeJob.token),
-                    repository.getGenerationMonologue(activeJob.id, activeJob.token)
-                )
+                generation = run {
+                    // R-RT-5：反转家教协调器写自己的 partialStore（与 DataModule 私有单例
+                    // 不同源），LOADING 期间优先从端口读实时预览与独白；未实现时回退 repo。
+                    val monologuePort = backgroundTurnPreparationPort as? TurnMonologuePort
+                    backgroundGenerationUiState(
+                        activeJob.status,
+                        activeJob.errorMessage,
+                        monologuePort?.getPreview(activeJob.id, activeJob.token.value)
+                            ?: repository.getGenerationPreview(activeJob.id, activeJob.token),
+                        monologuePort?.getMonologue(activeJob.id, activeJob.token.value)
+                            ?: repository.getGenerationMonologue(activeJob.id, activeJob.token)
+                    )
+                }
             } else {
                 // 终态失败回放（2026-09-21）：生成在离开会话期间失败时，用户消息已
                 // 持久化但页面没有任何状态残留——重进会话补出「生成失败+重试」。
@@ -466,6 +473,11 @@ fun ChatRoute(
         while (activeBackgroundJobId == jobId) {
             delay(150L)
             val job = repository.getJob(jobId) ?: return@LaunchedEffect
+            // 竞态守卫（连发合并配套，2026-10-11）：getJob 挂起期间，新发送的
+            // 协程可能已把观察目标切到新任务（旧任务被合并取消）。旧任务本次
+            // tick 直接退出——不得用旧终态覆盖新任务的 Pending/Streaming，
+            // 也不得把 activeBackgroundJobId 误置空杀死新任务的观察循环。
+            if (activeBackgroundJobId != jobId) return@LaunchedEffect
             if (job.status in TerminalGenerationStatuses) {
                 if (activeGenerationToken == job.token) {
                     activeGenerationToken = null
@@ -486,7 +498,8 @@ fun ChatRoute(
                 } else {
                     null
                 }
-                sessionContract = sessionContract?.withTerminalGeneration(job.status, job.errorMessage)
+                sessionContract = (backgroundTurnPreparationPort as? SessionContractProvider)?.getLatestContract(sessionId)
+                    ?: sessionContract?.withTerminalGeneration(job.status, job.errorMessage)
                 activeBackgroundJobId = null
                 reload()
                 return@LaunchedEffect
@@ -494,11 +507,17 @@ fun ChatRoute(
             // 2026-09-20 用户拍板：接通流式预览（翻转 2026-09-10 的无预览设计）。
             // Running 期间把 partialStore 的增量文本透出为 Streaming 状态逐字上屏；
             // 终态仍走上面分支——完整回复只由持久化消息发布一次，预览随终态清空。
+            // 流式桥接（2026-10-11 拍板修复）：与重挂路径同构——RT 协调器写自己的
+            // partialStore，仓库直读读不到；优先 TurnMonologuePort 读口，未接管时
+            // 回退仓库。Running + 预览/独白非空 → Streaming，思考链抽屉才可见。
+            val monologuePort = backgroundTurnPreparationPort as? TurnMonologuePort
             generation = backgroundGenerationUiState(
                 job.status,
                 job.errorMessage,
-                repository.getGenerationPreview(jobId, job.token),
-                repository.getGenerationMonologue(jobId, job.token)
+                monologuePort?.getPreview(jobId, job.token.value)
+                    ?: repository.getGenerationPreview(jobId, job.token),
+                monologuePort?.getMonologue(jobId, job.token.value)
+                    ?: repository.getGenerationMonologue(jobId, job.token)
             )
         }
     }
@@ -509,6 +528,9 @@ fun ChatRoute(
     var guidanceFireCount by remember(sessionId) { mutableIntStateOf(0) }
     var lastFiredGuidanceTriggerId by remember(sessionId) { mutableStateOf<String?>(null) }
     var dismissedGuidanceTriggerId by remember(sessionId) { mutableStateOf<String?>(null) }
+    // 2026-10-11 用户拍板降级：与卡片交互过一次（动作或收起）后冷却 6 条消息，
+    // 并把自动升档回落——引导是好心提醒，不能变成高频弹窗。
+    var guidanceCooldownUntilCount by remember(sessionId) { mutableIntStateOf(0) }
     val guidanceGenerating =
         generation is ChatGenerationUiState.Streaming || generation is ChatGenerationUiState.Pending
     val guidance: ChatGuidanceUiState? = remember(
@@ -518,7 +540,8 @@ fun ChatRoute(
         guidanceEscalated,
         sessionId,
         guidanceGenerating,
-        dismissedGuidanceTriggerId
+        dismissedGuidanceTriggerId,
+        guidanceCooldownUntilCount
     ) {
         if (guidanceMode == ChatGuidanceMode.OFF || guidanceGenerating) null
         else {
@@ -526,6 +549,12 @@ fun ChatRoute(
                 records.map { ChatGuidanceMessage(it.message.id, it.message.role == MessageRole.Assistant, it.message.text) }
             else
                 visibleTimelineEntries.map { ChatGuidanceMessage(it.id, it.role == MessageRole.Assistant, it.text) }
+            // 发送空窗抑制：最后一条是老师消息 = 回复未到。此刻评估停滞
+            // 信号必然误报（老师刚说完话），还会把窗口内容顶上去——等回复
+            // 到达后再检测。
+            val awaitingReply = detectionMessages.lastOrNull()?.let { !it.isAssistant } == true
+            if (awaitingReply || detectionMessages.size < guidanceCooldownUntilCount) null
+            else {
             val sensitivity = when (guidanceMode) {
                 ChatGuidanceMode.LOW -> ChatGuidanceSensitivity.LOW
                 ChatGuidanceMode.STANDARD -> ChatGuidanceSensitivity.STANDARD
@@ -546,6 +575,7 @@ fun ChatRoute(
                         )
                     )
                 }
+            }
         }
     }
     LaunchedEffect(guidance?.signal?.triggerMessageId) {
@@ -556,9 +586,16 @@ fun ChatRoute(
             if (guidanceFireCount >= 2) guidanceEscalated = true
         }
     }
+    fun degradeGuidance() {
+        val currentCount = visibleTimelineEntries?.size ?: records.size
+        guidanceCooldownUntilCount = currentCount + 6
+        guidanceEscalated = false
+        guidanceFireCount = 0
+    }
     val onGuidanceAction: (ChatGuidanceAction) -> Unit = { action ->
         val current = guidance
         if (current != null) {
+            degradeGuidance()
             when (action) {
                 ChatGuidanceAction.ApplyScaffold -> updateComposer(
                     composer.copy(text = current.scaffoldText, sendFailure = null, notice = null)
@@ -569,7 +606,10 @@ fun ChatRoute(
             }
         }
     }
-    val onDismissGuidance: () -> Unit = { guidance?.let { dismissedGuidanceTriggerId = it.signal.triggerMessageId } }
+    val onDismissGuidance: () -> Unit = {
+        guidance?.let { dismissedGuidanceTriggerId = it.signal.triggerMessageId }
+        degradeGuidance()
+    }
 
     val routeState = if (visibleTimelinePort == null) {
         buildChatRouteUiState(

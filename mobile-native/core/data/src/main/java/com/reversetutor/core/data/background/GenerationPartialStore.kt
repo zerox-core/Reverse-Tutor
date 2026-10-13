@@ -47,6 +47,8 @@ class GenerationPartialStore {
 
     private companion object {
         const val MaxPreviewChars = 1200
-        const val MaxMonologuePreviewChars = 600
+// 2026-10-11 用户拍板「独白显示不全」：600 字窗口把前几轮内心话截掉了；
+        // 放大到 4000 与协调器滚动窗口对齐（内存 map，量级无压力）。
+        const val MaxMonologuePreviewChars = 4000
     }
 }

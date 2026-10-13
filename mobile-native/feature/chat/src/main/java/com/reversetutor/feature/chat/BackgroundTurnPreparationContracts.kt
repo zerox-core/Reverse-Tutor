@@ -49,3 +49,24 @@ sealed interface BackgroundTurnPreparationResult {
     data object Unavailable : BackgroundTurnPreparationResult
     data object Failed : BackgroundTurnPreparationResult
 }
+
+/**
+ * 可选契约状态源接口。当协调器支持在回合完成后提供最新诊断与动作契约时实现本接口。
+ */
+fun interface SessionContractProvider {
+    fun getLatestContract(sessionId: String): SessionConversationContract?
+}
+
+/**
+ * 可选思考流读接口。LOADING 期间思考抽屉优先从实现本接口的端口读实时预览与独白
+ * （反转家教协调器写自己的 GenerationPartialStore，与 DataModule 私有单例不同源），
+ * 未实现时回退 backgroundGenerationRepository 读路径，行为完全不变。
+ */
+interface TurnMonologuePort {
+    /** 实时思考流（老师侧独白），对应 repository.getGenerationMonologue。 */
+    fun getMonologue(jobId: String, token: String): String?
+
+    /** 实时回复预览（学生台词草稿），对应 repository.getGenerationPreview；默认不接管。 */
+    fun getPreview(jobId: String, token: String): String? = null
+}
+

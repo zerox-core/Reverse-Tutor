@@ -12,6 +12,7 @@ import com.reversetutor.core.data.learning.LearningLedgerRepository
 import com.reversetutor.core.data.learning.LearningRepositoryImpl
 import com.reversetutor.core.data.llm.ChatGenerationRepository
 import com.reversetutor.core.llm.FakeLlmGenerationRuntime
+import com.reversetutor.core.model.BackgroundJobStatus
 import com.reversetutor.core.data.llm.LlmProfileRepository
 import com.reversetutor.core.data.memory.MemoryRepository
 import com.reversetutor.core.data.message.MessageRepository
@@ -77,6 +78,9 @@ import com.reversetutor.preview.shell.ChallengeRuntimeCoordinator
 import com.reversetutor.preview.shell.DefaultWorkspaceViewModelFactory
 import com.reversetutor.preview.shell.WorkspaceViewModelFactory
 import com.reversetutor.preview.wiring.session.BackgroundTurnPreparationCoordinator
+import com.reversetutor.preview.wiring.session.ReverseTutorTurnPreparationCoordinator
+import com.reversetutor.preview.wiring.session.ReverseTutorRuntimeAssembly
+import com.reversetutor.preview.wiring.session.RoutingTurnPreparationPort
 import com.reversetutor.preview.wiring.session.ChapterTransitionProposalStore
 import com.reversetutor.preview.wiring.session.SharedPreferencesChapterTransitionProposalStore
 import com.reversetutor.preview.wiring.session.RecentTurnSignalsReader
@@ -165,6 +169,8 @@ class HybridAppGraph private constructor(
     val windowBranchPort: WindowBranchPort,
     val backgroundGenerationRepository: BackgroundGenerationRepository,
     val backgroundTurnPreparationPort: BackgroundTurnPreparationPort,
+    /** R-RT：反转家教算法内核协调器（builtInPresetId == reverse-tutor 的会话专用）。 */
+    val reverseTutorTurnPreparationCoordinator: ReverseTutorTurnPreparationCoordinator,
     val heartbeatTurnDispatchPort: HeartbeatTurnDispatchPort,
     val sessionRichReplyPort: SessionRichReplyPort,
     val sourceRepository: SourceRepository,
@@ -345,8 +351,25 @@ class HybridAppGraph private constructor(
                 windowIntakeDispatcher = windowIntakeDispatcher,
                 windowMemoryContextPort = windowMemoryContextPort
             )
+            // R-RT-3：反转家教算法内核协调器（ToolLoop 31 工具决策循环），
+            // LLM 客户端随运行模式分派：Fake 脚本化 / Production OpenAI tool-calling。
+            val reverseTutorCoordinator: ReverseTutorTurnPreparationCoordinator =
+                ReverseTutorRuntimeAssembly.buildCoordinator(
+                    context = appContext,
+                    conversationRunRepository = conversationRunRepository,
+                    messageRepository = messageRepository,
+                    backgroundGenerationRepository = backgroundGenerationRepository,
+                    llmClientProvider = when (llmRuntimeMode) {
+                        HybridLlmRuntimeMode.Fake -> ReverseTutorRuntimeAssembly.buildFakeLlmClient()
+                        HybridLlmRuntimeMode.Production ->
+                            ReverseTutorRuntimeAssembly.buildProductionLlmClient(appContext)
+                    }
+                )
+            // R-RT-4：会话级路由端口——反转会话走算法内核，其余会话走原 RAG/图谱/记忆链路。
             val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =
-                BackgroundTurnPreparationCoordinator(
+                RoutingTurnPreparationPort(
+                    reversePort = reverseTutorCoordinator,
+                    defaultPort = BackgroundTurnPreparationCoordinator(
                     isSessionDeleted = { sessionId ->
                         conversationRunRepository.isSessionDeleted(sessionId)
                     },
@@ -386,7 +409,23 @@ class HybridAppGraph private constructor(
                             )
                         }
                     }
-                )
+                ),
+                // 连发合并（问题⑥，2026-10-11 拍板方案 A）：入队前仅当该会话最新活动
+                // 生成任务仍是 Queued（未被 Worker 认领）时取消之——本次全新装配的
+                // 上下文快照自然包含此前未被回复的用户消息，一波连发合并为一条回复；
+                // Running 任务不受影响（不打断生成中）。已用三连发+第一条已被认领的
+                // 边缘场景确认：cancel 会连带取消并发中的 Running 任务，后果是提前
+                // 重答而非丢单，可接受。
+                coalesceQueuedGeneration = { sessionId ->
+                    val activeJob = backgroundGenerationRepository.findActiveJobForSession(sessionId)
+                    if (activeJob?.status == BackgroundJobStatus.Queued) {
+                        backgroundGenerationRepository.cancelSessionGenerationJobs(
+                            sessionId,
+                            System.currentTimeMillis()
+                        )
+                    }
+                }
+            )
             val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(
                 sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },
                 sessionTitle = { sessionId -> sessionRepository.getSession(sessionId)?.title },
@@ -459,6 +498,7 @@ class HybridAppGraph private constructor(
                 challengeRuntimeCoordinator = challengeRuntimeCoordinator,
                 agentCreationGateway = agentCreationGateway,
                 agentCreationStateStore = agentCreationStateStore,
+                reverseTutorTurnPreparationCoordinator = reverseTutorCoordinator,
                 frontend = createFrontendFactories(
                     context = appContext,
                     sessionRepository = sessionRepository,

@@ -17,7 +17,8 @@ class FormalPresetModelsTest {
                 "716:1055",
                 "716:1147",
                 "716:1239",
-                "716:1331"
+                "716:1331",
+                "reverse-tutor-core"
             ),
             FormalLearningPresets.all.map { it.figmaNodeId }.toSet()
         )

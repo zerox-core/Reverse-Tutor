@@ -106,6 +106,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
@@ -303,10 +304,17 @@ internal fun ReverseTeachingChatScreen(
     // 自动滚动：用户发送消息后强制滚动到最新内容；新内容（回复到达 / 流式文本增长）
     // 仅在视口本来就贴近底部时跟随，不打断向上翻阅历史。
     var followNextAppend by remember(state.sessionTitle) { mutableStateOf(false) }
+    // 最后一条学生消息 id：学习提示 slot 只挂它（贴独白抽屉）
+    val latestAssistantMessageId = state.messages.lastOrNull { it.role == MessageRole.Assistant }?.id
     val streamingLength = (state.generation as? ChatGenerationUiState.Streaming)?.text?.length ?: 0
     val timelineItemCount = run {
         val messageItems = if (state.messages.isEmpty()) 1 else buildChatTimelineEntries(state.messages).size
-        messageItems + (if (sessionContract != null) 1 else 0)
+        messageItems + (if (sessionContract != null) 1 else 0) +
+            // 2026-10-11 生成状态气泡挪回会话流内（用户拍板，反转 2026-09-20 的
+            // 「固定输入框上方」）：计入 item 数，自动滚动目标才能落到状态气泡。
+            (if (state.generationStatusLabel != null) 1 else 0) +
+            // 引导卡在会话流内：出现时计入滚动目标，贴底时自动滚到卡片
+            (if (guidance != null) 1 else 0)
     }
     var previousTimelineItemCount by remember(state.sessionTitle) { mutableStateOf(timelineItemCount) }
     var scrollRestoreGuard by remember(state.sessionTitle) { mutableStateOf(true) }
@@ -451,6 +459,8 @@ internal fun ReverseTeachingChatScreen(
                         return@items
                     }
                     val item = (entry as ChatTimelineEntry.Message).item
+                    // 「本轮学习提示」只挂最后一条学生气泡（贴住独白抽屉）
+                    val isLatestAssistant = item.id == latestAssistantMessageId
                     // 2026-09-24 排版改版：气泡化后行距收紧，避免消息松散漂浮
                     val timelineSpacing = when (item.role) {
                         MessageRole.Assistant -> Modifier.padding(bottom = 8.dp)
@@ -475,82 +485,87 @@ internal fun ReverseTeachingChatScreen(
                             onReselectInvalidSource = onReselectInvalidSource,
                             onOpenExternalLink = onOpenExternalLink,
                             onCopyRichSource = onCopyRichSource,
-                            monologueExpanded = monologueExpanded,
-                            onMonologueExpandedChange = { monologueExpanded = it }
+                            learningHint = if (isLatestAssistant) {
+                                {
+                                    SessionAssistantReplyHint(
+                                        contract = sessionContract,
+                                        onInteraction = onAssistantInteraction
+                                    )
+                                }
+                            } else null
                         )
                     }
                 }
             }
-            sessionContract?.let { contract ->
+            // 生成状态气泡（2026-10-11 用户拍板，反转 2026-09-20 的「固定输入框
+            // 上方」）：思考中/流式正文/独白抽屉作为会话流尾部气泡随对话滚动，
+            // 自动滚动已计此 item。2026-09-20 挪出列表的原因是「指示器滚出视口
+            // 不渲染而间歇消失」——生成开始时自动贴底即可覆盖，上翻历史时气泡
+            // 随流滚走是标准对话行为。流式气泡限高内滚、随文本增长自动贴尾。
+            state.generationStatusLabel?.let { label ->
                 item {
-                    SessionAssistantReplyHint(
-                        contract = contract,
-                        onInteraction = onAssistantInteraction
-                    )
+                    val streaming = state.generation as? ChatGenerationUiState.Streaming
+                    val partial = streaming?.text
+                    val streamingMonologue = streaming?.monologue
+                    val generationRowScroll = rememberScrollState()
+                    LaunchedEffect(partial?.length, streamingMonologue?.length) {
+                        if (generationRowScroll.maxValue > 0) {
+                            generationRowScroll.scrollTo(generationRowScroll.maxValue)
+                        }
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xEAF3F5FA))
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .heightIn(max = 280.dp)
+                            .verticalScroll(generationRowScroll)
+                    ) {
+                        // 消息生成框置顶（消息生成为主体元素优先展示）
+                        if (partial.isNullOrBlank()) {
+                            GenerationRow(
+                                learnerName = state.learnerName,
+                                learnerAvatarReference = state.learnerAvatarReference,
+                                avatarVisible = state.avatarVisible,
+                                label = label,
+                                onOpenSettings = onOpenModelSettings,
+                                onRetry = onRetryGeneration
+                            )
+                        } else {
+                            StreamingGenerationRow(
+                                learnerName = state.learnerName,
+                                learnerAvatarReference = state.learnerAvatarReference,
+                                avatarVisible = state.avatarVisible,
+                                text = partial
+                            )
+                        }
+                        // 思考链内心独白：置于生成框下方，随生成一同动态出现
+                        if (!streamingMonologue.isNullOrBlank()) {
+                            Spacer(Modifier.height(6.dp))
+                            MonologueDrawer(
+                                monologue = streamingMonologue,
+                                expanded = monologueExpanded,
+                                onExpandedChange = { monologueExpanded = it },
+                                streaming = true
+                            )
+                        }
+                        // 本轮学习提示置于最下方
+                        SessionAssistantReplyHint(
+                            contract = sessionContract,
+                            onInteraction = onAssistantInteraction
+                        )
+                    }
                 }
             }
-        }
-        // v1 死循环干预（2026-09-28 拍板）：底部滑出引导卡，不打断对话。
-        AnimatedVisibility(
-            visible = guidance != null,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
+            // v1 死循环干预引导卡（2026-10-11 用户拍板，反转「输入栏上方滑出」）：
+            // 挂到会话流尾部随对话滚动，不再压缩输入区/顶起窗口；发送空窗
+            // （回复未到）不弹，交互一次后冷却降级（ChatScreen 派生层控制）。
             guidance?.let { current ->
-                ChatGuidanceCard(
-                    guidance = current,
-                    onAction = onGuidanceAction,
-                    onDismiss = onDismissGuidance
-                )
-            }
-        }
-        // 生成状态行固定在输入框上方（2026-09-20 拍板）：此前是 LazyColumn 尾部
-        // item；列表只组合可视区 item，指示器一旦滚出视口就不渲染，表现为间歇性
-        // 消失。挪出列表后始终可见；流式气泡限高内滚、随文本增长自动贴尾。
-        state.generationStatusLabel?.let { label ->
-            val streaming = state.generation as? ChatGenerationUiState.Streaming
-            val partial = streaming?.text
-            val streamingMonologue = streaming?.monologue
-            val generationRowScroll = rememberScrollState()
-            LaunchedEffect(partial?.length) {
-                if (generationRowScroll.maxValue > 0) {
-                    generationRowScroll.scrollTo(generationRowScroll.maxValue)
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xEAF3F5FA))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .heightIn(max = 280.dp)
-                    .verticalScroll(generationRowScroll)
-            ) {
-                // 2026-09-21 思考链流式透出：抽屉置顶、流式正文在下；展开状态与
-                // 已完成消息共享，生成结束落抽屉时不再闪断。
-                if (!streamingMonologue.isNullOrBlank()) {
-                    MonologueDrawer(
-                        monologue = streamingMonologue,
-                        expanded = monologueExpanded,
-                        onExpandedChange = { monologueExpanded = it },
-                        streaming = true
-                    )
-                    Spacer(Modifier.height(6.dp))
-                }
-                if (partial.isNullOrBlank()) {
-                    GenerationRow(
-                        learnerName = state.learnerName,
-                        learnerAvatarReference = state.learnerAvatarReference,
-                        avatarVisible = state.avatarVisible,
-                        label = label,
-                        onOpenSettings = onOpenModelSettings,
-                        onRetry = onRetryGeneration
-                    )
-                } else {
-                    StreamingGenerationRow(
-                        learnerName = state.learnerName,
-                        learnerAvatarReference = state.learnerAvatarReference,
-                        avatarVisible = state.avatarVisible,
-                        text = partial
+                item {
+                    ChatGuidanceCard(
+                        guidance = current,
+                        onAction = onGuidanceAction,
+                        onDismiss = onDismissGuidance
                     )
                 }
             }
@@ -1068,8 +1083,9 @@ private fun ReverseTeachingMessage(
     onReselectInvalidSource: (String, String) -> Unit,
     onOpenExternalLink: (String) -> Unit,
     onCopyRichSource: (String) -> ChatClipboardResult,
-    monologueExpanded: Boolean = false,
-    onMonologueExpandedChange: (Boolean) -> Unit = {}
+    // 2026-10-11「本轮学习提示」贴住内心独白（用户拍板）：slot 挂在最后一条
+    // 学生气泡的独白抽屉下方，不再于时间线尾部独立占一行。
+    learningHint: (@Composable () -> Unit)? = null
 ) {
     when (item.role) {
         MessageRole.System -> ChapterTransitionPolicy.parseCardText(item.text)
@@ -1093,8 +1109,7 @@ private fun ReverseTeachingMessage(
             onReselectInvalidSource,
             onOpenExternalLink,
             onCopyRichSource,
-            monologueExpanded,
-            onMonologueExpandedChange
+            learningHint = learningHint
         )
     }
 }
@@ -1185,9 +1200,13 @@ private fun LearnerTimelineMessage(
     onReselectInvalidSource: (String, String) -> Unit,
     onOpenExternalLink: (String) -> Unit,
     onCopyRichSource: (String) -> ChatClipboardResult,
-    monologueExpanded: Boolean = false,
-    onMonologueExpandedChange: (Boolean) -> Unit = {}
+    // 2026-10-11「本轮学习提示」贴住内心独白（用户拍板）：slot 挂在独白抽屉下方
+    learningHint: (@Composable () -> Unit)? = null
 ) {
+    // 2026-10-11 用户拍板「点最新消息独白被跳到上一条」：展开状态从会话级
+    // 单例下沉为 per-message——不再一次展开全部历史独白导致视口被顶走
+    // （反转 2026-09-21 的会话级共享）。
+    var monologueExpanded by rememberSaveable("rt-monologue", item.id) { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     Row(
@@ -1254,9 +1273,11 @@ private fun LearnerTimelineMessage(
                 MonologueDrawer(
                     monologue = monologue,
                     expanded = monologueExpanded,
-                    onExpandedChange = onMonologueExpandedChange
+                    onExpandedChange = { monologueExpanded = it }
                 )
             }
+            // 「本轮学习提示」紧贴独白抽屉（2026-10-11 用户拍板），不再尾部独立占行
+            learningHint?.invoke()
             if (selected) MessageMetadataRow(item)
         }
     }
@@ -1480,7 +1501,7 @@ private fun RememberedMessageLabel() {
 }
 
 @Composable
-private fun RichMessageContent(
+internal fun RichMessageContent(
     source: String,
     userAligned: Boolean,
     onOpenExternalLink: (String) -> Unit,
@@ -1489,7 +1510,10 @@ private fun RichMessageContent(
     onCopySource: (String) -> ChatClipboardResult,
     // 2026-09-24 排版改版：正文颜色可注入（用户蓝气泡传白字），
     // 列宽从撑满改为内容自适应上限，配合气泡排版。
-    textColor: Color = ChatInk
+    textColor: Color = ChatInk,
+    // 2026-10-11 内心独白复用：辅助信息用紧凑字号（16sp 正文在抽屉里太占位）
+    bodyFontSize: androidx.compose.ui.unit.TextUnit = 16.sp,
+    bodyLineHeight: androidx.compose.ui.unit.TextUnit = 24.sp
 ) {
     val blocks = remember(source) { ChatRichContentParser.parse(source) }
     Column(
@@ -1506,13 +1530,17 @@ private fun RichMessageContent(
                     lineHeight = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
-                is ChatRichBlock.Paragraph -> RichInlineRow(
-                    inlines = block.inlines,
-                    onOpenExternalLink = onOpenExternalLink,
-                    onMessageTap = onMessageTap,
-                    onMessageLongPress = onMessageLongPress,
-                    textColor = textColor
-                )
+                is ChatRichBlock.Paragraph -> Column {
+                    RichInlineRow(
+                        inlines = block.inlines,
+                        onOpenExternalLink = onOpenExternalLink,
+                        onMessageTap = onMessageTap,
+                        onMessageLongPress = onMessageLongPress,
+                        textColor = textColor,
+                        fontSize = bodyFontSize,
+                        lineHeight = bodyLineHeight
+                    )
+                }
                 is ChatRichBlock.ListItem -> Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text(if (block.ordered) "${block.index ?: 1}." else "•", color = ChatMuted, fontSize = 16.sp)
                     Column(modifier = Modifier.weight(1f)) {
@@ -1560,7 +1588,12 @@ private fun RichMessageContent(
                     }
                 }
                 is ChatRichBlock.Table -> RichTable(block)
-                is ChatRichBlock.PlainText -> Text(block.source, color = textColor, fontSize = 16.sp, lineHeight = 24.sp)
+                is ChatRichBlock.PlainText -> Text(
+                    block.source,
+                    color = textColor,
+                    fontSize = bodyFontSize,
+                    lineHeight = bodyLineHeight
+                )
             }
         }
     }
@@ -1572,7 +1605,9 @@ private fun RichInlineRow(
     onOpenExternalLink: (String) -> Unit,
     onMessageTap: () -> Unit,
     onMessageLongPress: () -> Unit,
-    textColor: Color = ChatInk
+    textColor: Color = ChatInk,
+    fontSize: androidx.compose.ui.unit.TextUnit = 16.sp,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 24.sp
 ) {
     val text = remember(inlines) { buildRichInlineAnnotatedString(inlines) }
     var layoutResult by remember(text) { mutableStateOf<TextLayoutResult?>(null) }
@@ -1594,8 +1629,8 @@ private fun RichInlineRow(
             )
         },
         color = textColor,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
+        fontSize = fontSize,
+        lineHeight = lineHeight,
         onTextLayout = { layoutResult = it }
     )
 }
