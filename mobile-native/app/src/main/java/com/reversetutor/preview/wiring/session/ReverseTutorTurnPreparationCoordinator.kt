@@ -104,7 +104,7 @@ class ReverseTutorTurnPreparationCoordinator(
                     topic = request.sessionSnapshot?.title?.ifBlank { "反转家教" } ?: "反转家教",
                     studentId = request.sessionSnapshot?.learnerDisplayName?.ifBlank { "小理" } ?: "小理",
                     grade = "初二",
-                    cardId = "card_01_struggling",
+                    cardId = "proud_average",
                     understandingLevel = 1,
                     initialUnderstandingLevel = 1,
                     currentRound = 0

@@ -78,8 +78,8 @@ class ReverseTutorTurnPreparationCoordinatorTest {
         """.trimIndent()
         val testCards = """
         {
-          "card_01_struggling": {
-            "card_id": "card_01_struggling",
+          "proud_average": {
+            "card_id": "proud_average",
             "name": "李想",
             "identity_text": "高二学生",
             "personality_text": "基础薄弱但不想承认，容易混淆移项变号规则",

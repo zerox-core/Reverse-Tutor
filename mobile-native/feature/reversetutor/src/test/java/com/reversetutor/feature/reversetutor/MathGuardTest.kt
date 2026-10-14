@@ -45,6 +45,23 @@ class MathGuardTest {
     }
 
     @Test
+    fun correctBinomialSquaredNotFlagged() {
+        // 回归（2026-10-14 s1 spike 实录）：正确的二项式平方 (x + b/2a)² 曾被
+        // 第四条正则（无上下文的 \+b/2a）误报为「顶点横坐标是 +b/2a」。
+        assertTrue(
+            MathGuard.scanMath("那顶点横坐标就是 (x + b/2a)²，负号是括号里那个加号带出来的").isEmpty()
+        )
+        assertTrue(MathGuard.scanMath("写成 (x+b/2a)² 再减 (b/2a)² 才对").isEmpty())
+    }
+
+    @Test
+    fun stillCatchesBarePlusB2aClaim() {
+        // 收窄后不得漏掉真违规（与 ToolLoopTest.runTurnMathGuardViolationCaptured 同源）
+        assertTrue(MathGuard.scanMath("我知道了，顶点横坐标是 +b/2a！").isNotEmpty())
+        assertTrue(MathGuard.scanMath("顶点是 +b/(2a) 就对了").isNotEmpty())
+    }
+
+    @Test
     fun verifyCompletingSquareMatchesPython() {
         // Python: verify_completing_square(6)
         val a = MathGuard.verifyCompletingSquare(6.0)
