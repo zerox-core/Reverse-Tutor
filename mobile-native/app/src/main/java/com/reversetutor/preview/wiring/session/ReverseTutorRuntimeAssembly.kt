@@ -21,7 +21,9 @@ import com.reversetutor.feature.reversetutor.loop.LlmUsage
 import com.reversetutor.feature.reversetutor.loop.ToolCallRequest
 import com.reversetutor.feature.reversetutor.loop.ToolLoop
 import com.reversetutor.feature.reversetutor.loop.ToolLoopLlmClient
+import com.reversetutor.feature.reversetutor.memory.InMemoryRTMemoryStore
 import com.reversetutor.feature.reversetutor.retrieval.MaterialStore
+import com.reversetutor.feature.reversetutor.scenario.ScenarioPackage
 import com.reversetutor.feature.reversetutor.tools.CoreTools
 import com.reversetutor.feature.reversetutor.tools.ToolRegistry
 import kotlinx.coroutines.CoroutineScope
@@ -49,6 +51,9 @@ object ReverseTutorRuntimeAssembly {
     private const val ASSET_CURRICULUM = "curriculum.json"
     private const val ASSET_STUDENT_CARDS = "student_cards.json"
 
+    /** 场景包资产目录（由 `py -m scripts.build_scenario_packages` 生成）。 */
+    private const val ASSET_SCENARIOS_DIR = "scenarios"
+
     fun buildCoordinator(
         context: Context,
         conversationRunRepository: ConversationRunRepositoryImpl,
@@ -64,10 +69,19 @@ object ReverseTutorRuntimeAssembly {
         StudentCards.setDefault(StudentCards(readAsset(appContext, ASSET_STUDENT_CARDS)))
         val registry = ToolRegistry()
         CoreTools.registerAll(registry)
+        // 场景素材注入（2026-10-14：算法为基底、场景为配置数据的第一步）：
+        // 此前 addDoc 无生产调用点，活动包的 sources 永不进资料库。
+        val materialStore = MaterialStore()
+        val scenarioDocs = installScenarioPackages(appContext, materialStore)
+        // 长期记忆（阶段 3 首批，2026-10-14）：save_teaching_pattern /
+        // retrieve_historical_context / generate_progress_report 需要跨会话状态。
+        // 此处用进程内实现（Room 属冻结区，待用户批准后再替换实现）。
+        val memoryStore = InMemoryRTMemoryStore()
         val toolLoop = ToolLoop(
             registry = registry,
             catalog = catalog,
-            store = MaterialStore()
+            store = materialStore,
+            memoryStore = memoryStore
         )
 
         // ---- 仓库桥接 ----
@@ -174,6 +188,30 @@ object ReverseTutorRuntimeAssembly {
 
     private fun readAsset(context: Context, name: String): String {
         return context.assets.open(name).bufferedReader(Charsets.UTF_8).use { it.readText() }
+    }
+
+    /**
+     * 把随包发布的场景素材注入资料库，返回注入条数。
+     *
+     * 现状（最小切片）：装配期装入全部打包场景——会话尚未携带 scenarioId，
+     * 按会话按场景隔离随「会话 ↔ 场景绑定」一起做。素材关键词互不重叠，
+     * 跨场景检索不会互相干扰。
+     *
+     * 目录缺失或单个包损坏都不影响启动（算法内核不因场景数据失败而不可用）。
+     */
+    private fun installScenarioPackages(context: Context, store: MaterialStore): Int {
+        val names = runCatching {
+            context.assets.list(ASSET_SCENARIOS_DIR)?.filter { it.endsWith(".json") }.orEmpty()
+        }.getOrElse { return 0 }
+
+        var installed = 0
+        for (name in names.sorted()) {
+            val parsed = runCatching {
+                ScenarioPackage.parse(readAsset(context, "$ASSET_SCENARIOS_DIR/$name"))
+            }.getOrNull() ?: continue
+            installed += parsed.installInto(store)
+        }
+        return installed
     }
 }
 

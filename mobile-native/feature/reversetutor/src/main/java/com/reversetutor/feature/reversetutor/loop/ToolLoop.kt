@@ -7,8 +7,10 @@ import com.reversetutor.core.llm.ProviderHttpResult
 import com.reversetutor.core.llm.ProviderHttpTransport
 import com.reversetutor.feature.reversetutor.curriculum.CurriculumCatalog
 import com.reversetutor.feature.reversetutor.guard.MathGuard
+import com.reversetutor.feature.reversetutor.memory.RTMemoryStore
 import com.reversetutor.feature.reversetutor.prompt.PromptAssembler
 import com.reversetutor.feature.reversetutor.retrieval.MaterialStore
+import com.reversetutor.feature.reversetutor.retrieval.RTWebSearchProvider
 import com.reversetutor.feature.reversetutor.session.BreakthroughEvent
 import com.reversetutor.feature.reversetutor.session.RTSession
 import com.reversetutor.feature.reversetutor.session.StruggleEvent
@@ -129,7 +131,11 @@ class ToolLoop(
     val catalog: CurriculumCatalog,
     val store: MaterialStore,
     val maxStepsPerTurn: Int = 12,
-    val recentRounds: Int = 3
+    val recentRounds: Int = 3,
+    /** 长期记忆存储（阶段 3 首批）；缺省回落到进程级默认实例，保证向后兼容。 */
+    val memoryStore: RTMemoryStore? = null,
+    /** 外部检索 provider；缺省不注入，等价 `WEB_SEARCH_PROVIDER=off`。 */
+    val webSearchProvider: RTWebSearchProvider? = null
 ) {
 
     companion object {
@@ -300,11 +306,14 @@ class ToolLoop(
 
         val report = TurnReport(round = roundNo)
         val sink = SessionStateSink()
+        val extra = mutableMapOf<String, Any>(CoreTools.KEY_SESSION_STATE_SINK to sink)
+        memoryStore?.let { extra[CoreTools.KEY_MEMORY_STORE] = it }
+        webSearchProvider?.let { extra[CoreTools.KEY_WEB_SEARCH_PROVIDER] = it }
         val toolContext = ToolContext(
             session = session.copy(currentRound = roundNo),
             curriculumCatalog = catalog,
             materialStore = store,
-            extra = mapOf(CoreTools.KEY_SESSION_STATE_SINK to sink)
+            extra = extra
         )
         val tools = registry.schemas()
 
@@ -716,7 +725,7 @@ class ToolLoop(
             newTraces.add(ToolTraceEntry(tool = t.tool, round = roundNo, callId = t.callId))
         }
 
-        return session.copy(
+        val updated = session.copy(
             understandingLevel = newLevel,
             emotion = newEmotion,
             masteredConcepts = mastered,
@@ -726,6 +735,55 @@ class ToolLoop(
             knowledgeGraphNodes = kgNodes,
             toolTrace = newTraces
         )
+
+        // 对齐 spike session_service：每轮结束后写会话快照，供
+        // generate_progress_report 跨会话聚合。存档失败不得影响回合结果。
+        saveSnapshotQuietly(updated)
+
+        return updated
+    }
+
+    /**
+     * 会话首次落快照的时间（对齐 spike `session["created_at"]`）。
+     * [RTSession] 无 create 时间字段，故在此按 sessionId 记忆；快照按
+     * sessionId 覆盖写，首次写入的时间即会话起始时间。
+     */
+    private val sessionStartedAt = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * 写会话快照到长期记忆（对齐 spike `STORE.save_snapshot`）。
+     * 任何异常都被吞掉：报告是附加能力，不能拖垮对话回合。
+     */
+    private fun saveSnapshotQuietly(session: RTSession) {
+        val store = memoryStore ?: return
+        try {
+            val sid = session.sessionId
+            if (sid.isEmpty()) return
+            val startedAt = sessionStartedAt.getOrPut(sid) { nowIso() }
+            val struggles = JSONArray()
+            for (e in session.struggleEvents) {
+                struggles.put(
+                    JSONObject().put("concept", e.concept).put("round", e.round)
+                )
+            }
+            store.saveSnapshot(
+                JSONObject()
+                    .put("session_id", sid)
+                    .put("student_id", session.studentId)
+                    .put("topic", session.topic)
+                    .put("status", session.status)
+                    .put("grade", session.grade)
+                    .put("created_at", startedAt)
+                    .put("understanding_level", session.understandingLevel)
+                    .put("initial_understanding_level", session.initialUnderstandingLevel)
+                    .put("mastered_concepts", JSONArray(session.masteredConcepts))
+                    .put("confused_concepts", JSONArray(session.confusedConcepts))
+                    .put("struggle_events", struggles)
+                    .put("messages", JSONArray())
+            )
+        } catch (_: Exception) {
+            // 快照失败静默：不影响回合与 UI
+        }
     }
 
     private fun serializeToolResult(result: ToolResult): String {

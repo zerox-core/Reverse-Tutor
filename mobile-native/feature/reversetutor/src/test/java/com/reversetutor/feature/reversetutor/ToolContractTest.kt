@@ -19,15 +19,15 @@ import org.junit.Test
 import java.io.File
 
 /**
- * 工具契约测试（对拍规格源：spike tests/test_tools_contract.py，裁剪到首批 27 工具）。
+ * 工具契约测试（对拍规格源：spike tests/test_tools_contract.py，全量 31 工具）。
  *
- * 覆盖：注册数量与分类、schema 完整性、27 工具最小参数执行、统一返回格式
+ * 覆盖：注册数量与分类、schema 完整性、31 工具最小参数执行、统一返回格式
  * （success/data/error/metadata）、参数缺失校验、未知工具、非知识库领域退化。
  *
  * 与 spike 的差异（均为声明过的移植形态）：
- * - 31 → 27：web_search / save_teaching_pattern / retrieve_historical_context /
- *   generate_progress_report 留批 2；
- * - 分类计数相应为 事实检索2/角色扮演6/认知诊断4/教学策略5/决策路由4/记忆管理3/评估反馈3；
+ * - 2026-10-14 补齐批 2：web_search / save_teaching_pattern /
+ *   retrieve_historical_context / generate_progress_report，计数对齐 spike 的 31；
+ * - 分类计数为 事实检索3/角色扮演6/认知诊断4/教学策略5/决策路由4/记忆管理5/评估反馈4；
  * - _repair_tool_arguments / _context_compression / SSE 流式属 ToolLoop 层，归阶段 6 测试。
  */
 class ToolContractTest {
@@ -76,6 +76,7 @@ class ToolContractTest {
         ),
         "lookup_curriculum" to obj("concept" to "极值点偏移"),
         "search_materials" to obj("query" to "对称化构造"),
+        "web_search" to obj("query" to "极值点偏移 典型例题"),
         "speak_as_confused_student" to obj(
             "confusion_point" to "为什么是 -b/2a", "intensity" to "moderate"
         ),
@@ -151,6 +152,10 @@ class ToolContractTest {
         "update_knowledge_graph" to obj(
             "mastered_concepts" to arr("配方法"), "pending_concepts" to arr("顶点")
         ),
+        "save_teaching_pattern" to obj(
+            "strategy" to "几何类比", "effectiveness" to 0.8, "context" to "学生卡在符号"
+        ),
+        "retrieve_historical_context" to obj("query" to "配方法 卡住"),
         "evaluate_session_quality" to obj(
             "initial_goals" to arr("配方法"), "tools_used" to arr("check_understanding")
         ),
@@ -158,6 +163,7 @@ class ToolContractTest {
             "pre_assessment" to obj("level" to 2), "post_assessment" to obj("level" to 4),
             "time_spent" to 12.0
         ),
+        "generate_progress_report" to obj("student_id" to "anonymous"),
         "detect_teaching_failure" to obj(
             "interaction_log" to arr(
                 obj("round" to 1, "level" to 1),
@@ -168,14 +174,14 @@ class ToolContractTest {
     )
 
     // ------------------------------------------------------------------
-    // 注册数量与分类（对拍 test_registry_counts，31→27、记忆/评估各 -1）
+    // 注册数量与分类（对拍 test_registry_counts，全量 31）
     // ------------------------------------------------------------------
     @Test
     fun registryCounts() {
-        assertEquals(27, registry.count())
+        assertEquals(31, registry.count())
         val expected = mapOf(
-            "事实检索" to 2, "角色扮演" to 6, "认知诊断" to 4,
-            "教学策略" to 5, "决策路由" to 4, "记忆管理" to 3, "评估反馈" to 3
+            "事实检索" to 3, "角色扮演" to 6, "认知诊断" to 4,
+            "教学策略" to 5, "决策路由" to 4, "记忆管理" to 5, "评估反馈" to 4
         )
         val byCat = HashMap<String, Int>()
         for (t in registry.allTools()) byCat.merge(t.category, 1, Int::plus)
@@ -195,7 +201,7 @@ class ToolContractTest {
         }
     }
 
-    /** 对拍 test_tool_contract：27 工具 × 最小参数 → 统一字段 + trace + success。 */
+    /** 对拍 test_tool_contract：31 工具 × 最小参数 → 统一字段 + trace + success。 */
     @Test
     fun toolContractWithMinArgs() {
         for ((name, args) in minArgs) {
@@ -284,7 +290,7 @@ class ToolContractTest {
         assertTrue(((r3.data as JSONObject).optInt("overall_level")) >= 1)
     }
 
-    /** schema 引用一致性：minArgs 必须恰好覆盖全部 27 个注册工具（防止漏测）。 */
+    /** schema 引用一致性：minArgs 必须恰好覆盖全部 31 个注册工具（防止漏测）。 */
     @Test
     fun minArgsCoverAllRegisteredTools() {
         val registered: List<RegisteredTool> = registry.allTools()

@@ -43,9 +43,14 @@
 
 **阶段 2 决策循环**：ToolRegistry + ToolLoop（function calling 协议 + JSON 修复兜底）+ 失败降级
 **阶段 3 存储**：Room 独立表（不改现有 ReverseTutorDatabase migration 链）
+  - 2026-10-14 状态：Room 属冻结区（`core/data/local`），未获批准，故先落**端口 + 进程内实现** `memory/RTMemoryStore.kt`；
+    契约对齐 spike `store.py` 的 events / teaching_patterns / session_snapshots 三表，接入 Room 时替换实现即可
 **阶段 4 提示词**：PromptAssembler 完整版（身份铁律+人设+卡+状态+工具说明）
 **阶段 5 验证**：误导/跳步/下套三场景剧本复跑
-**二批**：web_search、retrieve_historical_context、generate_progress_report、save_teaching_pattern、measure_learning_gain 等
+**二批（2026-10-14 已完成）**：web_search、retrieve_historical_context、generate_progress_report、save_teaching_pattern
+  - 至此注册表 **31 工具**，与 spike 全量对齐；`web_search` 无内置 provider（Android 无子进程、测试禁真实网络），
+    未注入时等价 `WEB_SEARCH_PROVIDER=off` 返回 `available=false` 的事实
+  - 遗留：4 张表的**跨进程持久化**（进程内实现重启即丢）
 
 ## 3. 硬规则遵守清单
 

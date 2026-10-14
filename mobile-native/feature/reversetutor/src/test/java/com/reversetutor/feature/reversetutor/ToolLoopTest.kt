@@ -7,9 +7,12 @@ import com.reversetutor.feature.reversetutor.loop.MockToolLoopLlmClient
 import com.reversetutor.feature.reversetutor.loop.ToolCallRequest
 import com.reversetutor.feature.reversetutor.loop.ToolLoop
 import com.reversetutor.feature.reversetutor.loop.ToolLoopLlmClient
+import com.reversetutor.feature.reversetutor.memory.InMemoryRTMemoryStore
 import com.reversetutor.feature.reversetutor.retrieval.MaterialStore
 import com.reversetutor.feature.reversetutor.session.RTSession
 import com.reversetutor.feature.reversetutor.tools.CoreTools
+import com.reversetutor.feature.reversetutor.tools.SessionStateSink
+import com.reversetutor.feature.reversetutor.tools.ToolContext
 import com.reversetutor.feature.reversetutor.tools.ToolRegistry
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -184,10 +187,121 @@ class ToolLoopTest {
         assertTrue("多轮工具执行后应记录 toolTrace", updatedSession.toolTrace.isNotEmpty())
     }
 
+    /**
+     * 阶段 3 快照接线（2026-10-14）：注入 memoryStore 后每轮写会话快照，
+     * `generate_progress_report` 才能跨会话聚合（对齐 spike session_service
+     * 每轮 `save_snapshot` 的行为）。
+     */
+    @Test
+    fun runTurnWritesSessionSnapshotForProgressReport() = runBlocking {
+        val memoryStore = InMemoryRTMemoryStore()
+        val loop = ToolLoop(
+            registry = registry,
+            catalog = catalog,
+            store = store,
+            memoryStore = memoryStore
+        )
+        val session = RTSession(
+            sessionId = "snap-test",
+            topic = "二次函数顶点公式",
+            studentId = "stu-snap",
+            understandingLevel = 2,
+            initialUnderstandingLevel = 1
+        )
+        loop.runTurn(
+            session = session,
+            historyMessages = emptyList(),
+            userText = "配方法就是把 x²+6x 凑成 (x+3)²，因为多了 9 所以减回去，得到顶点",
+            isOpening = false,
+            llmClient = MockToolLoopLlmClient()
+        )
+
+        val snapshots = memoryStore.sessionsForReport("stu-snap", null)
+        assertEquals("每轮应写 1 条会话快照", 1, snapshots.size)
+        assertEquals("snap-test", snapshots[0].getString("session_id"))
+
+        // 报告应能读到该快照，而不是回落当前会话
+        val context = ToolContext(
+            session = session,
+            extra = mapOf(
+                CoreTools.KEY_MEMORY_STORE to memoryStore,
+                CoreTools.KEY_SESSION_STATE_SINK to SessionStateSink()
+            )
+        )
+        val (result, _) = registry.execute(
+            "generate_progress_report",
+            JSONObject().put("student_id", "stu-snap"),
+            context
+        )
+        assertTrue(result.success)
+        val summary = (result.data as JSONObject).getString("summary")
+        assertTrue("报告应聚合快照而非回落：$summary", summary.contains("共 1 次会话"))
+    }
+
+    /**
+     * 跨会话聚合的判别测试：回落路径最多只能报 1 次会话，
+     * 因此「共 2 次会话」只可能来自快照聚合。
+     */
+    @Test
+    fun progressReportAggregatesMultipleSessionSnapshots() = runBlocking {
+        val memoryStore = InMemoryRTMemoryStore()
+        val loop = ToolLoop(
+            registry = registry,
+            catalog = catalog,
+            store = store,
+            memoryStore = memoryStore
+        )
+        val userText = "配方法就是把 x²+6x 凑成 (x+3)²，因为多了 9 所以减回去，得到顶点"
+        for (sid in listOf("snap-a", "snap-b")) {
+            loop.runTurn(
+                session = RTSession(
+                    sessionId = sid, topic = "二次函数顶点公式", studentId = "stu-multi",
+                    understandingLevel = 1, initialUnderstandingLevel = 1
+                ),
+                historyMessages = emptyList(),
+                userText = userText,
+                isOpening = false,
+                llmClient = MockToolLoopLlmClient()
+            )
+        }
+        assertEquals(2, memoryStore.sessionsForReport("stu-multi", null).size)
+
+        val (result, _) = registry.execute(
+            "generate_progress_report",
+            JSONObject().put("student_id", "stu-multi"),
+            ToolContext(
+                session = RTSession(sessionId = "snap-b", studentId = "stu-multi"),
+                extra = mapOf(
+                    CoreTools.KEY_MEMORY_STORE to memoryStore,
+                    CoreTools.KEY_SESSION_STATE_SINK to SessionStateSink()
+                )
+            )
+        )
+        val data = result.data as JSONObject
+        val summary = data.getString("summary")
+        assertTrue("两条快照应聚合为 2 次会话，实际：$summary", summary.contains("共 2 次会话"))
+        assertEquals(2, data.getJSONArray("charts").getJSONObject(0)
+            .getJSONObject("data").getJSONArray("values").length())
+    }
+
+    /** 未注入 memoryStore 时不得写快照，也不得抛异常（向后兼容）。 */
+    @Test
+    fun runTurnWithoutMemoryStoreDoesNotFail() = runBlocking {
+        val session = RTSession(sessionId = "no-store", topic = "二次函数顶点公式")
+        val result = toolLoop.runTurn(
+            session = session,
+            historyMessages = emptyList(),
+            userText = "配方法就是把 x²+6x 凑成 (x+3)²，因为多了 9 所以减回去，得到顶点",
+            isOpening = false,
+            llmClient = MockToolLoopLlmClient()
+        )
+        assertNotNull(result.report.finalReply)
+        assertEquals(1, result.updatedSession.currentRound)
+    }
+
     // ------------------------------------------------------------------
     // 4. 守卫与滑坡拦截测试
     // ------------------------------------------------------------------
-
     @Test
     fun runTurnMathGuardViolationCaptured() = runBlocking {
         val session = RTSession(sessionId = "math-guard-test")

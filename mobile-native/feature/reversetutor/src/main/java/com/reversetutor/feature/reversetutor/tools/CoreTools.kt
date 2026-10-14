@@ -5,7 +5,10 @@ import com.reversetutor.feature.reversetutor.curriculum.CurriculumCatalog
 import com.reversetutor.feature.reversetutor.graph.KnowledgeGraphBuilder
 import com.reversetutor.feature.reversetutor.guard.MathGuard
 import com.reversetutor.feature.reversetutor.knowledge.TopicKnowledgeBase
+import com.reversetutor.feature.reversetutor.memory.RTMemoryStore
+import com.reversetutor.feature.reversetutor.memory.RTMemoryStores
 import com.reversetutor.feature.reversetutor.retrieval.MaterialStore
+import com.reversetutor.feature.reversetutor.retrieval.RTWebSearchProvider
 import com.reversetutor.feature.reversetutor.score.ScoreEngine
 import org.json.JSONArray
 import org.json.JSONObject
@@ -17,11 +20,10 @@ import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * 阶段 2：27 个确定性工具的实现与注册（首批核心；web_search / save_teaching_pattern /
- * retrieve_historical_context / generate_progress_report 留待后续批次）。
+ * 阶段 2 + 阶段 3 首批：31 个确定性工具的实现与注册（与 spike 全量对齐）。
  *
  * 移植自 spike：
- * - retrieval.py   → lookup_curriculum / search_materials（事实检索 2）
+ * - retrieval.py   → lookup_curriculum / search_materials / web_search（事实检索 3）
  * - persona.py     → generate_student_persona / speak_as_confused_student / make_deliberate_mistake /
  *                    express_partial_understanding / simulate_breakthrough / challenge_teacher_explanation（角色扮演 6）
  * - cognitive.py   → check_understanding / detect_misconception / assess_readiness / identify_learning_style（认知诊断 4）
@@ -29,8 +31,10 @@ import kotlin.random.Random
  *                    suggest_analogy / scaffold_problem（教学策略 5）
  * - routing.py     → decide_next_action / select_teaching_route / determine_intervention_urgency /
  *                    plan_session_closure（决策路由 4）
- * - memory.py      → log_breakthrough / log_struggle_point / update_knowledge_graph（记忆管理 3）
- * - evaluation.py  → evaluate_session_quality / measure_learning_gain / detect_teaching_failure（评估反馈 3）
+ * - memory.py      → log_breakthrough / log_struggle_point / update_knowledge_graph /
+ *                    save_teaching_pattern / retrieve_historical_context（记忆管理 5）
+ * - evaluation.py  → evaluate_session_quality / measure_learning_gain / generate_progress_report /
+ *                    detect_teaching_failure（评估反馈 4）
  *
  * 原则：工具 = 事实层。所有工具只返回「事实/素材」（含中文 note 声明决策权在 LLM），
  * 教学决策完全由 LLM 自主 function calling 做出。
@@ -38,14 +42,23 @@ import kotlin.random.Random
  * 已声明的微小偏差（均有注释）：
  * 1. persona/speak 的 RNG：Python 用 hash 随机化（跨进程本就不稳定），Kotlin 用稳定种子；
  *    persona 种子里的 real_student_level 用 clamp 前的原始值字符串。
- * 2. 记忆工具经 [SessionStateSink] 落内存，阶段 3 迁 Room（events/struggle 相似案例检索届时补齐）。
+ * 2. 记忆工具经 [SessionStateSink] 落内存，并经 [RTMemoryStore] 落长期记忆
+ *    （进程内默认实现；跨进程持久化待用户批准接入 Room，见 RTMemoryStore 文档）。
  * 3. search_materials 的 results 条目在 Python 契约键（id/title/kind/subject/snippet/score）之上
  *    附加 grade/tags（MaterialStore 现有字段；阶段 3 Room 后补 kind/subject 真值）。
+ * 4. web_search 不内置 provider（Android 无子进程、测试禁真实网络）；未注入时
+ *    等价 spike `WEB_SEARCH_PROVIDER=off`，如实返回 available=false 的事实。
  */
 object CoreTools {
 
     /** ToolContext.extra 中共享 [SessionStateSink] 的键；缺省时各记忆工具退化为一次性 sink。 */
     const val KEY_SESSION_STATE_SINK = "sessionStateSink"
+
+    /** ToolContext.extra 中共享 [RTMemoryStore] 的键；缺省回落到 [RTMemoryStores.default]。 */
+    const val KEY_MEMORY_STORE = "memoryStore"
+
+    /** ToolContext.extra 中外部检索 provider 的键；缺省等价 `WEB_SEARCH_PROVIDER=off`。 */
+    const val KEY_WEB_SEARCH_PROVIDER = "webSearchProvider"
 
     // ------------------------------------------------------------------
     // 词表（cognitive.py 逐字）
@@ -235,6 +248,17 @@ object CoreTools {
                     "top_k" to iProp("返回条数", 1, 10)
                 )
             ) { args, ctx -> searchMaterials(args, ctx) }
+        )
+        registry.register(
+            RegisteredTool(
+                "web_search", "事实检索",
+                "外部网络搜索兜底（返回网页标题/摘要/链接）；未配置时返回 available=False 的事实",
+                schema(
+                    listOf("query"),
+                    "query" to sProp("搜索词"),
+                    "max_results" to iProp("返回条数", 1, 8)
+                )
+            ) { args, ctx -> webSearch(args, ctx) }
         )
 
         // —— 角色扮演（6）——
@@ -520,6 +544,30 @@ object CoreTools {
                 )
             ) { args, ctx -> updateKnowledgeGraph(args, ctx) }
         )
+        registry.register(
+            RegisteredTool(
+                "save_teaching_pattern", "记忆管理",
+                "把验证有效的教学策略写入长期记忆（含有效性评分与适用场景），供后续会话复用",
+                schema(
+                    listOf("strategy", "effectiveness"),
+                    "strategy" to sProp("策略描述"),
+                    "effectiveness" to nProp("有效性 0-1", 0.0, 1.0),
+                    "context" to sProp("使用场景")
+                )
+            ) { args, ctx -> saveTeachingPattern(args, ctx) }
+        )
+        registry.register(
+            RegisteredTool(
+                "retrieve_historical_context", "记忆管理",
+                "跨会话检索历史学习事件（顿悟/卡壳）与有效教学策略，给出连续性建议",
+                schema(
+                    listOf("query"),
+                    "query" to sProp("查询内容"),
+                    "time_range" to sProp("时间范围（ISO 起始时间）"),
+                    "event_type" to sProp("事件类型过滤")
+                )
+            ) { args, ctx -> retrieveHistoricalContext(args, ctx) }
+        )
 
         // —— 评估反馈（3）——
         registry.register(
@@ -545,6 +593,18 @@ object CoreTools {
                     "time_spent" to nProp("耗时（分钟）", 0.0, null)
                 )
             ) { args, _ -> measureLearningGain(args) }
+        )
+        registry.register(
+            RegisteredTool(
+                "generate_progress_report", "评估反馈",
+                "生成 Markdown 学习报告与图表数据",
+                schema(
+                    emptyList(),
+                    "time_range" to sProp("时间范围（ISO 起始时间）"),
+                    "student_id" to sProp("学生 ID"),
+                    "include_charts" to bProp("是否包含图表数据")
+                )
+            ) { args, ctx -> generateProgressReport(args, ctx) }
         )
         registry.register(
             RegisteredTool(
@@ -622,6 +682,50 @@ object CoreTools {
             "results" to results,
             "note" to (if (hits.isNotEmpty()) "命中片段供参考（title/score 供排序理解）；如何使用由你决定"
             else "资料库无相关命中——这是事实：学生的录入资料里没有这个内容；如何据此回应由你决定")
+        )
+    }
+
+    // ---------------------------------------------------------------- 7.3
+    /**
+     * 对齐 spike `_web_search`：未注入 provider（等价 `WEB_SEARCH_PROVIDER=off`）时
+     * **如实返回 available=false 的事实，而非报错**——LLM 自然绕过；
+     * provider 失败则结构化降级（抛 [ToolExecutionException] → success=false + 重试 1 次）。
+     */
+    private fun webSearch(args: JSONObject, context: ToolContext): JSONObject {
+        val query = str(args, "query")
+        val maxResults = intArg(args, "max_results", 3).coerceIn(1, 8)
+        val provider = webSearchProviderOf(context)
+            ?: return out(
+                "available" to false,
+                "query" to query,
+                "results" to JSONArray(),
+                "note" to ("外部检索未配置（WEB_SEARCH_PROVIDER=off）——事实陈述：无法上网核实，" +
+                    "请基于已有知识与资料检索结果回答")
+            )
+        val raw = try {
+            provider.search(query, maxResults)
+        } catch (e: Exception) {
+            throw ToolExecutionException(
+                "外部检索失败: ${e.message ?: e.javaClass.simpleName}",
+                "web_search_failed"
+            )
+        }
+        val results = JSONArray()
+        for (r in raw.take(maxResults)) {
+            results.put(
+                out(
+                    "title" to r.optString("title"),
+                    "snippet" to r.optString("snippet"),
+                    "url" to r.optString("url")
+                )
+            )
+        }
+        return out(
+            "available" to true,
+            "provider" to provider.providerName,
+            "query" to query,
+            "results" to results,
+            "note" to "外部网页摘要，可能有误，仅作事实参考；如何使用由你决定"
         )
     }
 
@@ -1487,9 +1591,23 @@ object CoreTools {
                 "round" to context.session.currentRound
             )
         )
+        // 长期记忆层（阶段 3 首批）：同一事件另写入 RTMemoryStore，供跨会话
+        // retrieve_historical_context 检索；event_id 由 store 生成（会话内 sink 的
+        // 自增 ID 只在单会话内唯一，跨会话复用会相互覆盖）。
+        recordLongTermEvent(
+            context,
+            out(
+                "event_type" to "breakthrough",
+                "concept" to concept,
+                "before" to str(args, "before_state"),
+                "after" to str(args, "after_state"),
+                "trigger" to str(args, "trigger"),
+                "round" to context.session.currentRound
+            )
+        )
         return out(
             "event_id" to eventId,
-            "saved_to" to "session memory（阶段 3 迁 Room events 表）",
+            "saved_to" to "会话内存 + 长期记忆（RTMemoryStore；跨进程持久化待接入 Room）",
             "related_concepts" to jarr(related)
         )
     }
@@ -1500,18 +1618,48 @@ object CoreTools {
         val attempts = intArg(args, "failed_attempts", 0).coerceIn(0, 100)
         val severity = if (attempts <= 1) "low" else (if (attempts <= 3) "medium" else "high")
         val eventId = sink.nextEventId()
+        val attemptsList = strList(args, "attempted_strategies")
         sink.events.add(
             out(
                 "event_id" to eventId,
                 "event_type" to "struggle",
                 "concept" to topic,
                 "failed_attempts" to attempts,
-                "attempted_strategies" to jarr(strList(args, "attempted_strategies")),
+                "attempted_strategies" to jarr(attemptsList),
                 "error_pattern" to str(args, "error_pattern"),
                 "severity" to severity,
                 "round" to context.session.currentRound
             )
         )
+        // 长期记忆层（阶段 3 首批）：写入后按同 topic 检索历史卡壳（排除本会话），
+        // 补齐 spike `similar_historical_cases`（此前为留空占位）。
+        recordLongTermEvent(
+            context,
+            out(
+                "event_type" to "struggle",
+                "concept" to topic,
+                "failed_attempts" to attempts,
+                "attempted_strategies" to jarr(attemptsList),
+                "error_pattern" to str(args, "error_pattern"),
+                "severity" to severity,
+                "round" to context.session.currentRound
+            )
+        )
+        val similar = memoryStoreOf(context)
+            .queryEvents(query = topic, eventType = "struggle", limit = 5)
+            .filter { it.optString("session_id") != context.session.sessionId }
+            .take(3)
+        val similarJson = JSONArray()
+        for (s in similar) {
+            val resolved = s.optJSONArray("attempted_strategies") ?: JSONArray()
+            similarJson.put(
+                out(
+                    "session_id" to s.optString("session_id"),
+                    "concept" to s.optString("concept"),
+                    "resolved_with" to resolved
+                )
+            )
+        }
         return out(
             "struggle_id" to eventId,
             "severity" to severity,
@@ -1519,8 +1667,7 @@ object CoreTools {
                 if (attempts >= 2) "改用类比或脚手架，而不是重复代数推导"
                 else "继续观察，先换一种提问方式"
                 ),
-            // 阶段 3 接 Room query_events 后补齐历史相似案例
-            "similar_historical_cases" to jarr(emptyList<JSONObject>())
+            "similar_historical_cases" to similarJson
         )
     }
 
@@ -1581,6 +1728,89 @@ object CoreTools {
             "next_optimal_concepts" to jarr(result.nextOptimalConcepts),
             "learning_progress" to result.learningProgress,
             "weak_areas" to jarr(result.weakAreas)
+        )
+    }
+
+    // ---------------------------------------------------------------- 5.4
+    /**
+     * 对齐 spike `_save_teaching_pattern`：effectiveness 先 clamp 到 [0,1] 再落库。
+     */
+    private fun saveTeachingPattern(args: JSONObject, context: ToolContext): JSONObject {
+        val store = memoryStoreOf(context)
+        val strategy = str(args, "strategy")
+        val effectiveness = num(args, "effectiveness", 0.0).coerceIn(0.0, 1.0)
+        val patternContext = str(args, "context")
+        val pid = store.addTeachingPattern(strategy, effectiveness, patternContext)
+        return out(
+            "pattern_id" to pid,
+            "reuse_conditions" to out(
+                "when" to patternContext.ifEmpty { "类似的知识点卡壳场景" },
+                "strategy" to strategy
+            ),
+            "success_rate" to effectiveness
+        )
+    }
+
+    // ---------------------------------------------------------------- 5.5
+    /**
+     * 对齐 spike `_retrieve_historical_context`：按 session 聚合事件，
+     * 汇总顿悟记录与历史有效策略，给出连续性建议。
+     */
+    private fun retrieveHistoricalContext(args: JSONObject, context: ToolContext): JSONObject {
+        val store = memoryStoreOf(context)
+        val query = str(args, "query")
+        val timeRange = str(args, "time_range").ifEmpty { null }
+        val eventType = str(args, "event_type").ifEmpty { null }
+        val events = store.queryEvents(query, eventType, timeRange, 10)
+
+        // 按 session_id 分组（保持 queryEvents 的 created_at DESC 顺序）
+        val bySession = LinkedHashMap<String, MutableList<JSONObject>>()
+        for (e in events) {
+            bySession.getOrPut(e.optString("session_id")) { mutableListOf() }.add(e)
+        }
+        val relevant = mutableListOf<JSONObject>()
+        for ((sid, evs) in bySession) {
+            // Python `"；".join(sorted({e.get("concept","") for e in evs if e.get("concept")}))`
+            val summary = evs.mapNotNull { it.optString("concept").ifEmpty { null } }
+                .toSortedSet()
+                .joinToString("；")
+            val keyMoments = JSONArray()
+            for (e in evs.take(3)) {
+                keyMoments.put(firstNonEmpty(e, "trigger", "error_pattern", "concept"))
+            }
+            relevant.add(
+                out(
+                    "session_id" to sid,
+                    // Python 取 evs[0].get("created_at","")，即该会话最近一条事件的时间
+                    "date" to (evs.firstOrNull()?.optString("created_at") ?: ""),
+                    "summary" to summary,
+                    "key_moments" to keyMoments
+                )
+            )
+        }
+
+        val breakthroughCount = events.count { it.optString("event_type") == "breakthrough" }
+        val insights = mutableListOf<String>()
+        if (breakthroughCount > 0) {
+            insights.add("历史上有成功突破的记录，可以复用当时的引导方式")
+        }
+        val patterns = store.topTeachingPatterns(3)
+        if (patterns.isNotEmpty()) {
+            val top = patterns.first()
+            insights.add(
+                "历史上有效策略：${top.optString("strategy")}" +
+                    "（成功率 ${pyFixed(top.optDouble("effectiveness", 0.0), 2)}）"
+            )
+        }
+
+        return out(
+            "relevant_sessions" to jarr(relevant.take(5)),
+            "key_insights" to jarr(insights.ifEmpty { listOf("暂无相关历史记录") }),
+            // Python 用截断前的 relevant 判空
+            "continuity_suggestions" to (
+                if (relevant.isNotEmpty()) "可以延续之前的类比或脚手架方式"
+                else "这是较早的探索，按新会话处理"
+                )
         )
     }
 
@@ -1668,6 +1898,108 @@ object CoreTools {
             "retention_prediction" to rd2(
                 ScoreEngine.clamp(0.4 + gain * 0.8 - (if (post - pre >= 2) 0.1 else 0.0), 0.1, 0.95)
             )
+        )
+    }
+
+    // ---------------------------------------------------------------- 6.3
+    /**
+     * 对齐 spike `_generate_progress_report`：跨会话聚合学习报告。
+     *
+     * 无历史快照时回落到当前会话（spike：`if not sessions and ctx.get("session")`）。
+     * 注意 spike 的会话快照由 session_service 在每轮后 `save_snapshot` 写入；
+     * native 侧的等价写入接线（[RTMemoryStore.saveSnapshot]）尚未接入 ToolLoop。
+     */
+    private fun generateProgressReport(args: JSONObject, context: ToolContext): JSONObject {
+        val store = memoryStoreOf(context)
+        val timeRange = str(args, "time_range").ifEmpty { null }
+        val studentId = str(args, "student_id", "anonymous")
+        val includeCharts = bool(args, "include_charts", true)
+
+        var sessions = store.sessionsForReport(studentId, timeRange)
+        if (sessions.isEmpty()) {
+            sessions = listOf(currentSessionSnapshot(context.session))
+        }
+
+        val labels = mutableListOf<String>()
+        val values = mutableListOf<Int>()
+        for (s in sessions) {
+            val closedAt = s.optString("closed_at")
+            val stamp = closedAt.ifEmpty { s.optString("created_at") }
+            labels.add(stamp.take(10))
+            values.add(s.optInt("understanding_level", 1))
+        }
+
+        val totalMinutes = sessions.sumOf { s ->
+            val msgs = s.optJSONArray("messages") ?: JSONArray()
+            (0 until msgs.length()).count { msgs.optJSONObject(it)?.optString("role") == "user" } * 2
+        }
+
+        val mastered = sessions.flatMap { s ->
+            val a = s.optJSONArray("mastered_concepts") ?: JSONArray()
+            (0 until a.length()).mapNotNull { a.optString(it).ifEmpty { null } }
+        }.toSortedSet()
+
+        val weak = sessions.flatMap { s ->
+            val a = s.optJSONArray("struggle_events") ?: JSONArray()
+            (0 until a.length()).mapNotNull { a.optJSONObject(it)?.optString("concept")?.ifEmpty { null } }
+        }.toSortedSet()
+
+        val summary = "共 ${sessions.size} 次会话，累计约 $totalMinutes 分钟；" +
+            "掌握 ${mastered.size} 个概念：" +
+            (mastered.take(5).joinToString("、").ifEmpty { "暂无" }) + "；" +
+            "理解水平 ${values.firstOrNull()?.toString() ?: "-"} → " +
+            (values.lastOrNull()?.toString() ?: "-")
+
+        val reportLines = mutableListOf(
+            "# 学习报告", "", "- 学生：$studentId", "- 会话数：${sessions.size}", "", "## 概念掌握"
+        )
+        if (mastered.isEmpty()) {
+            reportLines.add("- 暂无")
+        } else {
+            for (c in mastered) reportLines.add("- $c")
+        }
+        reportLines.addAll(listOf("", "## 薄弱点"))
+        if (weak.isEmpty()) {
+            reportLines.add("- 暂无")
+        } else {
+            for (w in weak) reportLines.add("- $w")
+        }
+        reportLines.addAll(listOf("", "## 总结", summary))
+
+        val charts = JSONArray()
+        if (includeCharts) {
+            charts.put(
+                out(
+                    "type" to "line",
+                    "title" to "理解水平变化",
+                    "data" to out("labels" to jarr(labels), "values" to jarr(values))
+                )
+            )
+        }
+        return out(
+            "markdown_report" to reportLines.joinToString("\n"),
+            "charts" to charts,
+            "summary" to summary
+        )
+    }
+
+    /** 由当前 [RTSession] 合成一份 spike 形态的会话快照（报告回落用）。 */
+    private fun currentSessionSnapshot(session: com.reversetutor.feature.reversetutor.session.RTSession): JSONObject {
+        val struggles = JSONArray()
+        for (e in session.struggleEvents) {
+            struggles.put(out("concept" to e.concept, "round" to e.round))
+        }
+        return out(
+            "session_id" to session.sessionId,
+            "student_id" to session.studentId,
+            "topic" to session.topic,
+            "status" to session.status,
+            "created_at" to com.reversetutor.feature.reversetutor.memory.RTIds.nowIso(),
+            "understanding_level" to session.understandingLevel,
+            "initial_understanding_level" to session.initialUnderstandingLevel,
+            "mastered_concepts" to jarr(session.masteredConcepts),
+            "struggle_events" to struggles,
+            "messages" to JSONArray()
         )
     }
 
@@ -1911,6 +2243,34 @@ object CoreTools {
 
     private fun sinkOf(context: ToolContext): SessionStateSink =
         (context.extra[KEY_SESSION_STATE_SINK] as? SessionStateSink) ?: SessionStateSink()
+
+    /**
+     * 长期记忆存储：优先取接入层注入的共享实例，缺省回落到进程级默认实例
+     * （对齐 spike 模块级 `STORE` 单例，保证工具在无注入时仍可用）。
+     */
+    private fun memoryStoreOf(context: ToolContext): RTMemoryStore =
+        (context.extra[KEY_MEMORY_STORE] as? RTMemoryStore) ?: RTMemoryStores.default
+
+    /** 外部检索 provider；返回 null 表示未配置（等价 `WEB_SEARCH_PROVIDER=off`）。 */
+    private fun webSearchProviderOf(context: ToolContext): RTWebSearchProvider? =
+        context.extra[KEY_WEB_SEARCH_PROVIDER] as? RTWebSearchProvider
+
+    /** 记忆工具的统一长期记忆写入（event_id 由 store 生成，保证跨会话唯一）。 */
+    private fun recordLongTermEvent(context: ToolContext, event: JSONObject): String =
+        memoryStoreOf(context).addEvent(context.session.sessionId, event)
+
+    /** Python `a or b or c` 取值语义：逐键取首个非空字符串。 */
+    private fun firstNonEmpty(obj: JSONObject, vararg keys: String): String {
+        for (k in keys) {
+            val v = obj.optString(k)
+            if (v.isNotEmpty()) return v
+        }
+        return ""
+    }
+
+    /** 对齐 Python `f"{v:.2f}"`（半进位到偶数由 [PyCompat.round] 保证）。 */
+    private fun pyFixed(v: Double, digits: Int): String =
+        String.format(Locale.US, "%.${digits}f", PyCompat.round(v, digits))
 }
 
 /**
