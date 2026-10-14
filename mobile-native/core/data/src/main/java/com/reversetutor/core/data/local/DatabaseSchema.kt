@@ -4,8 +4,58 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 object DatabaseSchema {
-    const val version = 20
+    const val version = 21
     const val exportSchema = true
+
+    /** 反转家教长期记忆三表（V21，对齐 spike store.py；纯增量建表，无数据迁移）。 */
+    private val rtMemoryTableSql = listOf(
+        """
+        CREATE TABLE IF NOT EXISTS rt_events (
+            eventId TEXT NOT NULL,
+            sessionId TEXT NOT NULL,
+            eventType TEXT NOT NULL,
+            concept TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            createdAt TEXT NOT NULL,
+            PRIMARY KEY(eventId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS rt_teaching_patterns (
+            patternId TEXT NOT NULL,
+            strategy TEXT NOT NULL,
+            effectiveness REAL NOT NULL,
+            context TEXT NOT NULL,
+            createdAt TEXT NOT NULL,
+            PRIMARY KEY(patternId)
+        )
+        """.trimIndent(),
+        """
+        CREATE TABLE IF NOT EXISTS rt_session_snapshots (
+            sessionId TEXT NOT NULL,
+            payload TEXT NOT NULL,
+            createdAt TEXT NOT NULL,
+            studentId TEXT NOT NULL,
+            PRIMARY KEY(sessionId)
+        )
+        """.trimIndent()
+    )
+
+    private val rtMemoryIndexSql = listOf(
+        "CREATE INDEX IF NOT EXISTS index_rt_events_sessionId ON rt_events(sessionId)",
+        "CREATE INDEX IF NOT EXISTS index_rt_events_createdAt ON rt_events(createdAt)",
+        "CREATE INDEX IF NOT EXISTS index_rt_events_eventType ON rt_events(eventType)",
+        "CREATE INDEX IF NOT EXISTS index_rt_teaching_patterns_effectiveness ON rt_teaching_patterns(effectiveness)",
+        "CREATE INDEX IF NOT EXISTS index_rt_session_snapshots_studentId ON rt_session_snapshots(studentId)",
+        "CREATE INDEX IF NOT EXISTS index_rt_session_snapshots_createdAt ON rt_session_snapshots(createdAt)"
+    )
+
+    val migration20To21: Migration = object : Migration(20, 21) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            rtMemoryTableSql.forEach(db::execSQL)
+            rtMemoryIndexSql.forEach(db::execSQL)
+        }
+    }
 
     val migration1To2: Migration = object : Migration(1, 2) {
         override fun migrate(db: SupportSQLiteDatabase) {
@@ -211,7 +261,8 @@ object DatabaseSchema {
         migration16To17,
         migration17To18,
         migration18To19,
-        migration19To20
+        migration19To20,
+        migration20To21
     )
 
     private fun createHybridTables(db: SupportSQLiteDatabase) {

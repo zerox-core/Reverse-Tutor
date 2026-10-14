@@ -21,7 +21,6 @@ import com.reversetutor.feature.reversetutor.loop.LlmUsage
 import com.reversetutor.feature.reversetutor.loop.ToolCallRequest
 import com.reversetutor.feature.reversetutor.loop.ToolLoop
 import com.reversetutor.feature.reversetutor.loop.ToolLoopLlmClient
-import com.reversetutor.feature.reversetutor.memory.InMemoryRTMemoryStore
 import com.reversetutor.feature.reversetutor.retrieval.MaterialStore
 import com.reversetutor.feature.reversetutor.scenario.ScenarioPackage
 import com.reversetutor.feature.reversetutor.tools.CoreTools
@@ -73,10 +72,10 @@ object ReverseTutorRuntimeAssembly {
         // 此前 addDoc 无生产调用点，活动包的 sources 永不进资料库。
         val materialStore = MaterialStore()
         val scenarioDocs = installScenarioPackages(appContext, materialStore)
-        // 长期记忆（阶段 3 首批，2026-10-14）：save_teaching_pattern /
-        // retrieve_historical_context / generate_progress_report 需要跨会话状态。
-        // 此处用进程内实现（Room 属冻结区，待用户批准后再替换实现）。
-        val memoryStore = InMemoryRTMemoryStore()
+        // 长期记忆（阶段 3，2026-10-14 批准解冻接入 Room）：save_teaching_pattern /
+        // retrieve_historical_context / generate_progress_report 需要跨会话、跨进程状态。
+        // V21 三表落盘，App 重启不丢；InMemoryRTMemoryStore 保留供 JVM 测试注入。
+        val memoryStore = RoomRTMemoryStore(DataModule.database(appContext).rtMemoryDao())
         val toolLoop = ToolLoop(
             registry = registry,
             catalog = catalog,

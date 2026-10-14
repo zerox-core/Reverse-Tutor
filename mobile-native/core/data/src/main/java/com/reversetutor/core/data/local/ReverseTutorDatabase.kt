@@ -29,6 +29,7 @@ import com.reversetutor.core.data.local.dao.WindowMemoryDao
 import com.reversetutor.core.data.local.dao.WindowMemoryTokenMeterDao
 import com.reversetutor.core.data.local.dao.WorldTreeDao
 import com.reversetutor.core.data.local.dao.SessionAgentDao
+import com.reversetutor.core.data.local.dao.RTMemoryDao
 import com.reversetutor.core.data.local.entity.AnchorEntity
 import com.reversetutor.core.data.local.entity.BackgroundJobEntity
 import com.reversetutor.core.data.local.entity.ErrorLogEntity
@@ -86,6 +87,9 @@ import com.reversetutor.core.data.local.entity.SessionTableEntity
 import com.reversetutor.core.data.local.entity.SessionTableColumnEntity
 import com.reversetutor.core.data.local.entity.SessionTableRowEntity
 import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
+import com.reversetutor.core.data.local.entity.RTEventEntity
+import com.reversetutor.core.data.local.entity.RTTeachingPatternEntity
+import com.reversetutor.core.data.local.entity.RTSessionSnapshotEntity
 
 @Database(
     entities = [
@@ -145,7 +149,10 @@ import com.reversetutor.core.data.local.entity.ToolCallReceiptEntity
         WindowMemoryActiveValueEntity::class,
         WindowIntakeWatermarkEntity::class,
         WindowRollingSummaryEntity::class,
-        WindowMemoryTokenMeterEntity::class
+        WindowMemoryTokenMeterEntity::class,
+        RTEventEntity::class,
+        RTTeachingPatternEntity::class,
+        RTSessionSnapshotEntity::class
     ],
     version = DatabaseSchema.version,
     exportSchema = DatabaseSchema.exportSchema
@@ -178,4 +185,5 @@ abstract class ReverseTutorDatabase : RoomDatabase() {
     abstract fun sessionAgentDao(): SessionAgentDao
     abstract fun windowMemoryDao(): WindowMemoryDao
     abstract fun windowMemoryTokenMeterDao(): WindowMemoryTokenMeterDao
+    abstract fun rtMemoryDao(): RTMemoryDao
 }
