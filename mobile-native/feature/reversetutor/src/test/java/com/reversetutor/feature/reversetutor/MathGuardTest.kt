@@ -30,13 +30,20 @@ class MathGuardTest {
 
     @Test
     fun correctFormsPass() {
-        // 正确写法、正确顶点、修正后写法都不违规
+        // 正确写法、正确顶点（带负号）、修正后写法都不违规
         assertTrue(MathGuard.scanMath("x² + 6x = (x + 3)² - 9").isEmpty())
         assertTrue(MathGuard.scanMath("顶点横坐标 x = -b/(2a)").isEmpty())
-        assertTrue(MathGuard.scanMath("顶点横坐标是 (b/2a, 0)".let {
-            // Python 实测 T3 返回空：第三条正则要求逗号，这里无逗号 → 不命中
-            it
-        }).isEmpty())
+        assertTrue(MathGuard.scanMath("顶点横坐标是 (-b/2a, -8)").isEmpty())
+    }
+
+    @Test
+    fun scanCatchesVertexBCoordinateClaim() {
+        // 回归：第三条正则此前写漏「横」字（[横坐]?标? 吃不满「横坐标」），
+        // 「顶点横坐标是 (b/2a, …)」这一 spike s1 同款句式漏报；修复后应命中。
+        val v = MathGuard.scanMath("顶点横坐标是 (b/2a, 0)")
+        assertEquals(1, v.size)
+        assertEquals("顶点横坐标是 -b/2a（不是 +b/2a）", v[0].pattern)
+        assertEquals("顶点横坐标是 (b/2a,", v[0].matched)
     }
 
     @Test
