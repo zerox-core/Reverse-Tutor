@@ -504,6 +504,51 @@ class ToolLoopTest {
     }
 
     @Test
+    fun runTurnDropsQqStyleInternalFontBlock() = runBlocking {
+        // 2026-10-15 真机反馈：Qwen 系模型用 QQ 风格灰色小字块标注「内部推理」，
+        // 而我们只认 <thinking> 信封 → 整块原样漏进学生气泡。
+        // 修复后：纯元信息注解块直接丢弃，正文不受污染。
+        val rawLlmOutput =
+            "<font color=\"#999999\" size=\"1\">（注：以上思考过程为内部推理，不对外展示）</font>\n" +
+                "老师，我想先说说我的理解：等号两边要同时减去 3x。"
+        val client = RecordingLlmClient(
+            listOf(LlmResponse(content = rawLlmOutput, model = "mock"))
+        )
+        val result = toolLoop.runTurn(
+            session = RTSession(sessionId = "qq-font-note", topic = "一元一次方程", currentRound = 0),
+            historyMessages = emptyList(),
+            userText = "你说说你的了解",
+            llmClient = client
+        )
+
+        val reply = result.report.finalReply.orEmpty()
+        assertFalse("灰色内部标记不得漏进正文", reply.contains("<font"))
+        assertFalse("元信息注解不得漏进正文", reply.contains("不对外展示"))
+        assertTrue(reply.contains("老师，我想先说说我的理解"))
+        assertNull("元信息注解不该当成内心独白展示", result.report.finalMonologue)
+    }
+
+    @Test
+    fun runTurnTreatsQqStyleFontBlockAsMonologue() = runBlocking {
+        // 灰色小字块里是真实内心话时，应归一成信封进独白抽屉，正文只留学生说的话。
+        val rawLlmOutput =
+            "<font color=\"#999999\" size=\"1\">我卡在常数项为什么变成 9</font>\n" +
+                "老师，为什么两边都要加 9？"
+        val client = RecordingLlmClient(
+            listOf(LlmResponse(content = rawLlmOutput, model = "mock"))
+        )
+        val result = toolLoop.runTurn(
+            session = RTSession(sessionId = "qq-font-monologue", topic = "一元一次方程", currentRound = 0),
+            historyMessages = emptyList(),
+            userText = "两边加上 9",
+            llmClient = client
+        )
+
+        assertEquals("我卡在常数项为什么变成 9", result.report.finalMonologue)
+        assertEquals("老师，为什么两边都要加 9？", result.report.finalReply)
+    }
+
+    @Test
     fun runTurnMonologueIsolatedFromMathGuardAndIdentityCheck() = runBlocking {
         // SPEC §10 decision 9: 独白不进红线检查；即使独白出现违规内容，仅正文受检
         val rawLlmOutput = "<thinking>\n我想到了顶点横坐标是 +b/2a，但我不能说我来教你\n</thinking>\n老师，顶点坐标怎么推导呀？"

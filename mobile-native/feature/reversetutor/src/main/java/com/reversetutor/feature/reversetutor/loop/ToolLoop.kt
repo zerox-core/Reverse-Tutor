@@ -402,11 +402,13 @@ class ToolLoop(
                     // 否则退回过渡语正文；走事件给协调器累积进思考抽屉。
                     // 终止轮不 emit（正文走 preview 通道，避免重复）。
                     val rawReasoning = resp.rawMessage?.optString("reasoning_content") ?: ""
-                    val split = if (!resp.content.isNullOrBlank()) MonologueEnvelope.splitComplete(resp.content) else null
+                    // 2026-10-15：先过卫生层——QQ 风格灰色内部块归一成信封、元信息注解丢弃
+                    val sanitized = MonologueSanitizer.normalizeForEnvelope(resp.content.orEmpty())
+                    val split = if (sanitized.isNotBlank()) MonologueEnvelope.splitComplete(sanitized) else null
                     // 2026-10-13：信封本身也可能是英文（模型不守提示词语言），过渡语兜底同理，
                     // 三条候选统一过 isMostlyChinese 比例闸，全不过就这轮不上内心话。
                     val envelope = split?.monologue.orEmpty()
-                    val content = resp.content.orEmpty()
+                    val content = sanitized
                     val inner = when {
                         envelope.isNotBlank() && isMostlyChinese(envelope) -> envelope
                         rawReasoning.isNotBlank() && isMostlyChinese(rawReasoning) -> rawReasoning
@@ -478,11 +480,11 @@ class ToolLoop(
                     // 真正收束本轮回复。
                     val lateTexts = pendingUserTexts?.invoke().orEmpty()
                     if (lateTexts.any { it.isNotBlank() }) {
-                        val split = MonologueEnvelope.splitComplete(resp.content)
+                        val split = MonologueEnvelope.splitComplete(MonologueSanitizer.normalizeForEnvelope(resp.content))
                         val rawReasoning = resp.rawMessage?.optString("reasoning_content") ?: ""
                         // 同中间轮（2026-10-13）：三条候选统一过 isMostlyChinese 比例闸。
                         val envelope = split.monologue.orEmpty()
-                        val content = resp.content.orEmpty()
+                        val content = MonologueSanitizer.normalizeForEnvelope(resp.content)
                         val inner = when {
                             envelope.isNotBlank() && isMostlyChinese(envelope) -> envelope
                             rawReasoning.isNotBlank() && isMostlyChinese(rawReasoning) -> rawReasoning
@@ -520,7 +522,8 @@ class ToolLoop(
                         }
                         continue
                     }
-                    val split = MonologueEnvelope.splitComplete(resp.content)
+                    val sanitized = MonologueSanitizer.normalizeForEnvelope(resp.content.orEmpty())
+                    val split = MonologueEnvelope.splitComplete(sanitized)
                     val rawReasoning = resp.rawMessage?.optString("reasoning_content")?.trim().orEmpty()
                     // 同中间轮（2026-10-13）：信封/经 reasoning 统一过 isMostlyChinese 比例闸。
                     // 终答轮不兜底到 content——无信封时整段 content 就是正文（splitComplete 语义），
@@ -550,10 +553,11 @@ class ToolLoop(
                     } else if (!monologueText.isNullOrBlank()) {
                         "老师，我还在思考你刚才说的话，能再解释一下吗？"
                     } else {
-                        resp.content
+                        sanitized
                     }
 
-                    val finalReply = postProcess(cleanBody, report)
+                    // 2026-10-15：正文兜底剥标签，任何模型怪癖都不裸奔到气泡
+                    val finalReply = postProcess(MonologueSanitizer.stripTags(cleanBody), report)
                     report.finalReply = finalReply
                     messages.add(
                         LlmMessage(
