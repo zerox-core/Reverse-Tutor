@@ -122,7 +122,10 @@ data class NewSessionConfiguration(
                 sourceSelections = List(preset.connectedSources) { index ->
                     "${preset.sourceTitle} ${index + 1}"
                 },
-                openingMessage = "我是${preset.learnerName}。${preset.episodeBody}",
+                // 开场消息必须是「学生说话」（2026-10-15 真机反馈）：不再拿写给老师的
+                // 第二人称剧情简介（episodeBody）拼「我是X。」旁白；openingLine 缺席时
+                // 才回退旧行为，保证自定义预设不因缺字段而空开场。
+                openingMessage = preset.openingLine.ifBlank { "我是${preset.learnerName}。${preset.episodeBody}" },
                 learnerImageRef = LearnerAvatarReference.PackagedDrawable(preset.avatarRes).persistedValue,
                 storyImageRef = preset.storyRes.toString(),
                 builtInPresetId = preset.id
