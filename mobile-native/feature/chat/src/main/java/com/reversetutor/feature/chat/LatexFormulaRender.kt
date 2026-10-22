@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
@@ -532,6 +534,52 @@ internal fun latexInlineAnnotatedString(source: String): AnnotatedString? {
     }
 }
 
+/**
+ * 是否包含 mhchem 化学命令（`\ce{...}` / `\pu{...}`）。
+ *
+ * 化学式必须走 [LatexPlainTextBeautifier.beautifyChemistry] 线性化：迷你解析器会把
+ * `\ce` 当成普通字母 `ce` 解析「成功」，把 `^` 气体符号吃成电荷上标，化学语义全丢，
+ * 而且解析结果里没有反斜杠，兜底判断也不会触发——必须在这里显式拦下。
+ */
+internal fun containsChemistryCommand(source: String): Boolean =
+    source.contains("\\ce{") || source.contains("\\pu{")
+
+/**
+ * 行内公式显示（调用方唯一入口）：能迷你排版就沿用既有拍平 + 上下标样式；
+ * 排版层拿不出结果（解析失败/流式半完整块），或结果里仍残留未识别命令的反斜杠时，
+ * 退化为 [LatexPlainTextBeautifier] 的可读 Unicode 数学文本。
+ *
+ * 契约：任何输入都返回可显示文本，绝不把带反斜杠的原始 LaTeX 交给用户。
+ */
+internal fun latexInlineDisplayAnnotatedString(source: String): AnnotatedString {
+    // 化学式优先：线性化后是唯一能正确表达下标/电荷/沉淀气体/反应箭头的形态。
+    if (containsChemistryCommand(source)) return beautifiedFormulaAnnotatedString(source)
+    val rendered = latexInlineAnnotatedString(source)
+    if (rendered != null && !rendered.text.contains('\\')) return rendered
+    return beautifiedFormulaAnnotatedString(source)
+}
+
+private fun beautifiedFormulaAnnotatedString(source: String): AnnotatedString = buildAnnotatedString {
+    withStyle(
+        SpanStyle(
+            color = LatexFormulaPalette.inlineInk,
+            fontFamily = FontFamily.Serif,
+            fontWeight = FontWeight.Medium
+        )
+    ) { append(LatexPlainTextBeautifier.beautify(source)) }
+}
+
+/**
+ * 块级公式是否值得交给 Compose 自绘：解析成功，且节点树里没有未识别命令留下的
+ * `\command` 字面 Atom（直接自绘会把反斜杠暴露给用户，此时应回退美化文本）。
+ * 化学式一律不自绘（走美化文本，见 [containsChemistryCommand]）。
+ */
+internal fun latexBlockNodesForDrawing(source: String): List<LatexNode>? {
+    if (containsChemistryCommand(source)) return null
+    val nodes = (LatexMiniParser.parse(source) as? LatexParseResult.Success)?.nodes ?: return null
+    return if (LatexMiniParser.plainText(nodes).contains('\\')) null else nodes
+}
+
 // ---------------- 块级渲染（$$...$$，Compose 自绘） ----------------
 
 internal object LatexFormulaPalette {
@@ -587,6 +635,60 @@ internal fun RichFormulaBlock(
                 contentAlignment = Alignment.Center
             ) {
                 LatexNodesView(nodes = nodes, fontSize = 17.sp)
+            }
+        }
+    }
+}
+
+/**
+ * 块级公式兜底卡片：无法自绘（解析失败或残留未识别命令）时，展示美化后的可读 Unicode
+ * 数学文本；复制仍给原始 LaTeX 源码，方便用户拿去别处继续用。
+ */
+@Composable
+internal fun RichFormulaPlainBlock(
+    source: String,
+    onCopySource: (String) -> ChatClipboardResult
+) {
+    val display = remember(source) { LatexPlainTextBeautifier.beautify(source) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = LatexFormulaPalette.card,
+        shape = RoundedCornerShape(7.dp),
+        border = BorderStroke(1.dp, LatexFormulaPalette.border)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "公式",
+                    modifier = Modifier.weight(1f),
+                    color = LatexFormulaPalette.label,
+                    fontSize = 11.sp
+                )
+                IconButton(onClick = { onCopySource(source) }, modifier = Modifier.size(40.dp)) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "复制公式",
+                        modifier = Modifier.size(18.dp),
+                        tint = LatexFormulaPalette.label
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = display,
+                    color = LatexFormulaPalette.ink,
+                    fontSize = 17.sp,
+                    fontFamily = FontFamily.Serif
+                )
             }
         }
     }

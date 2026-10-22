@@ -1,4 +1,4 @@
-﻿package com.reversetutor.feature.chat
+package com.reversetutor.feature.chat
 
 import android.Manifest
 import android.content.ContentUris
@@ -56,6 +56,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.ime
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -309,7 +310,7 @@ internal fun ReverseTeachingChatScreen(
     val streamingLength = (state.generation as? ChatGenerationUiState.Streaming)?.text?.length ?: 0
     val timelineItemCount = run {
         val messageItems = if (state.messages.isEmpty()) 1 else buildChatTimelineEntries(state.messages).size
-        messageItems + (if (sessionContract != null) 1 else 0) +
+        messageItems +
             // 2026-10-11 生成状态气泡挪回会话流内（用户拍板，反转 2026-09-20 的
             // 「固定输入框上方」）：计入 item 数，自动滚动目标才能落到状态气泡。
             (if (state.generationStatusLabel != null) 1 else 0) +
@@ -371,26 +372,26 @@ internal fun ReverseTeachingChatScreen(
             wasScrolling = scrolling
         }
     }
-    val imeOpen = androidx.compose.foundation.layout.WindowInsets.ime
-        .getBottom(LocalDensity.current) > 0
-    LaunchedEffect(imeOpen) {
-        if (imeOpen && nearEndFollow && timelineItemCount > 0) {
-            repeat(3) {
-                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
-                kotlinx.coroutines.delay(120)
-            }
-        }
-    }
-
     // R101（2026-10-05 用户拍板）：输入框聚焦即把最新消息钉进视口——
     // 不依赖 IME inset 是否送达（部分机型 adjustResize/insets 不同时生效），
     // 键盘弹起后最新一条始终可见。
     var composerFocused by remember { mutableStateOf(false) }
     LaunchedEffect(composerFocused) {
         if (composerFocused && timelineItemCount > 0) {
-            repeat(3) {
+            repeat(4) {
                 listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
-                kotlinx.coroutines.delay(120)
+                kotlinx.coroutines.delay(80)
+            }
+        }
+    }
+
+    val imeOpen = androidx.compose.foundation.layout.WindowInsets.ime
+        .getBottom(LocalDensity.current) > 0
+    LaunchedEffect(imeOpen) {
+        if (imeOpen && (nearEndFollow || composerFocused) && timelineItemCount > 0) {
+            repeat(4) {
+                listState.scrollToItem(timelineItemCount - 1, Int.MAX_VALUE)
+                kotlinx.coroutines.delay(80)
             }
         }
     }
@@ -485,14 +486,8 @@ internal fun ReverseTeachingChatScreen(
                             onReselectInvalidSource = onReselectInvalidSource,
                             onOpenExternalLink = onOpenExternalLink,
                             onCopyRichSource = onCopyRichSource,
-                            learningHint = if (isLatestAssistant) {
-                                {
-                                    SessionAssistantReplyHint(
-                                        contract = sessionContract,
-                                        onInteraction = onAssistantInteraction
-                                    )
-                                }
-                            } else null
+                            // 2026-10-17 用户拍板：彻底移除「本轮学习提示」占位卡片，释放空间提升信息密度
+                            learningHint = null
                         )
                     }
                 }
@@ -549,11 +544,6 @@ internal fun ReverseTeachingChatScreen(
                                 streaming = true
                             )
                         }
-                        // 本轮学习提示置于最下方
-                        SessionAssistantReplyHint(
-                            contract = sessionContract,
-                            onInteraction = onAssistantInteraction
-                        )
                     }
                 }
             }
@@ -1564,27 +1554,46 @@ internal fun RichMessageContent(
                         textColor = Color(0xFF4C586B)
                     )
                 }
-                is ChatRichBlock.Code -> RichSourceBlock(
-                    label = block.language?.let { "代码 · $it" } ?: "代码",
-                    source = block.source,
-                    displayText = remember(block.language, block.source) {
-                        highlightedCodeAnnotatedString(block.language, block.source)
-                    },
-                    onCopySource = onCopySource
-                )
-                is ChatRichBlock.Formula -> {
-                    val formulaNodes = remember(block.source) {
-                        (LatexMiniParser.parse(block.source) as? LatexParseResult.Success)?.nodes
-                    }
-                    if (formulaNodes != null) {
-                        RichFormulaBlock(
+                is ChatRichBlock.Code -> {
+                    val isAnimationOrInteractive = block.language?.lowercase() in setOf("html", "css", "svg", "web")
+                    if (isAnimationOrInteractive) {
+                        InteractiveTeachingSandboxBlock(
                             source = block.source,
-                            nodes = formulaNodes,
+                            language = block.language ?: "html",
                             onCopySource = onCopySource
                         )
                     } else {
-                        // 解析失败（含流式半完整块）回退原始源码展示，不炸屏
-                        RichSourceBlock("公式", block.source, onCopySource = onCopySource)
+                        RichSourceBlock(
+                            label = block.language?.let { "代码 · $it" } ?: "代码",
+                            source = block.source,
+                            displayText = remember(block.language, block.source) {
+                                highlightedCodeAnnotatedString(block.language, block.source)
+                            },
+                            onCopySource = onCopySource
+                        )
+                    }
+                }
+                is ChatRichBlock.Formula -> {
+                    // 化学式 / 矩阵 / cases 等原生自绘表达不了的排版：走本地离线 KaTeX
+                    // （KaTeX + mhchem + 字体全部打包在 APK assets，不联网、不上服务器）。
+                    // 普通 \frac/\sqrt/上下标仍走下面的原生绘制快路径，避免每个公式都起 WebView。
+                    if (shouldUseOfflineRenderer(block.source)) {
+                        LatexOfflineRenderCard(source = block.source, onCopySource = onCopySource)
+                    } else {
+                        val formulaNodes = remember(block.source) {
+                            latexBlockNodesForDrawing(block.source)
+                        }
+                        if (formulaNodes != null) {
+                            RichFormulaBlock(
+                                source = block.source,
+                                nodes = formulaNodes,
+                                onCopySource = onCopySource
+                            )
+                        } else {
+                            // 解析失败（含流式半完整块）或残留未识别命令：显示美化后的可读数学文本，
+                            // 不再把带反斜杠的原始 LaTeX 源码丢给用户
+                            RichFormulaPlainBlock(source = block.source, onCopySource = onCopySource)
+                        }
                     }
                 }
                 is ChatRichBlock.Table -> RichTable(block)
@@ -1668,23 +1677,144 @@ internal fun buildRichInlineAnnotatedString(inlines: List<ChatRichInline>): Anno
                     fontSize = 14.sp
                 )
             ) { append(inline.source) }
-            is ChatRichInline.Formula -> {
-                val renderedFormula = latexInlineAnnotatedString(inline.source)
-                if (renderedFormula != null) {
-                    append(renderedFormula)
-                } else {
-                    // 解析失败（含流式半完整块）回退原始源码样式
-                    withStyle(
-                        SpanStyle(color = Color(0xFF334D7A), fontWeight = FontWeight.Medium)
-                    ) { append(inline.source) }
-                }
-            }
+            is ChatRichInline.Formula -> append(latexInlineDisplayAnnotatedString(inline.source))
             is ChatRichInline.Link -> {
                 pushStringAnnotation(ChatRichInlineLinkTag, inline.url)
                 withStyle(
                     SpanStyle(color = Color(0xFF315FA3), textDecoration = TextDecoration.Underline)
                 ) { append(inline.label) }
                 pop()
+            }
+        }
+    }
+}
+
+/**
+ * 教学动效沙箱页：AI 输出的 HTML/CSS/SVG 片段包进统一外壳（透明背景、随聊天气泡主题、
+ * 居中、禁缩放），完整片段（自带 <html>）原样使用。
+ */
+private fun buildTeachingSandboxHtml(source: String): String {
+    if (source.contains("<html", ignoreCase = true)) return source
+    return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+            <style>
+                html, body {
+                    margin: 0;
+                    padding: 10px;
+                    background: transparent;
+                    color: #1A2333;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    overflow: hidden;
+                }
+            </style>
+        </head>
+        <body>
+            $source
+        </body>
+        </html>
+    """.trimIndent()
+}
+
+/**
+ * 2026-10-17 教学动效与交互沙箱容器：
+ * 支持 AI 输出的标准 HTML/CSS 动画、SVG 及微型教学可视化代码，在安全的独立容器中真实
+ * 渲染动画效果，并支持切换查看源码与复制。
+ */
+@Composable
+private fun InteractiveTeachingSandboxBlock(
+    source: String,
+    language: String,
+    onCopySource: (String) -> ChatClipboardResult
+) {
+    var showSource by remember { mutableStateOf(false) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFF7FAFD),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(1.dp, Color(0xFFD6E2F0))
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "教学动效 · $language",
+                    modifier = Modifier.weight(1f),
+                    color = Color(0xFF4A688C),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                TextButton(
+                    onClick = { showSource = !showSource },
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = if (showSource) "查看演示" else "代码",
+                        fontSize = 11.sp,
+                        color = Color(0xFF4287E8)
+                    )
+                }
+                IconButton(onClick = { onCopySource(source) }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Filled.ContentCopy,
+                        contentDescription = "复制代码",
+                        modifier = Modifier.size(16.dp),
+                        tint = Color(0xFF4A688C)
+                    )
+                }
+            }
+            if (showSource) {
+                Text(
+                    text = highlightedCodeAnnotatedString(language, source),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF202631))
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    color = Color(0xFFF1F4F8),
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp,
+                    fontFamily = FontFamily.Monospace,
+                    softWrap = false
+                )
+            } else {
+                AndroidView(
+                    factory = { context ->
+                        android.webkit.WebView(context).apply {
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            // 教学动效是纯本地渲染：切断文件与网络访问，避免 AI 生成的
+                            // 代码碰到不该碰的东西（沙箱化）。
+                            settings.allowFileAccess = false
+                            settings.allowContentAccess = false
+                            settings.blockNetworkLoads = true
+                            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                            isVerticalScrollBarEnabled = false
+                            isHorizontalScrollBarEnabled = false
+                        }
+                    },
+                    update = { webView ->
+                        // 只在源码真正变化时重新加载：重组时重复 loadData 会重启 CSS 动画、闪屏。
+                        // 用 View.tag 记录（而非 remember）——LazyColumn 回收后重建 WebView 时
+                        // tag 为空会重新加载，不会出现「滚动回来沙箱空白」。
+                        if (webView.tag != source) {
+                            webView.tag = source
+                            webView.loadDataWithBaseURL(null, buildTeachingSandboxHtml(source), "text/html", "utf-8", null)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp, max = 260.dp)
+                )
             }
         }
     }

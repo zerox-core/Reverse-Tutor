@@ -426,7 +426,32 @@ object ChatRichContentParser {
                     index += 1
                     continue
                 }
+                // 跨行 $$...$$ 块级公式支持
+                val closing = (index + 1 until lines.size).firstOrNull { lines[it].trim().endsWith("$$") }
+                if (closing != null) {
+                    val formulaContent = lines.subList(index, closing + 1).joinToString("\n").trim()
+                        .removePrefix("$$").removeSuffix("$$").trim()
+                    blocks += ChatRichBlock.Formula(formulaContent)
+                    index = closing + 1
+                    continue
+                }
                 return listOf(ChatRichBlock.PlainText(source))
+            }
+            if (line.trim().startsWith("\\[")) {
+                val trimmed = line.trim()
+                if (trimmed.endsWith("\\]")) {
+                    blocks += ChatRichBlock.Formula(trimmed.removePrefix("\\[").removeSuffix("\\]").trim())
+                    index += 1
+                    continue
+                }
+                val closing = (index + 1 until lines.size).firstOrNull { lines[it].trim().endsWith("\\]") }
+                if (closing != null) {
+                    val formulaContent = lines.subList(index, closing + 1).joinToString("\n").trim()
+                        .removePrefix("\\[").removeSuffix("\\]").trim()
+                    blocks += ChatRichBlock.Formula(formulaContent)
+                    index = closing + 1
+                    continue
+                }
             }
             val heading = Regex("^(#{1,6})\\s+(.+)$").matchEntire(line)
             if (heading != null) {
@@ -491,7 +516,7 @@ object ChatRichContentParser {
 
     private fun startsBlock(lines: List<String>, index: Int): Boolean {
         val line = lines[index]
-        return line.startsWith("```") || line.trim().startsWith("$") || line.startsWith("> ") ||
+        return line.startsWith("```") || line.trim().startsWith("$$") || line.trim().startsWith("\\[") || line.startsWith("> ") ||
             Regex("^(#{1,6})\\s+.+$").matches(line) || Regex("^[-*+]\\s+.+$").matches(line) ||
             Regex("^\\d+[.)]\\s+.+$").matches(line) ||
             Regex("^[一二三四五六七八九十百千两]{1,4}[、．.]\\s*.+$").matches(line) ||
@@ -520,7 +545,12 @@ object ChatRichContentParser {
     private fun tableCells(line: String): List<String> = line.trim().trim('|').split('|').map(String::trim)
 
     internal fun parseInlines(source: String): List<ChatRichInline> {
-        val pattern = Regex("`([^`]+)`|\\[([^]]+)]\\((https?://[^)]+)\\)|\\$([^$\\n]+)\\$|\\*\\*([^*\\n]+)\\*\\*")
+        // 行内公式认三种写法：$...$（模型主用法）、\(...\)、\[...\]。
+        // 后两种若不认，就会被当普通文本整段显示，带反斜杠的 LaTeX 源码直接外露。
+        val pattern = Regex(
+            "`([^`]+)`|\\[([^]]+)]\\((https?://[^)]+)\\)|\\$([^$\\n]+)\\$|\\*\\*([^*\\n]+)\\*\\*" +
+                """|\\\(([\s\S]+?)\\\)|\\\[([\s\S]+?)\\\]"""
+        )
         val result = mutableListOf<ChatRichInline>()
         var cursor = 0
         pattern.findAll(source).forEach { match ->
@@ -529,6 +559,8 @@ object ChatRichContentParser {
                 match.groupValues[1].isNotEmpty() -> ChatRichInline.Code(match.groupValues[1])
                 match.groupValues[2].isNotEmpty() -> ChatRichInline.Link(match.groupValues[2], match.groupValues[3])
                 match.groupValues[4].isNotEmpty() -> ChatRichInline.Formula(match.groupValues[4])
+                match.groupValues[6].isNotEmpty() -> ChatRichInline.Formula(match.groupValues[6])
+                match.groupValues[7].isNotEmpty() -> ChatRichInline.Formula(match.groupValues[7])
                 else -> ChatRichInline.Bold(match.groupValues[5])
             }
             cursor = match.range.last + 1

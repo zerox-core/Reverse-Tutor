@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="katex.min.css">
+<script src="katex.min.js"></script>
+<script src="contrib/mhchem.min.js"></script>
+<style>
+    html, body {
+        margin: 0; padding: 0; background: transparent; overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #22304A;
+    }
+    .wrap { padding: 2px 0; overflow-x: auto; overflow-y: hidden; }
+    .katex-display { margin: 0; }
+    .katex { font-size: 1.06em; }
+    .fallback {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 14px; line-height: 22px; color: #22304A;
+        white-space: pre-wrap; word-break: break-word;
+    }
+</style>
+</head>
+<body>
+<div class="wrap" id="out"></div>
+<script>
+// 渲染层契约（与 LatexOfflineRender 保持一致）：
+//   - 全部资源来自同目录本地文件，绝不发起网络请求；
+//   - 渲染失败时退回 fallback 可读文本，绝不把反斜杠源码丢给用户；
+//   - 渲染后把内容高度回传给原生层，卡片内部不出现滚动条。
+function reportHeight() {
+    try {
+        var h = Math.ceil(document.body.scrollHeight);
+        if (h > 0 && window.AndroidRender && window.AndroidRender.reportHeight) {
+            window.AndroidRender.reportHeight(h);
+        }
+    } catch (e) { /* 高度回传失败不影响渲染本身 */ }
+}
+
+function renderFormula(src, fallback) {
+    var out = document.getElementById('out');
+    if (!out) { return; }
+    out.innerHTML = '';
+    var ok = false;
+    try {
+        if (window.katex && typeof katex.render === 'function') {
+            katex.render(src, out, {
+                displayMode: true,
+                throwOnError: true,
+                strict: false,
+                trust: false,
+                output: 'html'
+            });
+            ok = true;
+        }
+    } catch (e) {
+        ok = false;
+    }
+    if (!ok) {
+        out.innerHTML = '';
+        var pre = document.createElement('div');
+        pre.className = 'fallback';
+        pre.textContent = fallback;
+        out.appendChild(pre);
+    }
+    reportHeight();
+    window.requestAnimationFrame(reportHeight);
+}
+
+window.addEventListener('load', reportHeight);
+</script>
+</body>
+</html>
