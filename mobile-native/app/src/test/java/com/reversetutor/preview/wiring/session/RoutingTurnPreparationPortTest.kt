@@ -13,7 +13,10 @@ import org.junit.Test
 
 /**
  * RoutingTurnPreparationPort 三项验收：
- * 1. 分派不变（R-RT-1 回归）：反转家教 → reversePort，其余 → defaultPort。
+ * 1. 分派（2026-10-18 用户拍板「应用内新建会话一律进内核」）：有落盘快照（= 新建漏斗
+ *    建出的会话）→ reversePort；无快照（首启欢迎/演示、空间导入）→ defaultPort。
+ *    旧键 `builtInPresetId == "reverse-tutor"` 已废弃：只有 1/8 张预设卡写得出该值，
+ *    其余入口（AI 创建窗口、预设副本、空白草稿、挑战 prefill）会静默掉进普通链路。
  * 2. 流式桥接（2026-10-11 拍板）：TurnMonologuePort 读口转发给 reversePort；
  *    reversePort 未实现时返回 null（调用方回退仓库直读）。
  * 3. 连发合并钩子（智能插队，2026-10-11 拍板升级）：仅普通会话每条入队前以会话 id
@@ -22,9 +25,15 @@ import org.junit.Test
  */
 class RoutingTurnPreparationPortTest {
 
+    /**
+     * @param createdInApp true = 应用内新建（新建漏斗 `promoteDraft` 落了快照）；
+     *   false = 无快照的会话（首启欢迎/演示会话、空间导入的历史会话）。
+     * @param builtInPresetId 预设身份，仅作数据字段，**不再参与路由判定**。
+     */
     private fun request(
         sessionId: String,
-        reverseTutor: Boolean
+        createdInApp: Boolean,
+        builtInPresetId: String? = null
     ) = BackgroundTurnPreparationRequest(
         spaceId = "space-1",
         sessionId = sessionId,
@@ -33,10 +42,11 @@ class RoutingTurnPreparationPortTest {
         token = "tok-1",
         quoteExcerpt = null,
         imageAttachments = emptyList(),
-        sessionSnapshot = NewSessionConfiguration(
-            title = "会话",
-            builtInPresetId = if (reverseTutor) REVERSE_TUTOR_PRESET_ID else "formal-math"
-        )
+        sessionSnapshot = if (createdInApp) {
+            NewSessionConfiguration(title = "会话", builtInPresetId = builtInPresetId)
+        } else {
+            null
+        }
     )
 
     private class RecordingReversePort : BackgroundTurnPreparationPort, TurnMonologuePort {
@@ -57,7 +67,7 @@ class RoutingTurnPreparationPortTest {
     }
 
     @Test
-    fun `dispatch unchanged - reverse tutor session goes to reversePort`() = runBlocking {
+    fun `created session goes to reversePort`() = runBlocking {
         val reversePort = RecordingReversePort()
         val defaultCalls = mutableListOf<String>()
         val port = RoutingTurnPreparationPort(
@@ -67,7 +77,9 @@ class RoutingTurnPreparationPortTest {
                 BackgroundTurnPreparationResult.Unavailable
             }
         )
-        val result = port.prepareAndEnqueue(request("session-rt", reverseTutor = true))
+        val result = port.prepareAndEnqueue(
+            request("session-rt", createdInApp = true, builtInPresetId = REVERSE_TUTOR_PRESET_ID)
+        )
         assertEquals(listOf("session-rt"), reversePort.sessions)
         assertEquals(emptyList<String>(), defaultCalls)
         assertEquals(
@@ -80,7 +92,37 @@ class RoutingTurnPreparationPortTest {
     }
 
     @Test
-    fun `dispatch unchanged - normal session goes to defaultPort`() = runBlocking {
+    fun `non reverse tutor preset card session also goes to reversePort`() = runBlocking {
+        // 2026-10-18 新键的核心断言：另外 7 张预设卡（如 formal-math-sprint）、预设「· 副本」、
+        // 空白自定义草稿、挑战 prefill 建出的会话都带落盘快照 → 必须进内核，不得按预设 id 分家。
+        val reversePort = RecordingReversePort()
+        val defaultCalls = mutableListOf<String>()
+        val port = RoutingTurnPreparationPort(
+            reversePort = reversePort,
+            defaultPort = BackgroundTurnPreparationPort { request ->
+                defaultCalls.add(request.sessionId)
+                BackgroundTurnPreparationResult.Unavailable
+            }
+        )
+
+        port.prepareAndEnqueue(
+            request("session-preset", createdInApp = true, builtInPresetId = "formal-math-sprint")
+        )
+        port.prepareAndEnqueue(request("session-copy", createdInApp = true, builtInPresetId = null))
+        port.prepareAndEnqueue(request("session-blank", createdInApp = true, builtInPresetId = null))
+        port.prepareAndEnqueue(
+            request("session-challenge", createdInApp = true, builtInPresetId = null)
+        )
+
+        assertEquals(
+            listOf("session-preset", "session-copy", "session-blank", "session-challenge"),
+            reversePort.sessions
+        )
+        assertEquals(emptyList<String>(), defaultCalls)
+    }
+
+    @Test
+    fun `session without snapshot goes to defaultPort`() = runBlocking {
         val defaultCalls = mutableListOf<String>()
         val port = RoutingTurnPreparationPort(
             reversePort = RecordingReversePort(),
@@ -92,7 +134,7 @@ class RoutingTurnPreparationPortTest {
                 )
             }
         )
-        val result = port.prepareAndEnqueue(request("session-normal", reverseTutor = false))
+        val result = port.prepareAndEnqueue(request("session-normal", createdInApp = false))
         assertEquals(listOf("session-normal"), defaultCalls)
         assertEquals(BackgroundTurnPreparationResult.Queued(
                     jobId = "job-default",
@@ -137,10 +179,10 @@ class RoutingTurnPreparationPortTest {
             coalesceQueuedGeneration = { sessionId -> hookedSessions.add(sessionId) }
         )
         // RT 会话不触发钩子（连发合并下沉到 RT 协调器的智能插队），普通会话触发
-        port.prepareAndEnqueue(request("session-rt-1", reverseTutor = true))
-        port.prepareAndEnqueue(request("session-rt-2", reverseTutor = true))
-        port.prepareAndEnqueue(request("session-normal-1", reverseTutor = false))
-        port.prepareAndEnqueue(request("session-normal-2", reverseTutor = false))
+        port.prepareAndEnqueue(request("session-rt-1", createdInApp = true))
+        port.prepareAndEnqueue(request("session-rt-2", createdInApp = true))
+        port.prepareAndEnqueue(request("session-normal-1", createdInApp = false))
+        port.prepareAndEnqueue(request("session-normal-2", createdInApp = false))
         assertEquals(listOf("session-normal-1", "session-normal-2"), hookedSessions)
     }
 
@@ -153,7 +195,7 @@ class RoutingTurnPreparationPortTest {
         )
         // 钩子异常被吞掉（runCatching），普通会话照常走 defaultPort 入队；
         // RT 会话则根本不跑钩子（上面的 once-per-enqueue 用例覆盖）。
-        val result = port.prepareAndEnqueue(request("session-normal", reverseTutor = false))
+        val result = port.prepareAndEnqueue(request("session-normal", createdInApp = false))
         assertEquals(BackgroundTurnPreparationResult.Unavailable, result)
     }
 }

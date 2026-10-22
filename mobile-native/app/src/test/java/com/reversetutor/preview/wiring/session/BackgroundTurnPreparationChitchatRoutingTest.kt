@@ -107,9 +107,11 @@ class BackgroundTurnPreparationChitchatRoutingTest {
             "轻量回合只应有 Message 类证据，实际 kinds=${evidence.map { it.kind }}",
             evidence.all { it.kind == "Message" }
         )
-        assertEquals("轻量证据只带最近 2 条消息", 2, evidence.size)
+        // 2026-10-18 用户拍板调大历史窗口（真机「上下文没了」修复）：轻量回合同样带
+        // 最近 8 条消息，而不是旧的 2 条——闲聊也要接得住上一句。
+        assertEquals("轻量证据带最近 8 条消息", 8, evidence.size)
         assertEquals(
-            listOf("msg-light-10", "msg-light-9"),
+            (10 downTo 3).map { "msg-light-$it" },
             evidence.map { it.sourceMessageId }
         )
     }

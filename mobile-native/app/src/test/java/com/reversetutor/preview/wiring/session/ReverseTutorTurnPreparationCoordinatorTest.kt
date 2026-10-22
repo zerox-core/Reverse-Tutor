@@ -409,6 +409,149 @@ class ReverseTutorTurnPreparationCoordinatorTest {
         assertEquals(2, savedMessages.size)
     }
 
+    @Test
+    fun prepareAndEnqueueRestoresSessionFromPersistentSnapshotOnColdStart() = runBlocking {
+        val restoredSession = com.reversetutor.feature.reversetutor.session.RTSession(
+            sessionId = "session-cold-start",
+            topic = "几何公理",
+            studentId = "小明",
+            understandingLevel = 3,
+            currentRound = 4,
+            masteredConcepts = listOf("点线面关系"),
+            historySummary = "前期摘要：学生已掌握点线面关系。"
+        )
+
+        val jobCompleted = CompletableDeferred<Unit>()
+        val coordinatorWithRestore = ReverseTutorTurnPreparationCoordinator(
+            isSessionDeleted = { false },
+            enqueueJob = { input, now ->
+                BackgroundGenerationJob(
+                    id = "job-restore",
+                    spaceId = input.spaceId,
+                    sessionId = input.sessionId,
+                    userMessageId = input.userMessageId,
+                    userText = input.userText,
+                    token = input.token,
+                    modelBindingId = null,
+                    status = BackgroundJobStatus.Queued,
+                    createdAtEpochMillis = now,
+                    startedAtEpochMillis = null,
+                    completedAtEpochMillis = null,
+                    errorMessage = null
+                )
+            },
+            claimJob = { _, _ -> 1 },
+            updateJobCompleted = { _, _ -> jobCompleted.complete(Unit) },
+            updateJobFailed = { _, _, _ -> },
+            saveAssistantMessage = { _, _, _, _, _ -> "msg-1" },
+            toolLoop = toolLoop,
+            llmClientProvider = { mockLlmClient },
+            restoreSession = { sid ->
+                if (sid == "session-cold-start") restoredSession else null
+            }
+        )
+
+        mockLlmClient.replyText = "好的老师，我们继续。"
+        val request = BackgroundTurnPreparationRequest(
+            spaceId = "space-1",
+            sessionId = "session-cold-start",
+            userMessageId = "u-restore",
+            userText = "继续往下讲",
+            token = "tok-restore",
+            quoteExcerpt = null,
+            imageAttachments = emptyList(),
+            sessionSnapshot = null
+        )
+
+        coordinatorWithRestore.prepareAndEnqueue(request)
+        jobCompleted.await()
+
+        val active = coordinatorWithRestore.getSession("session-cold-start")
+        assertNotNull("冷启动后应从持久化快照中恢复出会话", active)
+        assertEquals(3, active!!.understandingLevel)
+        assertEquals(5, active.currentRound) // 恢复出的第 4 轮推进到第 5 轮
+        assertTrue(active.masteredConcepts.contains("点线面关系"))
+        assertEquals("前期摘要：学生已掌握点线面关系。", active.historySummary)
+    }
+
+    @Test
+    fun prepareAndEnqueueLoadsUserMaterialsAndCarriesImageNote() = runBlocking {
+        val jobCompleted = CompletableDeferred<Unit>()
+        var observedMessages: List<LlmMessage> = emptyList()
+
+        val mockClientWithInspection = object : ToolLoopLlmClient {
+            override suspend fun chat(
+                messages: List<LlmMessage>,
+                tools: List<JSONObject>,
+                model: String?
+            ): LlmResponse {
+                observedMessages = messages
+                return LlmResponse(content = "老师我看到你发来的图片讲义了，讲的是空间向量！")
+            }
+        }
+
+        val coordinatorWithMaterialAndImage = ReverseTutorTurnPreparationCoordinator(
+            isSessionDeleted = { false },
+            enqueueJob = { input, now ->
+                BackgroundGenerationJob(
+                    id = "job-mat-img",
+                    spaceId = input.spaceId,
+                    sessionId = input.sessionId,
+                    userMessageId = input.userMessageId,
+                    userText = input.userText,
+                    token = input.token,
+                    modelBindingId = null,
+                    status = BackgroundJobStatus.Queued,
+                    createdAtEpochMillis = now,
+                    startedAtEpochMillis = null,
+                    completedAtEpochMillis = null,
+                    errorMessage = null
+                )
+            },
+            claimJob = { _, _ -> 1 },
+            updateJobCompleted = { _, _ -> jobCompleted.complete(Unit) },
+            updateJobFailed = { _, _, _ -> },
+            saveAssistantMessage = { _, _, _, _, _ -> "msg-mat-img" },
+            toolLoop = toolLoop,
+            llmClientProvider = { mockClientWithInspection },
+            loadUserMaterials = { _, _ ->
+                listOf("空间向量基础讲义" to "空间向量的数量积满足分配律，法向量垂直于平面内所有直线。")
+            }
+        )
+
+        val imageContract = MessageAttachment(
+            id = "img-1",
+            spaceId = "space-mat",
+            messageId = "u-img",
+            name = "problem.png",
+            mimeType = "image/png",
+            uri = "content://media/external/images/1"
+        )
+        val request = BackgroundTurnPreparationRequest(
+            spaceId = "space-mat",
+            sessionId = "session-mat",
+            userMessageId = "u-img",
+            userText = "看看这道题",
+            token = "tok-img",
+            quoteExcerpt = null,
+            imageAttachments = listOf(imageContract),
+            sessionSnapshot = null
+        )
+
+        coordinatorWithMaterialAndImage.prepareAndEnqueue(request)
+        jobCompleted.await()
+
+        // 验证用户资料已写入 MaterialStore
+        val searchHits = toolLoop.store.search("空间向量")
+        assertTrue("MaterialStore 应该能检索到动态注入的用户资料", searchHits.isNotEmpty())
+        assertEquals("空间向量基础讲义", searchHits.first().title)
+
+        // 验证 LLM 收到的 Prompt 包含了图片附件标记
+        val userMsg = observedMessages.find { it.role == "user" && it.content?.contains("看看这道题") == true }
+        assertNotNull("用户消息应该包含在输入中", userMsg)
+        assertTrue("用户消息应该附带图片提示标记", userMsg!!.content!!.contains("[附带了 1 张图片附件]"))
+    }
+
     // ------------------------------------------------------------------
     // 智能插队（2026-10-11 拍板）：活动回合执行中，连发请求注入而非新建 job
     // ------------------------------------------------------------------

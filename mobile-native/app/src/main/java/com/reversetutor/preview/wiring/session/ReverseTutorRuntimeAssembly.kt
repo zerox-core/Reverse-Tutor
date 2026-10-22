@@ -10,7 +10,6 @@ import com.reversetutor.core.llm.UrlConnectionProviderHttpTransport
 import com.reversetutor.core.model.LlmProfile
 import com.reversetutor.core.model.Message
 import com.reversetutor.core.model.MessageRole
-import com.reversetutor.feature.chat.BackgroundTurnPreparationRequest
 import com.reversetutor.feature.chat.ConversationMessageContract
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.reversetutor.card.StudentCards
@@ -76,17 +75,33 @@ object ReverseTutorRuntimeAssembly {
         // retrieve_historical_context / generate_progress_report 需要跨会话、跨进程状态。
         // V21 三表落盘，App 重启不丢；InMemoryRTMemoryStore 保留供 JVM 测试注入。
         val memoryStore = RoomRTMemoryStore(DataModule.database(appContext).rtMemoryDao())
+
+        // 外部联网搜索：自适应提供方（用户自定义 Key 优先 + 开源空客安全兜底）
+        val transport: ProviderHttpTransport = UrlConnectionProviderHttpTransport()
+        val llmProfileRepository = DataModule.llmProfileRepository(appContext)
+        val secretStore = DataModule.secretStore(appContext)
+
+        val adaptiveSearchProvider = AdaptiveWebSearchProvider(
+            profileProvider = {
+                llmProfileRepository.listProfiles().firstOrNull { it.enabled }
+            },
+            apiKeyResolver = { secretRef -> secretRef?.let { secretStore.get(it) } },
+            transport = transport,
+            builtinOfficialKeyProvider = null, // 开源空客：默认不置入官方付费Key；后续商业化在此挂载官方保底
+            builtinOfficialBaseUrl = null
+        )
+
         val toolLoop = ToolLoop(
             registry = registry,
             catalog = catalog,
             store = materialStore,
-            memoryStore = memoryStore
+            memoryStore = memoryStore,
+            webSearchProvider = adaptiveSearchProvider
         )
 
         // ---- 仓库桥接 ----
         val database = DataModule.database(appContext)
         val backgroundJobDao = database.backgroundJobDao()
-        val secretStore = DataModule.secretStore(appContext)
 
         return ReverseTutorTurnPreparationCoordinator(
             isSessionDeleted = { sessionId ->
@@ -157,7 +172,20 @@ object ReverseTutorRuntimeAssembly {
             partialStore = GenerationPartialStore(),
             toolLoop = toolLoop,
             llmClientProvider = llmClientProvider,
-            coroutineScope = conversationScope
+            coroutineScope = conversationScope,
+            restoreSession = { sessionId ->
+                memoryStore.sessionsForReport().firstOrNull {
+                    it.optString("session_id") == sessionId
+                }?.toReverseTutorSessionFromSnapshot()
+            },
+            loadUserMaterials = { spaceId, _ ->
+                runCatching {
+                    val sources = DataModule.sourceRepository(appContext).listSourcesWithChunks(spaceId)
+                    sources.map {
+                        it.source.title to (it.source.extractedText ?: it.chunks.joinToString("\n") { c -> c.text })
+                    }
+                }.getOrElse { emptyList<Pair<String, String>>() }
+            }
         )
     }
 
@@ -545,13 +573,6 @@ class ReverseTutorOpenAiLlmClient(
     }
 }
 
-/** 反转家教会话的创建期配置（路由端口判定输入），供后续 NewSession 预设接入使用。 */
-fun reverseTutorSessionConfiguration(title: String): NewSessionConfiguration =
-    NewSessionConfiguration(
-        title = title,
-        builtInPresetId = REVERSE_TUTOR_PRESET_ID
-    )
-
 /**
  * Fake 模式反转家教客户端：模拟 LLM 学生回答（脚本化演示），
  * 不发网络请求，保证预览壳在无渠道配置时也能完整走通 ToolLoop。
@@ -578,7 +599,3 @@ class ReverseTutorFakeLlmClient : ToolLoopLlmClient {
         )
     }
 }
-
-/** 供装配层在请求到达时做兼容判定（预留：会话快照缺失时按会话仓库补判）。 */
-fun BackgroundTurnPreparationRequest.isReverseTutorTurn(): Boolean =
-    sessionSnapshot?.builtInPresetId == REVERSE_TUTOR_PRESET_ID

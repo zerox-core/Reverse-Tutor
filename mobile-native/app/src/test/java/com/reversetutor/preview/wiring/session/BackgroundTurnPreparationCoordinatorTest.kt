@@ -380,7 +380,11 @@ class BackgroundTurnPreparationCoordinatorTest {
         assertTrue(result is BackgroundTurnPreparationResult.Queued)
 
         val evidence = queuedInputs.single().contextEvidence
-        assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.map { it.id })
+        // 2026-10-18 调大历史窗口后，闲聊回合把轻量装配给到的消息全部带上（不再砍到 2 条）
+        assertEquals(
+            listOf("msg-message-a", "msg-message-b", "msg-message-c"),
+            evidence.map { it.id }
+        )
         assertTrue(evidence.all { it.kind == "Message" })
         assertTrue(evidence.none { it.kind in setOf("Summary", "Gaps", "Review", "Memory", "Mastery", "Source", "Error") })
     }
@@ -397,7 +401,7 @@ class BackgroundTurnPreparationCoordinatorTest {
     }
 
     @Test
-    fun learning_turn_keeps_full_evidence_pack_with_two_recent_messages() = runBlocking {
+    fun learning_turn_keeps_full_evidence_pack_with_the_recent_message_window() = runBlocking {
         queuedInputs.clear()
         val result = recordingCoordinator().prepareAndEnqueue(request("我不会"))
         assertTrue(result is BackgroundTurnPreparationResult.Queued)
@@ -407,7 +411,9 @@ class BackgroundTurnPreparationCoordinatorTest {
         assertTrue("Summary" in kinds)
         assertTrue("Gaps" in kinds)
         assertTrue("Review" in kinds)
-        assertEquals(2, evidence.count { it.kind == "Message" })
+        // 2026-10-18 调大历史窗口（2 → 8）：本夹具给了 3 条消息，应一条不落全带上；
+        // 聚合证据与消息证据并存这一性质保持不变。
+        assertEquals(3, evidence.count { it.kind == "Message" })
         assertTrue("Mastery" !in kinds)
     }
 }

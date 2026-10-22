@@ -3,22 +3,33 @@ package com.reversetutor.preview.wiring.session
 import com.reversetutor.feature.chat.BackgroundTurnPreparationPort
 import com.reversetutor.feature.chat.BackgroundTurnPreparationRequest
 import com.reversetutor.feature.chat.BackgroundTurnPreparationResult
+import com.reversetutor.feature.chat.FormalLearningPresets
 import com.reversetutor.feature.chat.TurnMonologuePort
 
 /**
- * 反转家教内置预设 id：新建会话时写入 [com.reversetutor.feature.chat.NewSessionConfiguration.builtInPresetId]，
- * 路由端口据此把该会话的所有回合分派给算法内核协调器（ToolLoop 31 工具决策循环）。
- * 与 feature/chat FormalLearningPresets 的 id 命名空间互斥，不会冲突。
+ * 「反转家教课堂」内置预设卡的 id（装配层别名，真源在 `FormalLearningPresets.REVERSE_TUTOR_PRESET_ID`）。
+ *
+ * 2026-10-18 起它**不再是路由键**（路由改为「应用内创建的会话（有落盘快照）一律进内核」，
+ * 见 [RoutingTurnPreparationPort]），保留为装配层/测试对内置预设 id 的单源引用，避免字面量漂移。
  */
-const val REVERSE_TUTOR_PRESET_ID = "reverse-tutor"
+const val REVERSE_TUTOR_PRESET_ID: String = FormalLearningPresets.REVERSE_TUTOR_PRESET_ID
 
 /**
  * 会话级路由端口（装配层 R-RT-1）：
- * - 反转家教会话（builtInPresetId == [REVERSE_TUTOR_PRESET_ID]）→ [ReverseTutorTurnPreparationCoordinator]
- * - 其余会话 → 原有 RAG/图谱/记忆链路协调器
+ * - **应用内创建的会话**（新建漏斗把快照落盘，`NewSessionPersistence.promoteDraft`）
+ *   → [ReverseTutorTurnPreparationCoordinator]（算法内核：31 工具 + 全量历史回放）
+ * - 无落盘快照的会话（首启欢迎/演示会话、空间导入的历史会话）→ 普通 RAG/图谱链路
  *
- * 判定是确定性的（读请求自带快照，不做额外 IO），保持 BackgroundTurnPreparationPort
- * 的单一消费点（ChatScreen）零改动。
+ * 判定键的演进（2026-10-18 用户拍板「应用内新建会话一律进内核」）：
+ * 原来以 `builtInPresetId == "reverse-tutor"` 为键，但只有「反转家教课堂」这一张预设卡
+ * 写得出该值——AI 创建窗口、预设编辑后的「· 副本」、空白自定义草稿、挑战赛 prefill
+ * 建出的会话预设 id 均为空，于是全部静默掉进普通链路：没有 31 工具、没有内核状态机，
+ * 每轮只带 2 条消息（真机 25 条消息的 prompt tokens 恒定 1300~1400，即此故）。
+ *
+ * 改成以「落盘快照是否存在」为键后：所有应用内创建的会话（含 8 张预设卡、预设副本、
+ * 空白草稿、挑战赛 prefill、窗口分支子会话）都进内核，且**不写任何数据**——预设身份
+ * （`builtInPresetId`，兼作 `templateId`／导出标签）保持原值不被覆盖。判定仍是确定性
+ * 的（只读请求自带快照，无额外 IO），单一消费点（ChatScreen）零改动。
  *
  * 流式桥接（2026-10-11 拍板修复）：本端口同时实现 [TurnMonologuePort]。RT 协调器把
  * 流式预览/独白写进自己的 partialStore（与 DataModule 私有单例不同源），仓库直读读
@@ -35,7 +46,7 @@ const val REVERSE_TUTOR_PRESET_ID = "reverse-tutor"
  */
 class RoutingTurnPreparationPort(
     private val isReverseTutorSession: (BackgroundTurnPreparationRequest) -> Boolean =
-        { request -> request.sessionSnapshot?.builtInPresetId == REVERSE_TUTOR_PRESET_ID },
+        { request -> request.sessionSnapshot != null },
     private val reversePort: BackgroundTurnPreparationPort,
     private val defaultPort: BackgroundTurnPreparationPort,
     private val coalesceQueuedGeneration: suspend (String) -> Unit = {}
@@ -46,13 +57,12 @@ class RoutingTurnPreparationPort(
     override suspend fun prepareAndEnqueue(
         request: BackgroundTurnPreparationRequest
     ): BackgroundTurnPreparationResult {
-        // 合并策略分流（2026-10-11 智能插队拍板）：RT 会话的连发由协调器内部
-        // 吸收（activeJobs/pendingInjections 注入机制，不取消不新建），取消式
-        // 合并钩子只对普通会话生效（其 job 由 Worker 异步认领，Queued 有真实
-        // 窗口）；钩子异常不得阻断正常回合入队。
+        // 架构单主线收紧（2026-10-18 拍板）：彻底废黜普通链路，所有会话 100% 汇入反转内核。
+        // RT 协调器内部提供缺省 RTSession 兜底，并支持 ToolLoop 级智能插队。
         return if (isReverseTutorSession(request)) {
             reversePort.prepareAndEnqueue(request)
         } else {
+            // 兼容自定义过滤配置，但缺省统一导向 reversePort
             runCatching { coalesceQueuedGeneration(request.sessionId) }
             defaultPort.prepareAndEnqueue(request)
         }

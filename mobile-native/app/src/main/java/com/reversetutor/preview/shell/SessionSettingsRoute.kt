@@ -165,8 +165,11 @@ fun SessionSettingsRoute(
         tagLibraryPersistence != null &&
         sessionSettingsStore != null
     ) {
-        val snapshot = remember(sessionId, newSessionPersistence) {
-            newSessionPersistence?.loadSessionSnapshot(sessionId) ?: NewSessionConfiguration(
+        val storedSnapshot = remember(sessionId, newSessionPersistence) {
+            newSessionPersistence?.loadSessionSnapshot(sessionId)
+        }
+        val snapshot = remember(sessionId, newSessionPersistence, storedSnapshot) {
+            storedSnapshot ?: NewSessionConfiguration(
                 title = sessionTitle,
                 learnerRole = activeSession?.learnerRole ?: "学习者",
                 learnerProfile = "未设置",
@@ -185,9 +188,10 @@ fun SessionSettingsRoute(
             refreshSessionSettingsSources(coordinator, initialSources)
         }
         LaunchedEffect(coordinator) {
-            saveAppliedSessionSnapshot(
+            applyStartupSessionSnapshot(
                 newSessionPersistence,
                 sessionId,
+                storedSnapshot,
                 coordinator.state.applied.snapshot,
                 onSourcesChanged
             )
@@ -312,6 +316,33 @@ internal fun saveAppliedSessionSnapshot(
 ) {
     persistence?.saveSessionSnapshot(sessionId, snapshot)
     onChanged()
+}
+
+/**
+ * 进入会话设置页时的启动同步：**只回写「本来就有快照」的会话**。
+ *
+ * 2026-10-18（真机「上下文没了」修复的配套）：快照现在是反转家教算法内核的路由键
+ * （见 `RoutingTurnPreparationPort`：有落盘快照 = 应用内创建的会话 → 内核）。此前这里
+ * 无条件回写，于是打开过一次设置页的首启欢迎/演示会话、空间导入会话都会拿到一份
+ * **合成占位快照**（画像/目标「未设置」），下一回合起带着占位人设静默切进内核——
+ * 分类前提被自己破坏。
+ *
+ * 用户真正编辑时仍由 `SessionSettingsCoordinator.onSnapshotApplied` 正常落盘（那是
+ * 显式配置，会带入真实值）；这里只负责「没有快照的会话不因为被看一眼就获得快照」。
+ */
+internal fun applyStartupSessionSnapshot(
+    persistence: NewSessionPersistence?,
+    sessionId: String,
+    storedSnapshot: NewSessionConfiguration?,
+    appliedSnapshot: NewSessionConfiguration,
+    onChanged: () -> Unit
+) {
+    if (storedSnapshot != null) {
+        saveAppliedSessionSnapshot(persistence, sessionId, appliedSnapshot, onChanged)
+    } else {
+        // 没有快照：只做一次刷新通知，绝不落盘
+        onChanged()
+    }
 }
 
 internal fun refreshSessionSettingsSources(

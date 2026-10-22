@@ -261,7 +261,9 @@ class ReverseTutorEndToEndSmokeTest {
     }
 
     @Test
-    fun normalSessionRoutesToDefaultPort() = runBlocking {
+    fun sessionWithoutSnapshotRoutesToDefaultPort() = runBlocking {
+        // 2026-10-18 起路由键是「新建漏斗落盘了快照」而不是预设 id：无快照的会话
+        // （首启欢迎/演示会话、空间导入的历史会话）继续走普通链路。
         val result = routingPort.prepareAndEnqueue(
             BackgroundTurnPreparationRequest(
                 spaceId = "space-1",
@@ -271,13 +273,36 @@ class ReverseTutorEndToEndSmokeTest {
                 token = "tok-normal",
                 quoteExcerpt = null,
                 imageAttachments = emptyList(),
-                sessionSnapshot = NewSessionConfiguration(title = "普通会话") // builtInPresetId=null
+                sessionSnapshot = null
             )
         )
 
         assertEquals(BackgroundTurnPreparationResult.Unavailable, result)
         assertEquals(listOf("session-normal"), defaultPortCalls)
-        assertTrue("普通会话不应进入反转内核", completedJobIds.isEmpty())
+        assertTrue("无快照会话不应进入反转内核", completedJobIds.isEmpty())
         assertTrue(savedMessages.isEmpty())
+    }
+
+    @Test
+    fun appCreatedSessionWithoutAnyPresetStillRoutesToAlgoKernel() = runBlocking {
+        // 真机反馈「上下文没了」的根因回归：AI 创建窗口/空白草稿建出的会话预设 id 为空，
+        // 旧键据此把它们甩给普通链路。现在只要快照存在就必须进内核。
+        val result = routingPort.prepareAndEnqueue(
+            BackgroundTurnPreparationRequest(
+                spaceId = "space-1",
+                sessionId = "session-created",
+                userMessageId = "u-3",
+                userText = "3x - 5 = 10，把 -5 移过去",
+                token = "tok-created",
+                quoteExcerpt = null,
+                imageAttachments = emptyList(),
+                sessionSnapshot = NewSessionConfiguration(title = "趣味心理学基础") // builtInPresetId=null
+            )
+        )
+
+        assertTrue(result is BackgroundTurnPreparationResult.Queued)
+        assertEquals("job-1", (result as BackgroundTurnPreparationResult.Queued).jobId)
+        assertTrue("应用内创建的会话不应触达默认链路", defaultPortCalls.isEmpty())
+        assertEquals(listOf("job-1"), completedJobIds)
     }
 }

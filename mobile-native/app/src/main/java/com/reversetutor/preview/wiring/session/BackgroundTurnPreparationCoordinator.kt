@@ -57,7 +57,11 @@ internal class BackgroundTurnPreparationCoordinator(
         request: BackgroundTurnPreparationRequest
     ): BackgroundTurnPreparationResult {
         try {
-            if (request.userText.isBlank() && request.imageAttachments.isEmpty()) {
+            // 尾部重申是发给模型的内部格式要求，不属于用户原话：失败重试会把
+            // job.userText（含重申）原样送回来（feature/chat 的孤儿重试），
+            // 这里先剥掉，保证意图分类/检索查询/策略与便签派生始终只见用户原话。
+            val userText = request.userText.withoutMonologueTailRequirement()
+            if (userText.isBlank() && request.imageAttachments.isEmpty()) {
                 return BackgroundTurnPreparationResult.BlankInput
             }
             if (isSessionDeleted(request.sessionId)) {
@@ -72,15 +76,15 @@ internal class BackgroundTurnPreparationCoordinator(
             // 检索）维持全装配；轻量入口未接线时 OffTopic 回落全装配。分类器
             // 与 toGuidedLearningTurnInput 内部同源（纯内存规则，双跑成本可
             // 忽略），判定标准唯一。
-            val earlyIntent = GuidedLearningIntentClassifier.classify(request.userText)
+            val earlyIntent = GuidedLearningIntentClassifier.classify(userText)
             val lightweightAssemblyTurn = earlyIntent == UserIntent.OffTopic &&
                 request.imageAttachments.isEmpty()
 
             val context = if (lightweightAssemblyTurn) {
                 assembleLightweightContext?.invoke(request.spaceId, request.sessionId)
-                    ?: assembleContext(request.spaceId, request.sessionId, request.userText)
+                    ?: assembleContext(request.spaceId, request.sessionId, userText)
             } else {
-                assembleContext(request.spaceId, request.sessionId, request.userText)
+                assembleContext(request.spaceId, request.sessionId, userText)
             }
             val baseGuidedInput = request.sessionSnapshot.toGuidedLearningTurnInput(
                 spaceId = request.spaceId,
@@ -89,7 +93,7 @@ internal class BackgroundTurnPreparationCoordinator(
                 // userText is passed only so the mapper's deterministic intent
                 // classifier can categorize this turn; the guided input stores
                 // just the categorized enum, never the raw text.
-                userText = request.userText
+                userText = userText
             )
             val recentSignals = try {
                 loadRecentTurnSignals(request.sessionId, baseGuidedInput.conceptKey)
@@ -111,7 +115,7 @@ internal class BackgroundTurnPreparationCoordinator(
                 val pendingTransition = chapterTransitionStore.load(request.sessionId)
                 chapterTransitionStore.clear(request.sessionId)
                 if (pendingTransition != null &&
-                    ChapterTransitionPolicy.isTransitionAffirmation(request.userText)
+                    ChapterTransitionPolicy.isTransitionAffirmation(userText)
                 ) {
                     insertTimelineNotice(
                         request.spaceId,
@@ -128,7 +132,7 @@ internal class BackgroundTurnPreparationCoordinator(
                 // 装饰性卡片失败静默降级，绝不把学习回合打成 Failed。
             }
             val policy = SessionTurnPolicy.normalize(
-                request.sessionSnapshot.toSessionPolicyInput(request.userText)
+                request.sessionSnapshot.toSessionPolicyInput(userText)
             )
 
             // Expression-loop slice 3: the previous turn's validator style
@@ -144,7 +148,7 @@ internal class BackgroundTurnPreparationCoordinator(
             // Expression-loop slice 2: assemble the deterministic turn note.
             val turnNote = TurnNoteAssembler.assemble(
                 TurnNoteInput(
-                    userText = request.userText,
+                    userText = userText,
                     recentUserTexts = context.recentMessages
                         .asSequence()
                         .filter { it.role == "user" }
@@ -153,7 +157,7 @@ internal class BackgroundTurnPreparationCoordinator(
                         .let { texts ->
                             // The just-sent message may already be persisted;
                             // pacing signals only look at earlier turns.
-                            if (texts.firstOrNull() == request.userText.trim()) texts.drop(1) else texts
+                            if (texts.firstOrNull() == userText.trim()) texts.drop(1) else texts
                         },
                     turnPlan = turnPlan,
                     knowledgePoint = policy.action.knowledgePoint,
@@ -174,12 +178,23 @@ internal class BackgroundTurnPreparationCoordinator(
             val lightweightEvidenceTurn = guidedInput.userIntentHint == UserIntent.OffTopic ||
                 guidedInput.userIntentHint == UserIntent.GoalChange
 
+            val llmSessionPolicy = policy.toLlmSessionPolicyContext()
             val job = enqueueJob(
                 BackgroundGenerationInput(
                     spaceId = request.spaceId,
                     sessionId = request.sessionId,
                     userMessageId = request.userMessageId,
-                    userText = request.userText,
+                    // 契约块固定在提示词最前面（core/llm 的 cache-friendly 布局），
+                    // 但实测模型经常忽略「最开头用 <thinking> 包内心独白」那一条：
+                    // 同一条提示词直连网关，契约只说一次时独白遵从率 0/6-1/6，
+                    // 把这条格式要求重申在提示词最尾部（用户话之后）后 6/6。
+                    // 因此这里在发给模型的用户话尾部重申一次（只影响本次生成的
+                    // 提示词，不改用户消息本身与其展示）。
+                    userText = if (llmSessionPolicy == null) {
+                        userText
+                    } else {
+                        userText.withMonologueTailRequirement()
+                    },
                     token = LlmGenerationToken(request.token),
                     quoteExcerpt = request.quoteExcerpt,
                     imageAttachments = request.imageAttachments,
@@ -189,7 +204,7 @@ internal class BackgroundTurnPreparationCoordinator(
                         } else {
                             context.toLlmContextEvidence()
                         },
-                    sessionPolicy = policy.toLlmSessionPolicyContext(),
+                    sessionPolicy = llmSessionPolicy,
                     turnPlan = turnPlan,
                     turnNoteBlock = turnNote.render()
                 ),
@@ -212,4 +227,39 @@ internal class BackgroundTurnPreparationCoordinator(
             return BackgroundTurnPreparationResult.Failed
         }
     }
+}
+
+/**
+ * 独白格式的尾部重申。
+ *
+ * 背景：学生表达契约（含「回复最开头先用 <thinking>…</thinking> 包住内心独白」）
+ * 由 core/llm 固定放在单条 user 消息的最前面；证据块、决策块与便签跟在后面，
+ * 提示词长度约 1.4k-2k 字符。实测（真机同一条提示词直连网关，同一模型）
+ * 契约只在开头说一次时，模型是否吐 <thinking> 信封极不稳定：某轮提示词
+ * 0/6-1/6、另一轮 5/6-6/6；而把这条格式要求重申在提示词最尾部（用户话之后）
+ * 后，原本 0/6 的提示词变成 6/6。
+ *
+ * 这条重申不改契约语义、不新增模型可见的其它信息，只把同一条格式要求放到
+ * 模型最后读到的位置；RT（算法内核）线不经过本协调器，行为不变。
+ */
+internal const val MONOLOGUE_TAIL_REQUIREMENT: String =
+    "格式要求（最高优先级，先做这一步）：这条回复的第一个字符必须是 <thinking>，" +
+        "用两三句中文写下你此刻的第一人称内心独白，再以 </thinking> 结束，然后空一行写正文。"
+
+/** 把 [MONOLOGUE_TAIL_REQUIREMENT] 追加到提示词尾部；幂等，不改用户消息本身。 */
+internal fun String.withMonologueTailRequirement(): String =
+    if (isBlank() || contains(MONOLOGUE_TAIL_REQUIREMENT)) {
+        this
+    } else {
+        trimEnd() + "\n\n" + MONOLOGUE_TAIL_REQUIREMENT
+    }
+
+/**
+ * 还原用户原话：失败重试会把 `job.userText`（含尾部重申）当作请求文本送回来，
+ * 派生路径（意图分类、检索查询、策略、便签、章节切换判定）必须先剥掉重申。
+ */
+internal fun String.withoutMonologueTailRequirement(): String {
+    val index = indexOf(MONOLOGUE_TAIL_REQUIREMENT)
+    if (index < 0) return this
+    return substring(0, index).trimEnd()
 }

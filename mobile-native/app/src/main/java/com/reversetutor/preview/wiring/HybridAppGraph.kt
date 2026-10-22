@@ -365,67 +365,13 @@ class HybridAppGraph private constructor(
                             ReverseTutorRuntimeAssembly.buildProductionLlmClient(appContext)
                     }
                 )
-            // R-RT-4：会话级路由端口——反转会话走算法内核，其余会话走原 RAG/图谱/记忆链路。
+            // 唯一主线架构（2026-10-18 收紧）：彻底废除普通链路，所有会话100%汇入反转家教内核。
             val backgroundTurnPreparationPort: BackgroundTurnPreparationPort =
                 RoutingTurnPreparationPort(
+                    isReverseTutorSession = { true },
                     reversePort = reverseTutorCoordinator,
-                    defaultPort = BackgroundTurnPreparationCoordinator(
-                    isSessionDeleted = { sessionId ->
-                        conversationRunRepository.isSessionDeleted(sessionId)
-                    },
-                    assembleContext = { spaceId, sessionId, userText ->
-                        sessionConversationAssembly.assembleContext(spaceId, sessionId, userText)
-                    },
-                    // 1g 闲聊兼容：OffTopic 回合走轻装配，跳过 RAG/图谱/记忆端口。
-                    assembleLightweightContext = { spaceId, sessionId ->
-                        sessionConversationAssembly.assembleLightweightContext(spaceId, sessionId)
-                    },
-                    enqueueJob = { input, now ->
-                        backgroundGenerationRepository.enqueueGenerationJob(input, now)
-                    },
-                    loadRecentTurnSignals = recentTurnSignalsReader::read,
-                    loadLastTurnStyleHint = { sessionId ->
-                        DataModule.database(appContext).turnTrajectoryDao()
-                            .findLatestBySession(sessionId)
-                            ?.let { ReplyValidator.styleHintForPayload(it.styleFlagsPayload) }
-                            .orEmpty()
-                    },
-                    chapterTransitionStore = SharedPreferencesChapterTransitionProposalStore(appContext),
-                    // R88：章节卡片 = 一条 System 消息；按卡片文本去重，防止重试双卡。
-                    insertTimelineNotice = { spaceId, sessionId, text ->
-                        val cardText = text.trim()
-                        if (cardText.isNotEmpty() &&
-                            messageRepository.listMessages(sessionId).none { it.text == cardText }
-                        ) {
-                            messageRepository.saveMessage(
-                                com.reversetutor.core.model.Message(
-                                    id = "message-${java.util.UUID.randomUUID()}",
-                                    spaceId = spaceId.ifBlank { SessionRepository.defaultSpaceId },
-                                    sessionId = sessionId,
-                                    role = com.reversetutor.core.model.MessageRole.System,
-                                    text = cardText,
-                                    createdAtEpochMillis = System.currentTimeMillis()
-                                )
-                            )
-                        }
-                    }
-                ),
-                // 连发合并（问题⑥，2026-10-11 拍板方案 A）：入队前仅当该会话最新活动
-                // 生成任务仍是 Queued（未被 Worker 认领）时取消之——本次全新装配的
-                // 上下文快照自然包含此前未被回复的用户消息，一波连发合并为一条回复；
-                // Running 任务不受影响（不打断生成中）。已用三连发+第一条已被认领的
-                // 边缘场景确认：cancel 会连带取消并发中的 Running 任务，后果是提前
-                // 重答而非丢单，可接受。
-                coalesceQueuedGeneration = { sessionId ->
-                    val activeJob = backgroundGenerationRepository.findActiveJobForSession(sessionId)
-                    if (activeJob?.status == BackgroundJobStatus.Queued) {
-                        backgroundGenerationRepository.cancelSessionGenerationJobs(
-                            sessionId,
-                            System.currentTimeMillis()
-                        )
-                    }
-                }
-            )
+                    defaultPort = reverseTutorCoordinator
+                )
             val windowBranchPort: WindowBranchPort = WindowBranchCoordinator(
                 sessionExists = { sessionId -> sessionRepository.getSession(sessionId) != null },
                 sessionTitle = { sessionId -> sessionRepository.getSession(sessionId)?.title },

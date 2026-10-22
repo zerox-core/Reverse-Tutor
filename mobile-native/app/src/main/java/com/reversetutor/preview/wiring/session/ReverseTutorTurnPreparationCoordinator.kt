@@ -55,7 +55,9 @@ class ReverseTutorTurnPreparationCoordinator(
     private val llmClientProvider: suspend () -> ToolLoopLlmClient,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
     private val nowEpochMillis: () -> Long = System::currentTimeMillis,
-    private val onSessionUpdated: ((RTSession) -> Unit)? = null
+    private val onSessionUpdated: ((RTSession) -> Unit)? = null,
+    private val restoreSession: (suspend (String) -> RTSession?)? = null,
+    private val loadUserMaterials: (suspend (spaceId: String, sessionId: String) -> List<Pair<String, String>>)? = null
 ) : BackgroundTurnPreparationPort, SessionContractProvider, TurnMonologuePort {
 
     private val sessions = ConcurrentHashMap<String, RTSession>()
@@ -98,16 +100,18 @@ class ReverseTutorTurnPreparationCoordinator(
                 return BackgroundTurnPreparationResult.SessionUnavailable
             }
 
+            // 内核会话由 Room 快照或创建窗口快照映射而来，优先从本地持久化快照恢复
             val currentSession = sessions.getOrPut(request.sessionId) {
-                RTSession(
-                    sessionId = request.sessionId,
-                    topic = request.sessionSnapshot?.title?.ifBlank { "反转家教" } ?: "反转家教",
-                    studentId = request.sessionSnapshot?.learnerDisplayName?.ifBlank { "小理" } ?: "小理",
-                    grade = "初二",
-                    cardId = "proud_average",
-                    understandingLevel = 1,
-                    initialUnderstandingLevel = 1,
-                    currentRound = 0
+                restoreSession?.invoke(request.sessionId)
+                    ?: request.sessionSnapshot.toReverseTutorSession(request.sessionId)
+            }
+
+            // 动态装载用户资料到 MaterialStore
+            loadUserMaterials?.invoke(request.spaceId, request.sessionId)?.forEach { (title, content) ->
+                toolLoop.store.addDoc(
+                    docId = "user-${title.hashCode()}",
+                    title = title,
+                    content = content
                 )
             }
 
@@ -211,15 +215,10 @@ class ReverseTutorTurnPreparationCoordinator(
                             streamingMonologue.append(it)
                         }
                         // ToolLoop 侧 content 已过信封拆分（只含独白增量）。信封流
-                        // 优先，reasoning 流过闸兜底；全不过闸就不上抽屉，与轮末
-                        // llm_round 闸口径一致。
+                        // 优先，reasoning 流兜底；实时呈现打字机思考流，避免因中文比例阈值截断数学公式与思考初期片段。
                         val candidate = when {
-                            streamingMonologue.isNotEmpty() &&
-                                ToolLoop.isMostlyChinese(streamingMonologue.toString()) ->
-                                streamingMonologue.toString()
-                            streamingReasoning.isNotEmpty() &&
-                                ToolLoop.isMostlyChinese(streamingReasoning.toString()) ->
-                                streamingReasoning.toString()
+                            streamingMonologue.isNotEmpty() -> streamingMonologue.toString()
+                            streamingReasoning.isNotEmpty() -> streamingReasoning.toString()
                             else -> ""
                         }
                         if (candidate.isNotEmpty()) {
@@ -236,7 +235,7 @@ class ReverseTutorTurnPreparationCoordinator(
                         val reasoning = event.optString("reasoning").trim()
                         val inner = when {
                             content.isNotEmpty() -> content
-                            reasoning.isNotEmpty() && ToolLoop.isMostlyChinese(reasoning) -> reasoning
+                            reasoning.isNotEmpty() -> reasoning
                             else -> ""
                         }
                         if (inner.isNotEmpty()) {
@@ -255,10 +254,20 @@ class ReverseTutorTurnPreparationCoordinator(
                 }
             }
 
+            val effectiveUserText = if (request.imageAttachments.isNotEmpty()) {
+                val imageDetails = request.imageAttachments.joinToString("\n") { att ->
+                    "- 图片: ${att.name.ifBlank { "附件" }} (${att.mimeType}) [uri: ${att.uri}]"
+                }
+                val imageNote = "[附带了 ${request.imageAttachments.size} 张图片附件]\n$imageDetails"
+                if (request.userText.isBlank()) imageNote else "${request.userText}\n$imageNote"
+            } else {
+                request.userText
+            }
+
             val turnResult = toolLoop.runTurn(
                 session = session,
                 historyMessages = history,
-                userText = request.userText,
+                userText = effectiveUserText,
                 isOpening = false,
                 llmClient = llmClient,
                 onEvent = onEvent,

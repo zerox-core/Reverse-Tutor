@@ -11,9 +11,17 @@ import com.reversetutor.core.llm.LlmContextEvidence
 import com.reversetutor.core.llm.LlmSessionPolicyContext
 import com.reversetutor.feature.chat.NewSessionConfiguration
 
-private const val MaxContextEvidence = 6
+/**
+ * 证据上限（2026-10-18 用户拍板调大：真机反馈「上下文没了」）。
+ *
+ * 旧值 6 / 2 出自 2026-09-20 的「表达层提速」拍板——为了压首字延迟只带 2 条最近消息。
+ * 真机取证推翻了它：一场 25 条消息的会话里，prompt tokens 恒定在 1300~1400 不随对话
+ * 增长，模型完全接不上「再写一个」指的是什么。8 条消息 ≈ 最近 4 个来回（每条正文另有
+ * 200 字上限），配合 12 个证据槽，摘要/缺口/复习之后仍能保下整段对话窗口。
+ */
+private const val MaxContextEvidence = 12
 private const val MaxEvidenceBodyChars = 900
-private const val MaxRecentMessageEvidence = 2
+private const val MaxRecentMessageEvidence = 8
 private const val MaxLightweightEvidenceBodyChars = 400
 
 /**
@@ -173,13 +181,14 @@ internal fun ConversationContextContract.toLlmContextEvidence(): List<LlmContext
 }
 
 /**
- * Expression-loop speed pass (2026-09-20 拍板): casual (OffTopic) and
- * goal-change turns carry only the [MaxRecentMessageEvidence] most recent
- * messages, bounded tighter than the learning path. The digest, aggregates,
- * memory, sources and errors are all skipped — such a reply only needs the
- * persona (the caller still adds the session-template evidence) plus the
- * freshest conversational context, which keeps the whole prompt in the
- * ~1.5k-char range so provider prefill stops dominating casual-turn latency.
+ * Casual (OffTopic) and goal-change turns carry only the message window and skip
+ * the digest, aggregates, memory, sources and errors: such a reply needs the
+ * persona plus the freshest conversational context, nothing more.
+ *
+ * 2026-10-18 用户拍板：窗口随学习路径一起调大（2 → 8 条，见 [MaxRecentMessageEvidence]）。
+ * 原注释记的「~1.5k 字符 / 压首字延迟」口径出自 2026-09-20 提速拍板，已被真机取证推翻
+ * ——只有 2 条时模型接不住「再写一个」指代什么。正文另有 [MaxLightweightEvidenceBodyChars]
+ * 上限，所以最坏情况约 8×400 字。
  */
 internal fun ConversationContextContract.toLlmLightweightContextEvidence(): List<LlmContextEvidence> =
     recentMessages.take(MaxRecentMessageEvidence).map { msg ->

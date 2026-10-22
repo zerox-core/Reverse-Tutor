@@ -4,7 +4,9 @@ import com.reversetutor.core.domain.CorrectionPersistenceWire
 import com.reversetutor.core.domain.ContextMessage
 import com.reversetutor.core.domain.ConversationContextContract
 import com.reversetutor.core.domain.MasterySnapshot
+import com.reversetutor.core.domain.MemoryReferenceContract
 import com.reversetutor.core.domain.SessionModeWire
+import com.reversetutor.core.domain.SourceReferenceContract
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -115,12 +117,14 @@ class SessionPolicyInputMapperTest {
             warnings = emptyList()
         ).toLlmContextEvidence()
 
-        // 学习路径只保留最近两条消息证据（提速拍板 2026-09-20）
-        assertEquals(3, evidence.size)
+        // 2026-10-18 用户拍板调大历史窗口（真机「上下文没了」修复）：带最近 8 条消息证据，
+        // 超出的旧消息被截断——这里给 10 条，只应带前 8 条。
+        assertEquals(9, evidence.size)
         assertEquals(
-            listOf("msg-message-1", "msg-message-2"),
+            (1..8).map { "msg-message-$it" },
             evidence.filter { it.kind == "Message" }.map { it.id }
         )
+        // 复习软提示必须在截断中存活（本用例的原意，调大上限后不变量不变）
         val review = evidence.first { it.kind == "Review" }
         assertEquals("review-session-1", review.id)
         assertTrue(review.body.contains("因式分解"))
@@ -160,7 +164,7 @@ class SessionPolicyInputMapperTest {
     }
 
     @Test
-    fun lightweight_evidence_carries_only_two_recent_messages() {
+    fun lightweight_evidence_carries_the_recent_message_window() {
         val evidence = ConversationContextContract(
             spaceId = "space-1",
             sessionId = "session-1",
@@ -178,9 +182,43 @@ class SessionPolicyInputMapperTest {
             earlyHistoryDigest = "早期摘要"
         ).toLlmLightweightContextEvidence()
 
-        assertEquals(listOf("msg-message-a", "msg-message-b"), evidence.map { it.id })
+        // 闲聊/换目标回合：只带消息窗口（不带摘要/缺口/复习），窗口内一条不落
+        assertEquals(listOf("msg-message-a", "msg-message-b", "msg-message-c"), evidence.map { it.id })
         assertTrue(evidence.all { it.kind == "Message" })
         assertTrue(evidence.none { it.kind == "Summary" || it.kind == "Gaps" || it.kind == "Review" })
+    }
+
+    @Test
+    fun recent_message_window_is_not_starved_by_other_evidence_categories() {
+        val messages = (1..8).map { index ->
+            ContextMessage("message-$index", if (index % 2 == 0) "assistant" else "user", "第 $index 条", index.toLong())
+        }
+        val evidence = ConversationContextContract(
+            spaceId = "space-1",
+            sessionId = "session-1",
+            prerequisiteGaps = listOf("先掌握定义"),
+            relatedMemory = (1..5).map {
+                MemoryReferenceContract("mem-$it", "记忆 $it", 0.9f, it.toLong())
+            },
+            sourceEvidence = (1..5).map {
+                SourceReferenceContract("src-$it", "资料 $it", "片段 $it", "text", 0.9f)
+            },
+            historicalErrors = emptyList(),
+            pendingReviewKnowledgePoints = listOf("函数单调性"),
+            recentMessages = messages,
+            warnings = emptyList(),
+            earlyHistoryDigest = "早期摘要"
+        ).toLlmContextEvidence()
+
+        // 摘要 + 缺口 + 复习 + 8 条消息 = 11 槽，整段对话窗口必须完整存活；
+        // 被上限挤掉的是排在消息之后的记忆/资料证据，而不是历史本身。
+        assertEquals(8, evidence.count { it.kind == "Message" })
+        assertEquals(3, evidence.count { it.kind == "Summary" || it.kind == "Gaps" || it.kind == "Review" })
+        assertTrue(evidence.size <= 12)
+        assertEquals(
+            messages.map { "msg-${it.messageId}" },
+            evidence.filter { it.kind == "Message" }.map { it.id }
+        )
     }
 
     @Test
