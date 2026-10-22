@@ -38,6 +38,42 @@ class AgentCreationParserTest {
         assertEquals("慢热但较真", result?.draft?.persona)
     }
 
+    // 2026-10-16 用户拍板：模型自选工具。action 是模型输出的工具名，解析要宽松、缺省要安全。
+    @Test
+    fun parsesToolChoiceAction() {
+        assertEquals(
+            AgentCreationAction.DirectCreate,
+            AgentCreationParser.parseTurnResult("""{"action":"direct_create","assistantNote":"建会话"}""")?.action
+        )
+        assertEquals(
+            AgentCreationAction.Interview,
+            AgentCreationParser.parseTurnResult("""{"action":"interview","assistantNote":"再聊聊"}""")?.action
+        )
+        // 容忍大小写 / 连字符 / 同义词
+        assertEquals(
+            AgentCreationAction.DirectCreate,
+            AgentCreationParser.parseTurnResult("""{"action":" Create-Now ","assistantNote":"好"}""")?.action
+        )
+        // tool / toolName 是同一个意思的别名
+        assertEquals(
+            AgentCreationAction.Interview,
+            AgentCreationParser.parseTurnResult("""{"tool":"multi_turn","assistantNote":"问一句"}""")?.action
+        )
+    }
+
+    @Test
+    fun unparsableActionDegradesToNull() {
+        // 不认识的词 → null（协调器按 interview 保守处理，绝不擅自创建）
+        val unknown = AgentCreationParser.parseTurnResult("""{"action":"make_coffee","assistantNote":"嗯"}""")
+        assertNull(unknown?.action)
+        assertNotNull(unknown)
+
+        // 没报 action 的旧格式照旧能解析
+        val legacy = AgentCreationParser.parseTurnResult("""{"understanding":30,"assistantNote":"记下了"}""")
+        assertNull(legacy?.action)
+        assertEquals(30, legacy?.understanding)
+    }
+
     @Test
     fun parsesFencedJsonWithSurroundingProse() {
         val raw = "好的，我理解了。\n```json\n" +

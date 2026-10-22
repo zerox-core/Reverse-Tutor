@@ -1,5 +1,7 @@
 package com.reversetutor.feature.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,6 +50,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -58,6 +61,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -74,6 +78,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.reversetutor.core.design.FormalColors
 import com.reversetutor.core.design.FormalElevations
 import com.reversetutor.core.design.FormalShapes
@@ -96,6 +101,11 @@ fun AgentCreationRoute(
     onBack: () -> Unit = {},
     openPickerOnStart: Boolean = false,
     onOpenPickerConsumed: () -> Unit = {},
+    /**
+     * 2026-10-22 用户拍板（方案B）：预设 / 收藏 / 挑战活动不再进六栏表单，
+     * 而是把已定好的配置作为开场素材带进对话式创建。
+     */
+    seededConfiguration: NewSessionConfiguration? = null,
     gateway: AgentCreationGateway? = null,
     stateStore: AgentCreationStateStore? = null,
     /** R100 方案B 状态机灰度（App 端经 BuildConfig 下发）。 */
@@ -115,8 +125,16 @@ fun AgentCreationRoute(
     var state by remember { mutableStateOf(coordinator.state) }
     var input by remember { mutableStateOf("") }
     var pendingLowUnderstandingCreate by remember { mutableStateOf(false) }
+    var showPersonaDifficultyDialog by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
     var createError by remember { mutableStateOf<String?>(null) }
+    // 2026-10-16 用户反馈：不做模式开关（原来那个「一句话创建 / 多聊几轮」按钮已删），
+    // 是否直接创建由模型的 understanding / followUpQuestion 自己决定。
+    var notice by remember { mutableStateOf<String?>(null) }
+    // 修复 #2 ④：创建成功后的 3 秒可撤销窗口（倒计时 + 撤销 / 改草案）。
+    val createWindow = remember { AgentCreationCreateWindow() }
+    var pendingCreate by remember { mutableStateOf<AgentCreationCreateWindow.Pending?>(null) }
+    var windowSecondsLeft by remember { mutableStateOf(0) }
     val feedState = rememberLazyListState()
     val type = LocalFormalTypeScale.current
 
@@ -124,11 +142,15 @@ fun AgentCreationRoute(
         state = coordinator.state
     }
 
-    LaunchedEffect(coordinator) {
+    LaunchedEffect(coordinator, seededConfiguration) {
         // R91：协调器每次状态变更即时同步 UI——用户消息发出后气泡立刻上屏，
         // 不等整轮生成结束才和回复一起出现（2026-09-26 真机反馈）。
         coordinator.onStateChanged = { sync() }
-        coordinator.start()
+        // 方案B：带素材进来（预设 / 收藏 / 挑战活动）→ 用素材开场；否则走常规开场白。
+        // 两者都只在 Idle 时生效，已有未完成快照时交给「继续上次 / 创建新会话」弹窗。
+        if (seededConfiguration == null || !coordinator.startWithSeed(seededConfiguration)) {
+            coordinator.start()
+        }
         sync()
     }
 
@@ -162,6 +184,69 @@ fun AgentCreationRoute(
         runCatching { documentPicker.launch(arrayOf("*/*")) }
     }
 
+    // 修复 #2 ②：语音 + 打字统一入口——草案页输入框加麦克风按钮，接线方式与 ChatScreen 一致；
+    // 语音转文字落进同一个输入框，走同一条命令解析链路（send 后进一句话快车道 / 多轮访谈）。
+    var voiceInputState by remember { mutableStateOf(VoiceInputState()) }
+    var voiceBaseText by remember { mutableStateOf<String?>(null) }
+    val voiceController = remember { VoiceInputController { next -> voiceInputState = next } }
+    val voiceEngine = remember { SpeechRecognizerVoiceInputEngine(context) }
+
+    fun startVoiceSession() {
+        voiceBaseText = input
+        voiceController.onStartRequested()
+        voiceEngine.start(voiceController)
+    }
+
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startVoiceSession()
+        } else {
+            notice = "需要麦克风权限才能语音输入，可在系统设置中开启。"
+        }
+    }
+
+    val onVoiceInputClick: () -> Unit = {
+        when {
+            voiceInputState.active -> {
+                voiceController.onStopRequested()
+                voiceEngine.stop()
+            }
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> startVoiceSession()
+            else -> voicePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // 语音转写实时上屏：基准文本（开始录音时输入框内容）+ 本次转写。
+    LaunchedEffect(voiceInputState) {
+        val base = voiceBaseText ?: return@LaunchedEffect
+        val targetText = base + voiceInputState.transcript
+        if (input != targetText) input = targetText
+        when (voiceInputState.phase) {
+            VoiceInputPhase.Idle -> {
+                voiceBaseText = null
+                voiceController.reset()
+            }
+            VoiceInputPhase.Failed -> {
+                notice = voiceInputState.errorMessage ?: "语音识别失败，请重试。"
+                voiceBaseText = null
+                voiceController.reset()
+            }
+            else -> Unit
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceEngine.cancel()
+            voiceEngine.release()
+        }
+    }
+
     LaunchedEffect(openPickerOnStart) {
         if (openPickerOnStart) {
             onOpenPickerConsumed()
@@ -169,10 +254,30 @@ fun AgentCreationRoute(
         }
     }
 
+    /** 修复 #2 ④：撤销 / 改草案 → 回到草案页并恢复刚才的草案内容（创建时草稿记录已被 promote 掉，重开一份）。 */
+    fun restoreDraftAfterCreate(restore: AgentCreationCreateWindow.Decision.RestoreDraft) {
+        // 先把草稿箱读回来，再补一份恢复出来的草稿——不覆盖用户别的草稿。
+        lifecycle.load()
+        lifecycle.startPrefilledDraft(
+            NewSessionPrefillRequest(
+                requestId = "agent-creation-undo-${System.currentTimeMillis()}",
+                configuration = restore.draft
+            )
+        )
+        lifecycle.saveBoundary()
+        sync()
+        notice = when (restore.reason) {
+            AgentCreationCreateWindow.RestoreReason.Undo -> "已撤销创建，草案内容都还在，接着改就行。"
+            AgentCreationCreateWindow.RestoreReason.EditDraft -> "会话已保留，草案还在，改完可以再创建。"
+        }
+    }
+
     fun performCreate() {
-        if (creating) return
+        // 可撤销窗口还开着 = 会话已经建好了，别在倒计时里重复创建。
+        if (creating || pendingCreate != null) return
         creating = true
         createError = null
+        notice = null
         scope.launch {
             if (lifecycle.state.currentDraft == null && !lifecycle.startBlankDraft()) {
                 creating = false
@@ -183,10 +288,10 @@ fun AgentCreationRoute(
             lifecycle.saveBoundary()
             val outcome = lifecycle.createSession()
             if (outcome is CreateSessionOutcome.Success) {
-                coordinator.markCreated()
-                sync()
                 creating = false
-                onCreated(outcome.created.session)
+                // 修复 #2 ④：不立刻跳走——先开 3 秒可撤销窗口（撤销则回草案页并恢复草案内容）。
+                pendingCreate = createWindow.open(outcome.created.session, coordinator.configuration())
+                windowSecondsLeft = ((createWindow.remainingMillis() + 999L) / 1000L).toInt()
             } else {
                 creating = false
                 createError = when (outcome) {
@@ -204,17 +309,58 @@ fun AgentCreationRoute(
             pendingLowUnderstandingCreate = true
             return
         }
-        performCreate()
+        showPersonaDifficultyDialog = true
     }
 
+    /**
+     * 修复 #1：生成中按发送不再静默无效——文本入队（「排队中 · 待发送」气泡立刻可见），
+     * 当前生成结束后自动按 FIFO 发出。发送时清空输入；若这一句根本没被接受，原样回填（不丢字）。
+     */
     fun send() {
         val text = input.trim()
-        if (text.isEmpty() || state.busy) return
+        if (text.isEmpty()) return
         input = ""
+        notice = null
         scope.launch {
-            coordinator.sendUserText(text)
+            // 不做模式开关：走哪个工具由模型本轮输出的 action 自己决定
+            // （direct_create = 直接建；interview = 多轮访谈，含追问/要资料/路径确认/孵化卡）。
+            val accepted = coordinator.sendUserText(text)
+            if (!accepted) input = text
             sync()
         }
+    }
+
+    // 修复 #2 ③：一句话快车道判定「信息够了」→ 弹出确认弹窗，由用户显式点击「创建」后再进入会话窗口（绝不静默自动创建）。
+    LaunchedEffect(state.createRequested) {
+        if (!state.createRequested) return@LaunchedEffect
+        coordinator.consumeCreateRequest()
+        sync()
+        // 用户掌握最终同意权：收到信号后由用户主动触发或通过草案卡片确认，不自动调 performCreate()
+    }
+
+    // 修复 #1：发送失败把文本回填输入框（输入框已有新内容时不覆盖，气泡里的原文仍在，不丢文本）。
+    LaunchedEffect(state.restoreInput) {
+        val restore = state.restoreInput ?: return@LaunchedEffect
+        if (input.isBlank()) input = restore
+        coordinator.consumeRestoreInput()
+        sync()
+    }
+
+    // 修复 #2 ④：3 秒倒计时；到期未操作 → 浮层消失、会话保留（进入会话窗口）。
+    LaunchedEffect(pendingCreate) {
+        val opened = pendingCreate ?: return@LaunchedEffect
+        while (true) {
+            val remaining = createWindow.remainingMillis()
+            windowSecondsLeft = ((remaining + 999L) / 1000L).toInt()
+            if (remaining <= 0L) break
+            kotlinx.coroutines.delay(100)
+        }
+        windowSecondsLeft = 0
+        val keep = createWindow.expireIfDue() ?: return@LaunchedEffect
+        pendingCreate = null
+        coordinator.markCreated()
+        sync()
+        onCreated(keep.session)
     }
 
     BackHandler(onBack = onBack)
@@ -234,7 +380,7 @@ fun AgentCreationRoute(
             },
             dismissButton = {
                 TextButton(onClick = {
-                    coordinator.startFresh()
+                    coordinator.startFresh(seededConfiguration)
                     sync()
                 }) { Text("创建新会话") }
             }
@@ -335,7 +481,15 @@ fun AgentCreationRoute(
                     items(state.feed, key = { it.id }) { entry ->
                         when (entry) {
                             is AgentCreationFeedEntry.Assistant -> AssistantBubble(entry)
-                            is AgentCreationFeedEntry.User -> UserBubble(entry.text)
+                            is AgentCreationFeedEntry.User -> UserBubble(
+                                entry = entry,
+                                onCancelQueued = {
+                                    scope.launch {
+                                        coordinator.cancelQueuedMessage(entry.id)
+                                        sync()
+                                    }
+                                }
+                            )
                             is AgentCreationFeedEntry.FileCard -> FileCard(
                                 card = entry,
                                 onRetry = {
@@ -389,11 +543,15 @@ fun AgentCreationRoute(
             BottomComposer(
                 input = input,
                 busy = state.busy,
+                queuedCount = state.queuedCount,
+                voiceActive = voiceInputState.active,
                 requestDocumentActive = state.requestDocumentActive,
                 onInputChange = { input = it },
                 onSend = ::send,
                 onAttach = ::launchPicker,
+                onVoiceClick = onVoiceInputClick,
                 createError = createError,
+                notice = notice,
                 onInputFocused = {
                     // R101（2026-10-05 用户拍板）：聚焦输入框即钉底最新消息，
                     // 不依赖 IME inset 送达。
@@ -408,6 +566,24 @@ fun AgentCreationRoute(
                 }
             )
         }
+        // 2026-10-17 用户拍板：直接创建改用屏幕居中过渡弹窗（「确定进入会话」与「再等等」）
+        pendingCreate?.let { pending ->
+            AgentCreationCreateTransitionDialog(
+                pending = pending,
+                onConfirm = {
+                    val keep = createWindow.confirmKeep() ?: return@AgentCreationCreateTransitionDialog
+                    pendingCreate = null
+                    coordinator.markCreated()
+                    sync()
+                    onCreated(keep.session)
+                },
+                onWait = {
+                    val restore = createWindow.undo()
+                    pendingCreate = null
+                    if (restore != null) restoreDraftAfterCreate(restore)
+                }
+            )
+        }
     }
 
     if (pendingLowUnderstandingCreate) {
@@ -418,14 +594,141 @@ fun AgentCreationRoute(
             confirmButton = {
                 TextButton(onClick = {
                     pendingLowUnderstandingCreate = false
-                    performCreate()
-                }) { Text("仍然创建") }
+                    showPersonaDifficultyDialog = true
+                }) { Text("下一步：设定学生") }
             },
             dismissButton = {
                 TextButton(onClick = { pendingLowUnderstandingCreate = false }) { Text("再聊几句") }
             }
         )
     }
+
+    if (showPersonaDifficultyDialog) {
+        PersonaDifficultyConfirmDialog(
+            initialPersona = state.draft.persona.ifBlank { state.draft.learnerRole }.ifBlank { "初中基础 · 容易卡步骤 · 爱追问为什么" },
+            initialDifficulty = state.draft.probingIntensity.coerceIn(1, 3),
+            onDismiss = { showPersonaDifficultyDialog = false },
+            onConfirm = { chosenPersona, chosenLevel ->
+                showPersonaDifficultyDialog = false
+                coordinator.updateDraftManual { current ->
+                    current.copy(
+                        persona = chosenPersona,
+                        learnerRole = "AI 学生（$chosenPersona）",
+                        probingIntensity = chosenLevel,
+                        feedbackIntensity = chosenLevel,
+                        scaffoldingIntensity = 4 - chosenLevel // 难度越低脚手架支持越高
+                    )
+                }
+                sync()
+                performCreate()
+            }
+        )
+    }
+}
+
+@Composable
+private fun PersonaDifficultyConfirmDialog(
+    initialPersona: String,
+    initialDifficulty: Int,
+    onDismiss: () -> Unit,
+    onConfirm: (persona: String, level: Int) -> Unit
+) {
+    var persona by remember { mutableStateOf(initialPersona) }
+    var level by remember { mutableStateOf(initialDifficulty) }
+    val type = LocalFormalTypeScale.current
+
+    val presetPersonas = listOf(
+        "小理（基础求教型）：概念懂一半，计算容易卡壳，爱追问为什么",
+        "小明（思维跳步型）：思路敏捷但粗心，经常漏关键前提",
+        "零基础好奇型：没学过该知识，需要生活化比喻引导"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("设定学生画像与教学难度", style = type.style(18f, 24f, FontWeight.Bold, FormalColors.Ink))
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("选择或输入学生画像：", style = type.style(13f, 18f, FontWeight.Bold, FormalColors.Ink))
+                presetPersonas.forEach { p ->
+                    val isSelected = persona == p
+                    Surface(
+                        onClick = { persona = p },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isSelected) FormalColors.PrimarySoft else FormalColors.SurfaceSubtle,
+                        border = BorderStroke(1.dp, if (isSelected) FormalColors.Primary else FormalColors.Border),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            p,
+                            style = type.style(12f, 16f, color = if (isSelected) FormalColors.Primary else FormalColors.Ink),
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = persona,
+                    onValueChange = { persona = it },
+                    label = { Text("自定义学生性格与基础", style = type.style(12f, 16f, color = FormalColors.Muted)) },
+                    textStyle = type.style(12f, 16f, color = FormalColors.Ink),
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Text("教学难度等级：", style = type.style(13f, 18f, FontWeight.Bold, FormalColors.Ink))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val levels = listOf(1 to "入门基础", 2 to "典型巩固", 3 to "拔高冲刺")
+                    levels.forEach { (lvl, title) ->
+                        val isSelected = level == lvl
+                        Surface(
+                            onClick = { level = lvl },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) FormalColors.PrimarySoft else FormalColors.SurfaceSubtle,
+                            border = BorderStroke(1.dp, if (isSelected) FormalColors.Primary else FormalColors.Border),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    title,
+                                    style = type.style(12f, 16f, if (isSelected) FontWeight.Bold else FontWeight.Normal, if (isSelected) FormalColors.Primary else FormalColors.Ink)
+                                )
+                                Text(
+                                    "Level $lvl",
+                                    style = type.style(10f, 14f, color = FormalColors.Muted)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(persona, level) }
+            ) {
+                Text("确认并开始教学", style = type.style(14f, 18f, FontWeight.Bold, FormalColors.Primary))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消", style = type.style(14f, 18f, color = FormalColors.Muted))
+            }
+        }
+    )
 }
 
 @Composable
@@ -629,7 +932,8 @@ private fun AssistantRichText(text: String) {
                     style = type.style(12f, 18f, color = FormalColors.Muted)
                 )
                 is ChatRichBlock.Formula -> Text(
-                    text = block.source,
+                    // 块级公式在草案页没有二维渲染，至少不把带反斜杠的原始 LaTeX 直接给用户。
+                    text = LatexPlainTextBeautifier.beautify(block.source),
                     style = type.style(13f, 20f, color = FormalColors.Ink)
                 )
                 is ChatRichBlock.Table -> Text(
@@ -646,24 +950,58 @@ private fun AssistantRichText(text: String) {
 }
 
 @Composable
-private fun UserBubble(text: String) {
+private fun UserBubble(
+    entry: AgentCreationFeedEntry.User,
+    onCancelQueued: () -> Unit
+) {
     val type = LocalFormalTypeScale.current
     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            color = FormalColors.PrimarySoft,
-            shape = RoundedCornerShape(
-                topStart = FormalShapes.CardRadius, topEnd = 4.dp,
-                bottomStart = FormalShapes.CardRadius, bottomEnd = FormalShapes.CardRadius
-            ),
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .testTag("agent_creation_user")
-        ) {
-            Text(
-                text = text,
-                style = type.style(13f, 20f, color = FormalColors.Ink),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
-            )
+        Column(horizontalAlignment = Alignment.End) {
+            Surface(
+                color = if (entry.pending) FormalColors.SurfaceSubtle else FormalColors.PrimarySoft,
+                shape = RoundedCornerShape(
+                    topStart = FormalShapes.CardRadius, topEnd = 4.dp,
+                    bottomStart = FormalShapes.CardRadius, bottomEnd = FormalShapes.CardRadius
+                ),
+                border = if (entry.pending) BorderStroke(1.dp, FormalColors.Border) else null,
+                modifier = Modifier
+                    .widthIn(max = 320.dp)
+                    .testTag("agent_creation_user")
+            ) {
+                Text(
+                    text = entry.text,
+                    style = type.style(13f, 20f, color = FormalColors.Ink),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                )
+            }
+            // 修复 #1：排队中的消息带可见状态 + 单条取消，不再静默消失。
+            if (entry.pending) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(top = 3.dp, end = 2.dp)
+                        .testTag("agent_creation_queued_hint")
+                ) {
+                    Text(
+                        text = "排队中 · 待发送",
+                        style = type.style(10f, 14f, color = FormalColors.Muted)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        onClick = onCancelQueued,
+                        color = FormalColors.SurfaceSubtle,
+                        shape = RoundedCornerShape(FormalShapes.PillRadius),
+                        border = BorderStroke(1.dp, FormalColors.Border),
+                        modifier = Modifier.testTag("agent_creation_queued_cancel")
+                    ) {
+                        Text(
+                            text = "取消",
+                            style = type.style(10f, 14f, FontWeight.Medium, FormalColors.Muted),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -1139,11 +1477,15 @@ private fun WorkingDots() {
 private fun BottomComposer(
     input: String,
     busy: Boolean,
+    queuedCount: Int,
+    voiceActive: Boolean,
     requestDocumentActive: Boolean,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     onAttach: () -> Unit,
+    onVoiceClick: () -> Unit,
     createError: String?,
+    notice: String? = null,
     onInputFocused: () -> Unit = {}
 ) {
     val type = LocalFormalTypeScale.current
@@ -1166,11 +1508,28 @@ private fun BottomComposer(
                 .background(FormalColors.Divider)
         )
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            if (busy) {
+                Text(
+                    text = if (queuedCount > 0) "生成中 · $queuedCount 条排队中" else "生成中 · 发送会排队",
+                    style = type.style(10f, 14f, color = FormalColors.Warning),
+                    modifier = Modifier.testTag("agent_creation_queue_status")
+                )
+            }
+            Spacer(Modifier.height(6.dp))
             if (createError != null) {
                 Text(
                     text = createError,
                     style = type.style(10f, 15f, color = FormalColors.Danger),
                     modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
+            if (notice != null) {
+                Text(
+                    text = notice,
+                    style = type.style(10f, 15f, color = FormalColors.Primary),
+                    modifier = Modifier
+                        .padding(bottom = 6.dp)
+                        .testTag("agent_creation_notice")
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1195,18 +1554,51 @@ private fun BottomComposer(
                 OutlinedTextField(
                     value = input,
                     onValueChange = onInputChange,
+                    // 修复 #1：生成中输入框保持可用（发送即排队），不再整块禁用。
+                    enabled = true,
                     modifier = Modifier
                         .weight(1f)
                         .onFocusChanged { if (it.isFocused) onInputFocused() }
                         .testTag("agent_creation_input"),
-                    placeholder = { Text("说说你想学什么…", style = type.style(13f, 18f, color = FormalColors.Tertiary)) },
-                    maxLines = 4,
+                    placeholder = {
+                        Text(
+                            // 2026-10-16 用户反馈：原来那行长占位文案把输入框撑成 3 行高，改短。
+                            text = "说一句想学什么…",
+                            style = type.style(13f, 18f, color = FormalColors.Tertiary)
+                        )
+                    },
+                    // 2026-10-16 用户反馈：输入框固定一行高度（发送前要改可回滚：singleLine = false）。
+                    singleLine = true,
                     shape = RoundedCornerShape(FormalShapes.CardRadius)
                 )
                 Spacer(Modifier.width(8.dp))
+                // 修复 #2 ②：语音输入——转文字进同一个输入框，走同一条命令解析链路。
+                Surface(
+                    onClick = onVoiceClick,
+                    modifier = Modifier
+                        .size(44.dp)
+                        .testTag("agent_creation_mic"),
+                    color = if (voiceActive) FormalColors.Primary else FormalColors.SurfaceSubtle,
+                    shape = CircleShape,
+                    border = if (voiceActive) null else BorderStroke(1.dp, FormalColors.Border)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.Mic,
+                            contentDescription = if (voiceActive) "停止语音输入" else "语音输入",
+                            tint = if (voiceActive) {
+                                androidx.compose.ui.graphics.Color.White
+                            } else {
+                                FormalColors.Muted
+                            }
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
                 Surface(
                     onClick = onSend,
-                    enabled = input.isNotBlank() && !busy,
+                    // 修复 #1：生成中也能按发送——文本入队而不是被丢弃。
+                    enabled = input.isNotBlank(),
                     modifier = Modifier.size(44.dp),
                     color = FormalColors.Primary,
                     shape = CircleShape,
@@ -1216,10 +1608,133 @@ private fun BottomComposer(
                         Icon(
                             Icons.AutoMirrored.Filled.Send,
                             contentDescription = "发送",
-                            tint = if (input.isNotBlank() && !busy) androidx.compose.ui.graphics.Color.White else FormalColors.Border
+                            tint = if (input.isNotBlank()) androidx.compose.ui.graphics.Color.White else FormalColors.Border
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 2026-10-17 用户拍板：直接创建改用屏幕居中过渡弹窗——「确定进入会话」与「再等等」。
+ * 替换掉原先底部小黑浮层，视觉居中大方、草案要点一目了然。
+ */
+@Composable
+internal fun AgentCreationCreateTransitionDialog(
+    pending: AgentCreationCreateWindow.Pending,
+    onConfirm: () -> Unit,
+    onWait: () -> Unit
+) {
+    val type = LocalFormalTypeScale.current
+    AlertDialog(
+        onDismissRequest = onWait,
+        title = {
+            Text(
+                text = "学习会话已就绪",
+                style = type.style(18f, 24f, FontWeight.Bold, FormalColors.Ink)
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "已根据你的意图生成学习草案，随时可以开练：",
+                    style = type.style(13f, 18f, color = FormalColors.Ink)
+                )
+                Surface(
+                    color = FormalColors.Background,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "主题：${pending.draft.title.ifBlank { pending.session.title }}",
+                            style = type.style(13f, 17f, FontWeight.SemiBold, FormalColors.Primary)
+                        )
+                        if (pending.draft.learnerRole.isNotBlank()) {
+                            Text(
+                                text = "学生身份：${pending.draft.learnerRole}",
+                                style = type.style(12f, 16f, color = FormalColors.Muted)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(
+                onClick = onConfirm,
+                modifier = Modifier.testTag("agent_creation_confirm_enter_session")
+            ) {
+                Text("确定进入会话", style = type.style(14f, 18f, FontWeight.Bold, FormalColors.Primary))
+            }
+        },
+        dismissButton = {
+            androidx.compose.material3.TextButton(
+                onClick = onWait,
+                modifier = Modifier.testTag("agent_creation_wait_draft")
+            ) {
+                Text("再等等", style = type.style(14f, 18f, color = FormalColors.Muted))
+            }
+        },
+        modifier = Modifier.testTag("agent_creation_create_transition_dialog")
+    )
+}
+
+/**
+ * 修复 #2 ④：创建成功后的可撤销浮层——3 秒倒计时内可「撤销 / 改草案」；
+ * 未操作则到期消失（会话保留，由调用方在倒计时结束后进入会话窗口）。
+ */
+@Composable
+private fun AgentCreationCreateUndoOverlay(
+    secondsLeft: Int,
+    onUndo: () -> Unit,
+    onEditDraft: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val type = LocalFormalTypeScale.current
+    Surface(
+        color = FormalColors.Ink,
+        shape = RoundedCornerShape(FormalShapes.CardRadius),
+        shadowElevation = FormalElevations.Panel,
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("agent_creation_create_undo")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) {
+            Text(
+                text = "会话已创建 · ${secondsLeft}s 内可撤销",
+                style = type.style(12f, 17f, FontWeight.SemiBold, androidx.compose.ui.graphics.Color.White),
+                modifier = Modifier.weight(1f)
+            )
+            Surface(
+                onClick = onUndo,
+                color = FormalColors.Warning,
+                shape = RoundedCornerShape(FormalShapes.PillRadius),
+                modifier = Modifier.testTag("agent_creation_create_undo_action")
+            ) {
+                Text(
+                    text = "撤销",
+                    style = type.style(11f, 15f, FontWeight.Bold, androidx.compose.ui.graphics.Color.White),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Surface(
+                onClick = onEditDraft,
+                color = FormalColors.Surface,
+                shape = RoundedCornerShape(FormalShapes.PillRadius),
+                modifier = Modifier.testTag("agent_creation_create_edit_draft")
+            ) {
+                Text(
+                    text = "改草案",
+                    style = type.style(11f, 15f, FontWeight.Bold, FormalColors.Ink),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                )
             }
         }
     }

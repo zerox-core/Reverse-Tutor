@@ -156,6 +156,14 @@ class RealAgentCreationGateway(
             "stream done type=${result::class.simpleName} chunks=$chunkCount reasons=$reasonCount " +
                 "total=${streamed.length} elapsed=${System.currentTimeMillis() - streamStartedAt}ms"
         )
+        val visible = when (result) {
+            is LlmGenerationResult.Success -> result.text
+            is LlmGenerationResult.Streamed -> result.visibleText
+            else -> ""
+        }
+        if (visible.isNotEmpty()) {
+            Log.d(STREAM_LOG_TAG, "result text: ${visible.take(500)}")
+        }
         return when (result) {
             is LlmGenerationResult.Success ->
                 AgentCreationParser.parseTurnResult(result.text)

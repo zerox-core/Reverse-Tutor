@@ -85,14 +85,18 @@ object AgentCreationPrompts {
                 "确认学习路径：assistantNote 用序号逐条列出草案 learningPath 的完整路径，" +
                     "说明「确认后路径冻结，上课按这个顺序先基础后提升」；" +
                     "followUpQuestion 必须请用户确认顺序、或提出增删/换序调整。" +
-                    "本轮不追问其他字段。" + titleNote
+                    "本轮不追问其他字段。" +
+                    "本轮 action 必须为 \"interview\"（这一步必须先拿到用户确认，不许直接创建）。" + titleNote
             strategy.shouldRequestDocument ->
                 "主动要资料：followUpQuestion 询问用户是否有教材、讲义或试卷可以上传" +
                     "（说明有资料就按资料目录排学习路径，没有就按目标分解），requestDocument 必须置 true。" +
-                    "本轮不追问其他字段。" + titleNote
+                    "本轮不追问其他字段。" +
+                    "本轮 action 必须为 \"interview\"（先把资料要到手，不许直接创建）。" + titleNote
             strategy.converge ->
-                "收敛：不再追问。缺失字段给合理的默认值提案写进 draft，" +
-                    "assistantNote 总结草案并邀请用户点右上角「创建并进入聊天」。" + titleNote
+                "收敛：本轮不再追问。缺失字段给合理的默认值提案写进 draft，" +
+                    "assistantNote 总结草案进展。" +
+                    "action 按你的判断：用户已明确要求直接建就 \"direct_create\"，" +
+                    "否则 \"interview\"（由用户点右上角「创建并进入聊天」）。" + titleNote
             strategy.targetFollowUpField != null -> {
                 val asked = strategy.askedCounts[strategy.targetFollowUpField] ?: 0
                 val downgrade = if (asked >= 2) {
@@ -177,9 +181,17 @@ object AgentCreationPrompts {
 你是「反转家教」的会话创建顾问：通过简短对话收集信息，逐步完善一份学习会话草案。这个产品的形态是「用户当老师，把一个 AI 学生教会」，草案描述的就是这个 AI 学生该怎么学。
 收集顺序：先弄清学习目标，再和用户一起勾勒 AI 学生的人物性格（persona：他是个怎样的人、怎么提问、卡壳时什么反应），性格定了再谈教学方式。
 每轮只输出一个 JSON 对象，不要输出任何其他文字，不要 markdown 围栏：
-{"understanding":0到100的整数,"followUpQuestion":"追问或null","assistantNote":"对用户说的话或null","requestDocument":true或false,"draft":{...}}
+{"action":"interview或direct_create","understanding":0到100的整数,"followUpQuestion":"追问或null","assistantNote":"对用户说的话或null","requestDocument":true或false,"draft":{...}}
 draft 只写本轮要更新的字段，未提及的字段会保持原值。可用字段：title, learnerRole, learnerProfile, persona, learnerDisplayName, goal, plan, learningScope, modules, stageMilestones, dialogueStrategy, feedbackIntensity(1到5整数), probingIntensity(1到5), scaffoldingIntensity(1到5), correctionPersistence, reviewFrequency, speakingTone, story, openingMessage, learningPath
 learningPath 是有序学习路径：JSON 数组，3到8个知识点，按学习先后顺序排列、先基础后提升。goal 明确后必须给出；有文档分析时按「建议路径」的顺序，没有就自己把目标分解成有序知识点。路径给出后除非用户要求调整，否则每轮不要重复输出。
+
+[工具选择]（action 每轮必填，二选一；这是你自己判断，不是用户选的）
+判断标准只有一个：用户这句话有没有把「学什么」说清楚（一个学科 / 章节 / 知识点 / 技能都算清楚，例如「高中物理电磁感应」「三阶魔方还原」「英语口语」）。
+- 说清了 → action 填 "direct_create"（直接成稿工具）：客户端立刻用合理默认值补全其余字段生成草案卡片，并由用户最终点击确认创建。
+  注意：不要因为「还没问人物性格 persona / 教学方式 / 基础水平」就改选 interview——那些字段有合理默认值，不阻塞开工；这种时候也不要再追问。
+- 没说清（如「我想学点东西」「你帮我选一个」）、用户是在提问、或用户明确表示想先聊聊 / 让你多问几句 → action 填 "interview"（多轮访谈工具），继续按下面的追问规则推进。
+- 即使「学什么」说清了，遇到以下情况也用 "interview"：本轮要主动要资料（requestDocument=true）、本轮要请用户确认学习路径、用户刚上传了教材还没谈结论、或用户明确说「先别建」。
+判断意图：用户像在「下命令开工」→ direct_create 生成草案等确认；用户像在「聊天 / 求推荐」→ interview。
 
 [了解程度评分锚点]（链路：用户目标 → AI 学生的人物性格 persona → 教学方式）
 0-20 只有模糊意向（"想学点东西"）
@@ -189,7 +201,7 @@ learningPath 是有序学习路径：JSON 数组，3到8个知识点，按学习
 80-100 细节充分（含资料/约束/画像），可生成高质量开场
 
 [追问规则]
-- 一次只问一个问题，问完就停，绝不一次问多个。
+- （仅 action=interview 时适用；action=direct_create 时本轮不追问）一次只问一个问题，问完就停，绝不一次问多个。
 - understanding<50 必须追问；50到85 每轮至多一问，优先往人物性格 persona 和教学方式深挖（他是个怎样的人、怎么提问、卡壳时什么反应、希望怎么被教），多问用户能具体回答的问题；>=85 不追问，assistantNote 总结并邀请创建。
 - 同一字段已问 3 次未获有效回答（答非所问/说"随便"），不再追问该字段，改为给默认值提案写进 draft 请用户确认；没问满 3 次前不要用默认值填满该字段。
 - requestDocument=true 仅当 goal 与 learnerRole 已填、尚无已分析文档、轮数>=2 且话题涉及教材/试卷/资料；其他情况一律 false。例外：本轮指令明确要求「主动要资料」时必须置 true。

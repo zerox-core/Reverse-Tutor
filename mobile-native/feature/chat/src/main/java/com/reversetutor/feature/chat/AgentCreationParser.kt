@@ -12,20 +12,79 @@ object AgentCreationParser {
 
     fun parseTurnResult(rawText: String): AgentCreationTurnResult? {
         val json = extractJsonObject(rawText) ?: return null
-        val root = StrictJson.parseObject(json) ?: return null
-        val understanding = (root["understanding"] as? JsonValue.Decimal)
-            ?.value?.toDoubleOrNull()?.toInt()?.coerceIn(0, 100) ?: 0
-        val followUp = root.text("followUpQuestion")
-        val note = root.text("assistantNote")
-        val requestDocument = (root["requestDocument"] as? JsonValue.Flag)?.value == true
-        val draft = (root["draft"] as? JsonValue.Object)?.let(::parseDraftPatch)
-        if (followUp == null && note == null && draft == null) return null
+        val root = StrictJson.parseObject(json)
+        if (root != null) {
+            val understanding = (root["understanding"] as? JsonValue.Decimal)
+                ?.value?.toDoubleOrNull()?.toInt()?.coerceIn(0, 100) ?: 0
+            val followUp = root.text("followUpQuestion")
+            val note = root.text("assistantNote")
+            val requestDocument = (root["requestDocument"] as? JsonValue.Flag)?.value == true
+            val draft = (root["draft"] as? JsonValue.Object)?.let(::parseDraftPatch)
+            // 2026-10-16：工具选择。主字段 action；容忍模型用 tool / toolName 表达同一个意思。
+            val action = AgentCreationAction.fromWire(
+                root.text("action") ?: root.text("tool") ?: root.text("toolName")
+            )
+            if (followUp != null || note != null || draft != null || action != null) {
+                return AgentCreationTurnResult(
+                    understanding = understanding,
+                    followUpQuestion = followUp,
+                    assistantNote = note,
+                    requestDocument = requestDocument,
+                    draft = draft,
+                    action = action
+                )
+            }
+        }
+        // 容错兜底：当 StrictJson 因控制符（如换行符）或严格格式受阻时，使用 org.json 兜底解析
+        return parseTurnResultOrgJson(json)
+    }
+
+    private fun parseTurnResultOrgJson(jsonStr: String): AgentCreationTurnResult? {
+        val obj = try {
+            org.json.JSONObject(jsonStr)
+        } catch (_: Throwable) {
+            return null
+        }
+        val understanding = try { obj.optInt("understanding", 0).coerceIn(0, 100) } catch (_: Throwable) { 0 }
+        val followUp = try { obj.optString("followUpQuestion").takeIf { it.isNotBlank() } } catch (_: Throwable) { null }
+        val note = try { obj.optString("assistantNote").takeIf { it.isNotBlank() } } catch (_: Throwable) { null }
+        val requestDocument = try { obj.optBoolean("requestDocument", false) } catch (_: Throwable) { false }
+        val draftObj = try { obj.optJSONObject("draft") } catch (_: Throwable) { null }
+        val draft = draftObj?.let { d ->
+            AgentCreationDraftPatch(
+                title = try { d.optString("title").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                learnerRole = try { d.optString("learnerRole").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                learnerProfile = try { d.optString("learnerProfile").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                learnerDisplayName = try { d.optString("learnerDisplayName").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                goal = try { d.optString("goal").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                plan = try { d.optString("plan").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                learningScope = try { d.optString("learningScope").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                modules = try { d.optString("modules").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                stageMilestones = try { d.optString("stageMilestones").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                dialogueStrategy = try { d.optString("dialogueStrategy").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                speakingTone = try { d.optString("speakingTone").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                story = try { d.optString("story").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                openingMessage = try { d.optString("openingMessage").takeIf { it.isNotBlank() } } catch (_: Throwable) { null },
+                persona = try { d.optString("persona").takeIf { it.isNotBlank() } } catch (_: Throwable) { null }
+            )
+        }
+        val action = try {
+            AgentCreationAction.fromWire(
+                obj.optString("action").takeIf { it.isNotBlank() }
+                    ?: obj.optString("tool").takeIf { it.isNotBlank() }
+                    ?: obj.optString("toolName").takeIf { it.isNotBlank() }
+            )
+        } catch (_: Throwable) {
+            null
+        }
+        if (followUp == null && note == null && draft == null && action == null) return null
         return AgentCreationTurnResult(
             understanding = understanding,
             followUpQuestion = followUp,
             assistantNote = note,
             requestDocument = requestDocument,
-            draft = draft
+            draft = draft,
+            action = action
         )
     }
 
@@ -287,9 +346,10 @@ private class StrictJson(private val source: kotlin.String) {
                     '"', '\\', '/' -> result.append(escaped)
                     'b' -> result.append('\b'); 'f' -> result.append('\u000C'); 'n' -> result.append('\n'); 'r' -> result.append('\r'); 't' -> result.append('\t')
                     'u' -> result.append(source.substring(index, index + 4).toInt(16).toChar().also { index += 4 })
-                    else -> error("bad escape")
+                    else -> result.append(escaped) // 容忍非标准反斜杠转义
                 }
-                else -> if (char.code < 0x20) error("control character") else result.append(char)
+                '\n', '\r', '\t' -> result.append(char) // 容忍大模型在 JSON 字符串内部输出真实换行与制表符
+                else -> if (char.code < 0x20 && char != '\n' && char != '\r' && char != '\t') error("control character") else result.append(char)
             }
         }
     }

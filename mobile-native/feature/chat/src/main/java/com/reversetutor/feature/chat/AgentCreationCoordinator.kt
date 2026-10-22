@@ -32,7 +32,19 @@ data class AgentCreationUiState(
     val generationError: String? = null,
     val docAnalysis: AgentCreationDocAnalysis? = null,
     /** R92：检测到有上次未完成的快照，等用户选「继续上次 / 创建新会话」。 */
-    val resumeAvailable: Boolean = false
+    val resumeAvailable: Boolean = false,
+    /**
+     * 修复 #2：一句话命令快车道已判定「信息够了」→ 请 UI 立刻走既有 performCreate() 创建并进入会话窗口。
+     * 一次性信号，UI 消费后调 [AgentCreationCoordinator.consumeCreateRequest]。
+     */
+    val createRequested: Boolean = false,
+    /** 修复 #2：快车道进行中（首句命令起，直到给出创建信号）。 */
+    val oneLineCreating: Boolean = false,
+    /**
+     * 修复 #1：发送失败（含排队消息发送失败）需要回填输入框的文本——文本永不丢。
+     * 一次性信号，UI 消费后调 [AgentCreationCoordinator.consumeRestoreInput]。
+     */
+    val restoreInput: String? = null
 ) {
     /** R102：了解度降级为纯展示值——分数不再封顶，也不再驱动流程推进（改由槽位确认状态裁决）。 */
     val displayedUnderstanding: Int
@@ -43,6 +55,15 @@ data class AgentCreationUiState(
 
     /** 创建可用：必填齐全即常驻可点。 */
     val canCreate: Boolean get() = draft.validationErrors().isEmpty()
+
+    /**
+     * 修复 #1：排队等待发送的消息（FIFO）。feed 里 pending=true 的用户气泡即队列成员，
+     * 顺序就是发送顺序，可单条取消。
+     */
+    val queuedMessages: List<AgentCreationFeedEntry.User>
+        get() = feed.filterIsInstance<AgentCreationFeedEntry.User>().filter { it.pending }
+
+    val queuedCount: Int get() = queuedMessages.size
 }
 
 class AgentCreationCoordinator(
@@ -73,6 +94,10 @@ class AgentCreationCoordinator(
     private var lastAskedSlot: CreationSlot? = null
     /** R92：检测到但未恢复的快照——入口弹窗确认「继续上次」才真正恢复。 */
     private var pendingSnapshot: AgentCreationSnapshot? = null
+    /** 修复 #2：直接创建工具当前悬置的单问字段（null = 没有在等回答）。 */
+    private var oneLineFollowUpField: AgentCreationFollowUpPlanner.Field? = null
+    /** 修复 #2：本会话首句命令原文（目标兜底用）。 */
+    private var oneLineCommandText: String = ""
 
     /** R100 方案B 状态机：graphEnabled 时由它裁决「什么时候该出孵化草案 / 流程图」。 */
     internal val creationGraph = AgentCreationGraph()
@@ -102,8 +127,39 @@ class AgentCreationCoordinator(
         persist()
     }
 
+    /**
+     * 2026-10-22 用户拍板（方案B）：创建会话只有一条路——和 AI 直接聊。
+     * 预设 / 收藏 / 挑战活动不再进「六栏表单」，而是把素材作为开场上下文交给对话式创建：
+     * 草案预填（模型据此少问几轮），开场白换成对这份素材的确认，用户接着聊就行。
+     *
+     * 返回 false = 已有快照待确认或已在对话中，不覆盖当前状态（由 UI 交给 [resumePending]/[startFresh]）。
+     */
+    fun startWithSeed(configuration: NewSessionConfiguration): Boolean {
+        if (state.resumeAvailable) return false
+        if (state.phase != AgentCreationPhase.Idle) return false
+        val title = configuration.title.ifBlank { "这份素材" }
+        val role = configuration.learnerRole.ifBlank { "一个学习者" }
+        val goal = configuration.goal.ifBlank { "还没写目标" }
+        state = state.copy(
+            phase = AgentCreationPhase.Conversing,
+            draft = configuration.deepCopy(),
+            feed = state.feed + AgentCreationFeedEntry.Assistant(
+                id = nextId(),
+                text = "就从「$title」开始：我当$role，目标是「$goal」。\n" +
+                    "要改哪里、或者想补充什么，直接说；不然我们就照这个开场。"
+            )
+        )
+        persist()
+        return true
+    }
+
     fun markCreated() {
-        state = state.copy(phase = AgentCreationPhase.Created)
+        oneLineFollowUpField = null
+        state = state.copy(
+            phase = AgentCreationPhase.Created,
+            createRequested = false,
+            oneLineCreating = false
+        )
         // R85：创建成功后清掉本地快照，下次进创建窗口从零开始。
         stateStore?.clear()
     }
@@ -118,7 +174,7 @@ class AgentCreationCoordinator(
     }
 
     /** R92 入口询问「创建新会话」：清掉旧快照与追问进度，从零开始。 */
-    fun startFresh() {
+    fun startFresh(seed: NewSessionConfiguration? = null) {
         pendingSnapshot = null
         stateStore?.clear()
         history.clear()
@@ -126,26 +182,102 @@ class AgentCreationCoordinator(
         entrySequence = 0
         slots = CreationSlots()
         lastAskedSlot = null
+        oneLineFollowUpField = null
+        oneLineCommandText = ""
         state = AgentCreationUiState()
         if (graphEnabled) creationGraph.restoreFromSnapshot(false)
-        start()
+        // 方案B：从预设 / 收藏 / 挑战带素材进来时，「创建新会话」也要带着素材，不能退回空白。
+        if (seed == null || !startWithSeed(seed)) start()
     }
 
-    /** 用户发一条文字消息：→ P2' 生成 → 更新了解程度/草案/追问。 */
-    suspend fun sendUserText(text: String) {
+    /**
+     * 用户发一条文字消息（唯一入口）：→ P2' 生成 → 由模型本轮选定的工具决定收尾
+     * （direct_create = 直接创建；interview = 多轮访谈，含追问/要资料/路径确认/孵化卡）。
+     *
+     * 修复 #1（2026-10-15 用户反馈「生成中发消息被静默丢弃，不支持排队或者插队发送」）：
+     * 生成中不再丢弃——文本入队，立刻以「排队中 · 待发送」气泡进对话流，
+     * 当前生成结束后按 FIFO 自动作为下一轮发送（可单条取消）。
+     * 返回 false = 空文本或当前状态不接受（UI 据此把文本留在输入框里，不丢字）。
+     */
+    suspend fun sendUserText(text: String): Boolean {
         val trimmed = text.trim()
-        if (trimmed.isEmpty() || state.busy || state.phase != AgentCreationPhase.Conversing) return
+        if (trimmed.isEmpty() || state.phase != AgentCreationPhase.Conversing) return false
+        // 生成中：入队而不是丢弃（队列按 feed 里的排队气泡顺序 FIFO）。
+        if (state.busy) return enqueueQueuedText(trimmed)
+        deliverUserText(trimmed)
+        drainQueuedMessages()
+        return true
+    }
+
+    /**
+     * 修复 #1：取消一条排队消息（只有还没开始发送的才能取消）。
+     * 返回 false = 该条目不在队列里（已发出 / 不存在）。
+     */
+    fun cancelQueuedMessage(entryId: String): Boolean {
+        state.queuedMessages.firstOrNull { it.id == entryId } ?: return false
+        state = state.copy(feed = state.feed.filterNot { it.id == entryId })
+        persist()
+        return true
+    }
+
+    /** 修复 #2：UI 消费一次「可以创建了」信号（随后调既有 performCreate()）。 */
+    fun consumeCreateRequest() {
+        if (state.createRequested) state = state.copy(createRequested = false)
+    }
+
+    /** 修复 #1：UI 消费一次「回填输入框」信号。 */
+    fun consumeRestoreInput() {
+        if (state.restoreInput != null) state = state.copy(restoreInput = null)
+    }
+
+    private fun enqueueQueuedText(text: String): Boolean {
+        val entry = AgentCreationFeedEntry.User(id = nextId(), text = text, pending = true)
+        state = state.copy(feed = state.feed + entry)
+        return true
+    }
+
+    /** 2026-10-17 用户拍板：连续发送消息合并回复。当前生成结束后，把排队中的所有消息合并为一个上下文发给模型，单轮综合回复。 */
+    private suspend fun drainQueuedMessages() {
+        if (!state.busy && state.phase == AgentCreationPhase.Conversing) {
+            val queued = state.queuedMessages
+            if (queued.isEmpty()) return
+            // 将等待中的所有新消息标记为已发出（气泡原地转正）
+            queued.forEach { markQueuedAsSent(it.id) }
+            val mergedText = if (queued.size == 1) {
+                queued.single().text
+            } else {
+                queued.joinToString("\n") { it.text }
+            }
+            deliverUserText(mergedText, bubblePosted = true)
+        }
+    }
+
+    private fun markQueuedAsSent(entryId: String) {
+        state = state.copy(
+            feed = state.feed.map {
+                if (it.id == entryId && it is AgentCreationFeedEntry.User) it.copy(pending = false) else it
+            }
+        )
+    }
+
+    /**
+     * 一条用户文本真正进入一轮生成。R99/R100/R102 的前置处理（图谱轨道、确认态、收敛）照旧，
+     * 走哪个工具等 [converseTurn] 收尾时按模型本轮 action 分派。
+     */
+    private suspend fun deliverUserText(text: String, bubblePosted: Boolean = false) {
+        // 直接创建工具的确定性兜底要用「用户最初那句命令」补 goal/title。
+        if (oneLineCommandText.isBlank()) oneLineCommandText = text
         if (graphEnabled) {
             // R100 方案B：草案待确认期间，确认语走确认节点，其余文字一律当批注打回访谈。
             if (creationGraph.state == CreationState.ConfirmDraft) {
-                appendUser(trimmed)
-                history += AgentCreationHistoryTurn(isUser = true, text = trimmed)
-                if (isIncubationConfirm(trimmed)) {
+                if (!bubblePosted) appendUser(text)
+                history += AgentCreationHistoryTurn(isUser = true, text = text)
+                if (isIncubationConfirm(text)) {
                     confirmIncubation()
                 } else {
                     supersedePendingIncubationCard()
                     creationGraph.transitionTo(CreationState.Interview)
-                    converseTurn(trimmed)
+                    converseTurn(text)
                 }
                 persist()
                 return
@@ -155,12 +287,12 @@ class AgentCreationCoordinator(
             creationGraph.noteUserSpoke()
         }
         // 10.3：用户明确说「别问了 / 直接生成」→ 立即收敛，本轮即按收敛策略执行。
-        if (AgentCreationFollowUpPlanner.isStopAsking(trimmed)) {
+        if (AgentCreationFollowUpPlanner.isStopAsking(text)) {
             planner.forceConverge()
         }
-        appendUser(trimmed)
-        history += AgentCreationHistoryTurn(isUser = true, text = trimmed)
-        converseTurn(trimmed)
+        if (!bubblePosted) appendUser(text)
+        history += AgentCreationHistoryTurn(isUser = true, text = text)
+        converseTurn(text)
         persist()
     }
 
@@ -223,9 +355,26 @@ class AgentCreationCoordinator(
         state = state.copy(generationError = null)
     }
 
-    /** 最终配置（创建管道消费）。 */
+    /**
+     * 最终配置（创建管道消费）。
+     *
+     * 2026-10-18（真机反馈「上下文没了」）：路由不再由本方法盖章决定——装配层以
+     * 「应用内创建的会话（新建漏斗落盘了快照）一律进反转家教内核」为键，创建出口
+     * 不再是 `builtInPresetId` 的必经写入点。这里保持纯取值，只补默认草案。
+     */
     fun configuration(): NewSessionConfiguration = state.draft.deepCopy()
 
+    /** 用户手动调整学生画像、难度等级等草案配置。 */
+    fun updateDraftManual(transform: (NewSessionConfiguration) -> NewSessionConfiguration) {
+        val newDraft = transform(state.draft)
+        state = state.copy(draft = newDraft)
+        persist()
+    }
+
+    /**
+     * 一轮创建对话。走哪个工具**不由入口决定**：模型本轮输出的 action 在收尾处分派
+     * （direct_create → [applyDirectCreateTail]；interview/未报 → 既有 R99/R100/R102 访谈收尾）。
+     */
     private suspend fun converseTurn(userText: String) {
         // 10.1 第 2 步：调用网关前生成策略快照（追问目标 / 收敛 / title 提案义务）。
         val hasDoc = state.docAnalysis != null
@@ -364,7 +513,9 @@ class AgentCreationCoordinator(
         state = state.copy(busy = false)
         val turn = result ?: run {
             state = state.copy(
-                generationError = "生成暂时失败了，你说的我都记着。重发一句，或改用手动填写。"
+                generationError = "生成暂时失败了，你说的我都记着。重发一句，或改用手动填写。",
+                // 修复 #1：任何失败都不丢文本——回填输入框（UI 消费后清）。
+                restoreInput = userText
             )
             appendAssistant("刚才这轮生成出了点问题。你再说一遍，或者换个说法也行。")
             return
@@ -489,6 +640,21 @@ class AgentCreationCoordinator(
             requestDocumentActive = allowRequestDocument
         )
 
+        // 2026-10-16 用户拍板：走哪个工具由模型本轮输出的 action 决定。
+        // action = direct_create → 直接创建；interview（或模型没报）→ 既有 R99/R100/R102 访谈收尾。
+        if (turn.action == AgentCreationAction.DirectCreate) {
+            applyDirectCreateTail(
+                answerText = userText,
+                newDraft = newDraft,
+                draftChanged = draftChanged,
+                turn = turn,
+                reasoning = carriedReasoning,
+                reasoningSeconds = carriedSeconds,
+                stages = carriedStages
+            )
+            return
+        }
+
         // R102 追问把关：推进条件从「分数驱动」改为「确认驱动」——必填槽全 Confirmed 且
         // （收敛或可选槽全 Confirmed）即就绪出草案；目标未确认时强制追问目标，模型高分压不住。
         var followUp = turn.followUpQuestion
@@ -536,19 +702,84 @@ class AgentCreationCoordinator(
         if (draftChanged) {
             // R84：草案卡单卡化——撤掉旧卡、最新草案永远沉在对话流末尾，
             // 让「当前输出状态」持久可见，而不是滚出一串过期的历史卡。
-            state = state.copy(
-                feed = state.feed.filterNot { it is AgentCreationFeedEntry.DraftCard } +
-                    AgentCreationFeedEntry.DraftCard(
-                        id = nextId(),
-                        configuration = newDraft
-                    )
-            )
+            appendDraftCard(newDraft)
         }
 
         // R102：出孵化草案只读槽位确认状态——了解度分数对状态转移零投票权。
         if (graphEnabled && creationGraph.state == CreationState.Interview && readyForProposal) {
             runIncubationNode()
         }
+    }
+
+    /**
+     * 修复 #2 · 一句话命令快车道收尾（2026-10-15 用户拍板规格）：
+     * 2026-10-16 用户拍板：这是模型自选的「直接创建」工具（action = "direct_create"）的收尾——
+     * 模型说建就建：用确定性兜底补全必填项后立即给出创建信号（UI 走既有 performCreate 进会话窗口）；
+     * 只有兜底都补不出可创建草案时（极罕见）才退化为补问一个最关键字段，绝不建半成品。
+     */
+    private fun applyDirectCreateTail(
+        answerText: String,
+        newDraft: NewSessionConfiguration,
+        draftChanged: Boolean,
+        turn: AgentCreationTurnResult,
+        reasoning: String?,
+        reasoningSeconds: Long,
+        stages: List<AgentCreationStageEvent>
+    ) {
+        // 会话已创建（用户已进入会话窗口）：本轮落定不再改写状态、不再二次触发创建。
+        if (state.phase != AgentCreationPhase.Conversing) return
+        val expected = oneLineFollowUpField
+        oneLineFollowUpField = null
+        var finalDraft = newDraft
+        if (expected != null) {
+            // 单问回答轮：模型没判定成「亲口给值」时用用户原话落定被问字段（答了就不算白答）。
+            finalDraft = AgentCreationOneLineCommand.applyCommandAnswer(finalDraft, expected, answerText)
+            if (expected == AgentCreationFollowUpPlanner.Field.LearnerRole &&
+                slots.statusOf(CreationSlot.LearnerRole) != SlotStatus.Confirmed &&
+                finalDraft.learnerRole.isNotBlank()
+            ) {
+                slots = slots.confirm(CreationSlot.LearnerRole, finalDraft.learnerRole, planner.rounds)
+            }
+        }
+        // 模型调用了「直接创建」工具 → 用确定性兜底把必填项补齐后立即创建。
+        val finalized = AgentCreationOneLineCommand.finalizeForCreate(finalDraft, oneLineCommandText)
+        if (!AgentCreationOneLineCommand.readyToCreate(finalized)) {
+            // 兜底都补不出可创建草案（极罕见）：退化为补问一个最关键字段，绝不建半成品。
+            val field = planner.nextField(finalized, slots) ?: AgentCreationFollowUpPlanner.Field.Goal
+            oneLineFollowUpField = field
+            val question = turn.followUpQuestion?.takeIf { it.isNotBlank() } ?: field.fallbackQuestion
+            val note = turn.assistantNote
+            if (note != null) {
+                appendAssistant(note, reasoning, reasoningSeconds, stages)
+                appendAssistant(question)
+            } else {
+                appendAssistant(question, reasoning, reasoningSeconds, stages)
+            }
+            state = state.copy(draft = finalized, oneLineCreating = true)
+            if (draftChanged) appendDraftCard(finalized)
+            return
+        }
+        finalDraft = finalized
+        appendAssistant(
+            text = turn.assistantNote ?: ONE_LINE_CREATE_NOTE,
+            reasoning = reasoning,
+            reasoningElapsedSeconds = reasoningSeconds,
+            stages = stages
+        )
+        state = state.copy(
+            draft = finalDraft,
+            createRequested = true,
+            oneLineCreating = false
+        )
+        if (draftChanged || finalDraft != newDraft) appendDraftCard(finalDraft)
+    }
+
+    /** R84：草案卡单卡化——撤掉旧卡、最新草案沉在对话流末尾。 */
+    private fun appendDraftCard(configuration: NewSessionConfiguration) {
+        state = state.copy(
+            feed = state.feed.filterNot { it is AgentCreationFeedEntry.DraftCard } +
+                AgentCreationFeedEntry.DraftCard(id = nextId(), configuration = configuration)
+        )
     }
 
     /** R100 方案B · CONFIRM_DRAFT → GENERATE_PROFILE → GENERATE_LEARNING_FLOW：用户确认孵化草案。 */
@@ -723,7 +954,9 @@ class AgentCreationCoordinator(
         store.save(
             AgentCreationSnapshot(
                 draft = state.draft.deepCopy(),
-                feed = state.feed,
+                // 修复 #1：排队中的气泡是「还没发出去」的瞬态，不进快照——
+                // 恢复后不该冒充已发送消息（快照编解码格式也因此零改动）。
+                feed = state.feed.filterNot { it is AgentCreationFeedEntry.User && it.pending },
                 rawUnderstanding = state.rawUnderstanding,
                 requestDocumentActive = state.requestDocumentActive,
                 history = history.toList(),
@@ -746,6 +979,8 @@ class AgentCreationCoordinator(
             slots = CreationSlots.migratedFrom(snapshot.draft)
         }
         lastAskedSlot = null
+        oneLineFollowUpField = null
+        oneLineCommandText = ""
         entrySequence = snapshot.entrySequence
         state = AgentCreationUiState(
             phase = if (snapshot.feed.isEmpty()) AgentCreationPhase.Idle else AgentCreationPhase.Conversing,
@@ -767,5 +1002,8 @@ class AgentCreationCoordinator(
             "^(确认|确认了|确认草案|可以|可以了|行|好|好的|没问题|就这样|就这样吧|通过|ok|okay)[！!。.~～ ]*$",
             RegexOption.IGNORE_CASE
         )
+
+        /** 修复 #2：一句话命令成稿、模型正文缺席时的确认话术（随后由用户显式确认后创建）。 */
+        const val ONE_LINE_CREATE_NOTE = "学习方案已就绪，已为你生成草案。请确认是否以此方案创建会话？"
     }
 }

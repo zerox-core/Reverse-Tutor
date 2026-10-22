@@ -22,6 +22,38 @@ data class AgentCreationDocAnalysis(
 )
 
 /**
+ * 2026-10-16 用户拍板：会话创建流程改成「模型自选工具」。
+ *
+ * 模型每轮必须报出它调用了哪个工具（[AgentCreationTurnResult.action]）：
+ * - [DirectCreate]：直接创建——信息已够（或用户明确要求直接建），客户端用确定性兜底补全必填项后
+ *   立即创建并进入会话窗口，不再追问；
+ * - [Interview]：多轮访谈——继续走既有 R99/R100/R102 流程（追问 / 主动要资料 / 学习路径确认 /
+ *   孵化草案卡），内部步骤由该工具自己包含。
+ *
+ * 模型没报（或报了个不认识的词）时按 [Interview] 处理：保守回落到已拍板的访谈流程，
+ * 不会把灰度的流程图/确认流程劫持成直接创建。
+ */
+enum class AgentCreationAction {
+    DirectCreate,
+    Interview;
+
+    companion object {
+        /** 宽松解析 wire 值（大小写、连字符、空格、同义词都容忍）。 */
+        fun fromWire(raw: String?): AgentCreationAction? {
+            val key = raw?.trim()?.lowercase()?.replace('-', '_')?.replace(' ', '_') ?: return null
+            if (key.isEmpty()) return null
+            return when (key) {
+                "direct_create", "directcreate", "create_now", "createnow", "create",
+                "instant_create", "direct" -> DirectCreate
+                "interview", "multi_turn", "multiturn", "ask", "continue",
+                "chat", "request_document" -> Interview
+                else -> null
+            }
+        }
+    }
+}
+
+/**
  * P2' 轮次结果。draft 是「字段级补丁」：LLM 每轮输出完整草案，
  * 但解析端只保留实际出现的字段，由协调器叠加到上一轮草案上，
  * 保证「未提及的保持上一轮值」不依赖模型自觉。
@@ -31,7 +63,9 @@ data class AgentCreationTurnResult(
     val followUpQuestion: String? = null,
     val assistantNote: String? = null,
     val requestDocument: Boolean = false,
-    val draft: AgentCreationDraftPatch? = null
+    val draft: AgentCreationDraftPatch? = null,
+    /** 2026-10-16：本轮模型调用的工具；null = 没报（按 Interview 处理）。 */
+    val action: AgentCreationAction? = null
 )
 
 /** 草案字段级补丁：null = 本轮未提及，保持原值。 */
@@ -229,7 +263,15 @@ sealed interface AgentCreationFeedEntry {
         val stages: List<AgentCreationStageEvent> = emptyList()
     ) : AgentCreationFeedEntry
 
-    data class User(override val id: String, val text: String) : AgentCreationFeedEntry
+    /**
+     * 用户气泡。pending = 生成中排队等待发送（「排队中 · 待发送」可见状态，可单条取消）。
+     * 默认 false + 快照编解码器不落该字段 → 既有调用与快照格式零改动、向后兼容。
+     */
+    data class User(
+        override val id: String,
+        val text: String,
+        val pending: Boolean = false
+    ) : AgentCreationFeedEntry
 
     data class FileCard(
         override val id: String,
