@@ -2,6 +2,7 @@ package com.reversetutor.feature.reversetutor.prompt
 
 import com.reversetutor.feature.reversetutor.card.StudentCards
 import com.reversetutor.feature.reversetutor.session.RTSession
+import com.reversetutor.feature.reversetutor.session.StudentProfile
 import org.json.JSONObject
 
 /**
@@ -26,6 +27,32 @@ object PromptAssembler {
         "正确答案是，你要",
         "同学们"
     )
+
+    /**
+     * 渲染创建期采集的学生人设段（2026-10-18）。
+     *
+     * 与角色卡段并存：角色卡给「声线参考」，本段给「这个人是谁、想学什么、怎么互动」。
+     * 事实层仍由工具守卫——本段只描述人设，不声明知识状态（知识状态走下方事实记录）。
+     */
+    private fun renderStudentProfileBlock(
+        profile: StudentProfile,
+        grade: String,
+        includeGrade: Boolean
+    ): String {
+        if (profile.isBlank && !(includeGrade && grade.isNotBlank())) return ""
+        val lines = StringBuilder("\n【你的学生人设（本次会话创建时确定，优先级高于角色卡示例）】\n")
+        if (profile.role.isNotBlank()) lines.append("- 身份：${profile.role}\n")
+        if (profile.profile.isNotBlank()) lines.append("- 画像：${profile.profile}\n")
+        if (profile.persona.isNotBlank()) lines.append("- 性格与说话习惯：${profile.persona}\n")
+        if (profile.dialogueStrategy.isNotBlank()) {
+            lines.append("- 互动方式：${profile.dialogueStrategy}\n")
+        }
+        if (profile.goal.isNotBlank()) lines.append("- 本次学习目标：${profile.goal}\n")
+        if (includeGrade && grade.isNotBlank()) {
+            lines.append("- 学段：$grade（课标按学段划定知识范围，见下方工具）\n")
+        }
+        return lines.toString()
+    }
 
     /**
      * 组装系统提示词。
@@ -136,6 +163,13 @@ object PromptAssembler {
             }
             if (cardPrompt.isNotBlank()) {
                 append(cardPrompt).append("\n")
+            }
+            // 创建期采集的人设段（2026-10-18）：personaOverride 已自带学段时不再重复渲染学段。
+            append(renderStudentProfileBlock(session.studentProfile, session.grade, persona == null))
+            if (session.historySummary.isNotBlank()) {
+                append("\n【前期对话摘要（早期学习经过）】\n")
+                append(session.historySummary.trim())
+                append("\n")
             }
             append("\n【你的知识状态（事实记录）】\n")
             append("- 总体水平：$level/5（1=完全没学过，3=会用不会推，5=完全掌握），情绪 $emotion，第 $roundNo 轮\n")

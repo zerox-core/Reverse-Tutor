@@ -1,5 +1,6 @@
 package com.reversetutor.feature.reversetutor
 
+import com.reversetutor.core.domain.WindowMemoryConfig
 import com.reversetutor.feature.reversetutor.curriculum.CurriculumCatalog
 import com.reversetutor.feature.reversetutor.loop.LlmMessage
 import com.reversetutor.feature.reversetutor.loop.LlmResponse
@@ -136,6 +137,88 @@ class ToolLoopTest {
         assertTrue(llmHistory.any { it.role == "tool" && it.toolCallId == "c4" })
         assertTrue(llmHistory.any { it.role == "assistant" && !it.toolCalls.isNullOrEmpty() && it.toolCalls?.first()?.callId == "c4" })
         assertTrue(llmHistory.any { it.role == "assistant" && it.content == "学生第四答" })
+    }
+
+    @Test
+    fun historyWindowKeepsCompleteRecentRoundsAndSummarizesEvictedText() {
+        val bounded = ToolLoop(
+            registry = registry,
+            catalog = catalog,
+            store = store,
+            recentRounds = 1,
+            windowConfig = WindowMemoryConfig(
+                tokenBudget = 10,
+                messageCap = 4,
+                rollingSummaryEnabled = true
+            )
+        )
+        val messages = listOf(
+            LlmMessage(role = "user", content = "早期问题", round = 1),
+            LlmMessage(role = "assistant", content = "早期回答", round = 1),
+            LlmMessage(role = "user", content = "最近问题", round = 2),
+            LlmMessage(
+                role = "assistant",
+                toolCalls = listOf(ToolCallRequest("recent", "check_understanding", "{}")),
+                round = 2
+            ),
+            LlmMessage(role = "tool", toolCallId = "recent", name = "check_understanding", content = "结果", round = 2),
+            LlmMessage(role = "assistant", content = "最近回答", round = 2)
+        )
+
+        val result = bounded.historyWindowForLlm(RTSession(sessionId = "window", currentRound = 2), messages)
+
+        assertTrue(result.messages.any { it.content == "最近问题" })
+        assertTrue(result.messages.any { it.content == "最近回答" })
+        assertTrue(result.messages.any { it.toolCallId == "recent" })
+        assertTrue(result.summary.contains("早期问题"))
+        assertTrue(result.summary.contains("早期回答"))
+    }
+
+    @Test
+    fun historyWindowNeverExceedsMessageCapOrTokenBudget() {
+        val bounded = ToolLoop(
+            registry = registry,
+            catalog = catalog,
+            store = store,
+            windowConfig = WindowMemoryConfig(tokenBudget = 8, messageCap = 2)
+        )
+        val messages = (1..8).map { round ->
+            LlmMessage(role = "user", content = "消息$round", round = round)
+        }
+
+        val result = bounded.historyWindowForLlm(
+            RTSession(sessionId = "bounded", currentRound = 8),
+            messages
+        )
+
+        assertTrue(result.messages.size <= 2)
+        assertTrue(result.messages.sumOf { ((it.content?.length ?: 0) + 3) / 4 } <= 8)
+        assertTrue(result.summary.isNotBlank())
+    }
+
+    @Test
+    fun runTurnCarriesTheWindowSummaryIntoUpdatedSession() = runBlocking {
+        val bounded = ToolLoop(
+            registry = registry,
+            catalog = catalog,
+            store = store,
+            recentRounds = 1,
+            windowConfig = WindowMemoryConfig(tokenBudget = 12, messageCap = 4)
+        )
+        val history = listOf(
+            LlmMessage(role = "user", content = "早期的关键题面", round = 1),
+            LlmMessage(role = "assistant", content = "早期的关键结论", round = 1)
+        )
+        val result = bounded.runTurn(
+            session = RTSession(sessionId = "summary-turn", topic = "测试", currentRound = 1),
+            historyMessages = history,
+            userText = "现在继续",
+            isOpening = false,
+            llmClient = MockToolLoopLlmClient()
+        )
+
+        assertTrue(result.updatedSession.historySummary.contains("早期的关键题面"))
+        assertTrue(result.updatedSession.historySummary.contains("早期的关键结论"))
     }
 
     // ------------------------------------------------------------------

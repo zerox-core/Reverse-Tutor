@@ -23,8 +23,47 @@ data class RTSession(
     val breakthroughEvents: List<BreakthroughEvent> = emptyList(),
     val struggleEvents: List<StruggleEvent> = emptyList(),
     val knowledgeGraphNodes: List<KgNode> = emptyList(),
-    val status: String = "active"
+    val status: String = "active",
+    /**
+     * 创建期采集的学生人设（2026-10-18 接入）。
+     *
+     * 会话创建窗口会让用户/模型填出 Role / 画像 / 性格 / 对话策略 / 目标，这些字段
+     * 此前只进普通 RAG 链路的模板证据，算法内核完全读不到——同一份「大一学生、活泼
+     * 好奇」的人设在两条链路上表现不一致。全为空 = 未采集，提示词退回内置角色卡口径。
+     */
+    val studentProfile: StudentProfile = StudentProfile(),
+    /**
+     * 早期被滑动窗口淘汰的历史对话滚动摘要（2026-10-18 接入）。
+     *
+     * 防止超长对话无上限膨胀炸穿 LLM 窗口。当超出 token 预算或条数上限时，
+     * 较早的历史轮次会被压缩并归纳至此处，注入系统提示词。空则不渲染。
+     */
+    val historySummary: String = ""
 )
+
+/**
+ * 学生人设块（自由文本，原样渲染进系统提示词的人设段）。
+ *
+ * 刻意不做结构化拆分：创建窗口采集的就是自由文本，硬塞进 [studentProfile] 那套
+ * speaking_patterns/emotional_traits 结构只会丢信息且要猜默认值。
+ */
+data class StudentProfile(
+    /** 身份，如「对日常生活现象充满好奇的大一学生」。 */
+    val role: String = "",
+    /** 画像/背景，如「公式背得熟，遇概念辨析发懵」。 */
+    val profile: String = "",
+    /** 性格与说话习惯。 */
+    val persona: String = "",
+    /** 对话策略（用户希望的互动方式）。 */
+    val dialogueStrategy: String = "",
+    /** 本次会话的学习目标。 */
+    val goal: String = ""
+) {
+    /** 全部字段为空——提示词不渲染人设段（保持接入前的提示词口径）。 */
+    val isBlank: Boolean
+        get() = role.isBlank() && profile.isBlank() && persona.isBlank() &&
+            dialogueStrategy.isBlank() && goal.isBlank()
+}
 
 /** 工具调用轨迹（spike: session["tool_trace"] entry，扁平列表带 round）。 */
 data class ToolTraceEntry(

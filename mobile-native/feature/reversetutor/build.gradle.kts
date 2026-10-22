@@ -25,6 +25,7 @@ android {
 dependencies {
     // 冻结区只读复用：HTTP 传输接口与实现（不修改 core:llm 任何文件）
     implementation(project(":core:llm"))
+    implementation(project(":core:domain"))
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")

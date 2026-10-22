@@ -560,7 +560,17 @@ object LlmGenerationPlanner {
 }
 
 private const val DefaultImagePrompt = "Describe the attached image."
-private const val MaxContextEvidence = 6
+
+/**
+ * 进入提示词「Context evidence」块的证据条数上限。
+ *
+ * 2026-10-18 用户批准解冻本常量（6 → 12）：真机取证显示，app 层即使把消息窗口调大，
+ * 到模型的证据条数仍被这里钳在 6——模板证据占 1 条、摘要/缺口/复习各占 1 条后，真实
+ * 对话只剩 2 条，模型接不住「再写一个」指代什么。12 与 app 层
+ * `SessionPolicyInputMapper.MaxContextEvidence` 对齐：模板 1 + 聚合 3 + 消息 8 = 12，
+ * 整段对话窗口与学情聚合证据得以同时进提示词。
+ */
+private const val MaxContextEvidence = 12
 private const val MaxTurnNoteChars = 400
 
 /**

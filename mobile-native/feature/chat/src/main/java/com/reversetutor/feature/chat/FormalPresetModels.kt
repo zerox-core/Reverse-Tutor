@@ -73,6 +73,17 @@ fun FormalLearningPreset.presentationEpisodes(): List<FormalPresetEpisode> = lis
 )
 
 object FormalLearningPresets {
+
+    /**
+     * 反转家教算法内核预设 id。
+     *
+     * 装配层 `RoutingTurnPreparationPort` 用它决定会话走算法内核（ToolLoop 31 工具）
+     * 还是普通 RAG/图谱链路。**本常量是唯一真源**：预设卡 id、创建流程写入的
+     * `builtInPresetId`、装配层路由判定三处必须一致，否则新会话会被静默甩给普通
+     * 链路（2026-10-18 真机反馈「上下文没了」的根因）。
+     */
+    const val REVERSE_TUTOR_PRESET_ID = "reverse-tutor"
+
     val all: List<FormalLearningPreset> = listOf(
         FormalLearningPreset(
             id = "formal-math-sprint",
@@ -277,7 +288,7 @@ object FormalLearningPresets {
         // R-RT-6：反转家教内置预设（id 与 RoutingTurnPreparationPort 的路由标记一致）。
         // 命中 builtInPresetId == "reverse-tutor" 的会话走算法内核 ToolLoop，不走 RAG/记忆链路。
         FormalLearningPreset(
-            id = "reverse-tutor",
+            id = REVERSE_TUTOR_PRESET_ID,
             figmaNodeId = "reverse-tutor-core",
             title = "反转家教课堂",
             category = "反转家教",

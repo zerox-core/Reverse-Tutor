@@ -3,9 +3,11 @@ package com.reversetutor.feature.reversetutor
 import com.reversetutor.feature.reversetutor.prompt.PromptAssembler
 import com.reversetutor.feature.reversetutor.session.KgNode
 import com.reversetutor.feature.reversetutor.session.RTSession
+import com.reversetutor.feature.reversetutor.session.StudentProfile
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -20,6 +22,96 @@ class PromptAssemblerTest {
         com.reversetutor.feature.reversetutor.card.StudentCards.setDefault(
             com.reversetutor.feature.reversetutor.card.StudentCards(File("$assets/student_cards.json").readText())
         )
+    }
+
+    @Test
+    fun historySummaryIsRenderedInTheSystemPrompt() {
+        val prompt = PromptAssembler.buildSystemPrompt(
+            RTSession(
+                sessionId = "summary",
+                topic = "二次函数",
+                historySummary = "老师之前讲过配方法，学生在减去平方项这一步卡住。"
+            )
+        )
+
+        assertTrue(prompt.contains("前期对话摘要"))
+        assertTrue(prompt.contains("减去平方项"))
+    }
+
+    @Test
+    fun blankHistorySummaryDoesNotAddAnEmptyBlock() {
+        val prompt = PromptAssembler.buildSystemPrompt(
+            RTSession(sessionId = "summary-empty", topic = "二次函数")
+        )
+
+        assertFalse(prompt.contains("前期对话摘要"))
+    }
+
+    @Test
+    fun studentProfileBlockCarriesTheCreationWindowPersona() {
+        val session = RTSession(
+            sessionId = "s4",
+            topic = "趣味心理学基础",
+            grade = "大一",
+            studentProfile = StudentProfile(
+                role = "对日常生活现象充满好奇的大一学生",
+                profile = "喜欢用生活里的例子提问",
+                persona = "性格活泼好奇，理解卡壳时会诚实说困惑",
+                dialogueStrategy = "先让他举例，再一起命名现象",
+                goal = "日常生活中的趣味心理学"
+            )
+        )
+
+        val prompt = PromptAssembler.buildSystemPrompt(session)
+
+        // 2026-10-18：创建窗口采集的人设必须进内核提示词，否则同一个用户在两条链路上
+        // 会看到两个不同性格的学生。
+        assertTrue(prompt.contains("【你的学生人设（本次会话创建时确定"))
+        assertTrue(prompt.contains("身份：对日常生活现象充满好奇的大一学生"))
+        assertTrue(prompt.contains("画像：喜欢用生活里的例子提问"))
+        assertTrue(prompt.contains("性格与说话习惯：性格活泼好奇，理解卡壳时会诚实说困惑"))
+        assertTrue(prompt.contains("互动方式：先让他举例，再一起命名现象"))
+        assertTrue(prompt.contains("本次学习目标：日常生活中的趣味心理学"))
+        // 学段来自内核会话（personaOverride 缺席时由此段渲染）
+        assertTrue(prompt.contains("学段：大一（课标按学段划定知识范围，见下方工具）"))
+        // 身份铁律不被人设段削弱
+        assertTrue(prompt.contains("【身份铁律】"))
+        assertTrue(prompt.contains("你永远是学生，绝不以教师口吻说话"))
+    }
+
+    @Test
+    fun studentProfileBlockIsAbsentWhenNothingWasCollected() {
+        val prompt = PromptAssembler.buildSystemPrompt(
+            RTSession(sessionId = "s5", topic = "配方法")
+        )
+
+        // 未采集 = 提示词口径与接入前完全一致（不出现空段与空项目符号）
+        assertFalse(prompt.contains("【你的学生人设（本次会话创建时确定"))
+        assertFalse(prompt.contains("身份："))
+        assertFalse(prompt.contains("学段："))
+    }
+
+    @Test
+    fun profileBlockDoesNotDuplicateThePersonaOverrideGrade() {
+        val session = RTSession(
+            sessionId = "s6",
+            topic = "配方法",
+            grade = "初中",
+            studentProfile = StudentProfile(role = "初二学生")
+        )
+        val persona = JSONObject().apply {
+            put("persona_id", "p_low")
+            put("grade", "初三")
+            put("speaking_patterns", JSONObject())
+            put("emotional_traits", JSONObject())
+        }
+
+        val prompt = PromptAssembler.buildSystemPrompt(session, persona)
+
+        // personaOverride 自带学段时以它为准，人设段不再重复渲染学段行
+        assertTrue(prompt.contains("学段：初三"))
+        assertFalse(prompt.contains("学段：初中"))
+        assertTrue(prompt.contains("身份：初二学生"))
     }
 
     @Test

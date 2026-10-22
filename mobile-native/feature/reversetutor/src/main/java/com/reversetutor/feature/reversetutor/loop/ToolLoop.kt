@@ -1,5 +1,6 @@
 package com.reversetutor.feature.reversetutor.loop
 
+import com.reversetutor.core.domain.WindowMemoryConfig
 import com.reversetutor.core.llm.MonologueEnvelope
 import com.reversetutor.core.llm.MonologueStreamSplitter
 import com.reversetutor.core.llm.ProviderHttpRequest
@@ -100,6 +101,13 @@ data class TurnResult(
     val report: TurnReport
 )
 
+data class HistoryWindowResult(
+    val messages: List<LlmMessage>,
+    val summary: String
+)
+
+private const val MaxHistorySummaryChars = 4_000
+
 interface ToolLoopLlmClient {
     suspend fun chat(
         messages: List<LlmMessage>,
@@ -132,6 +140,12 @@ class ToolLoop(
     val store: MaterialStore,
     val maxStepsPerTurn: Int = 12,
     val recentRounds: Int = 3,
+    /** 内核短期上下文预算：保留最新轮次，超出部分进入滚动摘要。 */
+    val windowConfig: WindowMemoryConfig = WindowMemoryConfig(
+        tokenBudget = 16_000,
+        messageCap = 40,
+        rollingSummaryEnabled = true
+    ),
     /** 长期记忆存储（阶段 3 首批）；缺省回落到进程级默认实例，保证向后兼容。 */
     val memoryStore: RTMemoryStore? = null,
     /** 外部检索 provider；缺省不注入，等价 `WEB_SEARCH_PROVIDER=off`。 */
@@ -211,53 +225,137 @@ class ToolLoop(
         messages: List<LlmMessage>,
         persona: JSONObject? = null
     ): List<LlmMessage> {
-        val out = mutableListOf<LlmMessage>()
-        val sysPrompt = PromptAssembler.buildSystemPrompt(session, persona)
-        out.add(LlmMessage(role = "system", content = sysPrompt))
+        val window = historyWindowForLlm(session, messages)
+        return renderHistoryForLlm(session, window, persona)
+    }
 
+    private fun renderHistoryForLlm(
+        session: RTSession,
+        window: HistoryWindowResult,
+        persona: JSONObject?
+    ): List<LlmMessage> {
+        val out = mutableListOf<LlmMessage>()
+        val sysPrompt = PromptAssembler.buildSystemPrompt(
+            session.copy(historySummary = window.summary),
+            persona
+        )
+        out.add(LlmMessage(role = "system", content = sysPrompt))
+        out.addAll(window.messages)
+        return out
+    }
+
+    /**
+     * 先去掉旧轮次工具噪音，再按完整轮次做短期滑动窗口。
+     * 一个轮次不会被拆开，避免 tool_call 与 tool_result 失配；被淘汰的
+     * 用户/学生正文进入有界滚动摘要。
+     */
+    fun historyWindowForLlm(
+        session: RTSession,
+        messages: List<LlmMessage>
+    ): HistoryWindowResult {
         val current = session.currentRound
         val recent = maxOf(1, recentRounds)
+        val compacted = messages.filter { message ->
+            val isOld = message.round != null && current - message.round >= recent
+            !(isOld && (message.role == "tool" ||
+                (message.role == "assistant" && !message.toolCalls.isNullOrEmpty())))
+        }
 
-        for (m in messages) {
-            val role = m.role
-            val r = m.round
-            val isOld = (r != null) && (current - r >= recent)
-
-            if (isOld && role == "tool") continue
-            if (isOld && role == "assistant" && !m.toolCalls.isNullOrEmpty()) continue
-
-            when (role) {
-                "user" -> {
-                    if (!m.content.isNullOrEmpty()) {
-                        out.add(LlmMessage(role = "user", content = m.content))
-                    }
-                }
-                "tool" -> {
-                    out.add(
-                        LlmMessage(
-                            role = "tool",
-                            toolCallId = m.toolCallId,
-                            name = m.name,
-                            content = m.content ?: ""
-                        )
-                    )
-                }
-                "assistant" -> {
-                    val content = m.content ?: ""
-                    val tc = m.toolCalls
-                    if (content.isNotEmpty() || !tc.isNullOrEmpty()) {
-                        out.add(
-                            LlmMessage(
-                                role = "assistant",
-                                content = content.ifEmpty { null },
-                                toolCalls = tc
-                            )
-                        )
-                    }
-                }
+        val groups = mutableListOf<MutableList<LlmMessage>>()
+        val groupKeys = mutableListOf<Int>()
+        for ((index, message) in compacted.withIndex()) {
+            val key = message.round ?: (Int.MIN_VALUE + index)
+            val existing = groupKeys.indexOf(key)
+            if (existing >= 0) {
+                groups[existing].add(message)
+            } else {
+                groupKeys.add(key)
+                groups.add(mutableListOf(message))
             }
         }
-        return out
+
+        val keptGroups = ArrayDeque<List<LlmMessage>>()
+        var tokens = 0
+        var count = 0
+        for (group in groups.asReversed()) {
+            val groupTokens = group.sumOf { estimateTokens(it.content) }
+            if (keptGroups.isNotEmpty() &&
+                (count + group.size > windowConfig.messageCap ||
+                    tokens + groupTokens > windowConfig.tokenBudget)
+            ) {
+                // 只能从更早的轮次继续淘汰；不能跳过中间轮次后又保留更旧轮次。
+                break
+            }
+            if (keptGroups.isEmpty() && groupTokens > windowConfig.tokenBudget) {
+                // 最新轮次必须保留，但仍服从两个硬上限；从该轮最新消息向前裁剪。
+                val clipped = clipGroupToBudget(group)
+                keptGroups.addFirst(clipped)
+                count += clipped.size
+                tokens += clipped.sumOf { estimateTokens(it.content) }
+                break
+            }
+            keptGroups.addFirst(group)
+            count += group.size
+            tokens += groupTokens
+        }
+
+        val kept = keptGroups.flatten()
+        val keptIds = kept.toSet()
+        val evicted = compacted.filterNot { it in keptIds }
+        val newSummary = if (windowConfig.rollingSummaryEnabled && evicted.isNotEmpty()) {
+            mergeHistorySummary(session.historySummary, evicted)
+        } else {
+            session.historySummary
+        }
+        return HistoryWindowResult(kept, newSummary)
+    }
+
+    private fun estimateTokens(text: String?): Int =
+        ((text?.length ?: 0) + 3) / 4
+
+    private fun clipToTokenBudget(message: LlmMessage, remainingTokens: Int): LlmMessage {
+        val maxChars = (remainingTokens.coerceAtLeast(1) * 4).coerceAtLeast(4)
+        val content = message.content ?: return message
+        return message.copy(content = content.takeLast(maxChars))
+    }
+
+    private fun clipGroupToBudget(group: List<LlmMessage>): List<LlmMessage> {
+        val kept = ArrayDeque<LlmMessage>()
+        var tokens = 0
+        for (message in group.asReversed()) {
+            if (kept.size >= windowConfig.messageCap) break
+            val available = windowConfig.tokenBudget - tokens
+            if (available <= 0) break
+            val estimate = estimateTokens(message.content)
+            val clipped = if (estimate > available) {
+                clipToTokenBudget(message, available)
+            } else {
+                message
+            }
+            val clippedTokens = estimateTokens(clipped.content)
+            if (clippedTokens <= 0) continue
+            kept.addFirst(clipped)
+            tokens += clippedTokens
+        }
+        return kept.toList()
+    }
+
+    private fun mergeHistorySummary(
+        previous: String,
+        evicted: List<LlmMessage>
+    ): String {
+        val additions = evicted.mapNotNull { message ->
+            val text = message.content?.trim().orEmpty()
+            if (text.isEmpty() || message.role == "tool") null
+            else "${message.role}: $text"
+        }
+        if (additions.isEmpty()) return previous
+        val previousLines = previous.lines().toSet()
+        val fresh = additions.filterNot { it in previousLines }
+        if (fresh.isEmpty()) return previous
+        return (previous.trim() + "\n" + fresh.joinToString("\n"))
+            .trim()
+            .takeLast(MaxHistorySummaryChars)
     }
 
     /**
@@ -305,6 +403,7 @@ class ToolLoop(
         }
 
         val report = TurnReport(round = roundNo)
+        var historySummary = session.historySummary
         val sink = SessionStateSink()
         val extra = mutableMapOf<String, Any>(CoreTools.KEY_SESSION_STATE_SINK to sink)
         memoryStore?.let { extra[CoreTools.KEY_MEMORY_STORE] = it }
@@ -334,9 +433,20 @@ class ToolLoop(
                         )
                     }
                 }
-                val currentLlmMessages = historyForLlm(
-                    session = session.copy(currentRound = roundNo),
-                    messages = messages,
+                val window = historyWindowForLlm(
+                    session = session.copy(
+                        currentRound = roundNo,
+                        historySummary = historySummary
+                    ),
+                    messages = messages
+                )
+                historySummary = window.summary
+                val currentLlmMessages = renderHistoryForLlm(
+                    session = session.copy(
+                        currentRound = roundNo,
+                        historySummary = historySummary
+                    ),
+                    window = window,
                     persona = personaOverride
                 )
 
@@ -606,7 +716,10 @@ class ToolLoop(
 
         report.toolCallCount = report.toolCalls.size
         val updatedSession = updateState(
-            session = session.copy(currentRound = roundNo),
+            session = session.copy(
+                currentRound = roundNo,
+                historySummary = historySummary
+            ),
             report = report,
             sink = sink,
             roundNo = roundNo
