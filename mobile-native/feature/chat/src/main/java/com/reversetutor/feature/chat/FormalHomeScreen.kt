@@ -343,9 +343,7 @@ fun FormalHomeScreen(
             if (state.isNewSessionSheetVisible) {
                 FormalNewSessionSheet(
                     onDismiss = onDismissNewSessionSheet,
-                    onStartLearningSetup = onStartLearningSetup,
-                    onCustomCreate = onCustomCreate,
-                    onImportDocument = onImportDocument
+                    onStartCreation = onCustomCreate
                 )
             }
             actionSession?.let { session ->
@@ -1175,9 +1173,8 @@ private fun WeeklyPageIndicator(onClick: () -> Unit) {
 @Composable
 private fun FormalNewSessionSheet(
     onDismiss: () -> Unit,
-    onStartLearningSetup: () -> Unit,
-    onCustomCreate: () -> Unit,
-    onImportDocument: () -> Unit
+    /** 2026-10-22 用户拍板：新建会话只有一条路——和 AI 直接聊。 */
+    onStartCreation: () -> Unit
 ) {
     var entered by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entered = true }
@@ -1225,25 +1222,18 @@ private fun FormalNewSessionSheet(
             color = Color(0xFFFAFBFE),
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
-            NewSessionSheetContent(
-                onStartLearningSetup = onStartLearningSetup,
-                onCustomCreate = onCustomCreate,
-                onImportDocument = onImportDocument
-            )
+            NewSessionSheetContent(onStartCreation = onStartCreation)
         }
     }
 }
 
 @Composable
 private fun NewSessionSheetContent(
-    onStartLearningSetup: () -> Unit,
-    onCustomCreate: () -> Unit,
-    onImportDocument: () -> Unit
+    onStartCreation: () -> Unit
 ) {
     val type = LocalFormalTypeScale.current
     val modes = formalNewSessionModes()
     var selectedMode by remember { mutableStateOf(NewSessionMode.Learning) }
-    var selectedMethod by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1262,7 +1252,7 @@ private fun NewSessionSheetContent(
             modifier = Modifier.padding(top = 19.dp)
         )
         Text(
-            text = "选择会话模式和创建方式，然后开始。",
+            text = "不用填表：把你的想法说给 AI，边聊边把会话定下来。",
             style = type.style(11f, 16f, color = FormalColors.Muted),
             modifier = Modifier.padding(top = 4.dp)
         )
@@ -1287,154 +1277,43 @@ private fun NewSessionSheetContent(
                 )
             }
         }
-        Text(
-            text = "创建方式",
-            style = type.style(12f, 17f, FontWeight.Bold, FormalColors.Ink),
-            modifier = Modifier.padding(top = 18.dp)
-        )
-        Column(
-            modifier = Modifier
-                .padding(top = 10.dp)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Spacer(Modifier.height(22.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().testTag("home_new_session_direct_chat"),
+            color = Color(0xFFF4F7FC),
+            shape = RoundedCornerShape(FormalShapes.CardRadius),
+            border = BorderStroke(1.dp, Color(0xFFE3E9F2))
         ) {
-            NewSessionOptionRow(
-                title = "自定义",
-                description = "和 AI 直接聊，越聊越懂你",
-                badge = "推荐",
-                selected = selectedMethod == "custom",
-                onClick = { selectedMethod = "custom" },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("home_new_session_custom")
-            )
-            NewSessionOptionRow(
-                title = "模板",
-                description = "从预设模板里挑一个开始",
-                selected = selectedMethod == "template",
-                onClick = { selectedMethod = "template" },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("home_new_session_template")
-            )
-            NewSessionOptionRow(
-                title = "导入",
-                description = "上传教材或试卷，边分析边创建",
-                selected = selectedMethod == "import",
-                onClick = { selectedMethod = "import" },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("home_new_session_import")
-            )
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    "直接和 AI 聊",
+                    style = type.style(12f, 17f, FontWeight.Bold, FormalColors.Ink)
+                )
+                Text(
+                    "教材、试卷、旧模板都能在对话里直接丢给它；它会边问边把学生画像、目标和路径定好。",
+                    style = type.style(10f, 15f, color = FormalColors.Muted)
+                )
+            }
         }
         Spacer(Modifier.weight(1f))
-        val ready = selectedMethod != null
         Surface(
-            onClick = {
-                when (selectedMethod) {
-                    "custom" -> onCustomCreate()
-                    "template" -> onStartLearningSetup()
-                    "import" -> onImportDocument()
-                }
-            },
-            enabled = ready,
+            onClick = onStartCreation,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 20.dp)
                 .height(50.dp)
                 .testTag("home_new_session_confirm"),
-            color = if (ready) FormalColors.Primary else Color(0xFFE7EAF0),
+            color = FormalColors.Primary,
             shape = RoundedCornerShape(FormalShapes.CardRadius),
-            shadowElevation = if (ready) FormalElevations.Raised else 0.dp
+            shadowElevation = FormalElevations.Raised
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "开始创建",
-                    style = type.style(
-                        13f, 18f, FontWeight.Bold,
-                        if (ready) Color.White else Color(0xFF7D8798)
-                    )
-                )
+                Text("开始创建", style = type.style(13f, 18f, FontWeight.Bold, Color.White))
             }
         }
     }
 }
 
-@Composable
-private fun NewSessionOptionRow(
-    title: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    badge: String? = null
-) {
-    val type = LocalFormalTypeScale.current
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(60.dp),
-        color = if (selected) FormalColors.PrimarySoft else FormalColors.SurfaceElevated,
-        shape = RoundedCornerShape(FormalShapes.CardRadius),
-        border = BorderStroke(1.dp, if (selected) FormalColors.Primary else FormalColors.BorderStrong)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = title,
-                        style = type.style(13f, 18f, FontWeight.Medium, FormalColors.Ink)
-                    )
-                    if (badge != null) {
-                        Surface(
-                            shape = RoundedCornerShape(FormalShapes.PillRadius),
-                            color = FormalColors.PrimarySoft
-                        ) {
-                            Text(
-                                text = badge,
-                                style = type.style(9f, 12f, FontWeight.Medium, FormalColors.Primary),
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
-                }
-                Text(
-                    text = description,
-                    style = type.style(10f, 14f, color = FormalColors.Muted),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Surface(
-                shape = CircleShape,
-                color = if (selected) FormalColors.Primary else Color.Transparent,
-                border = BorderStroke(
-                    1.5.dp,
-                    if (selected) FormalColors.Primary else Color(0xFFB9C1D0)
-                ),
-                modifier = Modifier.size(18.dp)
-            ) {
-                if (selected) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(Color.White, CircleShape)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun NewSessionModeCard(

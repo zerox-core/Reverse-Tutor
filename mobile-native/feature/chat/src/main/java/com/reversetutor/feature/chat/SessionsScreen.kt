@@ -189,6 +189,8 @@ fun SessionsRoute(
                 onNewSession()
             },
             onCustomCreate = {
+                // 2026-10-22 用户拍板（方案B）：新建会话只有一条路——直接和 AI 聊。
+                // 「模板」「导入」不再是并列选项，素材在对话里直接丢给它。
                 showNewSessionSheet = false
                 onOpenAgentCreation()
             },

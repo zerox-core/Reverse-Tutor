@@ -86,6 +86,7 @@ import com.reversetutor.feature.chat.ChatScrollMemory
 import com.reversetutor.feature.chat.LearningOverviewPanel
 import com.reversetutor.feature.chat.LearningOverviewUiAction
 import com.reversetutor.feature.chat.LearningOverviewUiState
+import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionPrefillRequest
 import com.reversetutor.feature.chat.SessionSource
 import com.reversetutor.feature.chat.Task2B1NewSessionRoute
@@ -208,6 +209,11 @@ fun AppShell(
     var challengePrefillReturnContext by remember { mutableStateOf<ChallengeReturnContext?>(null) }
     var challengeRestoreContext by remember { mutableStateOf<ChallengeReturnContext?>(null) }
     var agentCreationImportRequested by remember { mutableStateOf(false) }
+    /**
+     * 2026-10-22 方案B：预设 / 收藏 / 挑战活动带进对话式创建的开场素材。
+     * null = 从零开始聊；非 null = 用这份配置开场。
+     */
+    var agentCreationSeed by remember { mutableStateOf<NewSessionConfiguration?>(null) }
     var workspaceChromeObscuredPages by remember { mutableStateOf(emptySet<WorkspacePage>()) }
     var pageLocalActionDismissers by remember {
         mutableStateOf(emptyMap<WorkspacePage, () -> Unit>())
@@ -286,7 +292,10 @@ fun AppShell(
                 challengePrefillReturnContext = returnContext
                 challengeSessionPrefill = launch.prefill
                 figmaUiState = figmaUiState.dismissActivityAnnouncement()
-                navigationState = navigationState.navigate(AppDestination.NewSession)
+                // 2026-10-22 方案B：挑战素材直接进对话式创建，不再途经预设/表单页。
+                // challengeSessionPrefill 保留，返回时据此回到挑战页。
+                agentCreationSeed = launch.prefill.configuration
+                navigationState = navigationState.navigate(AppDestination.AgentCreation)
             }
         }
     }
@@ -400,7 +409,9 @@ fun AppShell(
                             openChallenge()
                         },
                         onNewSessionClick = {
-                            navigationState = navigationState.navigate(AppDestination.NewSession)
+                            // 2026-10-22 用户拍板（方案B）：新建会话只有一条路——直接和 AI 聊；
+                            // 顶栏「新建」不再绕去预设列表。
+                            navigationState = navigationState.navigate(AppDestination.AgentCreation)
                         }
                     )
                 }
@@ -545,10 +556,13 @@ fun AppShell(
                             agentCreationImportRequested = true
                             navigationState = navigationState.navigate(AppDestination.AgentCreation)
                         },
-                        agentCreationImportRequested = agentCreationImportRequested,
-                        onAgentCreationImportConsumed = {
-                            agentCreationImportRequested = false
-                        },
+                agentCreationImportRequested = agentCreationImportRequested,
+                onAgentCreationImportConsumed = {
+                    agentCreationImportRequested = false
+                },
+                agentCreationSeed = agentCreationSeed,
+                onAgentCreationSeed = { agentCreationSeed = it },
+                onAgentCreationSeedConsumed = { agentCreationSeed = null },
                         onOpenPublicArticle = { slug ->
                             activeArticleSlug = slug
                             navigationState = navigationState.navigate(AppDestination.PublicArticle)
@@ -939,6 +953,10 @@ private fun DestinationContent(
     onOpenAgentCreationImport: () -> Unit,
     agentCreationImportRequested: Boolean,
     onAgentCreationImportConsumed: () -> Unit,
+    /** 2026-10-22 方案B：预设 / 收藏 / 挑战素材带进对话式创建。 */
+    agentCreationSeed: NewSessionConfiguration? = null,
+    onAgentCreationSeed: (NewSessionConfiguration) -> Unit = {},
+    onAgentCreationSeedConsumed: () -> Unit = {},
     onOpenPublicArticle: (String) -> Unit,
     onOpenSearchTarget: (SearchTarget) -> Unit,
     onSessionCreated: (com.reversetutor.feature.chat.SessionListItem) -> Unit,
@@ -1422,7 +1440,13 @@ private fun DestinationContent(
                 tagLibraryPersistence = hybridAppGraph.frontend.tagLibraryPersistence,
                 onCreated = onSessionCreated,
                 onBack = onCloseNewSession,
-                initialPrefill = challengeSessionPrefill
+                initialPrefill = challengeSessionPrefill,
+                // 2026-10-22 用户拍板（方案B）：选了预设 / 收藏 / 挑战素材 → 不填表，
+                // 带着这份配置进对话式创建，边聊边补。
+                onStartCreation = { configuration ->
+                    onAgentCreationSeed(configuration)
+                    onNavigateDestination(AppDestination.AgentCreation)
+                }
             )
             return@ReverseTutorScreenSurface
         }
@@ -1434,6 +1458,7 @@ private fun DestinationContent(
                 onBack = onCloseNewSession,
                 openPickerOnStart = agentCreationImportRequested,
                 onOpenPickerConsumed = onAgentCreationImportConsumed,
+                seededConfiguration = agentCreationSeed,
                 gateway = hybridAppGraph.agentCreationGateway,
                 stateStore = hybridAppGraph.agentCreationStateStore,
                 graphEnabled = hybridAppGraph.agentCreationGraphEnabled

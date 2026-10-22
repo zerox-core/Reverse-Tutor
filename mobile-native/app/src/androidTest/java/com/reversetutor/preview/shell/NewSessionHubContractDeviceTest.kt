@@ -3,13 +3,9 @@ package com.reversetutor.preview.shell
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextReplacement
-import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionCreatePort
 import com.reversetutor.feature.chat.NewSessionCreateRequest
@@ -18,18 +14,24 @@ import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
 import com.reversetutor.feature.chat.NewSessionPersistence
 import com.reversetutor.feature.chat.SessionListItem
+import com.reversetutor.feature.chat.Task2B1NewSessionRoute
 import com.reversetutor.preview.theme.ReverseTutorTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
+/**
+ * 2026-10-22 用户拍板（方案B）：新建会话不再有「自定义（六栏表单）」「草稿箱」。
+ * 选预设 / 收藏 → 把那份配置直接交给对话式创建当开场素材。
+ */
 class NewSessionHubContractDeviceTest {
     @get:Rule
     val composeRule = createComposeRule()
 
     @Test
-    fun builtInCardOpensDetailAndUseAdvancesToSixSectionCustomRoot() {
+    fun hubHasOnlyPresetAndFavoriteTabs() {
         composeRule.setContent {
             ReverseTutorTheme {
                 Task2B1NewSessionRoute(
@@ -42,21 +44,40 @@ class NewSessionHubContractDeviceTest {
 
         composeRule.onNodeWithText("内置预设").assertIsDisplayed()
         composeRule.onNodeWithText("收藏").assertIsDisplayed()
-        composeRule.onNodeWithText("自定义").assertIsDisplayed()
-        composeRule.onAllNodesWithContentDescription("草稿箱").assertCountEquals(0)
-
-        composeRule.onNodeWithText("高三数学讲题冲刺").performClick()
-        composeRule.onNodeWithText("使用此预设").assertIsDisplayed().performClick()
-
-        listOf("基本资料", "目标与计划", "对话策略", "世界树", "资料", "自定义栏目").forEach {
-            composeRule.onNodeWithText(it).assertIsDisplayed()
-        }
-        composeRule.onNodeWithContentDescription("草稿箱").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("新建空白草稿").assertIsDisplayed()
+        // 六栏表单入口必须消失。
+        composeRule.onAllNodesWithText("自定义").assertCountEquals(0)
+        composeRule.onAllNodesWithText("基本资料").assertCountEquals(0)
+        composeRule.onAllNodesWithText("创建并进入聊天").assertCountEquals(0)
     }
 
     @Test
-    fun validCustomCreateReturnsNavigationItemWithLearnerAndOpeningMessage() {
+    fun usePresetHandsConfigurationToConversationalCreation() {
+        var seeded: NewSessionConfiguration? = null
+        composeRule.setContent {
+            ReverseTutorTheme {
+                Task2B1NewSessionRoute(
+                    createPort = NewSessionCreatePort { error("not used") },
+                    persistence = FakeNewSessionPersistence(),
+                    onCreated = {},
+                    onStartCreation = { seeded = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("高三数学讲题冲刺").performClick()
+        composeRule.onNodeWithText("使用此预设").assertIsDisplayed().performClick()
+        composeRule.waitUntil(2_000L) { seeded != null }
+
+        composeRule.runOnIdle {
+            val configuration = checkNotNull(seeded)
+            assertEquals("高三数学讲题冲刺", configuration.title)
+            assertTrue(configuration.learnerRole.isNotBlank())
+            assertTrue(configuration.openingMessage.isNotBlank())
+        }
+    }
+
+    @Test
+    fun createPortStillProducesNavigationItemForConversationalPath() {
         var capturedRequest: NewSessionCreateRequest? = null
         var navigatedSession: SessionListItem? = null
         composeRule.setContent {
@@ -71,24 +92,28 @@ class NewSessionHubContractDeviceTest {
                         )
                     },
                     persistence = FakeNewSessionPersistence(),
-                    onCreated = { navigatedSession = it }
+                    onCreated = { navigatedSession = it },
+                    onStartCreation = { configuration ->
+                        // 模拟对话式创建走完一圈后落到 createPort。
+                        val request = NewSessionCreateRequest(
+                            attemptId = "seed",
+                            draftId = "draft-seed",
+                            snapshot = configuration
+                        )
+                        capturedRequest = request
+                        navigatedSession = sessionItem(request)
+                    }
                 )
             }
         }
 
-        composeRule.onNodeWithText("自定义").performClick()
-        composeRule.onNodeWithText("基本资料").performClick()
-        composeRule.onNodeWithTag("new-session-title").performTextReplacement("函数讲解")
-        composeRule.onNodeWithTag("new-session-learner-role").performTextReplacement("会追问的学习者")
-        composeRule.onNodeWithContentDescription("返回").performClick()
-        composeRule.onNodeWithText("创建并进入聊天").performClick()
+        composeRule.onNodeWithText("高三数学讲题冲刺").performClick()
+        composeRule.onNodeWithText("使用此预设").performClick()
         composeRule.waitUntil(2_000L) { navigatedSession != null }
 
         composeRule.runOnIdle {
-            val request = checkNotNull(capturedRequest)
-            assertTrue(request.snapshot.openingMessage.isNotBlank())
-            assertEquals("会追问的学习者", request.snapshot.learnerRole)
-            assertEquals(sessionItem(request).id, navigatedSession?.id)
+            assertNotNull(capturedRequest)
+            assertTrue(checkNotNull(capturedRequest).snapshot.openingMessage.isNotBlank())
         }
     }
 
