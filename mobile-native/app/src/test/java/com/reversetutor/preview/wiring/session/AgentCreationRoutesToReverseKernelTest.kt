@@ -12,6 +12,7 @@ import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
 import com.reversetutor.feature.chat.NewSessionLifecycleCoordinator
 import com.reversetutor.feature.chat.NewSessionPersistence
+import com.reversetutor.feature.chat.NewSessionPrefillRequest
 import com.reversetutor.feature.chat.SessionConversationContract
 import com.reversetutor.feature.chat.SessionListItem
 import kotlinx.coroutines.runBlocking
@@ -62,20 +63,29 @@ class AgentCreationRoutesToReverseKernelTest {
     }
 
     @Test
-    fun presetCopyCreatedInAppRoutesToTheReversePort() = runBlocking {
-        // 预设卡 → 改任一字段 → 既有设计把 preset 清空并改名「· 副本」；这类会话
-        // 恰恰是最容易被旧路由键漏掉的一种。
+    fun presetDerivedConfigurationStillRoutesToTheReversePort() = runBlocking {
+        // 预设 → 用户改过任一字段后创建的会话，是旧路由键最常漏掉的一类
+        // （旧键靠 builtInPresetId，而改名后该值被清空）。
+        //
+        // 2026-10-23 方案B：`useBuiltInPreset` 随表单页删除，预设内容现在经
+        // `startPrefilledDraft` 作为 prefill 进入对话式创建。本用例要守的是
+        // **路由**（有落盘快照就必须进内核），不是标题里那个「· 副本」后缀。
         val harness = CreationHarness()
         val preset = FormalLearningPresets.byId(FormalLearningPresets.REVERSE_TUTOR_PRESET_ID)!!
 
-        harness.coordinator.useBuiltInPreset(preset)
+        harness.coordinator.startPrefilledDraft(
+            NewSessionPrefillRequest(
+                requestId = "preset-copy",
+                configuration = NewSessionConfiguration.fromPreset(preset)
+            )
+        )
         harness.coordinator.updateConfiguration { it.copy(goal = "改过的目标") }
         assertTrue(harness.coordinator.createSession() is CreateSessionOutcome.Success)
 
         val snapshot = harness.promotedSnapshot()
         assertNotNull(snapshot)
-        assertEquals("${preset.title} · 副本", snapshot!!.title)
-        assertNull("「· 副本」按既有设计清空 preset id，但仍必须进内核", snapshot.builtInPresetId)
+        assertEquals(preset.title, snapshot!!.title)
+        assertEquals("未改动的预设身份保留原值", preset.id, snapshot.builtInPresetId)
 
         harness.route("session-copy", snapshot)
         assertEquals(listOf("session-copy"), harness.reverseSessions)
@@ -90,7 +100,12 @@ class AgentCreationRoutesToReverseKernelTest {
         val other = FormalLearningPresets.all
             .first { it.id != FormalLearningPresets.REVERSE_TUTOR_PRESET_ID }
 
-        harness.coordinator.useBuiltInPreset(other)
+        harness.coordinator.startPrefilledDraft(
+            NewSessionPrefillRequest(
+                requestId = "other-preset",
+                configuration = NewSessionConfiguration.fromPreset(other)
+            )
+        )
         assertTrue(harness.coordinator.createSession() is CreateSessionOutcome.Success)
 
         val snapshot = harness.promotedSnapshot()

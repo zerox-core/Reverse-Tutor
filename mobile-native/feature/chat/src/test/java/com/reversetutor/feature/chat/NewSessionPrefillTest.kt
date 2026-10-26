@@ -32,7 +32,6 @@ class NewSessionPrefillTest {
         )
 
         assertTrue(accepted)
-        assertEquals(NewSessionHubTab.Custom, coordinator.state.tab)
         assertEquals(listOf("activity:a"), coordinator.state.currentDraft?.configuration?.sourceSelections)
         assertEquals(0, createCalls)
     }

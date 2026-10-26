@@ -1,11 +1,9 @@
 package com.reversetutor.preview.wiring
 
-import com.reversetutor.feature.chat.EditorScrollPosition
 import com.reversetutor.feature.chat.CustomColumn
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
-import com.reversetutor.feature.chat.NewSessionSection
 import com.reversetutor.feature.chat.TagFieldSelection
 import com.reversetutor.feature.chat.TagSelectionValue
 import org.junit.Assert.assertEquals
@@ -59,9 +57,7 @@ class NewSessionSnapshotCodecTest {
             id = "draft:1",
             configuration = configuration,
             updatedAtEpochMillis = 42L,
-            favoriteId = "favorite:1",
-            lastSection = NewSessionSection.WorldTree,
-            scrollPositions = mapOf("root" to EditorScrollPosition(3, 19))
+            favoriteId = "favorite:1"
         )
         val favorite = NewSessionFavorite(
             id = "favorite:1",

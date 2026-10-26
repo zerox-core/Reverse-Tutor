@@ -5,7 +5,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -13,50 +12,22 @@ import org.junit.Test
 
 class NewSessionLifecycleTest {
     @Test
-    fun hubHasExactlyThreeTabsAndCustomHasExactlySixSections() {
-        assertEquals(listOf("内置预设", "收藏", "自定义"), NewSessionHubTab.entries.map { it.label })
-        assertEquals(
-            listOf("基本资料", "目标与计划", "对话策略", "世界树", "资料", "自定义栏目"),
-            NewSessionSection.entries.map { it.label }
-        )
+    fun hubHasExactlyTwoTabsSinceFormEntryWasRemoved() {
+        // 2026-10-23 方案B：六栏表单与「自定义」页删除，只剩两个取材入口。
+        assertEquals(listOf("内置预设", "收藏"), NewSessionHubTab.entries.map { it.label })
+        assertFalse(NewSessionHubTab.entries.any { it.label.contains("自定义") })
         assertFalse(NewSessionHubTab.entries.any { it.label.contains("草稿") })
     }
 
     @Test
-    fun editingBuiltInCreatesUnfavoritedPersonalCopy() {
-        val persistence = MemoryNewSessionPersistence()
-        val coordinator = coordinator(persistence)
-        val preset = FormalLearningPresets.all.first()
-
-        coordinator.useBuiltInPreset(preset)
-        val original = checkNotNull(coordinator.state.currentDraft)
-        assertEquals(preset.title, original.configuration.title)
-        assertEquals(preset.id, original.originBuiltInPresetId)
-
-        coordinator.updateConfiguration { it.copy(goal = "changed") }
-        coordinator.saveBoundary()
-        val copy = checkNotNull(coordinator.state.currentDraft)
-
-        assertEquals("${preset.title} · 副本", copy.configuration.title)
-        assertEquals("changed", copy.configuration.goal)
-        assertNull(copy.originBuiltInPresetId)
-        assertNull(copy.favoriteId)
-        assertEquals(preset.title, NewSessionConfiguration.fromPreset(preset).title)
-    }
-
-    @Test
-    fun draftBoxEvictsOldestUnfavoritedAndRestoresDestinationPosition() {
+    fun saveBoundaryEvictsOldestUnfavoritedDraft() {
         val favoriteId = "favorite-protected"
         val initial = (1L..20L).map { updated ->
             NewSessionDraftRecord(
                 id = "draft-$updated",
                 configuration = validConfiguration("Draft $updated"),
                 updatedAtEpochMillis = updated,
-                favoriteId = favoriteId.takeIf { updated == 1L },
-                lastSection = NewSessionSection.WorldTree.takeIf { updated == 20L },
-                scrollPositions = if (updated == 20L) {
-                    mapOf(NewSessionSection.WorldTree.name to EditorScrollPosition(4, 18))
-                } else emptyMap()
+                favoriteId = favoriteId.takeIf { updated == 1L }
             )
         }
         val persistence = MemoryNewSessionPersistence(drafts = initial)
@@ -66,91 +37,17 @@ class NewSessionLifecycleTest {
 
         assertTrue(coordinator.saveBoundary())
         assertEquals(20, coordinator.state.drafts.size)
+        // 被收藏的 draft-1 受保护，淘汰最旧的未收藏 draft-2。
         assertTrue(coordinator.state.drafts.any { it.id == "draft-1" })
         assertFalse(coordinator.state.drafts.any { it.id == "draft-2" })
 
         assertTrue(coordinator.restoreDraft("draft-20"))
-        assertEquals(NewSessionSection.WorldTree, coordinator.state.selectedSection)
-        assertEquals(
-            EditorScrollPosition(4, 18),
-            coordinator.state.currentDraft?.scrollPositions?.get(NewSessionSection.WorldTree.name)
-        )
+        assertEquals("draft-20", coordinator.state.currentDraft?.id)
         assertTrue(
             coordinator.state.drafts.zipWithNext().all { (newer, older) ->
                 newer.updatedAtEpochMillis >= older.updatedAtEpochMillis
             }
         )
-    }
-
-    @Test
-    fun randomPreviewApplyAndUndoNeverChangeStorySourcesOrImages() {
-        val persistence = MemoryNewSessionPersistence()
-        val coordinator = coordinator(
-            persistence = persistence,
-            randomizer = NewSessionRandomizer {
-                it.copy(
-                    learnerRole = "random role",
-                    goal = "random goal",
-                    plan = "random plan",
-                    story = "MUST NOT CHANGE",
-                    sourceSelections = listOf("MUST NOT CHANGE"),
-                    learnerImageRef = "MUST NOT CHANGE",
-                    storyImageRef = "MUST NOT CHANGE"
-                )
-            }
-        )
-        coordinator.startBlankDraft()
-        val original = validConfiguration("Random").copy(
-            story = "story",
-            sourceSelections = listOf("source-a"),
-            learnerImageRef = "learner.png",
-            storyImageRef = "story.png"
-        )
-        coordinator.updateConfiguration { original }
-
-        coordinator.previewRandom()
-        val preview = checkNotNull(coordinator.state.randomPreview)
-        assertEquals(setOf("学习者角色", "主要目标", "学习计划"), preview.differences.map { it.field }.toSet())
-        assertEquals(original.story, preview.after.story)
-        assertEquals(original.sourceSelections, preview.after.sourceSelections)
-        assertEquals(original.learnerImageRef, preview.after.learnerImageRef)
-        assertEquals(original.storyImageRef, preview.after.storyImageRef)
-
-        coordinator.applyRandom()
-        assertEquals("random role", coordinator.state.currentDraft?.configuration?.learnerRole)
-        coordinator.undoRandom()
-        assertEquals(original, coordinator.state.currentDraft?.configuration)
-    }
-
-    @Test
-    fun favoriteUpdateRequiresDiffConfirmationAndSessionSnapshotStaysIsolated() {
-        val persistence = MemoryNewSessionPersistence()
-        val coordinator = coordinator(persistence)
-        coordinator.startBlankDraft()
-        val original = validConfiguration("Favorite").copy(
-            sourceSelections = listOf("source-a"),
-            customFields = mapOf("level" to "beginner"),
-            customColumns = listOf(CustomColumn("level", "level", "beginner"))
-        )
-        coordinator.updateConfiguration { original }
-        coordinator.requestFavoriteCurrent()
-        val favorite = coordinator.state.favorites.single()
-        assertEquals(original, favorite.configuration)
-
-        persistence.promoteDraft("none", "session-existing", original.copy())
-        coordinator.updateConfiguration { it.copy(goal = "updated goal") }
-        coordinator.requestFavoriteCurrent()
-        assertNotNull(coordinator.state.favoriteUpdatePreview)
-        assertEquals(original, coordinator.state.favorites.single().configuration)
-
-        coordinator.confirmFavoriteUpdate()
-        assertEquals("updated goal", coordinator.state.favorites.single().configuration.goal)
-        assertEquals("beginner", coordinator.state.favorites.single().configuration.customColumns.single().content)
-        assertEquals(original, persistence.loadSessionSnapshot("session-existing"))
-
-        coordinator.removeFavorite(favorite.id)
-        assertTrue(coordinator.state.favorites.isEmpty())
-        assertEquals("updated goal", coordinator.state.currentDraft?.configuration?.goal)
     }
 
     @Test
@@ -257,12 +154,6 @@ class NewSessionLifecycleTest {
 
     @Test
     fun allFavoritedCapacityRefusalAbortsEveryBoundaryDestinationSwitch() {
-        val favorite = NewSessionFavorite(
-            id = "favorite-template",
-            name = "Favorite",
-            configuration = validConfiguration("Favorite"),
-            updatedAtEpochMillis = 100L
-        )
         val stored = (1L..20L).map { updated ->
             NewSessionDraftRecord(
                 id = "draft-$updated",
@@ -271,15 +162,14 @@ class NewSessionLifecycleTest {
                 favoriteId = "protected-$updated"
             )
         }
+        // selectTab 不再触发草稿边界；只剩真正会写草稿的入口参与容量拒绝。
         val actions: List<(NewSessionLifecycleCoordinator) -> Boolean> = listOf(
-            { it.selectTab(NewSessionHubTab.Favorites) },
             { it.startBlankDraft() },
-            { it.restoreDraft("draft-1") },
-            { it.useFavorite("favorite-template") }
+            { it.restoreDraft("draft-1") }
         )
 
         actions.forEachIndexed { index, action ->
-            val persistence = MemoryNewSessionPersistence(stored, listOf(favorite))
+            val persistence = MemoryNewSessionPersistence(stored, emptyList())
             val coordinator = coordinator(
                 persistence,
                 ids = ArrayDeque(listOf("current-$index", "next-$index"))
@@ -290,7 +180,6 @@ class NewSessionLifecycleTest {
             val currentId = coordinator.state.currentDraft?.id
 
             assertFalse("action $index must abort", action(coordinator))
-            assertEquals(NewSessionHubTab.Custom, coordinator.state.tab)
             assertEquals(currentId, coordinator.state.currentDraft?.id)
             assertEquals(unsaved, coordinator.state.currentDraft?.configuration)
             assertEquals(20, persistence.loadDrafts().size)
@@ -299,208 +188,70 @@ class NewSessionLifecycleTest {
     }
 
     @Test
-    fun customRootBecomesRestoreLocationAfterLeavingEditor() {
-        val persistence = MemoryNewSessionPersistence()
-        val coordinator = coordinator(persistence, ids = ArrayDeque(listOf("first", "second")))
+    fun selectingTabOnlyMovesTheTabAndKeepsTheDraft() {
+        val coordinator = coordinator(MemoryNewSessionPersistence())
         coordinator.startBlankDraft()
-        coordinator.updateConfiguration { validConfiguration("First") }
-        val firstId = checkNotNull(coordinator.state.currentDraft?.id)
+        val draftId = coordinator.state.currentDraft?.id
 
-        assertTrue(coordinator.openSection(NewSessionSection.WorldTree, EditorScrollPosition(3, 14)))
-        assertTrue(coordinator.closeSection(EditorScrollPosition(6, 22)))
-        assertNull(coordinator.state.selectedSection)
-        assertNull(coordinator.state.currentDraft?.lastSection)
-        assertEquals(EditorScrollPosition(3, 14), coordinator.state.currentDraft?.scrollPositions?.get("root"))
+        coordinator.selectTab(NewSessionHubTab.Favorites)
+        assertEquals(NewSessionHubTab.Favorites, coordinator.state.tab)
+        assertEquals(draftId, coordinator.state.currentDraft?.id)
 
-        assertTrue(coordinator.startBlankDraft())
-        assertTrue(coordinator.restoreDraft(firstId))
-        assertNull(coordinator.state.selectedSection)
-        assertNull(coordinator.state.currentDraft?.lastSection)
-        assertEquals(EditorScrollPosition(3, 14), coordinator.state.currentDraft?.scrollPositions?.get("root"))
-        assertEquals(EditorScrollPosition(6, 22), coordinator.state.currentDraft?.scrollPositions?.get(NewSessionSection.WorldTree.name))
-    }
-
-    @Test
-    fun randomUndoRestoresOnlyOwnedFieldsAfterProtectedFieldEdits() {
-        val persistence = MemoryNewSessionPersistence()
-        val coordinator = coordinator(
-            persistence = persistence,
-            randomizer = NewSessionRandomizer {
-                it.copy(learnerRole = "random role", goal = "random goal", plan = "random plan")
-            }
-        )
-        coordinator.startBlankDraft()
-        val original = validConfiguration("Random protected").copy(
-            story = "old story",
-            sourceSelections = listOf("old source"),
-            learnerImageRef = "old learner",
-            storyImageRef = "old story image"
-        )
-        coordinator.updateConfiguration { original }
-        coordinator.previewRandom()
-        coordinator.applyRandom()
-        coordinator.updateConfiguration {
-            it.copy(
-                story = "new story",
-                sourceSelections = listOf("new source"),
-                learnerImageRef = "new learner",
-                storyImageRef = "new story image",
-                dialogueStrategy = "new dialogue"
-            )
-        }
-
-        coordinator.undoRandom()
-        val result = checkNotNull(coordinator.state.currentDraft?.configuration)
-        assertEquals(original.learnerRole, result.learnerRole)
-        assertEquals(original.goal, result.goal)
-        assertEquals(original.plan, result.plan)
-        assertEquals("new story", result.story)
-        assertEquals(listOf("new source"), result.sourceSelections)
-        assertEquals("new learner", result.learnerImageRef)
-        assertEquals("new story image", result.storyImageRef)
-        assertEquals("new dialogue", result.dialogueStrategy)
-    }
-
-    @Test
-    fun randomAndRenameBothCreateUnfavoritedPersonalCopiesOfBuiltIns() {
-        val preset = FormalLearningPresets.all.first()
-        val randomCoordinator = coordinator(
-            MemoryNewSessionPersistence(),
-            randomizer = NewSessionRandomizer { it.copy(goal = "randomized") }
-        )
-        randomCoordinator.useBuiltInPreset(preset)
-        randomCoordinator.previewRandom()
-        randomCoordinator.applyRandom()
-        val randomized = checkNotNull(randomCoordinator.state.currentDraft)
-        assertEquals("${preset.title} · 副本", randomized.configuration.title)
-        assertNull(randomized.configuration.builtInPresetId)
-        assertNull(randomized.originBuiltInPresetId)
-        assertNull(randomized.favoriteId)
-
-        val renamePersistence = MemoryNewSessionPersistence()
-        val renameCoordinator = coordinator(renamePersistence)
-        renameCoordinator.useBuiltInPreset(preset)
-        assertTrue(renameCoordinator.saveBoundary())
-        val draftId = checkNotNull(renameCoordinator.state.currentDraft?.id)
-        assertTrue(renameCoordinator.renameDraft(draftId, "attempted direct rename"))
-        val renamed = checkNotNull(renameCoordinator.state.currentDraft)
-        assertEquals("${preset.title} · 副本", renamed.configuration.title)
-        assertNull(renamed.configuration.builtInPresetId)
-        assertNull(renamed.originBuiltInPresetId)
-        assertNull(renamed.favoriteId)
-    }
-
-    @Test
-    fun deletingOnlyActiveSavedDraftCreatesUsableBlankCustomDraft() {
-        val persistence = MemoryNewSessionPersistence()
-        val coordinator = coordinator(persistence, ids = ArrayDeque(listOf("active", "replacement")))
-        coordinator.startBlankDraft()
-        coordinator.updateConfiguration { validConfiguration("Active") }
-        assertTrue(coordinator.saveBoundary())
-        val activeId = checkNotNull(coordinator.state.currentDraft?.id)
-
-        coordinator.deleteDraft(activeId)
-
-        val replacement = checkNotNull(coordinator.state.currentDraft)
-        assertNotEquals(activeId, replacement.id)
-        assertEquals(NewSessionHubTab.Custom, coordinator.state.tab)
-        assertNull(coordinator.state.selectedSection)
-        assertTrue(replacement.configuration.title.isBlank())
-        assertTrue(persistence.loadDrafts().isEmpty())
-    }
-
-    @Test
-    fun enteringCustomWithSavedDraftsAsksContinueOrNewInsteadOfAutoBlank() {
-        val initial = listOf(
-            NewSessionDraftRecord(
-                id = "draft-old",
-                configuration = validConfiguration("上次的配置"),
-                updatedAtEpochMillis = 10L
-            )
-        )
-        val coordinator = coordinator(MemoryNewSessionPersistence(drafts = initial))
-
-        assertTrue(coordinator.selectTab(NewSessionHubTab.Custom))
-
-        assertTrue(coordinator.state.customEntryPrompt)
-        assertNull(coordinator.state.currentDraft)
-        assertEquals(NewSessionHubTab.Custom, coordinator.state.tab)
-    }
-
-    @Test
-    fun customEntryContinueRestoresLatestDraft() {
-        val initial = listOf(
-            NewSessionDraftRecord("draft-old", validConfiguration("旧配置"), updatedAtEpochMillis = 10L),
-            NewSessionDraftRecord("draft-new", validConfiguration("新配置"), updatedAtEpochMillis = 20L)
-        )
-        val coordinator = coordinator(MemoryNewSessionPersistence(drafts = initial))
-        coordinator.selectTab(NewSessionHubTab.Custom)
-
-        assertTrue(coordinator.continueLatestDraft())
-
-        assertFalse(coordinator.state.customEntryPrompt)
-        assertEquals("draft-new", coordinator.state.currentDraft?.id)
-        assertEquals("新配置", coordinator.state.currentDraft?.configuration?.title)
-    }
-
-    @Test
-    fun customEntryNewSessionStartsFreshBlankDraft() {
-        val initial = listOf(
-            NewSessionDraftRecord("draft-old", validConfiguration("旧配置"), updatedAtEpochMillis = 10L)
-        )
-        val coordinator = coordinator(
-            MemoryNewSessionPersistence(drafts = initial),
-            ids = ArrayDeque(listOf("fresh"))
-        )
-        coordinator.selectTab(NewSessionHubTab.Custom)
-
-        assertTrue(coordinator.startBlankDraftFromPrompt())
-
-        assertFalse(coordinator.state.customEntryPrompt)
-        val draft = checkNotNull(coordinator.state.currentDraft)
-        assertEquals("draft-fresh", draft.id)
-        assertTrue(draft.configuration.title.isBlank())
-    }
-
-    @Test
-    fun customEntryDismissReturnsToBuiltInWithoutDraft() {
-        val initial = listOf(
-            NewSessionDraftRecord("draft-old", validConfiguration("旧配置"), updatedAtEpochMillis = 10L)
-        )
-        val coordinator = coordinator(MemoryNewSessionPersistence(drafts = initial))
-        coordinator.selectTab(NewSessionHubTab.Custom)
-
-        coordinator.dismissCustomEntryPrompt()
-
-        assertFalse(coordinator.state.customEntryPrompt)
-        assertNull(coordinator.state.currentDraft)
+        coordinator.selectTab(NewSessionHubTab.BuiltIn)
         assertEquals(NewSessionHubTab.BuiltIn, coordinator.state.tab)
+        assertEquals(draftId, coordinator.state.currentDraft?.id)
     }
 
     @Test
-    fun enteringCustomWithoutDraftsStillAutoStartsBlank() {
-        val coordinator = coordinator(
-            MemoryNewSessionPersistence(),
-            ids = ArrayDeque(listOf("blank"))
+    fun favoritesCanBeToggledFromBuiltInPresetsAndRemoved() {
+        val coordinator = coordinator(MemoryNewSessionPersistence(), ids = ArrayDeque(listOf("fav")))
+        val preset = FormalLearningPresets.all.first()
+
+        coordinator.toggleBuiltInFavorite(preset)
+        val favorite = coordinator.state.favorites.single()
+        assertEquals("favorite-fav", favorite.id)
+        assertEquals(preset.title, favorite.name)
+        assertEquals(preset.id, favorite.originBuiltInPresetId)
+
+        coordinator.toggleBuiltInFavorite(preset)
+        assertTrue(coordinator.state.favorites.isEmpty())
+    }
+
+    @Test
+    fun removeFavoriteDetachesLinkedDraftWithoutDroppingIt() {
+        val draft = NewSessionDraftRecord(
+            id = "draft-linked",
+            configuration = validConfiguration("Linked"),
+            updatedAtEpochMillis = 10L,
+            favoriteId = "favorite-x"
         )
+        val favorite = NewSessionFavorite(
+            id = "favorite-x",
+            name = "Linked",
+            configuration = validConfiguration("Linked"),
+            updatedAtEpochMillis = 10L
+        )
+        val persistence = MemoryNewSessionPersistence(listOf(draft), listOf(favorite))
+        val coordinator = coordinator(persistence)
+        coordinator.restoreDraft("draft-linked")
 
-        assertTrue(coordinator.selectTab(NewSessionHubTab.Custom))
+        coordinator.removeFavorite("favorite-x")
 
-        assertFalse(coordinator.state.customEntryPrompt)
-        assertEquals("draft-blank", coordinator.state.currentDraft?.id)
+        assertTrue(coordinator.state.favorites.isEmpty())
+        assertNull(coordinator.state.currentDraft?.favoriteId)
+        assertEquals("draft-linked", coordinator.state.currentDraft?.id)
+        assertTrue(persistence.loadDrafts().any { it.id == "draft-linked" })
     }
 
     private fun coordinator(
         persistence: MemoryNewSessionPersistence,
         ids: ArrayDeque<String> = ArrayDeque((1..100).map(Int::toString)),
-        randomizer: NewSessionRandomizer = DefaultNewSessionRandomizer,
         port: NewSessionCreatePort = NewSessionCreatePort(::created)
     ): NewSessionLifecycleCoordinator {
         var now = 1_000L
         return NewSessionLifecycleCoordinator(
             persistence = persistence,
             createPort = port,
-            randomizer = randomizer,
             nowEpochMillis = { ++now },
             idFactory = { ids.removeFirst() }
         ).also { it.load() }

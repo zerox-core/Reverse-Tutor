@@ -179,7 +179,7 @@ private fun HubTabs(selected: NewSessionHubTab, onSelect: (NewSessionHubTab) -> 
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // 2026-10-22 方案B：新建会话不再有「自定义（填表）」入口，只剩内置预设 / 收藏。
-        NewSessionHubTab.entries.filter { it != NewSessionHubTab.Custom }.forEach { tab ->
+        NewSessionHubTab.entries.forEach { tab ->
             Surface(
                 onClick = { onSelect(tab) },
                 modifier = Modifier.weight(1f).height(44.dp).testTag("new-session-tab-${tab.name}"),

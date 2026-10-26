@@ -2,14 +2,12 @@ package com.reversetutor.preview.wiring
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.reversetutor.feature.chat.EditorScrollPosition
 import com.reversetutor.feature.chat.CustomColumn
 import com.reversetutor.feature.chat.LearnerAvatarReference
 import com.reversetutor.feature.chat.NewSessionConfiguration
 import com.reversetutor.feature.chat.NewSessionDraftRecord
 import com.reversetutor.feature.chat.NewSessionFavorite
 import com.reversetutor.feature.chat.NewSessionPersistence
-import com.reversetutor.feature.chat.NewSessionSection
 import com.reversetutor.feature.chat.TagFieldSelection
 import com.reversetutor.feature.chat.TagSelectionValue
 import com.reversetutor.feature.chat.deepCopy
@@ -250,36 +248,33 @@ object NewSessionSnapshotCodec {
         )
     }
 
+    /**
+     * 草稿字段 5 个（2026-10-23 用户拍板方案B）。
+     *
+     * 六栏表单删除后，草稿不再需要记录「上次停在哪个栏目 / 各栏目滚动位置」，
+     * 两个字段随之移除。解码要求严格 5 段，旧的 7 段草稿会在
+     * [decodeDrafts] 的 runCatching 里被丢弃——这是用户明确接受的代价。
+     * 收藏用独立的 5 段格式，不受影响。
+     */
     private fun encodeDraft(draft: NewSessionDraftRecord): String = pack(
         listOf(
             draft.id,
             encodeConfiguration(draft.configuration),
             draft.updatedAtEpochMillis.toString(),
             draft.favoriteId.orEmpty(),
-            draft.originBuiltInPresetId.orEmpty(),
-            draft.lastSection?.name.orEmpty(),
-            pack(draft.scrollPositions.entries.flatMap { entry ->
-                listOf(entry.key, entry.value.index.toString(), entry.value.offset.toString())
-            })
+            draft.originBuiltInPresetId.orEmpty()
         )
     )
 
     private fun decodeDraft(value: String): NewSessionDraftRecord {
         val fields = unpack(value)
-        require(fields.size == 7) { "Unexpected draft field count" }
-        val positions = unpack(fields[6]).chunked(3).mapNotNull { triple ->
-            triple.takeIf { it.size == 3 }?.let {
-                it[0] to EditorScrollPosition(it[1].toInt(), it[2].toInt())
-            }
-        }.toMap()
+        require(fields.size == 5) { "Unexpected draft field count" }
         return NewSessionDraftRecord(
             id = fields[0],
             configuration = decodeConfiguration(fields[1]),
             updatedAtEpochMillis = fields[2].toLong(),
             favoriteId = fields[3].ifEmpty { null },
-            originBuiltInPresetId = fields[4].ifEmpty { null },
-            lastSection = fields[5].ifEmpty { null }?.let(NewSessionSection::valueOf),
-            scrollPositions = positions
+            originBuiltInPresetId = fields[4].ifEmpty { null }
         )
     }
 
