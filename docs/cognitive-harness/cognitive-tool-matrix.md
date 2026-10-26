@@ -260,7 +260,54 @@
 
 ---
 
-## 三、矩阵化简与正交化备忘录 (SVD & Orthogonalization Backlog)
+## 三、两类实现形态：确定性能力 vs 结构化推理骨架
+
+> 2026-10-27 用户拍板。上层抽象出的所有算子，落地时必然分属这两类之一。
+> **这不是可选项，是架构约束**。
+
+### Type 1 · 确定性能力工具 (Deterministic Capability Tool)
+
+- **形态**：真实 function call。代码里真跑算法、真查数据、真写数据库。
+- **谁干活**：宿主代码。模型只负责决定「要不要调、传什么参」。
+- **返回值性质**：**客观事实**。同一个入参，任何时候返回同一结果。
+- **判定标准（三条全中才是 Type 1）**：
+  1. 结果不依赖模型的语言理解；
+  2. 可以写单元测试断言输出；
+  3. 换个模型来调，结果不变。
+- **当前清单（预计 6~10 个）**：
+  | 工具 | 为什么是确定性 |
+  |---|---|
+  | `search_course_material` | 向量/关键词检索，命中即事实 |
+  | `inspect_common_misconceptions` | 查预置误区库，客观返回 |
+  | `locate_missing_warrant` | 词表命中（"显然/同理/易证"）+ 上下文断言缺失检测 |
+  | `detect_fluency_illusion` | 统计近 N 轮用户产出 token/句式，纯计数 |
+  | `localize_confusion` | 结构化槽位填充，落库可查 |
+  | `detect_critical_degeneracy` | 对已解析表达式做符号检查（分母为零、定义域越界） |
+  | `record_student_mental_state` | 写记忆，幂等 |
+  | `update_knowledge_graph` | 写图谱节点/边，幂等 |
+  | `build_argument_graph` | 模型抽节点 + **图算法查悬空**（图算法部分是确定的） |
+
+### Type 2 · 结构化推理骨架 (Structured Reasoning Scaffold)
+
+- **形态**：**提示词注入的强制输出结构**。不是 function call。
+- **谁干活**：模型自己判断。但**必须按给定的槽位输出**，不能跳过、不能改结构。
+- **约束方式**：要求模型在生成回复**之前**，先填一段结构化自检（如 `<pedagogy_eval>` 块），字段固定。填不出来 = 这一轮不合格。
+- **为什么这不违反「禁止拆东墙补西墙」红线**：
+  - 贴胶带式 Prompt 是「针对某个具体错误现象追加一句咒语」——现象变了就失效，且不断累积。
+  - 结构化骨架是「针对**一整类认知动作**定义输出契约」——它约束的是**推理形式**，不是**具体内容**。
+  - 判据：**删掉这条骨架，模型的输出结构会退化；保留它，任何学科场景都受同一套约束。** 满足前者即为骨架，只满足"某句话不说了"的是胶带。
+- **当前清单（约 30 个）**：
+  `classify_feedback_level`（Hattie 四级）、`decompose_argument`（Toulmin 六要素）、`classify_refutation_response`（Lakatos 四种应对）、`construct_elenchus`（诘问链）、`map_analogy_structure`（Gentner 结构映射）、`probe_usage_not_essence`、`check_speech_act_felicity`、`detect_maxim_violation`、`estimate_cognitive_load`、`decide_scaffold_fade`、`check_step_granularity`、`assess_skill_stage`、`elicit_self_explanation`、`elicit_reflection_on_action`、`detect_banking_mode`、`invoke_heuristic`、`retrospect_check`、`define_verifiable_dod`、`backward_design_audit`、`verify_mastery_gate`、`reconstruct_original_question`、`detect_horizon_mismatch`、`manage_aporia_landing` 等。
+
+### 为什么必须分这两类（踩坑预警）
+
+若把 Type 2 的 35 个硬写成规则算法：
+- 每一个都会**比模型自己判断更差**（`classify_feedback_level` 用正则怎么判"这句是任务级还是自我级"？）；
+- 会丧失跨学科泛化能力，退化成当初被否决的「固定管线状态机」，只是换了张皮。
+
+---
+
+## 四、矩阵化简与正交化备忘录 (SVD & Orthogonalization Backlog)
 
 *注：本小节在多场景验证后，记录工具之间的投影与合并，保持矩阵满秩。*
 
