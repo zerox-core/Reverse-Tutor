@@ -22,6 +22,7 @@ import com.reversetutor.feature.reversetutor.loop.ToolLoop
 import com.reversetutor.feature.reversetutor.loop.ToolLoopLlmClient
 import com.reversetutor.feature.reversetutor.retrieval.MaterialStore
 import com.reversetutor.feature.reversetutor.scenario.ScenarioPackage
+import com.reversetutor.feature.reversetutor.tools.CognitiveTools
 import com.reversetutor.feature.reversetutor.tools.CoreTools
 import com.reversetutor.feature.reversetutor.tools.ToolRegistry
 import kotlinx.coroutines.CoroutineScope
@@ -67,6 +68,10 @@ object ReverseTutorRuntimeAssembly {
         StudentCards.setDefault(StudentCards(readAsset(appContext, ASSET_STUDENT_CARDS)))
         val registry = ToolRegistry()
         CoreTools.registerAll(registry)
+        // 2026-10-27：Type 1 认知能力工具（论证结构层，非学科知识层）。
+        // 与 CoreTools 的 31 个学科工具正交：它只检查讲解的形式结构（跳过论证、
+        // 流畅错觉、论证图悬空），不关心是数学还是英语。
+        CognitiveTools.registerAll(registry)
         // 场景素材注入（2026-10-14：算法为基底、场景为配置数据的第一步）：
         // 此前 addDoc 无生产调用点，活动包的 sources 永不进资料库。
         val materialStore = MaterialStore()

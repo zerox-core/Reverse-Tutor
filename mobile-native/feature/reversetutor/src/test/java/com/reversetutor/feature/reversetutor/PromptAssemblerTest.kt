@@ -152,12 +152,17 @@ class PromptAssemblerTest {
         assertTrue(prompt.contains("困惑中：配方法"))
         assertTrue(prompt.contains("以上清单之外的知识点/技巧：你没有任何学习记录"))
 
-        // 数学正确性
-        assertTrue(prompt.contains("【数学正确性（最高优先级）】"))
-        assertTrue(prompt.contains("x² + bx = (x + b/2)² - (b/2)²"))
-        assertTrue(prompt.contains("顶点横坐标是 -b/(2a)，不是 +b/(2a)"))
-        assertTrue(prompt.contains("二次函数要求 a ≠ 0"))
-        assertTrue(prompt.contains("你【故意犯错】时不算错误"))
+        // 2026-10-27：原先这里断言硬编码的「数学正确性」三行补丁（配方法/顶点/判别式）。
+        // 那是对二次函数这一具体知识点写的提示词胶带，换学科即失效，违反
+        // 「禁止拆东墙补西墙」红线，已删除。取而代之的是结构化推理骨架，见下方断言。
+        assertFalse("硬编码的学科补丁不得回归", prompt.contains("【数学正确性（最高优先级）】"))
+        assertFalse("硬编码的学科补丁不得回归", prompt.contains("x² + bx = (x + b/2)²"))
+        // 结构化推理骨架：输出契约 + 骨架菜单
+        assertTrue(prompt.contains("<pedagogy_eval>"))
+        assertTrue(prompt.contains("【认知骨架菜单（判定时从这里选，选完填槽位）】"))
+        assertTrue(prompt.contains("F2.warrant"))
+        assertTrue(prompt.contains("F6.fluency"))
+        assertTrue(prompt.contains("填不完整就不要输出正文"))
     }
 
     @Test
