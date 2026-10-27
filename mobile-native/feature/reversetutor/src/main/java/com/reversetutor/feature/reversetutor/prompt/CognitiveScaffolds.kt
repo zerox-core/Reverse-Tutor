@@ -1,5 +1,7 @@
 package com.reversetutor.feature.reversetutor.prompt
 
+import com.reversetutor.core.llm.MonologueEnvelope
+
 /**
  * 结构化推理骨架（Type 2）——提示词注入的强制推理结构。
  *
@@ -346,16 +348,33 @@ object CognitiveScaffolds {
      * 故改为：**发现多少写多少，但必须标注严重度并排序，动作只动最高那条**。
      * 其余发现不作废，留在判定里等下一轮继续追——这才是「不丢失信息」的做法。
      */
+    /**
+     * 为什么判定块放在 `<thinking>` 里面，而不是用独立的 `<pedagogy_eval>` 标签：
+     *
+     * `MonologueSanitizer.stripTags` 的行为是**只剥标签、保留中间文字**
+     * （见 `ToolLoop.kt` 的 `finalReply = postProcess(stripTags(cleanBody), report)`）。
+     * 也就是说，任何写在 `<thinking>` 之外的标签，其**内容会直接漏进用户看到的学生回复**。
+     *
+     * 若用 `<pedagogy_eval>...内容...</pedagogy_eval>`，用户会看到：
+     * 「选: F1.degeneracy 判定: [blocking] ... 动作: ... 老师，我想问一下斜率不存在的情况」
+     * ——整个判定过程赤裸裸地贴在气泡里。
+     *
+     * 放进 `<thinking>` 则天然被 `MonologueEnvelope.splitComplete` 切成「独白」，
+     * 只进抽屉与轨迹，正文只剩学生台词。零新增拦截逻辑，复用既有信封机制。
+     */
     const val OUTPUT_CONTRACT: String =
-        "\n【每轮必须先完成的判定（在 <thinking> 之后、正文之前）】\n" +
-            "用一段 <pedagogy_eval> 包住，格式严格如下，字段不可增删：\n" +
+        "\n【每轮必须先完成的判定】\n" +
+            "**把判定块放进 <thinking> 里面**（和你的内心独白同一段），格式严格如下，字段不可增删：\n" +
+            "<thinking>\n" +
+            "（你此刻的第一人称内心独白）\n" +
             "选: <骨架id,骨架id,...>   ← 从下方菜单里选中本轮**所有**被真正触发的；" +
             "不要因为数量多就省略。一条都没触发就写「无」\n" +
             "判定: <按选中骨架的槽位逐条填写，每条前缀 [严重度]；" +
             "写不出某个槽位，说明该骨架其实不适用，直接删掉换一条>\n" +
             "动作: <只针对严重度最高的那条，写你下一句要做的唯一一件事；" +
             "其余发现不必本轮解决，但它们仍然成立，后续轮次继续追>\n" +
-            "这段判定老师看不到。填不完整就不要输出正文——宁可重判一次。\n" +
+            "</thinking>\n" +
+            "判定块必须在 </thinking> 之内闭合——它老师看不到。填不完整就不要输出正文，宁可重判一次。\n" +
             "严重度只能取：blocking（这一步不成立会毁掉整个结论）/ " +
             "significant（会丢分或导致返工）/ minor（表达层面，不影响正确性）。\n"
 
@@ -432,12 +451,17 @@ object CognitiveScaffolds {
     }
 
     /**
-     * 从一段 <pedagogy_eval> 原文里抽取度量。
+     * 从一段判定原文（`<thinking>` 信封内的内容）里抽取度量。
      *
      * 解析刻意宽松：这是用于统计，不是用于校验，解析失败不应影响对话。
      */
     fun measure(evalBlock: String): EvalMetrics {
-        val selectionLine = evalBlock.lineSequence()
+        // 兼容两种输入：完整回复（含 <thinking> 信封）或已切好的独白文本。
+        val text: String = MonologueEnvelope.splitComplete(evalBlock)
+            .monologue
+            ?: evalBlock
+
+        val selectionLine = text.lineSequence()
             .firstOrNull { it.trim().startsWith("选") } ?: ""
         val selectedRaw = selectionLine.substringAfter(":", "").trim()
         val isEmpty = selectedRaw.isEmpty() || selectedRaw.startsWith("无")
@@ -449,16 +473,16 @@ object CognitiveScaffolds {
                 .filter { it.isNotEmpty() }
         }
 
-        val bodyStart = evalBlock.indexOf("判定")
-        val bodyEnd = evalBlock.indexOf("动作")
+        val bodyStart = text.indexOf("判定")
+        val bodyEnd = text.indexOf("动作")
         val body = if (bodyStart >= 0 && bodyEnd > bodyStart) {
-            evalBlock.substring(bodyStart, bodyEnd)
+            text.substring(bodyStart, bodyEnd)
         } else {
             ""
         }
 
         fun countSeverity(label: String): Int =
-            Regex("\\[$label\\]").findAll(evalBlock).count()
+            Regex("\\[$label\\]").findAll(text).count()
 
         return EvalMetrics(
             selectedCount = ids.size,

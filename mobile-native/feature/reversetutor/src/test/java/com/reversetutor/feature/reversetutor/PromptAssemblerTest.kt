@@ -157,8 +157,8 @@ class PromptAssemblerTest {
         // 「禁止拆东墙补西墙」红线，已删除。取而代之的是结构化推理骨架，见下方断言。
         assertFalse("硬编码的学科补丁不得回归", prompt.contains("【数学正确性（最高优先级）】"))
         assertFalse("硬编码的学科补丁不得回归", prompt.contains("x² + bx = (x + b/2)²"))
-        // 结构化推理骨架：输出契约 + 骨架菜单
-        assertTrue(prompt.contains("<pedagogy_eval>"))
+        // 结构化推理骨架：输出契约（写在 <thinking> 内）+ 骨架菜单
+        assertTrue(prompt.contains("【每轮必须先完成的判定】"))
         assertTrue(prompt.contains("【认知骨架菜单（判定时从这里选，选完填槽位）】"))
         assertTrue(prompt.contains("F2.warrant"))
         assertTrue(prompt.contains("F6.fluency"))

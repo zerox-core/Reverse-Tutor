@@ -485,10 +485,67 @@ class ToolLoopTest {
         assertTrue(result.report.degradations.any { it.type == "llm_failure" })
     }
 
+    /**
+     * 2026-10-27 真实探测中发现并固化的缺陷：
+     *
+     * 降级文案用 `roundNo > 1` 判断「是不是第一轮」，但 `roundNo` 的取值是
+     * `session.currentRound + 1`（非开场时）。而 [RTSession.currentRound] 默认 0，
+     * 失败路径又**不会**推进 session（异常在 updateState 之前抛出）。
+     *
+     * 后果：连续两轮失败时，`currentRound` 始终是 0，`roundNo` 始终是 1，
+     * 于是**第二轮仍然说「我准备好学习了」**——对一个已经在对话中间的学生来说，
+     * 这句话是荒谬的，用户会以为会话被重置了。
+     *
+     * 正确判据是「历史上是否已经有过对话轮次」，而不是「本轮编号」。
+     */
+    @Test
+    fun repeatedLlmFailureDoesNotReuseOpeningLineOnLaterTurns() = runBlocking {
+        val throwingClient = object : ToolLoopLlmClient {
+            override suspend fun chat(
+                messages: List<LlmMessage>,
+                tools: List<JSONObject>,
+                model: String?
+            ): LlmResponse {
+                throw IOException("Simulated network drop 502")
+            }
+        }
+
+        // 第一轮失败：此时确实还没有任何对话，用开场白是合理的
+        var session = RTSession(sessionId = "repeat-fail", currentRound = 0)
+        val first = toolLoop.runTurn(
+            session = session,
+            historyMessages = emptyList(),
+            userText = "第一句",
+            llmClient = throwingClient
+        )
+        assertEquals(
+            "首轮失败应使用开场白式降级",
+            "老师你好，我准备好学习了——刚才系统稍微卡了一下，我们直接开始吧！",
+            first.report.finalReply
+        )
+        session = first.updatedSession
+
+        // 第二轮失败：对话历史非空，不能再自称「我准备好学习了」
+        val second = toolLoop.runTurn(
+            session = session,
+            historyMessages = first.updatedMessages,
+            userText = "第二句",
+            llmClient = throwingClient
+        )
+        assertTrue(
+            "第二轮失败不得重申开场白，实际=${second.report.finalReply}",
+            second.report.finalReply != "老师你好，我准备好学习了——刚才系统稍微卡了一下，我们直接开始吧！"
+        )
+        assertEquals(
+            "第二轮失败应使用中途卡顿降级",
+            "老师……我这边好像有点卡，等一下再问我一遍好不好？",
+            second.report.finalReply
+        )
+    }
+
     // ------------------------------------------------------------------
     // 7. 智能插队（2026-10-11 拍板）：连发新消息注入进行中的回合
     // ------------------------------------------------------------------
-
     /** 记录每轮收到的上下文，按脚本顺序返回响应。 */
     private class RecordingLlmClient(
         private val responses: List<LlmResponse>

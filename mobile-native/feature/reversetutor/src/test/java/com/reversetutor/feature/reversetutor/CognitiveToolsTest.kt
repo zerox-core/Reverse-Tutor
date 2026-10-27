@@ -280,7 +280,6 @@ class CognitiveToolsTest {
     @Test
     fun outputContractRequiresStructuredVerdict() {
         val contract = CognitiveScaffolds.OUTPUT_CONTRACT
-        assertTrue(contract.contains("<pedagogy_eval>"))
         assertTrue(contract.contains("选:"))
         assertTrue(contract.contains("判定:"))
         assertTrue(contract.contains("动作:"))
@@ -295,6 +294,41 @@ class CognitiveToolsTest {
         assertTrue("必须说明不限条数", contract.contains("所有"))
     }
 
+    @Test
+    fun verdictMustLiveInsideThinkingEnvelopeNotABareTag() {
+        // 关键防回归：stripTags 只剥标签、保留文字。任何写在 <thinking> 之外的
+        // 判定块，其内容会直接漏进用户看到的学生回复。
+        val contract = CognitiveScaffolds.OUTPUT_CONTRACT
+        assertTrue("必须要求写进 <thinking>", contract.contains("<thinking>"))
+        assertTrue("必须在 thinking 内闭合", contract.contains("</thinking>"))
+        assertFalse(
+            "不得再使用独立标签——它的内容会漏进气泡",
+            contract.contains("pedagogy_eval")
+        )
+    }
+
+    @Test
+    fun measureReadsVerdictFromInsideThinkingEnvelope() {
+        // 真实回复形态：<thinking> 里包着独白+判定，正文是学生台词。
+        val fullReply = """
+            <thinking>
+            他这个「代进去就是答案」跳得有点大。
+            选: F2.warrant,F5.step
+            判定:
+            - [blocking] F2.warrant 被跳过的中间命题：k 的范围如何映射到 x0 的范围；该命题是否成立：未验证。
+            - [minor] F5.step 这一步跨度：从 k 到 x0 一步到位；是否超出可承载范围：是。
+            动作: 只追问 k 的范围怎么变成 x0 的范围。
+            </thinking>
+            老师，等一下，k 的范围我懂，可它怎么就变成 x₀ 的范围了？
+        """.trimIndent()
+
+        val m = CognitiveScaffolds.measure(fullReply)
+        assertEquals(2, m.selectedCount)
+        assertEquals(1, m.blocking)
+        assertEquals(1, m.minor)
+        assertFalse(m.isEmpty)
+    }
+
     // ==================================================================
     // 判定块度量（选几条不再是凭感觉定的，而是可统计的）
     // ==================================================================
@@ -302,14 +336,14 @@ class CognitiveToolsTest {
     @Test
     fun measureCountsSelectionAndSeverity() {
         val block = """
-            <pedagogy_eval>
+            <thinking>
             选: F1.degeneracy,F2.felicity,F5.step
             判定:
             - [blocking] F1.degeneracy 退化条件：斜率不存在；退化后是否仍成立：不成立，中垂线变成 x 轴本身；是否需要单独讨论：必须。
             - [significant] F2.felicity 声称动作：用韦达定理；恰当性条件：Δ>0 且二次项系数非零；未满足：Δ 从未验证。
             - [minor] F5.step 这一步跨度：从 k 的范围直接到 x0 的范围；是否超出可承载范围：是。
             动作: 只问垂线情形。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
 
         val m = CognitiveScaffolds.measure(block)
@@ -327,11 +361,11 @@ class CognitiveToolsTest {
     fun measureFlagsShallowSlotFilling() {
         // 选了 3 条却几乎不填槽位：这是「为了格式硬凑」的典型形态
         val block = """
-            <pedagogy_eval>
+            <thinking>
             选: F1.degeneracy,F2.felicity,F5.step
             判定: [blocking] 有问题 [significant] 也有问题 [minor] 小问题
             动作: 随便问一句。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
 
         val m = CognitiveScaffolds.measure(block)
@@ -347,21 +381,21 @@ class CognitiveToolsTest {
         // 阈值必须能区分「中文实填」与「敷衍」。用真实长度的实填样本反推，
         // 防止有人照英文习惯把它调回 40 导致中文实填被误判。
         val honest = """
-            <pedagogy_eval>
+            <thinking>
             选: F1.degeneracy,F2.felicity,F5.step
             判定:
             - [blocking] F1.degeneracy 退化条件：斜率不存在；退化后是否仍成立：不成立，中垂线变成 x 轴本身；是否需要单独讨论：必须。
             - [significant] F2.felicity 声称动作：用韦达定理；恰当性条件：Δ>0 且二次项系数非零；未满足：Δ 从未验证。
             - [minor] F5.step 这一步跨度：从 k 的范围直接到 x0 的范围；是否超出可承载范围：是。
             动作: 只问垂线情形。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
         val lazyOne = """
-            <pedagogy_eval>
+            <thinking>
             选: F1.degeneracy,F2.felicity,F5.step
             判定: [blocking] 有问题 [significant] 也有问题 [minor] 小问题
             动作: 随便问一句。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
 
         val honestPerScaffold = CognitiveScaffolds.measure(honest).charsPerScaffold
@@ -381,14 +415,14 @@ class CognitiveToolsTest {
     fun measureFlagsDegenerateSeverityDistribution() {
         // 选了很多条却全标 minor：说明它不敢判定谁更严重，排序失效
         val block = """
-            <pedagogy_eval>
+            <thinking>
             选: F1.degeneracy,F2.felicity,F5.step
             判定:
             - [minor] F1.degeneracy 斜率不存在这件事好像有点小问题，也许是表达不清导致的吧
             - [minor] F2.felicity 韦达定理那里可能大概是小瑕疵，不影响大局
             - [minor] F5.step 这一步跨度也许稍微大了一点点，问题不大
             动作: 继续追问。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
 
         val m = CognitiveScaffolds.measure(block)
@@ -398,11 +432,11 @@ class CognitiveToolsTest {
     @Test
     fun measureHandlesEmptySelection() {
         val block = """
-            <pedagogy_eval>
+            <thinking>
             选: 无
             判定: 老师这一轮的说法已经完整，找不到可攻击的形式缺陷。
             动作: 表示听懂了，请他继续下一步。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
 
         val m = CognitiveScaffolds.measure(block)
@@ -416,11 +450,11 @@ class CognitiveToolsTest {
     @Test
     fun measureDetectsSingleScaffoldHabit() {
         val block = """
-            <pedagogy_eval>
+            <thinking>
             选: F2.warrant
             判定: - [blocking] F2.warrant 被跳过的中间命题：凭什么 Δ 大于零；该命题是否成立：未验证。
             动作: 问他要条件。
-            </pedagogy_eval>
+            </thinking>
         """.trimIndent()
 
         val m = CognitiveScaffolds.measure(block)
