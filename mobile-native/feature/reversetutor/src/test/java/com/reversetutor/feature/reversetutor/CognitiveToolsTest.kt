@@ -286,6 +286,146 @@ class CognitiveToolsTest {
         assertTrue(contract.contains("动作:"))
         // 允许「本轮无认知阻力」，否则模型会被迫硬凑一条骨架
         assertTrue(contract.contains("无"))
+        // 严重度必须有定义，否则「排序」是空话
+        assertTrue(contract.contains("blocking"))
+        assertTrue(contract.contains("significant"))
+        assertTrue(contract.contains("minor"))
+        // 不设条数上限：初版的「1~3 条」已删，防止回归
+        assertFalse("不得再出现硬条数上限", contract.contains("1~3"))
+        assertTrue("必须说明不限条数", contract.contains("所有"))
+    }
+
+    // ==================================================================
+    // 判定块度量（选几条不再是凭感觉定的，而是可统计的）
+    // ==================================================================
+
+    @Test
+    fun measureCountsSelectionAndSeverity() {
+        val block = """
+            <pedagogy_eval>
+            选: F1.degeneracy,F2.felicity,F5.step
+            判定:
+            - [blocking] F1.degeneracy 退化条件：斜率不存在；退化后是否仍成立：不成立，中垂线变成 x 轴本身；是否需要单独讨论：必须。
+            - [significant] F2.felicity 声称动作：用韦达定理；恰当性条件：Δ>0 且二次项系数非零；未满足：Δ 从未验证。
+            - [minor] F5.step 这一步跨度：从 k 的范围直接到 x0 的范围；是否超出可承载范围：是。
+            动作: 只问垂线情形。
+            </pedagogy_eval>
+        """.trimIndent()
+
+        val m = CognitiveScaffolds.measure(block)
+        assertEquals(3, m.selectedCount)
+        assertEquals(1, m.blocking)
+        assertEquals(1, m.significant)
+        assertEquals(1, m.minor)
+        assertFalse(m.isEmpty)
+        assertFalse(m.isSingleScaffold)
+        assertFalse("槽位填得够实", m.looksShallow())
+        assertFalse("严重度分布合理", m.severityIsDegenerate())
+    }
+
+    @Test
+    fun measureFlagsShallowSlotFilling() {
+        // 选了 3 条却几乎不填槽位：这是「为了格式硬凑」的典型形态
+        val block = """
+            <pedagogy_eval>
+            选: F1.degeneracy,F2.felicity,F5.step
+            判定: [blocking] 有问题 [significant] 也有问题 [minor] 小问题
+            动作: 随便问一句。
+            </pedagogy_eval>
+        """.trimIndent()
+
+        val m = CognitiveScaffolds.measure(block)
+        assertEquals(3, m.selectedCount)
+        assertTrue(
+            "每骨架仅 ${"%.1f".format(m.charsPerScaffold)} 字，应低于阈值 ${CognitiveScaffolds.SHALLOW_THRESHOLD}",
+            m.looksShallow()
+        )
+    }
+
+    @Test
+    fun shallowThresholdIsCalibratedForChinese() {
+        // 阈值必须能区分「中文实填」与「敷衍」。用真实长度的实填样本反推，
+        // 防止有人照英文习惯把它调回 40 导致中文实填被误判。
+        val honest = """
+            <pedagogy_eval>
+            选: F1.degeneracy,F2.felicity,F5.step
+            判定:
+            - [blocking] F1.degeneracy 退化条件：斜率不存在；退化后是否仍成立：不成立，中垂线变成 x 轴本身；是否需要单独讨论：必须。
+            - [significant] F2.felicity 声称动作：用韦达定理；恰当性条件：Δ>0 且二次项系数非零；未满足：Δ 从未验证。
+            - [minor] F5.step 这一步跨度：从 k 的范围直接到 x0 的范围；是否超出可承载范围：是。
+            动作: 只问垂线情形。
+            </pedagogy_eval>
+        """.trimIndent()
+        val lazyOne = """
+            <pedagogy_eval>
+            选: F1.degeneracy,F2.felicity,F5.step
+            判定: [blocking] 有问题 [significant] 也有问题 [minor] 小问题
+            动作: 随便问一句。
+            </pedagogy_eval>
+        """.trimIndent()
+
+        val honestPerScaffold = CognitiveScaffolds.measure(honest).charsPerScaffold
+        val lazyPerScaffold = CognitiveScaffolds.measure(lazyOne).charsPerScaffold
+
+        assertTrue(
+            "实填(${"%.1f".format(honestPerScaffold)}) 必须高于阈值",
+            honestPerScaffold > CognitiveScaffolds.SHALLOW_THRESHOLD
+        )
+        assertTrue(
+            "敷衍(${"%.1f".format(lazyPerScaffold)}) 必须低于阈值",
+            lazyPerScaffold < CognitiveScaffolds.SHALLOW_THRESHOLD
+        )
+    }
+
+    @Test
+    fun measureFlagsDegenerateSeverityDistribution() {
+        // 选了很多条却全标 minor：说明它不敢判定谁更严重，排序失效
+        val block = """
+            <pedagogy_eval>
+            选: F1.degeneracy,F2.felicity,F5.step
+            判定:
+            - [minor] F1.degeneracy 斜率不存在这件事好像有点小问题，也许是表达不清导致的吧
+            - [minor] F2.felicity 韦达定理那里可能大概是小瑕疵，不影响大局
+            - [minor] F5.step 这一步跨度也许稍微大了一点点，问题不大
+            动作: 继续追问。
+            </pedagogy_eval>
+        """.trimIndent()
+
+        val m = CognitiveScaffolds.measure(block)
+        assertTrue("全 minor 应被标记为退化分布", m.severityIsDegenerate())
+    }
+
+    @Test
+    fun measureHandlesEmptySelection() {
+        val block = """
+            <pedagogy_eval>
+            选: 无
+            判定: 老师这一轮的说法已经完整，找不到可攻击的形式缺陷。
+            动作: 表示听懂了，请他继续下一步。
+            </pedagogy_eval>
+        """.trimIndent()
+
+        val m = CognitiveScaffolds.measure(block)
+        assertTrue(m.isEmpty)
+        assertEquals(0, m.selectedCount)
+        // 「无」不该被当成敷衍
+        assertFalse(m.looksShallow())
+        assertFalse(m.severityIsDegenerate())
+    }
+
+    @Test
+    fun measureDetectsSingleScaffoldHabit() {
+        val block = """
+            <pedagogy_eval>
+            选: F2.warrant
+            判定: - [blocking] F2.warrant 被跳过的中间命题：凭什么 Δ 大于零；该命题是否成立：未验证。
+            动作: 问他要条件。
+            </pedagogy_eval>
+        """.trimIndent()
+
+        val m = CognitiveScaffolds.measure(block)
+        assertTrue(m.isSingleScaffold)
+        assertEquals(1, m.selectedCount)
     }
 
     // ---- helper ----

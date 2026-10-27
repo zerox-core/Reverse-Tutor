@@ -326,14 +326,38 @@ object CognitiveScaffolds {
      * 注意 `<pedagogy_eval>` 与既有 `<thinking>` 的分工：
      * - `<thinking>`：第一人称内心独白（人设层，可自由发挥）
      * - `<pedagogy_eval>`：结构化判定（骨架层，字段固定，不可省略）
+     *
+     * ## 为什么选几条规定是「不限条数 + 必须排序」
+     *
+     * 2026-10-27 修正：初版写的是「选 1~3 条」，那是凭感觉定的上限，无量化依据。
+     *
+     * 被误用的约束：认知负荷理论（工作记忆 4±1）。它管的是**人类读起来吃力程度**，
+     * 而 `<pedagogy_eval>` 是隐藏块，没有人读它。token 成本也不是问题：菜单 40 条约
+     * 2000 token 一次性，每条槽位 50~100 token，选 10 条也才 800 token。
+     *
+     * 唯一成立的约束：`动作` 字段是单数的——它是「下一句要做的唯一一件事」。
+     * 选 N 条 → N 份判定 → 压成 1 个动作，是有损压缩；N 越大丢得越多。
+     * 但这条推出的是「动作必须单数」，**不是「选择数量必须少」**。初版把两者混为一谈。
+     *
+     * 硬上限的真实代价：一轮对话同时有 4 个问题很正常（斜率没讨论 + Δ 没验 +
+     * 韦达定理条件缺失 + 代换跳步）。设 3 条上限，第 4 个被静默吞掉——而它可能
+     * 恰好最致命。这跟「让模型自主思考」的目标正好相反。
+     *
+     * 故改为：**发现多少写多少，但必须标注严重度并排序，动作只动最高那条**。
+     * 其余发现不作废，留在判定里等下一轮继续追——这才是「不丢失信息」的做法。
      */
     const val OUTPUT_CONTRACT: String =
         "\n【每轮必须先完成的判定（在 <thinking> 之后、正文之前）】\n" +
             "用一段 <pedagogy_eval> 包住，格式严格如下，字段不可增删：\n" +
-            "选: <骨架id,骨架id>   ← 从下方菜单里选 1~3 条；若本轮老师的话没触发任何一条，写「无」\n" +
-            "判定: <按选中骨架的槽位逐条填写；写不出某个槽位，说明该骨架其实不适用，换一条>\n" +
-            "动作: <基于判定，你下一句要做的唯一一件事>\n" +
-            "这段判定老师看不到。填不完整就不要输出正文——宁可重判一次。\n"
+            "选: <骨架id,骨架id,...>   ← 从下方菜单里选中本轮**所有**被真正触发的；" +
+            "不要因为数量多就省略。一条都没触发就写「无」\n" +
+            "判定: <按选中骨架的槽位逐条填写，每条前缀 [严重度]；" +
+            "写不出某个槽位，说明该骨架其实不适用，直接删掉换一条>\n" +
+            "动作: <只针对严重度最高的那条，写你下一句要做的唯一一件事；" +
+            "其余发现不必本轮解决，但它们仍然成立，后续轮次继续追>\n" +
+            "这段判定老师看不到。填不完整就不要输出正文——宁可重判一次。\n" +
+            "严重度只能取：blocking（这一步不成立会毁掉整个结论）/ " +
+            "significant（会丢分或导致返工）/ minor（表达层面，不影响正确性）。\n"
 
     /**
      * 渲染骨架菜单。按家族分组，每条一行，保证模型能在几十行内扫完。
@@ -355,4 +379,95 @@ object CognitiveScaffolds {
 
     /** 家族内条数，供测试校验分组均衡。 */
     fun countByFamily(family: Family): Int = all.count { it.family == family }
+
+    /**
+     * 「每骨架字符数」低于此值即疑似敷衍。实测校准，见 [EvalMetrics.looksShallow]。
+     * 中文单字信息密度高，不可套用英文的字符数标准。
+     */
+    const val SHALLOW_THRESHOLD: Double = 25.0
+
+    /**
+     * 判定块的可量化体检器。
+     *
+     * 为什么需要它：'选几条' 从'凭感觉定上限' 改成 '不限条数' 之后，
+     * 就必须有别的办法发现'模型在偷懒'。上限定死了模型会漏掉真发现；
+     * 完全不限则会退化成'每轮只选一条最省事的'。
+     *
+     * 这里不做拦截（拦截会再次退化成硬上限），只做**度量**——
+     * 把这几项指标记进 trace，用于事后统计与调参。
+     */
+    data class EvalMetrics(
+        /** 本轮选中的骨架数。 */
+        val selectedCount: Int,
+        /** 判定块字符数 / 选中数。过低意味着槽位在敷衍。 */
+        val charsPerScaffold: Double,
+        /** 各严重度计数。 */
+        val blocking: Int,
+        val significant: Int,
+        val minor: Int,
+        /** 是否只填了 single 骨架（连续多轮为 1 值得警惕）。 */
+        val isSingleScaffold: Boolean,
+        /** 是否声明'无'（合理，但不能是常态）。 */
+        val isEmpty: Boolean
+    ) {
+        /**
+         * 槽位填充是否可能敷衍。
+         *
+         * 阈值 [SHALLOW_THRESHOLD] 是**实测校准值，不是理论推导**：
+         * - 初版按英文习惯定 40 字符/条，实测发现一段槽位填得很实的判定
+         *   （3 条骨架、每条 2~3 个槽位都答了）只有 36.7 字/条，被误判为敷衍。
+         *   原因：中文单字信息密度约为英文单词的 3~4 倍，直接套字符数会系统性偏高。
+         * - 下探到 25 后：实填样本 36.7 判为合格；只写「有问题/也有问题/小问题」
+         *   的敷衍样本 15.0 被判为敷衍。两者区分清晰。
+         *
+         * 此值应随真实对话数据继续调整；不要用它做拦截，只做统计。
+         */
+        fun looksShallow(): Boolean =
+            !isEmpty && !isSingleScaffold && charsPerScaffold < SHALLOW_THRESHOLD
+
+        /** 严重度分布是否合理（全是 minor 或全是 blocking 都值得怀疑）。 */
+        fun severityIsDegenerate(): Boolean =
+            !isEmpty && selectedCount >= 3 &&
+                (blocking + significant == 0 || minor == 0)
+    }
+
+    /**
+     * 从一段 <pedagogy_eval> 原文里抽取度量。
+     *
+     * 解析刻意宽松：这是用于统计，不是用于校验，解析失败不应影响对话。
+     */
+    fun measure(evalBlock: String): EvalMetrics {
+        val selectionLine = evalBlock.lineSequence()
+            .firstOrNull { it.trim().startsWith("选") } ?: ""
+        val selectedRaw = selectionLine.substringAfter(":", "").trim()
+        val isEmpty = selectedRaw.isEmpty() || selectedRaw.startsWith("无")
+        val ids = if (isEmpty) {
+            emptyList()
+        } else {
+            selectedRaw.split(',', '，', '、')
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+        }
+
+        val bodyStart = evalBlock.indexOf("判定")
+        val bodyEnd = evalBlock.indexOf("动作")
+        val body = if (bodyStart >= 0 && bodyEnd > bodyStart) {
+            evalBlock.substring(bodyStart, bodyEnd)
+        } else {
+            ""
+        }
+
+        fun countSeverity(label: String): Int =
+            Regex("\\[$label\\]").findAll(evalBlock).count()
+
+        return EvalMetrics(
+            selectedCount = ids.size,
+            charsPerScaffold = if (ids.isEmpty()) 0.0 else body.length.toDouble() / ids.size,
+            blocking = countSeverity("blocking"),
+            significant = countSeverity("significant"),
+            minor = countSeverity("minor"),
+            isSingleScaffold = ids.size == 1,
+            isEmpty = isEmpty
+        )
+    }
 }
